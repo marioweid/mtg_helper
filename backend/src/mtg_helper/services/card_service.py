@@ -165,3 +165,56 @@ async def get_card_by_id(pool: asyncpg.Pool, card_id: UUID) -> CardResponse | No
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM cards WHERE id = $1", card_id)
     return _row_to_card(row) if row else None
+
+
+async def resolve_card_by_name(pool: asyncpg.Pool, name: str) -> CardResponse | None:
+    """Resolve a card name to a CardResponse using exact then fuzzy matching.
+
+    Tries an exact (case-insensitive) match first. Falls back to pg_trgm fuzzy
+    match (similarity > 0.4) to recover from minor AI misspellings. Only returns
+    Commander-legal cards.
+
+    Args:
+        pool: asyncpg connection pool.
+        name: Card name as returned by the AI.
+
+    Returns:
+        CardResponse if matched, None otherwise.
+    """
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT * FROM cards WHERE lower(name) = lower($1)"
+            " AND legalities->>'commander' = 'legal' LIMIT 1",
+            name,
+        )
+        if row is None:
+            row = await conn.fetchrow(
+                "SELECT * FROM cards WHERE similarity(name, $1) > 0.4"
+                " AND legalities->>'commander' = 'legal'"
+                " ORDER BY similarity(name, $1) DESC LIMIT 1",
+                name,
+            )
+    return _row_to_card(row) if row else None
+
+
+async def resolve_card_names(
+    pool: asyncpg.Pool, names: list[str]
+) -> tuple[list[CardResponse], list[str]]:
+    """Resolve a list of card names, returning matched cards and unresolved names.
+
+    Args:
+        pool: asyncpg connection pool.
+        names: List of card names from AI output.
+
+    Returns:
+        Tuple of (matched CardResponse list, unresolved name list).
+    """
+    matched: list[CardResponse] = []
+    unresolved: list[str] = []
+    for name in names:
+        card = await resolve_card_by_name(pool, name)
+        if card is not None:
+            matched.append(card)
+        else:
+            unresolved.append(name)
+    return matched, unresolved

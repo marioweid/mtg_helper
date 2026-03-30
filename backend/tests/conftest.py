@@ -1,5 +1,6 @@
 """Shared test fixtures."""
 
+import asyncio
 import json
 import os
 from collections.abc import AsyncGenerator
@@ -11,6 +12,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/m
 os.environ.setdefault("ANTHROPIC_API_KEY", "test")
 
 import asyncpg
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -95,20 +97,14 @@ _TEST_CARDS = [
 ]
 
 
-@pytest_asyncio.fixture(scope="session")
-async def db_pool() -> AsyncGenerator[asyncpg.Pool]:
-    """Create a test DB pool and initialize the schema."""
-    pool = await asyncpg.create_pool(dsn=TEST_DB_URL)
-
-    async with pool.acquire() as conn:
-        # Drop and recreate all tables
+async def _setup_schema() -> None:
+    """Drop, recreate, and seed the test database schema."""
+    conn = await asyncpg.connect(dsn=TEST_DB_URL)
+    try:
         await conn.execute(
             "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO mtg;"
         )
-        schema_sql = SCHEMA_PATH.read_text()
-        await conn.execute(schema_sql)
-
-        # Seed test cards
+        await conn.execute(SCHEMA_PATH.read_text())
         for card in _TEST_CARDS:
             await conn.execute(
                 """
@@ -133,7 +129,20 @@ async def db_pool() -> AsyncGenerator[asyncpg.Pool]:
                 card["color_identity"],
                 [],
             )
+    finally:
+        await conn.close()
 
+
+@pytest.fixture(scope="session", autouse=True)
+def _init_db() -> None:
+    """Initialize the test database schema once per session (synchronous entry point)."""
+    asyncio.run(_setup_schema())
+
+
+@pytest_asyncio.fixture
+async def db_pool(_init_db: None) -> AsyncGenerator[asyncpg.Pool]:
+    """Create a fresh asyncpg pool for each test (avoids cross-loop issues)."""
+    pool = await asyncpg.create_pool(dsn=TEST_DB_URL)
     yield pool
     await pool.close()
 

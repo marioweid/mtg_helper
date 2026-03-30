@@ -15,6 +15,40 @@ from mtg_helper.models.decks import (
     DeckUpdate,
 )
 
+# Ordered list of build stages. "created" is the initial state before any stage.
+STAGES: list[str] = ["theme", "ramp", "draw", "removal", "utility", "lands", "complete"]
+
+
+def next_stage(current: str) -> str | None:
+    """Return the next build stage after the given one.
+
+    Args:
+        current: Current deck stage (e.g. "created", "theme").
+
+    Returns:
+        Next stage name, or None if already complete.
+    """
+    if current == "created":
+        return STAGES[0]
+    if current == "complete" or current not in STAGES:
+        return None
+    idx = STAGES.index(current)
+    return STAGES[idx + 1] if idx + 1 < len(STAGES) else None
+
+
+def stage_number(stage: str) -> int:
+    """Return the 1-indexed position of a build stage.
+
+    Args:
+        stage: Stage name. "created" returns 0; unknown stages return 0.
+
+    Returns:
+        Stage number (1-indexed) or 0 if not a recognized active stage.
+    """
+    if stage in STAGES:
+        return STAGES.index(stage) + 1
+    return 0
+
 
 class ColorIdentityError(ValueError):
     """Raised when a card violates the commander's color identity."""
@@ -315,6 +349,50 @@ async def add_card_to_deck(
         category=data.category,
         added_by=data.added_by,
     )
+
+
+async def export_moxfield(pool: asyncpg.Pool, deck_id: UUID) -> tuple[str, str] | None:
+    """Export a deck in Moxfield-compatible text format.
+
+    Produces a plain-text deck list with commanders tagged *CMDR* and cards
+    grouped by category with blank-line separators.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck's UUID.
+
+    Returns:
+        Tuple of (deck_name, export_text) or None if deck not found.
+    """
+    deck = await get_deck(pool, deck_id)
+    if deck is None:
+        return None
+
+    async with pool.acquire() as conn:
+        commander_row = await conn.fetchrow(
+            "SELECT name FROM cards WHERE id = $1", deck.commander_id
+        )
+        partner_row = None
+        if deck.partner_id:
+            partner_row = await conn.fetchrow(
+                "SELECT name FROM cards WHERE id = $1", deck.partner_id
+            )
+
+    lines: list[str] = []
+    lines.append(f"1 {commander_row['name']} *CMDR*")
+    if partner_row:
+        lines.append(f"1 {partner_row['name']} *CMDR*")
+
+    by_category: dict[str, list[str]] = {}
+    for card in deck.cards:
+        cat = card.category or "other"
+        by_category.setdefault(cat, []).append(f"{card.quantity} {card.name}")
+
+    for category in sorted(by_category):
+        lines.append("")
+        lines.extend(by_category[category])
+
+    return deck.name, "\n".join(lines)
 
 
 async def remove_card_from_deck(pool: asyncpg.Pool, deck_id: UUID, scryfall_id: UUID) -> bool:
