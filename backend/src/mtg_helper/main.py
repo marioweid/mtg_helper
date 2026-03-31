@@ -3,7 +3,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import anthropic
+import openai
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -16,7 +16,7 @@ from mtg_helper.routers import ai, cards, decks, health
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
-    app.state.ai_client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    app.state.ai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
     yield
     await close_pool(app.state.db_pool)
 

@@ -5,7 +5,7 @@
 - **Backend:** Python 3.13, FastAPI, asyncpg (plain SQL, no ORM), Pydantic V2, uv
 - **Frontend:** Next.js 14+ (App Router), TypeScript
 - **Database:** PostgreSQL 16
-- **AI:** Claude API via Anthropic SDK
+- **AI:** OpenAI GPT API via OpenAI SDK
 - **Local dev:** Docker Compose
 
 ## Python
@@ -50,5 +50,5 @@ Loaded via pydantic-settings from `.env` in `backend/`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | — | asyncpg DSN |
-| `ANTHROPIC_API_KEY` | — | Claude API key |
+| `OPENAI_API_KEY` | — | OpenAI API key |
 | `SCRYFALL_BULK_DATA_URL` | `https://api.scryfall.com/bulk-data` | Bulk data endpoint |

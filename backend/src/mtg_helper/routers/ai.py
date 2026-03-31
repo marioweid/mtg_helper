@@ -15,7 +15,15 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.common import DataResponse
 from mtg_helper.services import ai_service, deck_service
-from mtg_helper.services.ai_service import DeckNotFoundError
+from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
+
+
+def _llm_unavailable(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=502,
+        detail={"code": "LLM_EMPTY_RESPONSE", "message": detail},
+    )
+
 
 router = APIRouter(prefix="/decks", tags=["ai"])
 
@@ -42,6 +50,8 @@ async def build_stage(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    except LLMEmptyResponseError as e:
+        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 
@@ -62,6 +72,8 @@ async def suggest_cards(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    except LLMEmptyResponseError as e:
+        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 
@@ -81,6 +93,8 @@ async def chat_about_deck(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    except LLMEmptyResponseError as e:
+        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 

@@ -9,7 +9,7 @@ from uuid import UUID
 
 # Set required env vars before importing any app module that reads config at import time.
 os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test")
-os.environ.setdefault("ANTHROPIC_API_KEY", "test")
+os.environ.setdefault("OPENAI_API_KEY", "test")
 
 import asyncpg
 import pytest

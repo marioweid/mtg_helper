@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     database_url: str
-    anthropic_api_key: str = ""
+    openai_api_key: str = ""
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
 
     # Pagination defaults

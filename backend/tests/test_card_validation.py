@@ -3,7 +3,6 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 
-from anthropic.types import TextBlock
 from httpx import AsyncClient
 
 from mtg_helper.main import app
@@ -11,11 +10,17 @@ from tests.conftest import HAZEL_SCRYFALL_ID
 
 
 def _make_ai_client(response_text: str) -> MagicMock:
-    message = MagicMock()
-    message.content = [TextBlock(type="text", text=response_text)]
+    choice = MagicMock()
+    choice.message = MagicMock()
+    choice.message.content = response_text
+
+    response = MagicMock()
+    response.choices = [choice]
+
     ai = MagicMock()
-    ai.messages = MagicMock()
-    ai.messages.create = AsyncMock(return_value=message)
+    ai.chat = MagicMock()
+    ai.chat.completions = MagicMock()
+    ai.chat.completions.create = AsyncMock(return_value=response)
     return ai
 
 

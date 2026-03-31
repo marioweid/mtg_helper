@@ -5,10 +5,9 @@ from __future__ import annotations
 from uuid import UUID
 
 import asyncpg
-from anthropic.types import MessageParam
 
 
-async def get_turns(pool: asyncpg.Pool, deck_id: UUID) -> list[MessageParam]:
+async def get_turns(pool: asyncpg.Pool, deck_id: UUID) -> list[dict[str, str]]:
     """Fetch all conversation turns for a deck, ordered by turn_order.
 
     Args:
@@ -16,7 +15,7 @@ async def get_turns(pool: asyncpg.Pool, deck_id: UUID) -> list[MessageParam]:
         deck_id: The deck's UUID.
 
     Returns:
-        List of {role, content} dicts suitable for the Anthropic messages API.
+        List of {role, content} dicts suitable for the OpenAI chat completions API.
     """
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -24,7 +23,7 @@ async def get_turns(pool: asyncpg.Pool, deck_id: UUID) -> list[MessageParam]:
             " WHERE deck_id = $1 ORDER BY turn_order ASC",
             deck_id,
         )
-    return [MessageParam(role=r["role"], content=r["content"]) for r in rows]
+    return [{"role": r["role"], "content": r["content"]} for r in rows if r["content"]]
 
 
 async def append_turn(pool: asyncpg.Pool, deck_id: UUID, role: str, content: str) -> None:

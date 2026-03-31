@@ -3,7 +3,6 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 
-from anthropic.types import TextBlock
 from httpx import AsyncClient
 
 from mtg_helper.main import app
@@ -11,11 +10,17 @@ from tests.conftest import HAZEL_SCRYFALL_ID
 
 
 def _make_ai_client(response_text: str) -> MagicMock:
-    message = MagicMock()
-    message.content = [TextBlock(type="text", text=response_text)]
+    choice = MagicMock()
+    choice.message = MagicMock()
+    choice.message.content = response_text
+
+    response = MagicMock()
+    response.choices = [choice]
+
     ai = MagicMock()
-    ai.messages = MagicMock()
-    ai.messages.create = AsyncMock(return_value=message)
+    ai.chat = MagicMock()
+    ai.chat.completions = MagicMock()
+    ai.chat.completions.create = AsyncMock(return_value=response)
     return ai
 
 
@@ -35,13 +40,17 @@ async def test_conversation_persists_across_chat(client: AsyncClient) -> None:
 
     async def capture_create(**kwargs):  # type: ignore[no-untyped-def]
         call_messages.append(kwargs.get("messages", []))
-        msg = MagicMock()
-        msg.content = [TextBlock(type="text", text="Great deck strategy!")]
-        return msg
+        choice = MagicMock()
+        choice.message = MagicMock()
+        choice.message.content = "Great deck strategy!"
+        resp = MagicMock()
+        resp.choices = [choice]
+        return resp
 
     mock_ai = MagicMock()
-    mock_ai.messages = MagicMock()
-    mock_ai.messages.create = AsyncMock(side_effect=capture_create)
+    mock_ai.chat = MagicMock()
+    mock_ai.chat.completions = MagicMock()
+    mock_ai.chat.completions.create = AsyncMock(side_effect=capture_create)
     app.state.ai_client = mock_ai
 
     # First message
@@ -67,13 +76,17 @@ async def test_build_persists_conversation(client: AsyncClient) -> None:
         text = json.dumps(
             [{"name": "Sol Ring", "category": "ramp", "reasoning": "good", "synergies": []}]
         )
-        msg = MagicMock()
-        msg.content = [TextBlock(type="text", text=text)]
-        return msg
+        choice = MagicMock()
+        choice.message = MagicMock()
+        choice.message.content = text
+        resp = MagicMock()
+        resp.choices = [choice]
+        return resp
 
     mock_ai = MagicMock()
-    mock_ai.messages = MagicMock()
-    mock_ai.messages.create = AsyncMock(side_effect=count_create)
+    mock_ai.chat = MagicMock()
+    mock_ai.chat.completions = MagicMock()
+    mock_ai.chat.completions.create = AsyncMock(side_effect=count_create)
     app.state.ai_client = mock_ai
 
     resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={"action": "next_stage"})

@@ -1,12 +1,11 @@
-"""AI deck building service using the Claude API."""
+"""AI deck building service using the OpenAI API."""
 
 import json
 import re
 from uuid import UUID
 
-import anthropic
 import asyncpg
-from anthropic.types import MessageParam, TextBlock
+import openai
 
 from mtg_helper.models.ai import BuildResponse, CardSuggestion, ChatResponse, SuggestResponse
 from mtg_helper.models.cards import CardResponse
@@ -14,7 +13,7 @@ from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services import card_service, conversation_service, deck_service
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
 
-_MODEL = "claude-sonnet-4-20250514"
+_MODEL = "gpt-4.1-mini"
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
 
 # Stage metadata: (category label, target count description)
@@ -39,12 +38,16 @@ class DeckNotFoundError(ValueError):
     """Raised when the requested deck does not exist."""
 
 
+class LLMEmptyResponseError(RuntimeError):
+    """Raised when the LLM returns empty or null content."""
+
+
 def _build_system_prompt(
     deck: DeckDetailResponse,
     commander: CardResponse,
     partner: CardResponse | None,
 ) -> str:
-    """Build the Claude system prompt with full deck context."""
+    """Build the system prompt with full deck context."""
     color_identity = ", ".join(commander.color_identity) or "colorless"
     bracket = deck.bracket or 3
     bracket_desc = _BRACKET_DESCRIPTIONS.get(bracket, "")
@@ -109,7 +112,7 @@ def _build_stage_prompt(stage: str, deck: DeckDetailResponse) -> str:
 
 
 def _parse_suggestions(raw: str) -> list[dict]:
-    """Extract a JSON array from the Claude response text."""
+    """Extract a JSON array from the LLM response text."""
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     if not match:
         return []
@@ -134,25 +137,29 @@ def _suggestion_from_card(card: CardResponse, raw: dict) -> CardSuggestion:
     )
 
 
-async def _call_claude(
-    ai_client: anthropic.AsyncAnthropic,
+async def _call_llm(
+    ai_client: openai.AsyncOpenAI,
     system: str,
-    history: list[MessageParam],
+    history: list[dict[str, str]],
     user_message: str,
 ) -> str:
-    """Send a message to Claude and return the text response."""
-    messages: list[MessageParam] = [
+    """Send a message to the LLM and return the text response."""
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": system},
         *history,
-        MessageParam(role="user", content=user_message),
+        {"role": "user", "content": user_message},
     ]
-    response = await ai_client.messages.create(
+    response = await ai_client.chat.completions.create(
         model=_MODEL,
-        max_tokens=4096,
-        system=system,
+        max_completion_tokens=4096,
         messages=messages,
     )
-    text_block = next(b for b in response.content if isinstance(b, TextBlock))
-    return text_block.text
+    choice = response.choices[0]
+    content = choice.message.content
+    if not content:
+        finish_reason = getattr(choice, "finish_reason", "unknown")
+        raise LLMEmptyResponseError(f"LLM returned empty content (finish_reason={finish_reason!r})")
+    return content
 
 
 async def _validate_suggestions(
@@ -178,14 +185,14 @@ async def _validate_suggestions(
 
 async def build_stage(
     pool: asyncpg.Pool,
-    ai_client: anthropic.AsyncAnthropic,
+    ai_client: openai.AsyncOpenAI,
     deck_id: UUID,
 ) -> BuildResponse:
     """Advance the deck to the next build stage and return AI suggestions.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: Anthropic async client.
+        ai_client: OpenAI async client.
         deck_id: The deck's UUID.
 
     Returns:
@@ -220,13 +227,14 @@ async def build_stage(
     user_msg = _build_stage_prompt(stage, deck)
     history = await conversation_service.get_turns(pool, deck_id)
 
-    raw_response = await _call_claude(ai_client, system, history, user_msg)
+    raw_response = await _call_llm(ai_client, system, history, user_msg)
     raw_items = _parse_suggestions(raw_response)
 
     suggestions, unresolved = await _validate_suggestions(pool, raw_items, commander)
 
     await conversation_service.append_turn(pool, deck_id, "user", user_msg)
-    await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
+    if raw_response:
+        await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
     await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=stage))
 
     return BuildResponse(
@@ -240,7 +248,7 @@ async def build_stage(
 
 async def suggest_cards(
     pool: asyncpg.Pool,
-    ai_client: anthropic.AsyncAnthropic,
+    ai_client: openai.AsyncOpenAI,
     deck_id: UUID,
     prompt: str,
     count: int,
@@ -249,7 +257,7 @@ async def suggest_cards(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: Anthropic async client.
+        ai_client: OpenAI async client.
         deck_id: The deck's UUID.
         prompt: Natural language description of desired cards.
         count: Number of cards to request.
@@ -281,20 +289,21 @@ async def suggest_cards(
 
     system = _build_system_prompt(deck, commander, partner)
     history = await conversation_service.get_turns(pool, deck_id)
-    raw_response = await _call_claude(ai_client, system, history, user_msg)
+    raw_response = await _call_llm(ai_client, system, history, user_msg)
     raw_items = _parse_suggestions(raw_response)
 
     suggestions, unresolved = await _validate_suggestions(pool, raw_items, commander)
 
     await conversation_service.append_turn(pool, deck_id, "user", user_msg)
-    await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
+    if raw_response:
+        await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
 
     return SuggestResponse(suggestions=suggestions, unresolved=unresolved)
 
 
 async def chat_about_deck(
     pool: asyncpg.Pool,
-    ai_client: anthropic.AsyncAnthropic,
+    ai_client: openai.AsyncOpenAI,
     deck_id: UUID,
     message: str,
 ) -> ChatResponse:
@@ -305,7 +314,7 @@ async def chat_about_deck(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: Anthropic async client.
+        ai_client: OpenAI async client.
         deck_id: The deck's UUID.
         message: User's chat message.
 
@@ -329,7 +338,7 @@ async def chat_about_deck(
 
     system = _build_system_prompt(deck, commander, partner)
     history = await conversation_service.get_turns(pool, deck_id)
-    raw_response = await _call_claude(ai_client, system, history, message)
+    raw_response = await _call_llm(ai_client, system, history, message)
 
     raw_items = _parse_suggestions(raw_response)
     suggestions: list[CardSuggestion] = []
@@ -337,6 +346,7 @@ async def chat_about_deck(
         suggestions, _ = await _validate_suggestions(pool, raw_items, commander)
 
     await conversation_service.append_turn(pool, deck_id, "user", message)
-    await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
+    if raw_response:
+        await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
 
     return ChatResponse(reply=raw_response, suggestions=suggestions)
