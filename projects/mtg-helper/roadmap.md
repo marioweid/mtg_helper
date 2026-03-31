@@ -62,3 +62,4 @@ Refinement and quality of life.
 - Qdrant vector search for card similarity
 - Price-aware suggestions
 - Collection integration
+- Double Check bracket definition
