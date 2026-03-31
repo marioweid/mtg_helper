@@ -71,6 +71,7 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
         stage=row["stage"],
         commander_id=row["commander_id"],
         partner_id=row["partner_id"],
+        owner_id=row["owner_id"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -152,8 +153,8 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
 
         row = await conn.fetchrow(
             """
-            INSERT INTO decks (name, commander_id, partner_id, description, bracket)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
             """,
             data.name,
@@ -161,6 +162,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
             partner_id,
             data.description,
             data.bracket,
+            data.owner_id,
         )
     return _row_to_deck(row)
 
@@ -236,6 +238,7 @@ async def get_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckDetailResponse | No
         stage=deck_row["stage"],
         commander_id=deck_row["commander_id"],
         partner_id=deck_row["partner_id"],
+        owner_id=deck_row["owner_id"],
         created_at=deck_row["created_at"],
         updated_at=deck_row["updated_at"],
         cards=[_row_to_deck_card_item(r) for r in card_rows],

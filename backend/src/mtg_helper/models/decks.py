@@ -15,6 +15,7 @@ class DeckCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = None
     bracket: int = Field(default=3, ge=1, le=4)
+    owner_id: UUID | None = None
 
 
 class DeckUpdate(BaseModel):
@@ -24,6 +25,7 @@ class DeckUpdate(BaseModel):
     description: str | None = None
     bracket: int | None = Field(default=None, ge=1, le=4)
     stage: str | None = None
+    owner_id: UUID | None = None
 
 
 class DeckSummary(BaseModel):
@@ -50,6 +52,7 @@ class DeckResponse(BaseModel):
     stage: str
     commander_id: UUID
     partner_id: UUID | None
+    owner_id: UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -84,6 +87,7 @@ class DeckDetailResponse(BaseModel):
     stage: str
     commander_id: UUID
     partner_id: UUID | None
+    owner_id: UUID | None
     created_at: datetime
     updated_at: datetime
     cards: list[DeckCardItem]

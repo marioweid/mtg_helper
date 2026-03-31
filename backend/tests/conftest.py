@@ -161,3 +161,28 @@ SOL_RING_SCRYFALL_ID = UUID("3d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 DOUBLING_SEASON_SCRYFALL_ID = UUID("1d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 RHYSTIC_STUDY_SCRYFALL_ID = UUID("2d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 DOCKSIDE_SCRYFALL_ID = UUID("5d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
+
+
+async def create_test_account(client: AsyncClient, display_name: str = "Test User") -> str:
+    """Helper: create an account and return its ID."""
+    resp = await client.post("/api/v1/accounts", json={"display_name": display_name})
+    assert resp.status_code == 201
+    return resp.json()["data"]["id"]
+
+
+async def create_test_deck(
+    client: AsyncClient,
+    *,
+    name: str = "Test Deck",
+    owner_id: str | None = None,
+) -> str:
+    """Helper: create a deck (with optional owner) and return its ID."""
+    payload: dict = {
+        "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
+        "name": name,
+    }
+    if owner_id is not None:
+        payload["owner_id"] = owner_id
+    resp = await client.post("/api/v1/decks", json=payload)
+    assert resp.status_code == 201
+    return resp.json()["data"]["id"]

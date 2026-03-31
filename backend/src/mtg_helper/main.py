@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from mtg_helper.config import settings
 from mtg_helper.db import close_pool, create_pool
-from mtg_helper.routers import ai, cards, decks, health
+from mtg_helper.routers import accounts, ai, cards, decks, feedback, health, preferences
 
 
 @asynccontextmanager
@@ -34,6 +34,9 @@ async def generic_exception_handler(_request: Request, exc: Exception) -> JSONRe
 
 
 app.include_router(health.router)
+app.include_router(accounts.router, prefix="/api/v1")
 app.include_router(cards.router, prefix="/api/v1")
 app.include_router(decks.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
+app.include_router(feedback.router, prefix="/api/v1")
+app.include_router(preferences.router, prefix="/api/v1")

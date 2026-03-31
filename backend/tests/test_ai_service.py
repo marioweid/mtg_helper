@@ -7,7 +7,13 @@ from httpx import AsyncClient
 
 from mtg_helper.main import app
 from mtg_helper.services.deck_service import STAGES
-from tests.conftest import HAZEL_SCRYFALL_ID
+from tests.conftest import (
+    DOUBLING_SEASON_SCRYFALL_ID,
+    HAZEL_SCRYFALL_ID,
+    SOL_RING_SCRYFALL_ID,
+    create_test_account,
+    create_test_deck,
+)
 
 
 def _make_ai_client(response_text: str) -> MagicMock:
@@ -118,3 +124,81 @@ async def test_build_stage_deck_not_found(client: AsyncClient) -> None:
         json={"action": "next_stage"},
     )
     assert resp.status_code == 404
+
+
+async def test_build_stage_includes_preferences_in_prompt(client: AsyncClient) -> None:
+    account_id = await create_test_account(client, "Pref User")
+    deck_id = await create_test_deck(client, owner_id=account_id)
+
+    await client.post(
+        f"/api/v1/accounts/{account_id}/preferences",
+        json={"preference_type": "pet_card", "card_scryfall_id": str(DOUBLING_SEASON_SCRYFALL_ID)},
+    )
+    await client.post(
+        f"/api/v1/accounts/{account_id}/preferences",
+        json={"preference_type": "avoid_archetype", "description": "stax"},
+    )
+
+    captured_messages: list = []
+    ai_client = _make_ai_client(_card_json(["Sol Ring"]))
+    original_create = ai_client.chat.completions.create
+
+    async def capture_and_call(**kwargs):  # type: ignore[no-untyped-def]
+        captured_messages.extend(kwargs.get("messages", []))
+        return await original_create(**kwargs)
+
+    ai_client.chat.completions.create = capture_and_call
+    app.state.ai_client = ai_client
+
+    await client.post(f"/api/v1/decks/{deck_id}/build", json={"action": "next_stage"})
+
+    system_content = next(m["content"] for m in captured_messages if m["role"] == "system")
+    assert "PLAYER PREFERENCES" in system_content
+    assert "Doubling Season" in system_content
+    assert "stax" in system_content
+
+
+async def test_build_stage_includes_downvoted_cards_in_prompt(client: AsyncClient) -> None:
+    deck_id = await create_test_deck(client)
+
+    await client.post(
+        f"/api/v1/decks/{deck_id}/feedback",
+        json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "feedback": "down"},
+    )
+
+    captured_messages: list = []
+    ai_client = _make_ai_client(_card_json(["Rhystic Study"]))
+    original_create = ai_client.chat.completions.create
+
+    async def capture_and_call(**kwargs):  # type: ignore[no-untyped-def]
+        captured_messages.extend(kwargs.get("messages", []))
+        return await original_create(**kwargs)
+
+    ai_client.chat.completions.create = capture_and_call
+    app.state.ai_client = ai_client
+
+    await client.post(f"/api/v1/decks/{deck_id}/build", json={"action": "next_stage"})
+
+    system_content = next(m["content"] for m in captured_messages if m["role"] == "system")
+    assert "FEEDBACK" in system_content
+    assert "Sol Ring" in system_content
+
+
+async def test_build_stage_no_owner_skips_preferences(client: AsyncClient) -> None:
+    deck_id = await create_test_deck(client)
+
+    captured_messages: list = []
+    ai_client = _make_ai_client(_card_json(["Sol Ring"]))
+    original_create = ai_client.chat.completions.create
+
+    async def capture_and_call(**kwargs):  # type: ignore[no-untyped-def]
+        captured_messages.extend(kwargs.get("messages", []))
+        return await original_create(**kwargs)
+
+    ai_client.chat.completions.create = capture_and_call
+    app.state.ai_client = ai_client
+
+    await client.post(f"/api/v1/decks/{deck_id}/build", json={"action": "next_stage"})
+
+    system_content = next(m["content"] for m in captured_messages if m["role"] == "system")
+    assert "PLAYER PREFERENCES" not in system_content

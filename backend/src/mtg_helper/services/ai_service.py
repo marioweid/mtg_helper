@@ -10,7 +10,7 @@ import openai
 from mtg_helper.models.ai import BuildResponse, CardSuggestion, ChatResponse, SuggestResponse
 from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services import card_service, conversation_service, deck_service
+from mtg_helper.services import card_service, conversation_service, deck_service, preference_service
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
 
 _MODEL = "gpt-4.1-mini"
@@ -27,10 +27,26 @@ _STAGE_META: dict[str, tuple[str, str]] = {
 }
 
 _BRACKET_DESCRIPTIONS = {
-    1: "casual precon-level, no staples, minimal tutors",
-    2: "upgraded casual, some staples, light tutors",
-    3: "optimized, efficient synergies, strong staples",
-    4: "cEDH, maximum power, fast mana, free interaction",
+    1: (
+        "casual precon-level. No tutors, no infinite combos, no extra turn spells, "
+        "no fast mana beyond Sol Ring. Prioritize fun and flavor over efficiency. "
+        "Avoid staples that feel repetitive across every deck."
+    ),
+    2: (
+        "upgraded casual. Light tutors are acceptable, but no infinite combos. "
+        "Staples like Sol Ring and Arcane Signet are fine. "
+        "Avoid mass land destruction and hyper-efficient win conditions."
+    ),
+    3: (
+        "optimized. Efficient synergies and strong staples are expected. "
+        "Tutors, combo finishers, and tight interaction are appropriate. "
+        "Focus on a clear, redundant game plan."
+    ),
+    4: (
+        "cEDH, maximum power. Prioritize fast mana, free interaction, "
+        "compact win conditions, and efficient tutors. "
+        "Every card should contribute to winning as quickly and consistently as possible."
+    ),
 }
 
 
@@ -46,8 +62,18 @@ def _build_system_prompt(
     deck: DeckDetailResponse,
     commander: CardResponse,
     partner: CardResponse | None,
+    preferences: dict[str, list[str]] | None = None,
+    downvoted_cards: list[str] | None = None,
 ) -> str:
-    """Build the system prompt with full deck context."""
+    """Build the system prompt with full deck context.
+
+    Args:
+        deck: Full deck detail including cards and metadata.
+        commander: Commander card data.
+        partner: Partner commander card data, if any.
+        preferences: Account preferences grouped by type for injection.
+        downvoted_cards: Card names the user has thumbed-down for this deck.
+    """
     color_identity = ", ".join(commander.color_identity) or "colorless"
     bracket = deck.bracket or 3
     bracket_desc = _BRACKET_DESCRIPTIONS.get(bracket, "")
@@ -70,12 +96,19 @@ def _build_system_prompt(
         parts.append(f"\nDeck strategy: {deck.description}")
 
     parts += [
-        f"\nPower level: Bracket {bracket} — {bracket_desc}.",
+        f"\nPower level: Bracket {bracket} — {bracket_desc}",
         "",
         "CONSTRAINTS:",
         f"- Only suggest cards with color identity within: [{color_identity}]",
         "- Only suggest Commander-legal cards (no banned cards)",
         "- Every card must be a real, existing Magic card",
+    ]
+
+    pref_lines = _build_preference_lines(preferences, downvoted_cards)
+    if pref_lines:
+        parts += ["", *pref_lines]
+
+    parts += [
         "",
         "OUTPUT FORMAT:",
         "Return ONLY a JSON array. Each element must have these exact keys:",
@@ -84,6 +117,36 @@ def _build_system_prompt(
         "Do not include any text outside the JSON array.",
     ]
     return "\n".join(parts)
+
+
+def _build_preference_lines(
+    preferences: dict[str, list[str]] | None,
+    downvoted_cards: list[str] | None,
+) -> list[str]:
+    """Build the PLAYER PREFERENCES and FEEDBACK sections for the system prompt."""
+    lines: list[str] = []
+
+    if preferences is not None and any(preferences.values()):
+        lines.append("PLAYER PREFERENCES:")
+        if preferences.get("pet_cards"):
+            cards = ", ".join(preferences["pet_cards"])
+            lines.append(f"- Try to include these cards when possible: {cards}")
+        if preferences.get("avoid_cards"):
+            cards = ", ".join(preferences["avoid_cards"])
+            lines.append(f"- Never suggest these cards: {cards}")
+        if preferences.get("avoid_archetypes"):
+            archetypes = ", ".join(preferences["avoid_archetypes"])
+            lines.append(f"- Avoid strategies involving: {archetypes}")
+        if preferences.get("general"):
+            for note in preferences["general"]:
+                lines.append(f"- {note}")
+
+    if downvoted_cards:
+        lines.append("FEEDBACK:")
+        cards = ", ".join(downvoted_cards)
+        lines.append(f"- Do not suggest these previously rejected cards: {cards}")
+
+    return lines
 
 
 def _format_current_cards(deck: DeckDetailResponse) -> str:
@@ -135,6 +198,37 @@ def _suggestion_from_card(card: CardResponse, raw: dict) -> CardSuggestion:
         reasoning=raw.get("reasoning", ""),
         synergies=raw.get("synergies") or [],
     )
+
+
+async def _load_prompt_context(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+) -> tuple[dict[str, list[str]] | None, list[str]]:
+    """Load account preferences and downvoted cards for prompt injection.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck: Deck detail (owner_id used to fetch preferences).
+
+    Returns:
+        Tuple of (preferences dict or None, list of downvoted card names).
+    """
+    prefs: dict[str, list[str]] | None = None
+    if deck.owner_id is not None:
+        prefs = await preference_service.get_preferences_for_prompt(pool, deck.owner_id)
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT c.name
+            FROM deck_feedback df
+            JOIN cards c ON df.card_id = c.id
+            WHERE df.deck_id = $1 AND df.feedback = 'down'
+            """,
+            deck.id,
+        )
+    downvoted = [r["name"] for r in rows]
+    return prefs, downvoted
 
 
 async def _call_llm(
@@ -223,7 +317,8 @@ async def build_stage(
     if deck.partner_id:
         partner = await card_service.get_card_by_id(pool, deck.partner_id)
 
-    system = _build_system_prompt(deck, commander, partner)
+    prefs, downvoted = await _load_prompt_context(pool, deck)
+    system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
     user_msg = _build_stage_prompt(stage, deck)
     history = await conversation_service.get_turns(pool, deck_id)
 
@@ -287,7 +382,8 @@ async def suggest_cards(
         "Return only the JSON array."
     )
 
-    system = _build_system_prompt(deck, commander, partner)
+    prefs, downvoted = await _load_prompt_context(pool, deck)
+    system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
     history = await conversation_service.get_turns(pool, deck_id)
     raw_response = await _call_llm(ai_client, system, history, user_msg)
     raw_items = _parse_suggestions(raw_response)
@@ -336,7 +432,8 @@ async def chat_about_deck(
     if deck.partner_id:
         partner = await card_service.get_card_by_id(pool, deck.partner_id)
 
-    system = _build_system_prompt(deck, commander, partner)
+    prefs, downvoted = await _load_prompt_context(pool, deck)
+    system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
     history = await conversation_service.get_turns(pool, deck_id)
     raw_response = await _call_llm(ai_client, system, history, message)
 
