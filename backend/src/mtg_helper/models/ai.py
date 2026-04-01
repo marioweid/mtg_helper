@@ -1,15 +1,16 @@
 """Pydantic models for AI deck building endpoints."""
 
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
 class BuildRequest(BaseModel):
-    """Request body for advancing the staged deck build."""
+    """Request body for the staged deck build."""
 
-    action: Literal["next_stage"] = "next_stage"
+    stage: str | None = None
+    target: int | None = Field(default=None, ge=1, le=99)
+    exclude: list[str] | None = Field(default=None, max_length=200)
 
 
 class CardSuggestion(BaseModel):

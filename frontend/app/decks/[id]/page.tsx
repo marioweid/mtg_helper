@@ -10,10 +10,8 @@ import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaSymbols } from "@/components/mana-symbols";
 import { ExportButton } from "@/components/export-button";
-import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
+import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import type { DeckCardItem, DeckDetailResponse } from "@/lib/types";
-
-const CATEGORY_ORDER = ["theme", "ramp", "draw", "removal", "utility", "lands"];
 
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};

@@ -1,7 +1,5 @@
 import type { DeckCardItem } from "@/lib/types";
-import { CATEGORY_TARGETS, COLOR_SYMBOLS, STAGE_LABELS } from "@/lib/constants";
-
-const CATEGORY_ORDER = ["theme", "ramp", "draw", "removal", "utility", "lands"];
+import { CATEGORY_ORDER, CATEGORY_TARGETS, COLOR_SYMBOLS, STAGE_LABELS } from "@/lib/constants";
 
 function avgCmc(cards: DeckCardItem[]): string {
   const nonLands = cards.filter((c) => !c.type_line?.includes("Land") && c.cmc != null);

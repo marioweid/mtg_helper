@@ -16,7 +16,7 @@ from mtg_helper.models.decks import (
 )
 
 # Ordered list of build stages. "created" is the initial state before any stage.
-STAGES: list[str] = ["theme", "ramp", "draw", "removal", "utility", "lands", "complete"]
+STAGES: list[str] = ["ramp", "interaction", "draw", "theme", "utility", "lands", "complete"]
 
 
 def next_stage(current: str) -> str | None:

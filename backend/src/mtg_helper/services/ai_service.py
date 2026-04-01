@@ -18,10 +18,15 @@ _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
 
 # Stage metadata: (category label, target count description)
 _STAGE_META: dict[str, tuple[str, str]] = {
-    "theme": ("core theme / synergy", "20-25"),
     "ramp": ("ramp / mana acceleration", "10-12"),
+    "interaction": (
+        "interaction / removal and protection — targeted removal, board wipes, "
+        "counterspells, hexproof/shroud givers (e.g. Lightning Greaves, Swiftfoot Boots), "
+        "and indestructible effects (e.g. Heroic Intervention, Boros Charm)",
+        "8-10",
+    ),
     "draw": ("card draw / card advantage", "8-10"),
-    "removal": ("removal / interaction", "8-10"),
+    "theme": ("core theme / synergy", "20-25"),
     "utility": ("utility / flex", "5-8"),
     "lands": ("mana base / lands", "35-38"),
 }
@@ -162,16 +167,28 @@ def _format_current_cards(deck: DeckDetailResponse) -> str:
     return "\n".join(lines)
 
 
-def _build_stage_prompt(stage: str, deck: DeckDetailResponse) -> str:
+def _build_stage_prompt(
+    stage: str,
+    deck: DeckDetailResponse,
+    target: int | None = None,
+    exclude: list[str] | None = None,
+) -> str:
     """Build the user message for a specific build stage."""
-    cat_label, target = _STAGE_META.get(stage, (stage, "10"))
+    cat_label, default_range = _STAGE_META.get(stage, (stage, "10"))
+    target_str = str(target) if target is not None else default_range
     current_summary = _format_current_cards(deck)
-    return (
-        f"Build stage: {cat_label} (target: {target} cards)\n\n"
-        f"Cards already in the deck:\n{current_summary}\n\n"
-        f"Suggest {target} {cat_label} cards for this Commander deck. "
-        "Consider synergies with existing cards. Return only the JSON array."
-    )
+    parts = [
+        f"Build stage: {cat_label} (target: {target_str} cards)",
+        "",
+        f"Cards already in the deck:\n{current_summary}",
+        "",
+        f"Suggest {target_str} {cat_label} cards for this Commander deck. "
+        "Consider synergies with existing cards. Return only the JSON array.",
+    ]
+    if exclude:
+        excluded = ", ".join(exclude)
+        parts.append(f"\nDo not suggest these cards (already suggested): {excluded}")
+    return "\n".join(parts)
 
 
 def _parse_suggestions(raw: str) -> list[dict]:
@@ -277,30 +294,65 @@ async def _validate_suggestions(
     return suggestions, unresolved
 
 
+def _resolve_stage(
+    current_deck_stage: str,
+    requested_stage: str | None,
+) -> tuple[str, bool]:
+    """Resolve which stage to build and whether to advance the deck's stage column.
+
+    Args:
+        current_deck_stage: The deck's current stage from the database.
+        requested_stage: Explicit stage requested by the client, or None to auto-advance.
+
+    Returns:
+        Tuple of (resolved_stage, should_advance).
+
+    Raises:
+        ValueError: If requested_stage is not a valid active stage.
+    """
+    if requested_stage is not None:
+        active_stages = [s for s in STAGES if s != "complete"]
+        if requested_stage not in active_stages:
+            raise ValueError(f"Invalid stage: {requested_stage!r}")
+        return requested_stage, False
+
+    resolved = next_stage(current_deck_stage)
+    if resolved is None or resolved == "complete":
+        return "complete", False
+    return resolved, True
+
+
 async def build_stage(
     pool: asyncpg.Pool,
     ai_client: openai.AsyncOpenAI,
     deck_id: UUID,
+    stage: str | None = None,
+    target: int | None = None,
+    exclude: list[str] | None = None,
 ) -> BuildResponse:
-    """Advance the deck to the next build stage and return AI suggestions.
+    """Generate AI card suggestions for a build stage.
 
     Args:
         pool: asyncpg connection pool.
         ai_client: OpenAI async client.
         deck_id: The deck's UUID.
+        stage: Specific stage to generate for. If None, auto-advances to the next stage.
+        target: Override target card count for the AI prompt.
+        exclude: Card names to exclude from suggestions (already shown to the user).
 
     Returns:
-        BuildResponse with validated card suggestions for the new stage.
+        BuildResponse with validated card suggestions for the stage.
 
     Raises:
         DeckNotFoundError: If the deck does not exist.
+        ValueError: If an invalid stage name is provided.
     """
     deck = await deck_service.get_deck(pool, deck_id)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 
-    stage = next_stage(deck.stage)
-    if stage is None or stage == "complete":
+    resolved_stage, advance_deck_stage = _resolve_stage(deck.stage, stage)
+    if resolved_stage == "complete":
         return BuildResponse(
             stage="complete",
             stage_number=_TOTAL_STAGES,
@@ -319,7 +371,7 @@ async def build_stage(
 
     prefs, downvoted = await _load_prompt_context(pool, deck)
     system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
-    user_msg = _build_stage_prompt(stage, deck)
+    user_msg = _build_stage_prompt(resolved_stage, deck, target, exclude)
     history = await conversation_service.get_turns(pool, deck_id)
 
     raw_response = await _call_llm(ai_client, system, history, user_msg)
@@ -330,11 +382,12 @@ async def build_stage(
     await conversation_service.append_turn(pool, deck_id, "user", user_msg)
     if raw_response:
         await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
-    await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=stage))
+    if advance_deck_stage:
+        await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage))
 
     return BuildResponse(
-        stage=stage,
-        stage_number=stage_number(stage),
+        stage=resolved_stage,
+        stage_number=stage_number(resolved_stage),
         total_stages=_TOTAL_STAGES,
         suggestions=suggestions,
         unresolved=unresolved,

@@ -47,11 +47,16 @@ async def build_stage(
             request.app.state.db_pool,
             request.app.state.ai_client,
             deck_id,
+            stage=body.stage,
+            target=body.target,
+            exclude=body.exclude,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
     except LLMEmptyResponseError as e:
         raise _llm_unavailable(str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_STAGE", "message": str(e)})
     return DataResponse(data=result)
 
 
