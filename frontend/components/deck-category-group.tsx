@@ -7,9 +7,10 @@ interface Props {
   category: string;
   cards: DeckCardItem[];
   onRemove?: (scryfallId: string) => void;
+  petCardNames?: Set<string>;
 }
 
-export function DeckCategoryGroup({ category, cards, onRemove }: Props) {
+export function DeckCategoryGroup({ category, cards, onRemove, petCardNames }: Props) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -40,7 +41,12 @@ export function DeckCategoryGroup({ category, cards, onRemove }: Props) {
                 />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{card.name}</p>
+                <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
+                  {card.name}
+                  {petCardNames?.has(card.name) && (
+                    <span className="text-red-400 flex-shrink-0" title="Pet card">♥</span>
+                  )}
+                </p>
                 <p className="text-xs text-gray-500 truncate">{card.type_line}</p>
               </div>
               {card.mana_cost && (

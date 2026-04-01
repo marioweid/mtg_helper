@@ -44,5 +44,20 @@ services:
       - ./frontend/lib:/app/lib
       - ./frontend/components:/app/components
 
+  scryfall-sync:
+    image: alpine/curl:latest
+    entrypoint: >
+      sh -c "
+        echo 'Scryfall weekly sync cron started';
+        while true; do
+          sleep 604800;
+          echo 'Running weekly Scryfall sync...';
+          curl -sf -X POST http://backend:8000/api/v1/admin/sync-cards && echo 'Sync complete' || echo 'Sync failed';
+        done
+      "
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   pgdata:

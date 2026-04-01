@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
+import { getStoredAccountId } from "@/lib/account";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
+import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaSymbols } from "@/components/mana-symbols";
 import { ExportButton } from "@/components/export-button";
@@ -44,6 +46,7 @@ export default function DeckDetailPage() {
   const deckId = params["id"] as string;
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [petCardNames, setPetCardNames] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +60,19 @@ export default function DeckDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const accountId = getStoredAccountId();
+    if (!accountId) return;
+    apiClient.listPreferences(accountId).then((prefs) => {
+      const names = new Set(
+        prefs
+          .filter((p) => p.preference_type === "pet_card" && p.card_name)
+          .map((p) => p.card_name as string),
+      );
+      setPetCardNames(names);
+    }).catch(() => {/* non-critical */});
+  }, []);
 
   async function handleRemoveCard(scryfallId: string) {
     if (!deck) return;
@@ -134,6 +150,7 @@ export default function DeckDetailPage() {
               category={cat}
               cards={groups[cat] ?? []}
               onRemove={handleRemoveCard}
+              petCardNames={petCardNames}
             />
           ))}
           {deck.cards.length === 0 && (
@@ -150,6 +167,9 @@ export default function DeckDetailPage() {
         <div className="flex flex-col gap-6">
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <ManaCurve cards={deck.cards} />
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <DeckStats cards={deck.cards} />
           </div>
         </div>
       </div>

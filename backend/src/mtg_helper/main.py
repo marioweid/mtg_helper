@@ -1,5 +1,6 @@
 """FastAPI application factory and lifespan management."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -10,7 +11,10 @@ from fastapi.responses import JSONResponse
 
 from mtg_helper.config import settings
 from mtg_helper.db import close_pool, create_pool
-from mtg_helper.routers import accounts, ai, cards, decks, feedback, health, preferences
+from mtg_helper.routers import accounts, admin, ai, cards, decks, feedback, health, preferences
+from mtg_helper.services import scryfall
+
+_log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -18,6 +22,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
     app.state.ai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+
+    card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
+    if card_count == 0:
+        _log.info("Cards table is empty — running initial Scryfall sync")
+        try:
+            result = await scryfall.run_sync(app.state.db_pool)
+            _log.info("Scryfall sync complete: %s", result)
+        except Exception:
+            _log.exception("Scryfall sync failed on startup; continuing without card data")
+
     yield
     await close_pool(app.state.db_pool)
 
@@ -48,3 +62,4 @@ app.include_router(decks.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")

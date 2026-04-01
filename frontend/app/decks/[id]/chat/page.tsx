@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient, ApiError } from "@/lib/api";
+import { getStoredAccountId } from "@/lib/account";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import type { CardSuggestion, ChatResponse } from "@/lib/types";
 
@@ -25,7 +26,21 @@ export default function ChatPage() {
   const [suggesting, setSuggesting] = useState(false);
   const [suggestionResults, setSuggestionResults] = useState<CardSuggestion[]>([]);
   const [suggestionStatuses, setSuggestionStatuses] = useState<Record<string, SuggestionStatus>>({});
+  const [petCardNames, setPetCardNames] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const accountId = getStoredAccountId();
+    if (!accountId) return;
+    apiClient.listPreferences(accountId).then((prefs) => {
+      const names = new Set(
+        prefs
+          .filter((p) => p.preference_type === "pet_card" && p.card_name)
+          .map((p) => p.card_name as string),
+      );
+      setPetCardNames(names);
+    }).catch(() => {/* non-critical */});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,9 +79,15 @@ export default function ChatPage() {
     setSuggestionStatuses({});
     try {
       const res = await apiClient.suggestCards(deckId, prompt);
-      setSuggestionResults(res.suggestions);
+      const seen = new Set<string>();
+      const suggestions = res.suggestions.filter((s) => {
+        if (seen.has(s.scryfall_id)) return false;
+        seen.add(s.scryfall_id);
+        return true;
+      });
+      setSuggestionResults(suggestions);
       const statuses: Record<string, SuggestionStatus> = {};
-      for (const s of res.suggestions) statuses[s.scryfall_id] = "pending";
+      for (const s of suggestions) statuses[s.scryfall_id] = "pending";
       setSuggestionStatuses(statuses);
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to get suggestions");
@@ -116,7 +137,7 @@ export default function ChatPage() {
 
       {/* Chat */}
       <div className="rounded-xl border border-white/10 bg-white/5">
-        <div className="flex flex-col gap-4 p-4 min-h-[300px] max-h-[500px] overflow-y-auto">
+        <div className="flex flex-col gap-4 p-4 min-h-[300px] max-h-[50vh] sm:max-h-[500px] overflow-y-auto">
           {messages.length === 0 && (
             <p className="text-sm text-gray-500 text-center py-8">
               Ask anything about your deck, strategy, or card choices.
@@ -137,7 +158,7 @@ export default function ChatPage() {
                 {msg.content}
               </div>
               {msg.suggestions && msg.suggestions.length > 0 && (
-                <InlineSuggestions suggestions={msg.suggestions} deckId={deckId} />
+                <InlineSuggestions suggestions={msg.suggestions} deckId={deckId} petCardNames={petCardNames} />
               )}
             </div>
           ))}
@@ -192,6 +213,7 @@ export default function ChatPage() {
                 status={suggestionStatuses[s.scryfall_id] ?? "pending"}
                 onAccept={() => void handleAcceptSuggestion(s)}
                 onReject={() => void handleRejectSuggestion(s)}
+                isPetCard={petCardNames.has(s.name)}
               />
             ))}
           </div>
@@ -204,13 +226,16 @@ export default function ChatPage() {
 function InlineSuggestions({
   suggestions,
   deckId,
+  petCardNames,
 }: {
   suggestions: CardSuggestion[];
   deckId: string;
+  petCardNames: Set<string>;
 }) {
+  const deduped = suggestions.filter((s, i) => suggestions.findIndex((x) => x.scryfall_id === s.scryfall_id) === i);
   const [statuses, setStatuses] = useState<Record<string, SuggestionStatus>>(() => {
     const s: Record<string, SuggestionStatus> = {};
-    for (const c of suggestions) s[c.scryfall_id] = "pending";
+    for (const c of deduped) s[c.scryfall_id] = "pending";
     return s;
   });
 
@@ -242,13 +267,14 @@ function InlineSuggestions({
 
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {suggestions.map((s) => (
+      {deduped.map((s) => (
         <CardSuggestionCard
           key={s.scryfall_id}
           suggestion={s}
           status={statuses[s.scryfall_id] ?? "pending"}
           onAccept={() => void accept(s)}
           onReject={() => void reject(s)}
+          isPetCard={petCardNames.has(s.name)}
         />
       ))}
     </div>

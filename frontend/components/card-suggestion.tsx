@@ -7,9 +7,10 @@ interface Props {
   status: "pending" | "accepted" | "rejected";
   onAccept: () => void;
   onReject: () => void;
+  isPetCard?: boolean;
 }
 
-export function CardSuggestionCard({ suggestion, status, onAccept, onReject }: Props) {
+export function CardSuggestionCard({ suggestion, status, onAccept, onReject, isPetCard }: Props) {
   return (
     <div
       className={`flex flex-col rounded-xl border overflow-hidden transition-all ${
@@ -31,7 +32,10 @@ export function CardSuggestionCard({ suggestion, status, onAccept, onReject }: P
       )}
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div>
-          <p className="font-medium text-white leading-tight">{suggestion.name}</p>
+          <p className="font-medium text-white leading-tight flex items-center gap-1.5">
+            {suggestion.name}
+            {isPetCard && <span className="text-red-400 flex-shrink-0 text-xs" title="Pet card">♥</span>}
+          </p>
           {suggestion.mana_cost && (
             <p className="text-xs text-gray-500">{suggestion.mana_cost}</p>
           )}
