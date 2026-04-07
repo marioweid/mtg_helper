@@ -1,6 +1,5 @@
 """Tests for conversation history persistence via AI endpoints."""
 
-import json
 from unittest.mock import AsyncMock, MagicMock
 
 from httpx import AsyncClient
@@ -17,10 +16,18 @@ def _make_ai_client(response_text: str) -> MagicMock:
     response = MagicMock()
     response.choices = [choice]
 
+    emb_item = MagicMock()
+    emb_item.embedding = [0.0] * 1536
+    emb_item.index = 0
+    emb_response = MagicMock()
+    emb_response.data = [emb_item]
+
     ai = MagicMock()
     ai.chat = MagicMock()
     ai.chat.completions = MagicMock()
     ai.chat.completions.create = AsyncMock(return_value=response)
+    ai.embeddings = MagicMock()
+    ai.embeddings.create = AsyncMock(return_value=emb_response)
     return ai
 
 
@@ -65,33 +72,44 @@ async def test_conversation_persists_across_chat(client: AsyncClient) -> None:
     assert "Hello" in contents
 
 
-async def test_build_persists_conversation(client: AsyncClient) -> None:
-    """Build stage persists conversation turns."""
+async def test_build_uses_embeddings_not_chat_llm(client: AsyncClient) -> None:
+    """Build stage uses embeddings for retrieval but does not call the chat LLM."""
     deck_id = await _create_deck(client)
-    call_count = 0
+    chat_call_count = 0
+    emb_call_count = 0
 
-    async def count_create(**kwargs):  # type: ignore[no-untyped-def]
-        nonlocal call_count
-        call_count += 1
-        text = json.dumps(
-            [{"name": "Sol Ring", "category": "ramp", "reasoning": "good", "synergies": []}]
-        )
+    async def count_chat(**kwargs):  # type: ignore[no-untyped-def]
+        nonlocal chat_call_count
+        chat_call_count += 1
         choice = MagicMock()
         choice.message = MagicMock()
-        choice.message.content = text
+        choice.message.content = "[]"
         resp = MagicMock()
         resp.choices = [choice]
         return resp
 
+    async def count_embed(**kwargs):  # type: ignore[no-untyped-def]
+        nonlocal emb_call_count
+        emb_call_count += 1
+        emb_item = MagicMock()
+        emb_item.embedding = [0.0] * 1536
+        emb_item.index = 0
+        emb_resp = MagicMock()
+        emb_resp.data = [emb_item]
+        return emb_resp
+
     mock_ai = MagicMock()
     mock_ai.chat = MagicMock()
     mock_ai.chat.completions = MagicMock()
-    mock_ai.chat.completions.create = AsyncMock(side_effect=count_create)
+    mock_ai.chat.completions.create = AsyncMock(side_effect=count_chat)
+    mock_ai.embeddings = MagicMock()
+    mock_ai.embeddings.create = AsyncMock(side_effect=count_embed)
     app.state.ai_client = mock_ai
 
-    resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={"action": "next_stage"})
+    resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={})
     assert resp.status_code == 200
-    assert call_count == 1
+    assert chat_call_count == 0  # LLM not used for build
+    assert emb_call_count >= 1  # Embeddings used for Qdrant query
 
 
 async def test_chat_returns_text_reply(client: AsyncClient) -> None:

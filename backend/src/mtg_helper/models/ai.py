@@ -14,16 +14,22 @@ class BuildRequest(BaseModel):
 
 
 class CardSuggestion(BaseModel):
-    """A single AI-suggested card with reasoning."""
+    """A single suggested card with reasoning."""
 
     scryfall_id: UUID
     name: str
     mana_cost: str | None
     type_line: str | None
     image_uri: str | None
+    oracle_text: str | None = None
+    power: str | None = None
+    toughness: str | None = None
+    rarity: str | None = None
+    cmc: float | None = None
     category: str
     reasoning: str
     synergies: list[str]
+    highlight_reasons: list[str] | None = None
 
 
 class BuildResponse(BaseModel):

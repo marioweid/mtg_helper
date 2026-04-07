@@ -1,6 +1,15 @@
 "use client";
 
+import { useState } from "react";
+
 import type { CardSuggestion } from "@/lib/types";
+
+const RARITY_COLORS: Record<string, string> = {
+  common: "text-gray-400 bg-gray-800/60",
+  uncommon: "text-slate-300 bg-slate-700/60",
+  rare: "text-yellow-300 bg-yellow-900/40",
+  mythic: "text-orange-400 bg-orange-900/40",
+};
 
 interface Props {
   suggestion: CardSuggestion;
@@ -27,6 +36,13 @@ export function CardSuggestionCard({
   quantity = 1,
   onQuantityChange,
 }: Props) {
+  const [showDetails, setShowDetails] = useState(false);
+  const hasDetails =
+    suggestion.oracle_text != null ||
+    suggestion.power != null ||
+    suggestion.toughness != null ||
+    suggestion.rarity != null;
+
   return (
     <div
       className={`flex flex-col rounded-xl border overflow-hidden transition-all ${
@@ -58,13 +74,59 @@ export function CardSuggestionCard({
           <p className="text-xs text-gray-400 mt-0.5">{suggestion.type_line}</p>
         </div>
         <p className="text-xs text-gray-400 leading-relaxed">{suggestion.reasoning}</p>
+        {suggestion.highlight_reasons && suggestion.highlight_reasons.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-xs font-semibold text-amber-400">⚡ Top Pick</span>
+            {suggestion.highlight_reasons.map((r) => (
+              <span key={r} className="rounded bg-amber-900/30 px-1.5 py-0.5 text-xs text-amber-300">
+                {r}
+              </span>
+            ))}
+          </div>
+        )}
         {suggestion.synergies.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-auto">
+          <div className="flex flex-wrap gap-1">
             {suggestion.synergies.slice(0, 3).map((s) => (
               <span key={s} className="rounded bg-indigo-900/40 px-1.5 py-0.5 text-xs text-indigo-300">
                 {s}
               </span>
             ))}
+          </div>
+        )}
+        {hasDetails && (
+          <div className="mt-auto">
+            <button
+              onClick={() => setShowDetails((v) => !v)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              {showDetails ? "Hide details" : "Show details"}
+            </button>
+            {showDetails && (
+              <div className="mt-2 space-y-1.5 border-t border-white/5 pt-2">
+                {suggestion.oracle_text && (
+                  <p className="text-xs text-gray-400 italic leading-relaxed">
+                    {suggestion.oracle_text}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {suggestion.power != null && suggestion.toughness != null && (
+                    <span className="text-xs text-gray-300 font-medium">
+                      {suggestion.power}/{suggestion.toughness}
+                    </span>
+                  )}
+                  {suggestion.cmc != null && (
+                    <span className="text-xs text-gray-500">MV: {suggestion.cmc}</span>
+                  )}
+                  {suggestion.rarity && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs capitalize ${RARITY_COLORS[suggestion.rarity] ?? "text-gray-400 bg-gray-800/60"}`}
+                    >
+                      {suggestion.rarity}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -24,7 +24,11 @@ interface Props {
 }
 
 export function PreferenceList({ accountId, preferences, onDeleted }: Props) {
-  if (preferences.length === 0) {
+  const displayPreferences = preferences.filter(
+    (p) => p.preference_type !== "feedback_boosting",
+  );
+
+  if (displayPreferences.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-4 text-center">
         No preferences set yet.
@@ -43,7 +47,7 @@ export function PreferenceList({ accountId, preferences, onDeleted }: Props) {
 
   return (
     <ul className="flex flex-col gap-2">
-      {preferences.map((pref) => (
+      {displayPreferences.map((pref) => (
         <li
           key={pref.id}
           className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3"

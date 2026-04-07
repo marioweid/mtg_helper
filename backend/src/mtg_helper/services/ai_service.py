@@ -1,17 +1,35 @@
 """AI deck building service using the OpenAI API."""
 
+import asyncio
 import json
+import logging
 import re
+from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
 import openai
+from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import BuildResponse, CardSuggestion, ChatResponse, SuggestResponse
 from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services import card_service, conversation_service, deck_service, preference_service
+from mtg_helper.services import (
+    card_service,
+    conversation_service,
+    deck_service,
+    preference_service,
+    profile_service,
+)
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
+from mtg_helper.services.retrieval_service import (
+    RetrievedCard,
+    parse_query_tags,
+    retrieve_candidates,
+    stage_retrieval_query,
+)
+
+_log = logging.getLogger(__name__)
 
 _MODEL = "gpt-4.1-mini"
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
@@ -54,6 +72,16 @@ _BRACKET_DESCRIPTIONS = {
     ),
 }
 
+_SIGNAL_LABELS: dict[str, str] = {
+    "semantic": "Strong semantic match",
+    "tag": "High tag relevance",
+    "fts": "Strong text match",
+}
+
+# Threshold for highlighting top picks (new scoring is [0, 1])
+_BANGER_SCORE_THRESHOLD = 0.6
+_BANGER_MIN_SIGNALS = 2
+
 
 class DeckNotFoundError(ValueError):
     """Raised when the requested deck does not exist."""
@@ -63,6 +91,72 @@ class LLMEmptyResponseError(RuntimeError):
     """Raised when the LLM returns empty or null content."""
 
 
+def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
+    """Return highlight reasons if the card is a multi-signal top hit ('banger').
+
+    A card is highlighted when it scores highly across 2+ retrieval signals.
+
+    Args:
+        candidate: Retrieved card with weighted score and signal list.
+
+    Returns:
+        List of human-readable reason strings, or None if not a banger.
+    """
+    if len(candidate.signals) < _BANGER_MIN_SIGNALS:
+        return None
+    if candidate.score < _BANGER_SCORE_THRESHOLD:
+        return None
+    return [_SIGNAL_LABELS[s] for s in candidate.signals if s in _SIGNAL_LABELS]
+
+
+def _card_from_retrieved(
+    card: RetrievedCard,
+    stage: str,
+    query_tags: list[str],
+) -> CardSuggestion:
+    """Build a CardSuggestion directly from a RetrievedCard without LLM involvement.
+
+    Args:
+        card: Retrieved card with scoring data.
+        stage: Build stage name (used for category label).
+        query_tags: Tags used in the retrieval query (used to derive synergies).
+
+    Returns:
+        CardSuggestion populated from retrieval signals.
+    """
+    category = _STAGE_META.get(stage, (stage, ""))[0]
+    matching_tags = [t for t in card.tags if t in query_tags]
+    synergies = matching_tags or card.tags[:3]
+
+    parts: list[str] = []
+    for signal in card.signals:
+        label = _SIGNAL_LABELS.get(signal)
+        if label:
+            parts.append(label)
+    if card.edhrec_rank and card.edhrec_rank < 1000:
+        parts.append(f"EDHREC rank {card.edhrec_rank}")
+    reasoning = ". ".join(parts) if parts else "Relevant to stage"
+
+    cmc_float: float | None = float(card.cmc) if card.cmc is not None else None
+
+    return CardSuggestion(
+        scryfall_id=card.scryfall_id,
+        name=card.name,
+        mana_cost=card.mana_cost,
+        type_line=card.type_line,
+        image_uri=card.image_uri,
+        oracle_text=card.oracle_text,
+        power=card.power,
+        toughness=card.toughness,
+        rarity=card.rarity,
+        cmc=cmc_float,
+        category=category,
+        reasoning=reasoning,
+        synergies=synergies,
+        highlight_reasons=_compute_highlight_reasons(card),
+    )
+
+
 def _build_system_prompt(
     deck: DeckDetailResponse,
     commander: CardResponse,
@@ -70,7 +164,7 @@ def _build_system_prompt(
     preferences: dict[str, list[str]] | None = None,
     downvoted_cards: list[str] | None = None,
 ) -> str:
-    """Build the system prompt with full deck context.
+    """Build the system prompt with full deck context (used for chat).
 
     Args:
         deck: Full deck detail including cards and metadata.
@@ -154,43 +248,6 @@ def _build_preference_lines(
     return lines
 
 
-def _format_current_cards(deck: DeckDetailResponse) -> str:
-    """Summarize cards already in the deck for AI context."""
-    if not deck.cards:
-        return "No cards added yet."
-    by_cat: dict[str, list[str]] = {}
-    for c in deck.cards:
-        by_cat.setdefault(c.category or "other", []).append(c.name)
-    lines = []
-    for cat, names in sorted(by_cat.items()):
-        lines.append(f"{cat}: {', '.join(names)}")
-    return "\n".join(lines)
-
-
-def _build_stage_prompt(
-    stage: str,
-    deck: DeckDetailResponse,
-    target: int | None = None,
-    exclude: list[str] | None = None,
-) -> str:
-    """Build the user message for a specific build stage."""
-    cat_label, default_range = _STAGE_META.get(stage, (stage, "10"))
-    target_str = str(target) if target is not None else default_range
-    current_summary = _format_current_cards(deck)
-    parts = [
-        f"Build stage: {cat_label} (target: {target_str} cards)",
-        "",
-        f"Cards already in the deck:\n{current_summary}",
-        "",
-        f"Suggest {target_str} {cat_label} cards for this Commander deck. "
-        "Consider synergies with existing cards. Return only the JSON array.",
-    ]
-    if exclude:
-        excluded = ", ".join(exclude)
-        parts.append(f"\nDo not suggest these cards (already suggested): {excluded}")
-    return "\n".join(parts)
-
-
 def _parse_suggestions(raw: str) -> list[dict]:
     """Extract a JSON array from the LLM response text."""
     match = re.search(r"\[.*\]", raw, re.DOTALL)
@@ -204,7 +261,7 @@ def _parse_suggestions(raw: str) -> list[dict]:
 
 
 def _suggestion_from_card(card: CardResponse, raw: dict) -> CardSuggestion:
-    """Build a CardSuggestion from a validated card + raw AI output."""
+    """Build a CardSuggestion from a validated card + raw AI output (used for chat)."""
     return CardSuggestion(
         scryfall_id=card.scryfall_id,
         name=card.name,
@@ -217,11 +274,76 @@ def _suggestion_from_card(card: CardResponse, raw: dict) -> CardSuggestion:
     )
 
 
+async def _compute_feedback_weights(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    owner_id: UUID | None,
+) -> dict[UUID, float] | None:
+    """Compute per-card score multipliers from feedback and preferences.
+
+    Returns None if feedback boosting is disabled or the deck has no owner.
+    Weights are clamped to [0.05, 2.0].
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck's UUID (for per-deck thumbs up/down).
+        owner_id: The account UUID (for account-level pet/avoid weights).
+
+    Returns:
+        Dict mapping card UUID to combined weight, or None to skip weighting.
+    """
+    if owner_id is None:
+        return None
+    if not await preference_service.is_feedback_boosting_enabled(pool, owner_id):
+        return None
+
+    async with pool.acquire() as conn:
+        feedback_rows = await conn.fetch(
+            "SELECT card_id, feedback FROM deck_feedback WHERE deck_id = $1",
+            deck_id,
+        )
+
+    weights: dict[UUID, float] = {}
+    for row in feedback_rows:
+        weights[row["card_id"]] = 1.3 if row["feedback"] == "up" else 0.3
+
+    pref_weights = await preference_service.get_card_preference_weights(pool, owner_id)
+    for card_id, pref_mult in pref_weights.items():
+        weights[card_id] = weights.get(card_id, 1.0) * pref_mult
+
+    for card_id in weights:
+        weights[card_id] = max(0.05, min(2.0, weights[card_id]))
+
+    return weights if weights else None
+
+
+async def _load_user_profile(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    owner_id: UUID | None,
+) -> "profile_service.UserProfile | None":
+    """Load the cross-deck user profile if the feature is enabled.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck being built (excluded from profile).
+        owner_id: The account UUID.
+
+    Returns:
+        UserProfile if enabled and sufficient deck history exists, else None.
+    """
+    if owner_id is None:
+        return None
+    if not await preference_service.is_user_profile_enabled(pool, owner_id):
+        return None
+    return await profile_service.get_user_profile(pool, owner_id, deck_id)
+
+
 async def _load_prompt_context(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
 ) -> tuple[dict[str, list[str]] | None, list[str]]:
-    """Load account preferences and downvoted cards for prompt injection.
+    """Load account preferences and downvoted cards for prompt injection (used for chat).
 
     Args:
         pool: asyncpg connection pool.
@@ -278,7 +400,7 @@ async def _validate_suggestions(
     raw_items: list[dict],
     commander: CardResponse,
 ) -> tuple[list[CardSuggestion], list[str]]:
-    """Validate AI suggestions against the local DB and color identity."""
+    """Validate AI suggestions against the local DB and color identity (used for chat)."""
     names = [item.get("name", "") for item in raw_items if item.get("name")]
     matched, unresolved = await card_service.resolve_card_names(pool, names)
 
@@ -322,26 +444,70 @@ def _resolve_stage(
     return resolved, True
 
 
+def _compute_deck_cmc_counts(deck: DeckDetailResponse) -> dict[int, int]:
+    """Compute CMC distribution of cards currently in the deck.
+
+    Args:
+        deck: Full deck detail with cards.
+
+    Returns:
+        Dict mapping CMC bucket (int, capped at 6) to count.
+    """
+    counts: dict[int, int] = {}
+    for card in deck.cards:
+        cmc = getattr(card, "cmc", None)
+        if cmc is None:
+            continue
+        bucket = min(int(Decimal(str(cmc))), 6)
+        counts[bucket] = counts.get(bucket, 0) + 1
+    return counts
+
+
+async def _resolve_exclude_ids(
+    pool: asyncpg.Pool,
+    exclude: list[str] | None,
+) -> list[UUID]:
+    """Resolve a list of card names to their database UUIDs.
+
+    Args:
+        pool: asyncpg connection pool.
+        exclude: Card names to resolve.
+
+    Returns:
+        List of resolved card UUIDs.
+    """
+    if not exclude:
+        return []
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id FROM cards WHERE LOWER(name) = ANY($1::text[])",
+            [n.lower() for n in exclude],
+        )
+    return [r["id"] for r in rows]
+
+
 async def build_stage(
     pool: asyncpg.Pool,
     ai_client: openai.AsyncOpenAI,
+    qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     stage: str | None = None,
     target: int | None = None,
     exclude: list[str] | None = None,
 ) -> BuildResponse:
-    """Generate AI card suggestions for a build stage.
+    """Generate card suggestions for a build stage using hybrid retrieval.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client.
+        ai_client: OpenAI async client (used for embeddings only).
+        qdrant_client: Qdrant async client for semantic retrieval.
         deck_id: The deck's UUID.
         stage: Specific stage to generate for. If None, auto-advances to the next stage.
-        target: Override target card count for the AI prompt.
+        target: Override target card count (determines how many candidates to return).
         exclude: Card names to exclude from suggestions (already shown to the user).
 
     Returns:
-        BuildResponse with validated card suggestions for the stage.
+        BuildResponse with card suggestions for the stage.
 
     Raises:
         DeckNotFoundError: If the deck does not exist.
@@ -365,23 +531,36 @@ async def build_stage(
     if commander is None:
         raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
 
-    partner = None
-    if deck.partner_id:
-        partner = await card_service.get_card_by_id(pool, deck.partner_id)
+    deck_card_ids = [c.card_id for c in deck.cards]
+    exclude_ids = await _resolve_exclude_ids(pool, exclude)
+    all_excluded = list({*deck_card_ids, *exclude_ids})
 
-    prefs, downvoted = await _load_prompt_context(pool, deck)
-    system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
-    user_msg = _build_stage_prompt(resolved_stage, deck, target, exclude)
-    history = await conversation_service.get_turns(pool, deck_id)
+    query_text, query_tags = stage_retrieval_query(resolved_stage, deck.description)
+    feedback_weights, user_profile = await asyncio.gather(
+        _compute_feedback_weights(pool, deck.id, deck.owner_id),
+        _load_user_profile(pool, deck.id, deck.owner_id),
+    )
+    deck_cmc_counts = _compute_deck_cmc_counts(deck)
 
-    raw_response = await _call_llm(ai_client, system, history, user_msg)
-    raw_items = _parse_suggestions(raw_response)
+    limit = target if target is not None else 20
+    candidates = await retrieve_candidates(
+        pool,
+        ai_client,
+        qdrant_client,
+        query_text,
+        query_tags,
+        commander.color_identity,
+        all_excluded,
+        limit=limit,
+        stage=resolved_stage,
+        deck_cmc_counts=deck_cmc_counts,
+        feedback_weights=feedback_weights,
+        user_profile=user_profile,
+    )
+    _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
-    suggestions, unresolved = await _validate_suggestions(pool, raw_items, commander)
+    suggestions = [_card_from_retrieved(c, resolved_stage, query_tags) for c in candidates]
 
-    await conversation_service.append_turn(pool, deck_id, "user", user_msg)
-    if raw_response:
-        await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
     if advance_deck_stage:
         await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage))
 
@@ -390,25 +569,27 @@ async def build_stage(
         stage_number=stage_number(resolved_stage),
         total_stages=_TOTAL_STAGES,
         suggestions=suggestions,
-        unresolved=unresolved,
+        unresolved=[],
     )
 
 
 async def suggest_cards(
     pool: asyncpg.Pool,
     ai_client: openai.AsyncOpenAI,
+    qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     prompt: str,
     count: int,
 ) -> SuggestResponse:
-    """Return AI-suggested cards matching a free-form prompt.
+    """Return suggested cards matching a free-form prompt via hybrid retrieval.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client.
+        ai_client: OpenAI async client (used for embeddings only).
+        qdrant_client: Qdrant async client for semantic retrieval.
         deck_id: The deck's UUID.
         prompt: Natural language description of desired cards.
-        count: Number of cards to request.
+        count: Number of cards to return.
 
     Returns:
         SuggestResponse with validated suggestions.
@@ -424,30 +605,31 @@ async def suggest_cards(
     if commander is None:
         raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
 
-    partner = None
-    if deck.partner_id:
-        partner = await card_service.get_card_by_id(pool, deck.partner_id)
-
-    current_summary = _format_current_cards(deck)
-    user_msg = (
-        f"{prompt}\n\n"
-        f"Suggest {count} cards. Current deck:\n{current_summary}\n\n"
-        "Return only the JSON array."
+    deck_card_ids = [c.card_id for c in deck.cards]
+    query_tags = parse_query_tags(prompt)
+    feedback_weights, user_profile = await asyncio.gather(
+        _compute_feedback_weights(pool, deck.id, deck.owner_id),
+        _load_user_profile(pool, deck.id, deck.owner_id),
     )
+    deck_cmc_counts = _compute_deck_cmc_counts(deck)
 
-    prefs, downvoted = await _load_prompt_context(pool, deck)
-    system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
-    history = await conversation_service.get_turns(pool, deck_id)
-    raw_response = await _call_llm(ai_client, system, history, user_msg)
-    raw_items = _parse_suggestions(raw_response)
+    candidates = await retrieve_candidates(
+        pool,
+        ai_client,
+        qdrant_client,
+        prompt,
+        query_tags,
+        commander.color_identity,
+        deck_card_ids,
+        limit=count,
+        deck_cmc_counts=deck_cmc_counts,
+        feedback_weights=feedback_weights,
+        user_profile=user_profile,
+    )
+    _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 
-    suggestions, unresolved = await _validate_suggestions(pool, raw_items, commander)
-
-    await conversation_service.append_turn(pool, deck_id, "user", user_msg)
-    if raw_response:
-        await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
-
-    return SuggestResponse(suggestions=suggestions, unresolved=unresolved)
+    suggestions = [_card_from_retrieved(c, "theme", query_tags) for c in candidates]
+    return SuggestResponse(suggestions=suggestions, unresolved=[])
 
 
 async def chat_about_deck(

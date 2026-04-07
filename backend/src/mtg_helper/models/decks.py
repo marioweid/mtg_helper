@@ -114,3 +114,22 @@ class DeckCardResponse(BaseModel):
     quantity: int
     category: str | None
     added_by: str
+
+
+class DeckImportRequest(BaseModel):
+    """Request body for importing a deck from a pasted deck list."""
+
+    deck_list: str = Field(min_length=1, max_length=50000)
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    bracket: int = Field(default=3, ge=1, le=4)
+    owner_id: UUID | None = None
+
+
+class DeckImportResponse(BaseModel):
+    """Response from a deck import operation."""
+
+    deck: DeckResponse
+    imported_count: int
+    unresolved: list[str]
+    color_violations: list[str]

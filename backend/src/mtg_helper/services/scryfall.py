@@ -1,14 +1,19 @@
 """Scryfall bulk data pipeline: download, parse, and upsert cards into PostgreSQL."""
 
 import json
+import logging
 import time
 from datetime import date
 from typing import Any
 
 import asyncpg
 import httpx
+import openai
+from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.config import settings
+
+_log = logging.getLogger(__name__)
 
 # Batch size for upsert operations
 _BATCH_SIZE = 500
@@ -158,15 +163,28 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
     )
 
 
-async def run_sync(pool: asyncpg.Pool) -> dict[str, Any]:
+async def run_sync(
+    pool: asyncpg.Pool,
+    ai_client: openai.AsyncOpenAI | None = None,
+    qdrant_client: AsyncQdrantClient | None = None,
+) -> dict[str, Any]:
     """Download Scryfall oracle_cards bulk data and upsert into the cards table.
+
+    When ai_client and qdrant_client are provided, also embeds any cards that
+    are new or updated since their last embedding.
 
     Args:
         pool: asyncpg connection pool.
+        ai_client: Optional OpenAI client for post-sync embedding.
+        qdrant_client: Optional Qdrant client for post-sync embedding.
 
     Returns:
-        Summary dict with cards_processed and duration_seconds.
+        Summary dict with cards_processed, duration_seconds, and optionally
+        cards_embedded.
     """
+    from mtg_helper.services.embedding_service import run_batch_embed
+    from mtg_helper.services.tag_service import run_batch_tag
+
     start = time.monotonic()
     async with httpx.AsyncClient(timeout=120) as client:
         download_url = await _fetch_bulk_data_url(client)
@@ -180,7 +198,24 @@ async def run_sync(pool: asyncpg.Pool) -> dict[str, Any]:
         for i in range(0, len(relevant), _BATCH_SIZE):
             await _upsert_batch(conn, relevant[i : i + _BATCH_SIZE])
 
-    return {
+    result: dict[str, Any] = {
         "cards_processed": len(relevant),
         "duration_seconds": round(time.monotonic() - start, 2),
     }
+
+    if ai_client is not None and qdrant_client is not None:
+        _log.info("Running post-sync tagging")
+        try:
+            tag_result = await run_batch_tag(pool)
+            result["cards_tagged"] = tag_result["cards_tagged"]
+        except Exception:
+            _log.exception("Post-sync tagging failed")
+
+        _log.info("Running post-sync embedding for new/updated cards")
+        try:
+            embed_result = await run_batch_embed(pool, ai_client, qdrant_client)
+            result["cards_embedded"] = embed_result["cards_embedded"]
+        except Exception:
+            _log.exception("Post-sync embedding failed; cards will be embedded on next run")
+
+    return result

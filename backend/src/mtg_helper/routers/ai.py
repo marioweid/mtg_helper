@@ -41,11 +41,12 @@ async def build_stage(
     body: BuildRequest,
     request: Request,
 ) -> DataResponse[BuildResponse]:
-    """Advance the deck to the next build stage and return AI card suggestions."""
+    """Advance the deck to the next build stage and return card suggestions."""
     try:
         result = await ai_service.build_stage(
             request.app.state.db_pool,
             request.app.state.ai_client,
+            request.app.state.qdrant_client,
             deck_id,
             stage=body.stage,
             target=body.target,
@@ -53,8 +54,6 @@ async def build_stage(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
-    except LLMEmptyResponseError as e:
-        raise _llm_unavailable(str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail={"code": "INVALID_STAGE", "message": str(e)})
     return DataResponse(data=result)
@@ -66,19 +65,18 @@ async def suggest_cards(
     body: SuggestRequest,
     request: Request,
 ) -> DataResponse[SuggestResponse]:
-    """Get AI card suggestions for a deck based on a free-form prompt."""
+    """Get card suggestions for a deck based on a free-form prompt."""
     try:
         result = await ai_service.suggest_cards(
             request.app.state.db_pool,
             request.app.state.ai_client,
+            request.app.state.qdrant_client,
             deck_id,
             body.prompt,
             body.count,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
-    except LLMEmptyResponseError as e:
-        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 

@@ -11,11 +11,13 @@ from mtg_helper.models.decks import (
     DeckCardResponse,
     DeckCreate,
     DeckDetailResponse,
+    DeckImportRequest,
+    DeckImportResponse,
     DeckResponse,
     DeckSummary,
     DeckUpdate,
 )
-from mtg_helper.services import deck_service
+from mtg_helper.services import deck_service, import_service
 from mtg_helper.services.deck_service import (
     CardNotFoundError,
     ColorIdentityError,
@@ -54,6 +56,32 @@ async def create_deck(
     except CardNotFoundError as e:
         raise HTTPException(status_code=422, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
     return DataResponse(data=deck)
+
+
+@router.post("/import", response_model=DataResponse[DeckImportResponse], status_code=201)
+async def import_deck(
+    body: DeckImportRequest,
+    request: Request,
+) -> DataResponse[DeckImportResponse]:
+    """Import a deck from a pasted deck list.
+
+    Accepts Moxfield, MTGO, TappedOut, and similar text formats.
+    The deck is created with stage 'complete', skipping the build wizard.
+    Mark the commander with *CMDR* at the end of its line.
+    """
+    try:
+        result = await import_service.import_deck(request.app.state.db_pool, body)
+    except CardNotFoundError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "COMMANDER_NOT_FOUND", "message": str(e)},
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "PARSE_ERROR", "message": str(e)},
+        )
+    return DataResponse(data=result)
 
 
 @router.get("/{deck_id}", response_model=DataResponse[DeckDetailResponse])

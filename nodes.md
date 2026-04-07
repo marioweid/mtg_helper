@@ -1,14 +1,4 @@
-# Changes i want
-
-- Change order of building
-  1. Ramp
-  2. Interaction (Removal and Protection)
-  3. Draw
-  4. Theme
-  5. Lands
-- Removal should be Interaction (Removal and Protection)
-- Change The Building so that in each state it asks of you how much of this kind you want f.e. how much Ramp you want than suggest cards
-- If when deck building i added all cards i want i have a button for more, that gets me new cards and on accepting i add the cards to the deck and updating my counter f.e. 2/8 ramp
-- I want to be able to jump between stages so f.e. i can dynamically switch from ramp to theme. Here when i loaded cards already i dont want to wait again for a fresh card laod.
-- For Lands i want also be able to add multiple forrest.
-- Also when accepting and removing cards i just want to give a good or bad feedback not remove them from the view entirly, this is good when having a load more cards feature.
+# Add card search
+- when adding cards in the sages f.e. ramp i want the load more button and also i want the possibility to manually add cards via a search bar
+- the search bar should accept fuzzy matching so i only need to type parts of the card f.e. and also it should pre-filter based on the commander color identity
+- I also want the possibility to open a small chat and load suggestions from what i type in the chat so f.e. if i have +1/+1 in my deck description but i say token doublers it should give uggestions for the token doublers and not the +1/+1 from the deck there should also be something so that i can remove this filter

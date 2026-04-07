@@ -10,7 +10,14 @@ from pydantic import BaseModel, Field, model_validator
 class PreferenceCreate(BaseModel):
     """Request body for creating a preference."""
 
-    preference_type: Literal["pet_card", "avoid_card", "avoid_archetype", "general"]
+    preference_type: Literal[
+        "pet_card",
+        "avoid_card",
+        "avoid_archetype",
+        "general",
+        "feedback_boosting",
+        "user_profile_boosting",
+    ]
     card_scryfall_id: UUID | None = None
     description: str | None = Field(default=None, max_length=500)
 

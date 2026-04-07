@@ -150,7 +150,16 @@ async def db_pool(_init_db: None) -> AsyncGenerator[asyncpg.Pool]:
 @pytest_asyncio.fixture
 async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
     """HTTP test client with the real FastAPI app and test DB pool."""
+    from unittest.mock import AsyncMock, MagicMock
+
     app.state.db_pool = db_pool
+
+    # Minimal Qdrant mock: search returns empty list so retrieval falls back
+    # to tag + FTS signals only, keeping AI tests independent of vector index.
+    mock_qdrant = MagicMock()
+    mock_qdrant.search = AsyncMock(return_value=[])
+    app.state.qdrant_client = mock_qdrant
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 

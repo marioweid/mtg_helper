@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { getStoredAccountId } from "@/lib/account";
@@ -41,10 +41,15 @@ function colorIdentityFromCards(cards: DeckCardItem[]): string[] {
 
 export default function DeckDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const deckId = params["id"] as string;
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [petCardNames, setPetCardNames] = useState<Set<string>>(new Set());
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [draftDescription, setDraftDescription] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +76,33 @@ export default function DeckDetailPage() {
       setPetCardNames(names);
     }).catch(() => {/* non-critical */});
   }, []);
+
+  async function handleSaveDescription() {
+    if (!deck) return;
+    setSavingDescription(true);
+    try {
+      await apiClient.updateDeck(deck.id, { description: draftDescription || null });
+      setDeck({ ...deck, description: draftDescription || null });
+      setEditingDescription(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update description");
+    } finally {
+      setSavingDescription(false);
+    }
+  }
+
+  async function handleDeleteDeck() {
+    if (!deck) return;
+    if (!confirm(`Delete "${deck.name}"? All cards, feedback, and chat history will be permanently removed.`)) return;
+    setDeleting(true);
+    try {
+      await apiClient.deleteDeck(deck.id);
+      router.push("/decks");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete deck");
+      setDeleting(false);
+    }
+  }
 
   async function handleRemoveCard(scryfallId: string) {
     if (!deck) return;
@@ -108,8 +140,49 @@ export default function DeckDetailPage() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">{deck.name}</h1>
-          {deck.description && (
-            <p className="mt-1 text-sm text-gray-400">{deck.description}</p>
+          {editingDescription ? (
+            <div className="mt-2 flex flex-col gap-2">
+              <textarea
+                value={draftDescription}
+                onChange={(e) => setDraftDescription(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:border-indigo-500 focus:outline-none resize-none"
+                placeholder="Describe the deck strategy..."
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void handleSaveDescription()}
+                  disabled={savingDescription}
+                  className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                >
+                  {savingDescription ? "Saving…" : "Save"}
+                </button>
+                <button
+                  onClick={() => setEditingDescription(false)}
+                  className="rounded-md border border-white/20 px-3 py-1 text-xs text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-1 flex items-start gap-1.5">
+              {deck.description ? (
+                <p className="text-sm text-gray-400">{deck.description}</p>
+              ) : (
+                <span className="text-sm text-gray-600 italic">No description</span>
+              )}
+              <button
+                onClick={() => {
+                  setDraftDescription(deck.description ?? "");
+                  setEditingDescription(true);
+                }}
+                className="ml-1 text-xs text-gray-600 hover:text-gray-300 transition-colors flex-shrink-0"
+                title="Edit description"
+              >
+                ✎
+              </button>
+            </div>
           )}
           <div className="mt-2 flex flex-wrap gap-3 text-sm">
             <span className="rounded bg-white/10 px-2 py-0.5 text-gray-300">{stage}</span>
@@ -136,6 +209,13 @@ export default function DeckDetailPage() {
             Chat
           </Link>
           <ExportButton deckId={deck.id} />
+          <button
+            onClick={() => void handleDeleteDeck()}
+            disabled={deleting}
+            className="rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-400 hover:border-red-500/70 hover:text-red-300 disabled:opacity-50 transition-colors"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
         </div>
       </div>
 

@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS cards (
     set_code        TEXT,
     released_at     DATE,
     edhrec_rank     INTEGER,
+    tags            TEXT[] NOT NULL DEFAULT '{}',
+    embedded_at     TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -51,6 +53,9 @@ CREATE INDEX IF NOT EXISTS idx_cards_legalities
 
 -- Mana value range queries
 CREATE INDEX IF NOT EXISTS idx_cards_cmc ON cards (cmc);
+
+-- Tag-based filtering (hybrid retrieval)
+CREATE INDEX IF NOT EXISTS idx_cards_tags ON cards USING GIN (tags);
 
 -- ============================================================
 -- ACCOUNTS
@@ -98,12 +103,19 @@ CREATE TABLE IF NOT EXISTS preferences (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     preference_type TEXT NOT NULL CHECK (preference_type IN (
-        'pet_card', 'avoid_card', 'avoid_archetype', 'general'
+        'pet_card', 'avoid_card', 'avoid_archetype', 'general', 'feedback_boosting',
+        'user_profile_boosting'
     )),
     card_id         UUID REFERENCES cards(id),
     description     TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_preferences_feedback_boosting
+    ON preferences (account_id) WHERE preference_type = 'feedback_boosting';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_preferences_user_profile_boosting
+    ON preferences (account_id) WHERE preference_type = 'user_profile_boosting';
 
 -- ============================================================
 -- DECK FEEDBACK (per-deck thumbs up/down)
@@ -116,6 +128,8 @@ CREATE TABLE IF NOT EXISTS deck_feedback (
     reason          TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_deck_feedback_deck_id ON deck_feedback (deck_id);
 
 -- ============================================================
 -- CONVERSATION TURNS (AI chat history per deck)

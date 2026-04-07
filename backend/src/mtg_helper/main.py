@@ -8,11 +8,13 @@ import openai
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.config import settings
 from mtg_helper.db import close_pool, create_pool
 from mtg_helper.routers import accounts, admin, ai, cards, decks, feedback, health, preferences
 from mtg_helper.services import scryfall
+from mtg_helper.services.embedding_service import ensure_collection
 
 _log = logging.getLogger(__name__)
 
@@ -22,17 +24,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
     app.state.ai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+    app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url)
+    await ensure_collection(app.state.qdrant_client)
 
     card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
     if card_count == 0:
         _log.info("Cards table is empty — running initial Scryfall sync")
         try:
-            result = await scryfall.run_sync(app.state.db_pool)
+            result = await scryfall.run_sync(
+                app.state.db_pool,
+                app.state.ai_client,
+                app.state.qdrant_client,
+            )
             _log.info("Scryfall sync complete: %s", result)
         except Exception:
             _log.exception("Scryfall sync failed on startup; continuing without card data")
 
     yield
+    await app.state.qdrant_client.close()
     await close_pool(app.state.db_pool)
 
 

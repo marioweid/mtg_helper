@@ -6,6 +6,9 @@ import asyncpg
 
 from mtg_helper.models.preferences import PreferenceCreate, PreferenceResponse
 
+_PET_WEIGHT = 1.5
+_AVOID_WEIGHT = 0.1
+
 
 class AccountNotFoundError(ValueError):
     """Raised when the referenced account does not exist."""
@@ -159,3 +162,71 @@ async def get_preferences_for_prompt(pool: asyncpg.Pool, account_id: UUID) -> di
             result["general"].append(row["description"])
 
     return result
+
+
+async def is_feedback_boosting_enabled(pool: asyncpg.Pool, account_id: UUID) -> bool:
+    """Check if feedback boosting is enabled for an account.
+
+    Args:
+        pool: asyncpg connection pool.
+        account_id: The account's UUID.
+
+    Returns:
+        True if the feedback_boosting preference row exists.
+    """
+    async with pool.acquire() as conn:
+        exists = await conn.fetchval(
+            "SELECT EXISTS(SELECT 1 FROM preferences "
+            "WHERE account_id = $1 AND preference_type = 'feedback_boosting')",
+            account_id,
+        )
+    return bool(exists)
+
+
+async def is_user_profile_enabled(pool: asyncpg.Pool, account_id: UUID) -> bool:
+    """Check if user profile boosting is enabled for an account.
+
+    Args:
+        pool: asyncpg connection pool.
+        account_id: The account's UUID.
+
+    Returns:
+        True if the user_profile_boosting preference row exists.
+    """
+    async with pool.acquire() as conn:
+        exists = await conn.fetchval(
+            "SELECT EXISTS(SELECT 1 FROM preferences "
+            "WHERE account_id = $1 AND preference_type = 'user_profile_boosting')",
+            account_id,
+        )
+    return bool(exists)
+
+
+async def get_card_preference_weights(
+    pool: asyncpg.Pool,
+    account_id: UUID,
+) -> dict[UUID, float]:
+    """Get per-card weight multipliers from account-level preferences.
+
+    Args:
+        pool: asyncpg connection pool.
+        account_id: The account's UUID.
+
+    Returns:
+        Dict mapping card UUID to weight multiplier
+        (1.5 for pet_card, 0.1 for avoid_card).
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT card_id, preference_type FROM preferences "
+            "WHERE account_id = $1 AND preference_type IN ('pet_card', 'avoid_card') "
+            "AND card_id IS NOT NULL",
+            account_id,
+        )
+    weights: dict[UUID, float] = {}
+    for row in rows:
+        if row["preference_type"] == "pet_card":
+            weights[row["card_id"]] = _PET_WEIGHT
+        else:
+            weights[row["card_id"]] = _AVOID_WEIGHT
+    return weights
