@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS cards (
     released_at     DATE,
     edhrec_rank     INTEGER,
     tags            TEXT[] NOT NULL DEFAULT '{}',
+    card_types      TEXT[] NOT NULL DEFAULT '{}',
+    subtypes        TEXT[] NOT NULL DEFAULT '{}',
     embedded_at     TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -56,6 +58,10 @@ CREATE INDEX IF NOT EXISTS idx_cards_cmc ON cards (cmc);
 
 -- Tag-based filtering (hybrid retrieval)
 CREATE INDEX IF NOT EXISTS idx_cards_tags ON cards USING GIN (tags);
+
+-- Type/subtype filtering (soft boosting)
+CREATE INDEX IF NOT EXISTS idx_cards_card_types ON cards USING GIN (card_types);
+CREATE INDEX IF NOT EXISTS idx_cards_subtypes ON cards USING GIN (subtypes);
 
 -- ============================================================
 -- ACCOUNTS

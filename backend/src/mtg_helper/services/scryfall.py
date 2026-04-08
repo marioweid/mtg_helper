@@ -18,6 +18,53 @@ _log = logging.getLogger(__name__)
 # Batch size for upsert operations
 _BATCH_SIZE = 500
 
+_CARD_TYPES = frozenset({
+    "Artifact", "Creature", "Enchantment", "Instant",
+    "Land", "Planeswalker", "Sorcery", "Battle", "Kindred",
+})
+
+
+def parse_type_line(type_line: str | None) -> tuple[list[str], list[str]]:
+    """Parse a Scryfall type line into card types and subtypes.
+
+    Handles double-faced cards (split on ' // '), extracts card types from the
+    left side of ' — ' and subtypes from the right side.
+
+    Args:
+        type_line: Raw type line string, e.g. "Legendary Creature — Human Wizard".
+
+    Returns:
+        Tuple of (card_types, subtypes) with deduplicated values.
+    """
+    if not type_line:
+        return [], []
+
+    all_card_types: list[str] = []
+    all_subtypes: list[str] = []
+
+    for face in type_line.split(" // "):
+        parts = face.split(" \u2014 ", maxsplit=1)
+        left_words = parts[0].split()
+        all_card_types.extend(w for w in left_words if w in _CARD_TYPES)
+        if len(parts) > 1:
+            all_subtypes.extend(parts[1].split())
+
+    seen_types: set[str] = set()
+    card_types: list[str] = []
+    for t in all_card_types:
+        if t not in seen_types:
+            seen_types.add(t)
+            card_types.append(t)
+
+    seen_subs: set[str] = set()
+    subtypes: list[str] = []
+    for s in all_subtypes:
+        if s not in seen_subs:
+            seen_subs.add(s)
+            subtypes.append(s)
+
+    return card_types, subtypes
+
 
 def _extract_image_uri(card: dict[str, Any]) -> str | None:
     """Extract the normal-size image URI from a Scryfall card object.
@@ -47,6 +94,7 @@ def _map_card(card: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Dict with keys matching the cards table columns.
     """
+    card_types, subtypes = parse_type_line(card.get("type_line"))
     return {
         "scryfall_id": card["id"],
         "oracle_id": card.get("oracle_id"),
@@ -67,6 +115,8 @@ def _map_card(card: dict[str, Any]) -> dict[str, Any]:
         "set_code": card.get("set"),
         "released_at": date.fromisoformat(card["released_at"]) if card.get("released_at") else None,
         "edhrec_rank": card.get("edhrec_rank"),
+        "card_types": card_types,
+        "subtypes": subtypes,
     }
 
 
@@ -110,10 +160,11 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
         INSERT INTO cards (
             scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
             color_identity, colors, keywords, power, toughness, legalities,
-            image_uri, prices, rarity, set_code, released_at, edhrec_rank, updated_at
+            image_uri, prices, rarity, set_code, released_at, edhrec_rank,
+            card_types, subtypes, updated_at
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, now()
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, now()
         )
         ON CONFLICT (scryfall_id) DO UPDATE SET
             oracle_id      = EXCLUDED.oracle_id,
@@ -134,6 +185,8 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
             set_code       = EXCLUDED.set_code,
             released_at    = EXCLUDED.released_at,
             edhrec_rank    = EXCLUDED.edhrec_rank,
+            card_types     = EXCLUDED.card_types,
+            subtypes       = EXCLUDED.subtypes,
             updated_at     = now()
         """,
         [
@@ -157,6 +210,8 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
                 c["set_code"],
                 c["released_at"],
                 c["edhrec_rank"],
+                c["card_types"],
+                c["subtypes"],
             )
             for c in batch
         ],

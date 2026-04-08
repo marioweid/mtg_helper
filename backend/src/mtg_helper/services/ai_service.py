@@ -25,6 +25,7 @@ from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
 from mtg_helper.services.retrieval_service import (
     RetrievedCard,
     parse_query_tags,
+    parse_query_types,
     retrieve_candidates,
     stage_retrieval_query,
 )
@@ -607,6 +608,7 @@ async def suggest_cards(
 
     deck_card_ids = [c.card_id for c in deck.cards]
     query_tags = parse_query_tags(prompt)
+    type_filter = parse_query_types(prompt)
     feedback_weights, user_profile = await asyncio.gather(
         _compute_feedback_weights(pool, deck.id, deck.owner_id),
         _load_user_profile(pool, deck.id, deck.owner_id),
@@ -625,6 +627,7 @@ async def suggest_cards(
         deck_cmc_counts=deck_cmc_counts,
         feedback_weights=feedback_weights,
         user_profile=user_profile,
+        type_filter=type_filter,
     )
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 

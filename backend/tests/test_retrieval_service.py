@@ -4,11 +4,14 @@ from decimal import Decimal
 from uuid import UUID
 
 from mtg_helper.services.retrieval_service import (
+    TypeFilter,
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
     _personal_rating,
+    _type_match_score,
     parse_query_tags,
+    parse_query_types,
     stage_retrieval_query,
 )
 
@@ -308,3 +311,131 @@ def test_stage_retrieval_query_no_description_unchanged() -> None:
     # Both should return the base ramp query without description appended
     assert text_none == text_empty
     assert tags_none == tags_empty
+
+
+# ── parse_query_types ─────────────────────────────────────────────────────────
+
+
+def test_parse_query_types_no_types_returns_none() -> None:
+    assert parse_query_types("I want ramp spells") is None
+
+
+def test_parse_query_types_detects_card_type() -> None:
+    result = parse_query_types("artifact ramp please")
+    assert result is not None
+    assert "Artifact" in result.card_types
+    assert result.subtypes == []
+
+
+def test_parse_query_types_detects_subtype() -> None:
+    result = parse_query_types("elf mana dorks")
+    assert result is not None
+    assert "Elf" in result.subtypes
+    assert result.card_types == []
+
+
+def test_parse_query_types_detects_multiple_subtypes() -> None:
+    result = parse_query_types("monk human ramp")
+    assert result is not None
+    assert "Monk" in result.subtypes
+    assert "Human" in result.subtypes
+
+
+def test_parse_query_types_case_insensitive() -> None:
+    result = parse_query_types("ARTIFACT removal")
+    assert result is not None
+    assert "Artifact" in result.card_types
+
+
+def test_parse_query_types_mixed_type_and_subtype() -> None:
+    result = parse_query_types("artifact creature goblin")
+    assert result is not None
+    assert "Artifact" in result.card_types
+    assert "Creature" in result.card_types
+    assert "Goblin" in result.subtypes
+
+
+def test_parse_query_types_elves_normalized() -> None:
+    result = parse_query_types("elves ramp")
+    assert result is not None
+    assert "Elf" in result.subtypes
+
+
+def test_parse_query_types_empty_string_returns_none() -> None:
+    assert parse_query_types("") is None
+
+
+# ── _type_match_score ─────────────────────────────────────────────────────────
+
+
+def _make_type_row(card_types: list[str], subtypes: list[str]) -> dict:
+    return {
+        "id": _A,
+        "edhrec_rank": 100,
+        "cmc": Decimal("2"),
+        "card_types": card_types,
+        "subtypes": subtypes,
+        "tags": [],
+    }
+
+
+def test_type_match_score_full_match() -> None:
+    row = _make_type_row(["Artifact"], [])
+    tf = TypeFilter(card_types=["Artifact"], subtypes=[])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_no_match() -> None:
+    row = _make_type_row(["Creature"], ["Human"])
+    tf = TypeFilter(card_types=["Artifact"], subtypes=[])
+    assert _type_match_score(row, tf) == 0.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_partial_match() -> None:
+    row = _make_type_row(["Creature"], ["Human"])
+    tf = TypeFilter(card_types=[], subtypes=["Human", "Monk"])
+    score = _type_match_score(row, tf)  # type: ignore[arg-type]
+    assert score == 0.5
+
+
+def test_type_match_score_subtype_match() -> None:
+    row = _make_type_row(["Creature"], ["Elf", "Druid"])
+    tf = TypeFilter(card_types=[], subtypes=["Elf"])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+# ── _compute_weighted_scores with type_filter ─────────────────────────────────
+
+
+def test_weighted_score_type_filter_boosts_matching_card() -> None:
+    rows = {
+        _A: {**_make_type_row(["Artifact"], []), "id": _A},
+        _B: {**_make_type_row(["Creature"], ["Human"]), "id": _B},
+    }
+    tf = TypeFilter(card_types=["Artifact"], subtypes=[])
+    scores = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.5, _B: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,  # type: ignore[arg-type]
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        type_filter=tf,
+    )
+    assert scores[_A] > scores[_B]
+
+
+def test_weighted_score_no_type_filter_unchanged_weights() -> None:
+    rows = {_A: _make_row(_A), _B: _make_row(_B)}
+    scores_no_filter = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.8, _B: 0.2},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        type_filter=None,
+    )
+    assert scores_no_filter[_A] > scores_no_filter[_B]

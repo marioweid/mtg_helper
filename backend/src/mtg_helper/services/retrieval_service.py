@@ -32,6 +32,18 @@ _TARGET_CMC: dict[int, float] = {0: 0.05, 1: 0.08, 2: 0.22, 3: 0.25, 4: 0.18, 5:
 
 
 @dataclass
+class TypeFilter:
+    """Parsed type/subtype preferences from a user query.
+
+    When present, cards matching these types get a score boost during fusion.
+    Cards that do not match are not excluded — the filter is always soft.
+    """
+
+    card_types: list[str]
+    subtypes: list[str]
+
+
+@dataclass
 class RetrievedCard:
     """A card retrieved via hybrid search, enriched with full DB data."""
 
@@ -151,6 +163,65 @@ def parse_query_tags(query: str) -> list[str]:
             seen.add(tag)
             result.append(tag)
     return result
+
+
+_CARD_TYPE_NAMES: frozenset[str] = frozenset({
+    "artifact", "creature", "enchantment", "instant",
+    "land", "planeswalker", "sorcery", "battle", "kindred",
+})
+
+# Common creature and permanent subtypes worth detecting in queries
+_SUBTYPE_NAMES: frozenset[str] = frozenset({
+    "elf", "elves", "human", "wizard", "goblin", "dragon", "monk",
+    "angel", "demon", "zombie", "vampire", "merfolk", "warrior",
+    "knight", "cleric", "rogue", "shaman", "druid", "beast",
+    "elemental", "spirit", "squirrel", "cat", "dog", "bird",
+    "soldier", "pirate", "dinosaur", "giant", "hydra", "wurm",
+    "sliver", "golem", "elemental", "treefolk", "faerie", "kithkin",
+    "ally", "scout", "ranger", "archer", "berserker", "artificer",
+    "advisor", "noble", "peasant", "citizen", "rebel", "mercenary",
+    "shaman", "barbarian", "horror", "illusion", "shapeshifter",
+    "snake", "wolf", "bear", "spider", "insect", "rat", "fox",
+    "raccoon", "rabbit", "otter", "mouse", "bat", "fish",
+    "equipment", "aura", "vehicle", "food", "treasure", "clue",
+    "saga", "class", "role", "curse",
+})
+
+# Map plural/variant forms to canonical subtype
+_SUBTYPE_NORMALIZE: dict[str, str] = {"elves": "Elf"}
+
+
+def parse_query_types(query: str) -> TypeFilter | None:
+    """Extract type/subtype preferences from a natural-language query.
+
+    Returns None when no type terms are detected, keeping the feature inactive
+    for queries that don't mention card types.
+
+    Args:
+        query: Free-form user query text.
+
+    Returns:
+        TypeFilter if any types/subtypes detected, else None.
+    """
+    words = query.lower().split()
+    card_types: list[str] = []
+    subtypes: list[str] = []
+    seen_types: set[str] = set()
+    seen_subs: set[str] = set()
+
+    for word in words:
+        stripped = word.strip(".,!?;:'\"")
+        if stripped in _CARD_TYPE_NAMES and stripped not in seen_types:
+            seen_types.add(stripped)
+            card_types.append(stripped.capitalize())
+        elif stripped in _SUBTYPE_NAMES and stripped not in seen_subs:
+            seen_subs.add(stripped)
+            canonical = _SUBTYPE_NORMALIZE.get(stripped, stripped.capitalize())
+            subtypes.append(canonical)
+
+    if not card_types and not subtypes:
+        return None
+    return TypeFilter(card_types=card_types, subtypes=subtypes)
 
 
 def stage_retrieval_query(stage: str, deck_description: str | None) -> tuple[str, list[str]]:
@@ -422,6 +493,28 @@ def _personal_rating(card_id: UUID, feedback_weights: dict[UUID, float] | None) 
     return (weight - 0.05) / 1.95
 
 
+def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
+    """Score a card based on how many of the requested types/subtypes it matches.
+
+    Returns a [0.0, 1.0] value proportional to the fraction of requested types
+    that the card satisfies. A card with no matching types scores 0.0.
+
+    Args:
+        row: DB row with card_types and subtypes fields.
+        type_filter: Parsed type preferences from the user query.
+
+    Returns:
+        Match fraction in [0.0, 1.0].
+    """
+    requested = set(type_filter.card_types) | set(type_filter.subtypes)
+    if not requested:
+        return 0.0
+    card_types = set(row["card_types"])
+    subtypes = set(row["subtypes"])
+    matched = (card_types & set(type_filter.card_types)) | (subtypes & set(type_filter.subtypes))
+    return len(matched) / len(requested)
+
+
 def _compute_weighted_scores(
     all_ids: list[UUID],
     qdrant_scores: dict[UUID, float],
@@ -431,15 +524,25 @@ def _compute_weighted_scores(
     deck_cmc_counts: dict[int, int] | None,
     feedback_weights: dict[UUID, float] | None,
     user_profile: "profile_service.UserProfile | None" = None,
+    type_filter: TypeFilter | None = None,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
-    Formula:
+    Without type_filter:
         score = 0.4 * vector_similarity
               + 0.3 * synergy_score
               + 0.05 * popularity
               + 0.1 * curve_fit
               + 0.1 * personal_card_rating
+              + 0.05 * user_profile_score
+
+    With type_filter (reallocates 0.15 to type match signal):
+        score = 0.35 * vector_similarity
+              + 0.25 * synergy_score
+              + 0.15 * type_match
+              + 0.05 * popularity
+              + 0.1 * curve_fit
+              + 0.05 * personal_card_rating
               + 0.05 * user_profile_score
 
     Args:
@@ -451,6 +554,7 @@ def _compute_weighted_scores(
         deck_cmc_counts: Current deck CMC distribution.
         feedback_weights: Per-card feedback weight multipliers.
         user_profile: Optional cross-deck user preference profile.
+        type_filter: Optional parsed type/subtype preferences; activates type boost.
 
     Returns:
         Dict mapping card UUID to final weighted score.
@@ -469,40 +573,63 @@ def _compute_weighted_scores(
         if row is None:
             continue
 
-        # 0.4 — vector similarity (cosine, already [0,1])
         vec_sim = qdrant_scores.get(uid, 0.0)
 
-        # 0.3 — synergy: tag overlap, with FTS membership as a bonus
         raw_overlap = tag_overlaps.get(uid, 0)
         fts_bonus = 0.15 if uid in fts_set else 0.0
         synergy = min(1.0, (raw_overlap / max_overlap) + fts_bonus)
 
-        # 0.05 — popularity (lower edhrec_rank → more popular → higher score)
         rank = row["edhrec_rank"]
         popularity = (1.0 - rank / max_rank) if rank is not None else 0.0
 
-        # 0.1 — curve fit
         curve = _curve_fit_score(row["cmc"], deck_cmc_counts)
-
-        # 0.1 — personal rating from feedback
         personal = _personal_rating(uid, feedback_weights)
 
-        # 0.05 — cross-deck user profile signal
         if user_profile is not None:
             profile_score = profile_service.score_card(user_profile, uid, list(row["tags"]))
         else:
             profile_score = 0.5
 
-        scores[uid] = (
-            0.4 * vec_sim
-            + 0.3 * synergy
-            + 0.05 * popularity
-            + 0.1 * curve
-            + 0.1 * personal
-            + 0.05 * profile_score
-        )
+        if type_filter is not None:
+            type_score = _type_match_score(row, type_filter)
+            scores[uid] = (
+                0.35 * vec_sim
+                + 0.25 * synergy
+                + 0.15 * type_score
+                + 0.05 * popularity
+                + 0.1 * curve
+                + 0.05 * personal
+                + 0.05 * profile_score
+            )
+        else:
+            scores[uid] = (
+                0.4 * vec_sim
+                + 0.3 * synergy
+                + 0.05 * popularity
+                + 0.1 * curve
+                + 0.1 * personal
+                + 0.05 * profile_score
+            )
 
     return scores
+
+
+def _annotate_type_signals(
+    signal_map: dict[UUID, list[str]],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+    type_filter: TypeFilter | None,
+) -> None:
+    """Add 'type' to signal_map for cards that match the type filter.
+
+    No-op when type_filter is None.
+    """
+    if type_filter is None:
+        return
+    for uid, row in cards_by_id.items():
+        if _type_match_score(row, type_filter) > 0:
+            entry = signal_map.setdefault(uid, [])
+            if "type" not in entry:
+                entry.append("type")
 
 
 async def retrieve_candidates(
@@ -519,6 +646,7 @@ async def retrieve_candidates(
     deck_cmc_counts: dict[int, int] | None = None,
     feedback_weights: dict[UUID, float] | None = None,
     user_profile: "profile_service.UserProfile | None" = None,
+    type_filter: TypeFilter | None = None,
 ) -> list[RetrievedCard]:
     """Run hybrid retrieval and return top candidate cards with weighted scoring.
 
@@ -538,6 +666,7 @@ async def retrieve_candidates(
         deck_cmc_counts: Deck's current CMC distribution for curve fit scoring.
         feedback_weights: Optional per-card score multipliers (range [0.05, 2.0]).
         user_profile: Optional cross-deck user preference profile.
+        type_filter: Optional type/subtype preferences for soft score boosting.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -582,7 +711,10 @@ async def retrieve_candidates(
         deck_cmc_counts,
         feedback_weights,
         user_profile,
+        type_filter,
     )
+
+    _annotate_type_signals(signal_map, cards_by_id, type_filter)
     top_ids = sorted(scores, key=lambda uid: scores[uid], reverse=True)[:limit]
     if not top_ids:
         return []
@@ -636,7 +768,8 @@ async def _fetch_candidates(
         rows = await conn.fetch(
             f"""
             SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
-                   color_identity, image_uri, tags, edhrec_rank, power, toughness, rarity
+                   color_identity, image_uri, tags, edhrec_rank, power, toughness, rarity,
+                   card_types, subtypes
             FROM cards
             WHERE id = ANY($1::uuid[])
               {land_filter}
