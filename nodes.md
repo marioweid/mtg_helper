@@ -1,4 +1,5 @@
 # Add card search
-- when adding cards in the sages f.e. ramp i want the load more button and also i want the possibility to manually add cards via a search bar
-- the search bar should accept fuzzy matching so i only need to type parts of the card f.e. and also it should pre-filter based on the commander color identity
-- I also want the possibility to open a small chat and load suggestions from what i type in the chat so f.e. if i have +1/+1 in my deck description but i say token doublers it should give uggestions for the token doublers and not the +1/+1 from the deck there should also be something so that i can remove this filter
+- Also add metadata filtering for types f.e. artifcats, create but also supertypes like squirrels, monk, human, wizzard.
+- These need to be added in the pipeline from scryfall and added to the vector db so that we can do metadata filtering
+- the idea is that when i promp in the prompt f.e. i want only exclusively artifact ramp, or please priotize artifact ramp that there is a pre_filtering for that field
+- also this should not be very strict so f.e. if i has i want monk human ramp, there wont be any matches but if there are some that f.e. are human ramp, these should go first and have higher scores. This is especially with elves f.e. if im building an elv deck i usually dont want other ramp than mana dorck elves, how can we implement this so that its not on by default and every search etc. is too strict ?

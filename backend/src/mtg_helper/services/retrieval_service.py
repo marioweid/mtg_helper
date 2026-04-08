@@ -176,11 +176,7 @@ def stage_retrieval_query(stage: str, deck_description: str | None) -> tuple[str
         return base
 
     query_text = f"{base[0]} {deck_description}"
-    query_tags = list(base[1])
-    for tag in parse_query_tags(deck_description):
-        if tag not in query_tags:
-            query_tags.append(tag)
-    return query_text, query_tags
+    return query_text, list(base[1])
 
 
 def _excluded_colors(commander_color_identity: list[str]) -> list[str]:

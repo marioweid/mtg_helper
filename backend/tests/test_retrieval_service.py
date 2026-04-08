@@ -287,22 +287,19 @@ def test_stage_retrieval_query_ramp_with_description() -> None:
     text, tags = stage_retrieval_query("ramp", "Squirrels and +1/+1 Counters")
     assert "Squirrels" in text
     assert "+1/+1 Counters" in text
-    assert "ramp" in tags
-    assert "plus_one_counters" in tags
+    assert tags == ["ramp", "fast_mana"]
 
 
 def test_stage_retrieval_query_draw_with_description() -> None:
     text, tags = stage_retrieval_query("draw", "sacrifice aristocrats")
     assert "sacrifice" in text.lower()
-    assert "draw" in tags
-    assert "sacrifice" in tags
-    assert "aristocrats" in tags
+    assert tags == ["draw"]
 
 
-def test_stage_retrieval_query_description_tags_deduped() -> None:
-    # "ramp" in description should not double the ramp tag
-    _, tags = stage_retrieval_query("ramp", "ramp and counters")
-    assert tags.count("ramp") == 1
+def test_stage_retrieval_query_description_does_not_affect_tags() -> None:
+    # Deck description keywords must never pollute non-theme stage tags
+    _, tags = stage_retrieval_query("ramp", "elf tribal with card draw and sacrifice")
+    assert tags == ["ramp", "fast_mana"]
 
 
 def test_stage_retrieval_query_no_description_unchanged() -> None:
