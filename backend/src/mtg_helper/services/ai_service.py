@@ -534,7 +534,8 @@ async def build_stage(
 
     deck_card_ids = [c.card_id for c in deck.cards]
     exclude_ids = await _resolve_exclude_ids(pool, exclude)
-    all_excluded = list({*deck_card_ids, *exclude_ids})
+    commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
+    all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids})
 
     query_text, query_tags = stage_retrieval_query(resolved_stage, deck.description)
     feedback_weights, user_profile = await asyncio.gather(
@@ -606,7 +607,8 @@ async def suggest_cards(
     if commander is None:
         raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
 
-    deck_card_ids = [c.card_id for c in deck.cards]
+    commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
+    deck_card_ids = list({*(c.card_id for c in deck.cards), *commander_ids})
     query_tags = parse_query_tags(prompt)
     type_filter = parse_query_types(prompt)
     feedback_weights, user_profile = await asyncio.gather(

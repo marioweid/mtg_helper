@@ -368,13 +368,22 @@ def test_parse_query_types_empty_string_returns_none() -> None:
 # ── _type_match_score ─────────────────────────────────────────────────────────
 
 
-def _make_type_row(card_types: list[str], subtypes: list[str]) -> dict:
+def _make_type_row(
+    card_types: list[str],
+    subtypes: list[str],
+    keywords: list[str] | None = None,
+    traits: list[str] | None = None,
+    token_types: list[str] | None = None,
+) -> dict:
     return {
         "id": _A,
         "edhrec_rank": 100,
         "cmc": Decimal("2"),
         "card_types": card_types,
         "subtypes": subtypes,
+        "keywords": keywords or [],
+        "traits": traits or [],
+        "token_types": token_types or [],
         "tags": [],
     }
 
@@ -439,3 +448,275 @@ def test_weighted_score_no_type_filter_unchanged_weights() -> None:
         type_filter=None,
     )
     assert scores_no_filter[_A] > scores_no_filter[_B]
+
+
+# ── _type_match_score with keywords + traits ──────────────────────────────────
+
+
+def test_type_match_score_keyword_match() -> None:
+    row = _make_type_row(["Creature"], [], keywords=["Flying", "Vigilance"])
+    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying"])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_keyword_no_match() -> None:
+    row = _make_type_row(["Creature"], [], keywords=["Vigilance"])
+    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying"])
+    assert _type_match_score(row, tf) == 0.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_trait_match() -> None:
+    row = _make_type_row(["Creature"], [], traits=["etb", "evasion"])
+    tf = TypeFilter(card_types=[], subtypes=[], traits=["etb"])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_keyword_case_insensitive() -> None:
+    row = _make_type_row(["Creature"], [], keywords=["Flying"])
+    tf = TypeFilter(card_types=[], subtypes=[], keywords=["flying"])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_mixed_partial() -> None:
+    # Request: flying + deathtouch; card has only flying → 0.5
+    row = _make_type_row(["Creature"], [], keywords=["Flying"])
+    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"])
+    assert _type_match_score(row, tf) == 0.5  # type: ignore[arg-type]
+
+
+# ── parse_query_types: keywords + traits + strict ─────────────────────────────
+
+
+def test_parse_query_types_detects_keyword() -> None:
+    result = parse_query_types("flying creatures")
+    assert result is not None
+    assert "Flying" in result.keywords
+    assert "Creature" in result.card_types
+
+
+def test_parse_query_types_flying_deathtouch_strict() -> None:
+    result = parse_query_types("flying deathtouch creatures")
+    assert result is not None
+    assert "Flying" in result.keywords
+    assert "Deathtouch" in result.keywords
+    assert "Creature" in result.card_types
+    assert result.strict is True
+
+
+def test_parse_query_types_artifact_ramp_not_strict() -> None:
+    # Only 1 filter dimension (card_types) → not strict
+    result = parse_query_types("artifact ramp")
+    assert result is not None
+    assert "Artifact" in result.card_types
+    assert result.strict is False
+
+
+def test_parse_query_types_detects_etb_trait() -> None:
+    result = parse_query_types("etb creatures")
+    assert result is not None
+    assert "etb" in result.traits
+    assert "Creature" in result.card_types
+
+
+def test_parse_query_types_etb_creature_strict() -> None:
+    result = parse_query_types("etb creatures")
+    assert result is not None
+    assert result.strict is True
+
+
+def test_parse_query_types_evasion_trait() -> None:
+    result = parse_query_types("evasive threats")
+    assert result is not None
+    assert "evasion" in result.traits
+
+
+def test_parse_query_types_first_strike_phrase() -> None:
+    result = parse_query_types("first strike creatures")
+    assert result is not None
+    assert "First Strike" in result.keywords
+
+
+def test_parse_query_types_double_strike_phrase() -> None:
+    result = parse_query_types("double strike warriors")
+    assert result is not None
+    assert "Double Strike" in result.keywords
+    assert "Warrior" in result.subtypes
+    assert result.strict is True
+
+
+# ── strict mode filtering ─────────────────────────────────────────────────────
+
+
+def test_strict_mode_zeroes_out_zero_match_cards() -> None:
+    rows = {
+        _A: {**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A},
+        _B: {**_make_type_row(["Enchantment"], []), "id": _B},  # zero match
+    }
+    tf = TypeFilter(card_types=["Creature"], subtypes=[], keywords=["Flying"], strict=True)
+    scores = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.5, _B: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,  # type: ignore[arg-type]
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        type_filter=tf,
+    )
+    assert scores[_B] == 0.0
+    assert scores[_A] > 0.0
+
+
+def test_strict_mode_partial_match_not_zeroed() -> None:
+    # Flying creature but no deathtouch — partial match, not zeroed
+    rows = {
+        _A: {**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A},
+    }
+    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"], strict=True)
+    scores = _compute_weighted_scores(
+        [_A],
+        qdrant_scores={_A: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,  # type: ignore[arg-type]
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        type_filter=tf,
+    )
+    assert scores[_A] > 0.0
+
+
+def test_non_strict_mode_zero_match_not_zeroed() -> None:
+    rows = {
+        _A: {**_make_type_row(["Enchantment"], []), "id": _A},
+    }
+    tf = TypeFilter(card_types=["Creature"], subtypes=[], strict=False)
+    scores = _compute_weighted_scores(
+        [_A],
+        qdrant_scores={_A: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,  # type: ignore[arg-type]
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        type_filter=tf,
+    )
+    assert scores[_A] > 0.0
+
+
+# ── parse_query_types: token_types ────────────────────────────────────────────
+
+
+def test_parse_query_types_detects_treasure() -> None:
+    result = parse_query_types("treasure producers")
+    assert result is not None
+    assert "treasure" in result.token_types
+
+
+def test_parse_query_types_detects_food() -> None:
+    result = parse_query_types("food token synergy")
+    assert result is not None
+    assert "food" in result.token_types
+
+
+def test_parse_query_types_detects_clue() -> None:
+    result = parse_query_types("clue investigate")
+    assert result is not None
+    assert "clue" in result.token_types
+
+
+def test_parse_query_types_detects_blood() -> None:
+    result = parse_query_types("blood token cards")
+    assert result is not None
+    assert "blood" in result.token_types
+
+
+def test_parse_query_types_detects_powerstone() -> None:
+    result = parse_query_types("powerstone ramp")
+    assert result is not None
+    assert "powerstone" in result.token_types
+
+
+def test_parse_query_types_detects_map() -> None:
+    result = parse_query_types("map token explore")
+    assert result is not None
+    assert "map" in result.token_types
+
+
+def test_parse_query_types_detects_incubator() -> None:
+    result = parse_query_types("incubator transform")
+    assert result is not None
+    assert "incubator" in result.token_types
+
+
+def test_parse_query_types_token_type_strict_with_card_type() -> None:
+    result = parse_query_types("treasure artifact")
+    assert result is not None
+    assert "treasure" in result.token_types
+    assert result.strict is True
+
+
+def test_parse_query_types_token_type_no_duplicates() -> None:
+    result = parse_query_types("treasure treasure synergy")
+    assert result is not None
+    assert result.token_types.count("treasure") == 1
+
+
+# ── parse_query_types: extended keywords ──────────────────────────────────────
+
+
+def test_parse_query_types_scry() -> None:
+    result = parse_query_types("cards with scry")
+    assert result is not None
+    assert "Scry" in result.keywords
+
+
+def test_parse_query_types_surveil() -> None:
+    result = parse_query_types("surveil cards")
+    assert result is not None
+    assert "Surveil" in result.keywords
+
+
+def test_parse_query_types_discover() -> None:
+    result = parse_query_types("discover synergy")
+    assert result is not None
+    assert "Discover" in result.keywords
+
+
+def test_parse_query_types_flashback() -> None:
+    result = parse_query_types("flashback spells")
+    assert result is not None
+    assert "Flashback" in result.keywords
+
+
+def test_parse_query_types_proliferate() -> None:
+    result = parse_query_types("proliferate counters")
+    assert result is not None
+    assert "Proliferate" in result.keywords
+
+
+# ── _type_match_score with token_types ────────────────────────────────────────
+
+
+def test_type_match_score_token_type_full_match() -> None:
+    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
+    tf = TypeFilter(card_types=[], subtypes=[], token_types=["treasure"])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_token_type_no_match() -> None:
+    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
+    tf = TypeFilter(card_types=[], subtypes=[], token_types=["food"])
+    assert _type_match_score(row, tf) == 0.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_token_type_partial() -> None:
+    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
+    tf = TypeFilter(card_types=[], subtypes=[], token_types=["treasure", "food"])
+    assert _type_match_score(row, tf) == 0.5  # type: ignore[arg-type]
+
+
+def test_type_match_score_token_type_with_card_type() -> None:
+    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
+    tf = TypeFilter(card_types=["Artifact"], subtypes=[], token_types=["treasure"])
+    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]

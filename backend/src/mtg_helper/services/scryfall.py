@@ -18,10 +18,19 @@ _log = logging.getLogger(__name__)
 # Batch size for upsert operations
 _BATCH_SIZE = 500
 
-_CARD_TYPES = frozenset({
-    "Artifact", "Creature", "Enchantment", "Instant",
-    "Land", "Planeswalker", "Sorcery", "Battle", "Kindred",
-})
+_CARD_TYPES = frozenset(
+    {
+        "Artifact",
+        "Creature",
+        "Enchantment",
+        "Instant",
+        "Land",
+        "Planeswalker",
+        "Sorcery",
+        "Battle",
+        "Kindred",
+    }
+)
 
 
 def parse_type_line(type_line: str | None) -> tuple[list[str], list[str]]:

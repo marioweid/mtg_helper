@@ -33,14 +33,18 @@ _TARGET_CMC: dict[int, float] = {0: 0.05, 1: 0.08, 2: 0.22, 3: 0.25, 4: 0.18, 5:
 
 @dataclass
 class TypeFilter:
-    """Parsed type/subtype preferences from a user query.
+    """Parsed type/subtype/keyword/trait preferences from a user query.
 
-    When present, cards matching these types get a score boost during fusion.
-    Cards that do not match are not excluded — the filter is always soft.
+    When present, cards matching these criteria get a score boost during fusion.
+    When strict=True, cards with zero matches are scored 0.0 (hard-filtered out).
     """
 
     card_types: list[str]
     subtypes: list[str]
+    keywords: list[str] = field(default_factory=list)
+    traits: list[str] = field(default_factory=list)
+    token_types: list[str] = field(default_factory=list)
+    strict: bool = False
 
 
 @dataclass
@@ -57,6 +61,7 @@ class RetrievedCard:
     color_identity: list[str]
     image_uri: str | None
     tags: list[str]
+    token_types: list[str]
     edhrec_rank: int | None
     power: str | None
     toughness: str | None
@@ -121,6 +126,52 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "extra turn": ["extra_turn"],
     "land destruction": ["land_destruction"],
     "tribal": ["tribal"],
+    "treasure": ["token"],
+    "food token": ["token"],
+    "clue token": ["token"],
+    "blood token": ["token"],
+    "powerstone": ["token"],
+    "treasure token": ["token"],
+}
+
+# Token types that can be detected from a query (maps query word → canonical name)
+_TOKEN_TYPE_NAMES: dict[str, str] = {
+    "treasure": "treasure",
+    "food": "food",
+    "clue": "clue",
+    "blood": "blood",
+    "powerstone": "powerstone",
+    "map": "map",
+    "incubator": "incubator",
+    # Creature token types
+    "zombie": "zombie",
+    "soldier": "soldier",
+    "spirit": "spirit",
+    "saproling": "saproling",
+    "goblin": "goblin",
+    "elf": "elf",
+    "squirrel": "squirrel",
+    "angel": "angel",
+    "demon": "demon",
+    "dragon": "dragon",
+    "elemental": "elemental",
+    "beast": "beast",
+    "bird": "bird",
+    "cat": "cat",
+    "human": "human",
+    "knight": "knight",
+    "warrior": "warrior",
+    "thopter": "thopter",
+    "servo": "servo",
+    "insect": "insect",
+    "rat": "rat",
+    "snake": "snake",
+    "wolf": "wolf",
+    "vampire": "vampire",
+    "faerie": "faerie",
+    "merfolk": "merfolk",
+    "plant": "plant",
+    "horror": "horror",
 }
 
 # Maps stage names to (query_text, query_tags)
@@ -165,63 +216,326 @@ def parse_query_tags(query: str) -> list[str]:
     return result
 
 
-_CARD_TYPE_NAMES: frozenset[str] = frozenset({
-    "artifact", "creature", "enchantment", "instant",
-    "land", "planeswalker", "sorcery", "battle", "kindred",
-})
+_CARD_TYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "artifact",
+        "creature",
+        "enchantment",
+        "instant",
+        "land",
+        "planeswalker",
+        "sorcery",
+        "battle",
+        "kindred",
+    }
+)
+
+# Plural forms for card type names (lowercase → canonical singular)
+_CARD_TYPE_PLURALS: dict[str, str] = {
+    "artifacts": "Artifact",
+    "creatures": "Creature",
+    "enchantments": "Enchantment",
+    "instants": "Instant",
+    "lands": "Land",
+    "planeswalkers": "Planeswalker",
+    "sorceries": "Sorcery",
+    "battles": "Battle",
+}
 
 # Common creature and permanent subtypes worth detecting in queries
-_SUBTYPE_NAMES: frozenset[str] = frozenset({
-    "elf", "elves", "human", "wizard", "goblin", "dragon", "monk",
-    "angel", "demon", "zombie", "vampire", "merfolk", "warrior",
-    "knight", "cleric", "rogue", "shaman", "druid", "beast",
-    "elemental", "spirit", "squirrel", "cat", "dog", "bird",
-    "soldier", "pirate", "dinosaur", "giant", "hydra", "wurm",
-    "sliver", "golem", "elemental", "treefolk", "faerie", "kithkin",
-    "ally", "scout", "ranger", "archer", "berserker", "artificer",
-    "advisor", "noble", "peasant", "citizen", "rebel", "mercenary",
-    "shaman", "barbarian", "horror", "illusion", "shapeshifter",
-    "snake", "wolf", "bear", "spider", "insect", "rat", "fox",
-    "raccoon", "rabbit", "otter", "mouse", "bat", "fish",
-    "equipment", "aura", "vehicle", "food", "treasure", "clue",
-    "saga", "class", "role", "curse",
-})
+_SUBTYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "elf",
+        "elves",
+        "human",
+        "wizard",
+        "goblin",
+        "dragon",
+        "monk",
+        "angel",
+        "demon",
+        "zombie",
+        "vampire",
+        "merfolk",
+        "warrior",
+        "knight",
+        "cleric",
+        "rogue",
+        "shaman",
+        "druid",
+        "beast",
+        "elemental",
+        "spirit",
+        "squirrel",
+        "cat",
+        "dog",
+        "bird",
+        "soldier",
+        "pirate",
+        "dinosaur",
+        "giant",
+        "hydra",
+        "wurm",
+        "sliver",
+        "golem",
+        "elemental",
+        "treefolk",
+        "faerie",
+        "kithkin",
+        "ally",
+        "scout",
+        "ranger",
+        "archer",
+        "berserker",
+        "artificer",
+        "advisor",
+        "noble",
+        "peasant",
+        "citizen",
+        "rebel",
+        "mercenary",
+        "shaman",
+        "barbarian",
+        "horror",
+        "illusion",
+        "shapeshifter",
+        "snake",
+        "wolf",
+        "bear",
+        "spider",
+        "insect",
+        "rat",
+        "fox",
+        "raccoon",
+        "rabbit",
+        "otter",
+        "mouse",
+        "bat",
+        "fish",
+        "equipment",
+        "aura",
+        "vehicle",
+        "food",
+        "treasure",
+        "clue",
+        "saga",
+        "class",
+        "role",
+        "curse",
+    }
+)
 
 # Map plural/variant forms to canonical subtype
-_SUBTYPE_NORMALIZE: dict[str, str] = {"elves": "Elf"}
+_SUBTYPE_NORMALIZE: dict[str, str] = {
+    "elves": "Elf",
+    "warriors": "Warrior",
+    "goblins": "Goblin",
+    "dragons": "Dragon",
+    "humans": "Human",
+    "wizards": "Wizard",
+    "monks": "Monk",
+    "angels": "Angel",
+    "demons": "Demon",
+    "zombies": "Zombie",
+    "vampires": "Vampire",
+    "knights": "Knight",
+    "clerics": "Cleric",
+    "rogues": "Rogue",
+    "shamans": "Shaman",
+    "druids": "Druid",
+    "beasts": "Beast",
+    "spirits": "Spirit",
+    "slivers": "Sliver",
+}
+
+# MTG keyword abilities detectable from single query words
+_KEYWORD_NAMES: frozenset[str] = frozenset(
+    {
+        # Evasion / combat
+        "flying",
+        "trample",
+        "haste",
+        "deathtouch",
+        "lifelink",
+        "menace",
+        "vigilance",
+        "flash",
+        "reach",
+        "ward",
+        "hexproof",
+        "indestructible",
+        "defender",
+        "prowess",
+        "ninjutsu",
+        "annihilator",
+        "myriad",
+        "wither",
+        "infect",
+        "exalted",
+        # Card selection / advantage
+        "scry",
+        "surveil",
+        "discover",
+        "explore",
+        "investigate",
+        "connive",
+        "foretell",
+        # Counters / growth
+        "proliferate",
+        "adapt",
+        "fabricate",
+        "mentor",
+        "training",
+        "amass",
+        "mutate",
+        # Mana / cost reduction
+        "cascade",
+        "convoke",
+        "delve",
+        "cycling",
+        "affinity",
+        "kicker",
+        "emerge",
+        # Recursion / graveyard
+        "flashback",
+        "unearth",
+        "encore",
+        "escape",
+        "overload",
+        "embalm",
+        "eternalize",
+        "disturb",
+        "madness",
+        "dredge",
+        "suspend",
+        # Token / go-wide
+        "populate",
+        # Control / stax
+        "extort",
+        "miracle",
+        "storm",
+        "persist",
+        "undying",
+    }
+)
+
+# MTG keyword abilities that require phrase matching
+_KEYWORD_PHRASES: frozenset[str] = frozenset(
+    {
+        "first strike",
+        "double strike",
+    }
+)
+
+# Maps user query terms/phrases to trait names (longer keys checked first)
+_TRAIT_SYNONYMS: dict[str, str] = {
+    "enters the battlefield": "etb",
+    "enter the battlefield": "etb",
+    "activated ability": "activated",
+    "activated abilities": "activated",
+    "tap ability": "activated",
+    "etb": "etb",
+    "enters": "etb",
+    "activated": "activated",
+    "evasion": "evasion",
+    "evasive": "evasion",
+    "unblockable": "evasion",
+}
+
+
+def _classify_query_word(
+    stripped: str,
+    seen_types: set[str],
+    seen_subs: set[str],
+    seen_kw: set[str],
+    card_types: list[str],
+    subtypes: list[str],
+    keywords: list[str],
+) -> None:
+    """Classify a single query word into card types, subtypes, or keywords."""
+    if stripped in _CARD_TYPE_NAMES and stripped not in seen_types:
+        seen_types.add(stripped)
+        card_types.append(stripped.capitalize())
+    elif stripped in _CARD_TYPE_PLURALS and stripped not in seen_types:
+        seen_types.add(stripped)
+        canonical = _CARD_TYPE_PLURALS[stripped]
+        if canonical not in card_types:
+            card_types.append(canonical)
+    elif (
+        stripped in _SUBTYPE_NAMES or stripped in _SUBTYPE_NORMALIZE
+    ) and stripped not in seen_subs:
+        seen_subs.add(stripped)
+        subtypes.append(_SUBTYPE_NORMALIZE.get(stripped, stripped.capitalize()))
+    elif stripped in _KEYWORD_NAMES and stripped not in seen_kw:
+        seen_kw.add(stripped)
+        keywords.append(stripped.capitalize())
 
 
 def parse_query_types(query: str) -> TypeFilter | None:
-    """Extract type/subtype preferences from a natural-language query.
+    """Extract type/subtype/keyword/trait preferences from a natural-language query.
 
-    Returns None when no type terms are detected, keeping the feature inactive
-    for queries that don't mention card types.
+    Returns None when no filter terms are detected, keeping the feature inactive
+    for queries that don't mention card types, keywords, or traits.
+
+    Strict mode is enabled when 2+ filter terms are detected across all
+    dimensions — strict queries zero-out zero-match cards.
 
     Args:
         query: Free-form user query text.
 
     Returns:
-        TypeFilter if any types/subtypes detected, else None.
+        TypeFilter if any filter terms detected, else None.
     """
-    words = query.lower().split()
+    q_lower = query.lower()
     card_types: list[str] = []
     subtypes: list[str] = []
+    keywords: list[str] = []
+    traits: list[str] = []
+    token_types: list[str] = []
     seen_types: set[str] = set()
     seen_subs: set[str] = set()
+    seen_kw: set[str] = set()
+    seen_traits: set[str] = set()
+    seen_tokens: set[str] = set()
 
-    for word in words:
+    for phrase in _KEYWORD_PHRASES:
+        if phrase in q_lower and phrase not in seen_kw:
+            seen_kw.add(phrase)
+            keywords.append(phrase.title())
+
+    for key in sorted(_TRAIT_SYNONYMS, key=len, reverse=True):
+        trait = _TRAIT_SYNONYMS[key]
+        if key in q_lower and trait not in seen_traits:
+            seen_traits.add(trait)
+            traits.append(trait)
+
+    for word in q_lower.split():
         stripped = word.strip(".,!?;:'\"")
-        if stripped in _CARD_TYPE_NAMES and stripped not in seen_types:
-            seen_types.add(stripped)
-            card_types.append(stripped.capitalize())
-        elif stripped in _SUBTYPE_NAMES and stripped not in seen_subs:
-            seen_subs.add(stripped)
-            canonical = _SUBTYPE_NORMALIZE.get(stripped, stripped.capitalize())
-            subtypes.append(canonical)
+        _classify_query_word(
+            stripped,
+            seen_types,
+            seen_subs,
+            seen_kw,
+            card_types,
+            subtypes,
+            keywords,
+        )
+        if stripped in _TOKEN_TYPE_NAMES and stripped not in seen_tokens:
+            seen_tokens.add(stripped)
+            token_types.append(_TOKEN_TYPE_NAMES[stripped])
 
-    if not card_types and not subtypes:
+    if not card_types and not subtypes and not keywords and not traits and not token_types:
         return None
-    return TypeFilter(card_types=card_types, subtypes=subtypes)
+
+    total_terms = len(card_types) + len(subtypes) + len(keywords) + len(traits) + len(token_types)
+    return TypeFilter(
+        card_types=card_types,
+        subtypes=subtypes,
+        keywords=keywords,
+        traits=traits,
+        token_types=token_types,
+        strict=total_terms >= 2,
+    )
 
 
 def stage_retrieval_query(stage: str, deck_description: str | None) -> tuple[str, list[str]]:
@@ -494,25 +808,42 @@ def _personal_rating(card_id: UUID, feedback_weights: dict[UUID, float] | None) 
 
 
 def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
-    """Score a card based on how many of the requested types/subtypes it matches.
+    """Score a card based on how many requested types/subtypes/keywords/traits it matches.
 
-    Returns a [0.0, 1.0] value proportional to the fraction of requested types
-    that the card satisfies. A card with no matching types scores 0.0.
+    Returns a [0.0, 1.0] value proportional to the fraction of requested filter
+    terms the card satisfies. A card with no matches scores 0.0.
 
     Args:
-        row: DB row with card_types and subtypes fields.
-        type_filter: Parsed type preferences from the user query.
+        row: DB row with card_types, subtypes, keywords, traits fields.
+        type_filter: Parsed type/keyword/trait preferences from the user query.
 
     Returns:
         Match fraction in [0.0, 1.0].
     """
-    requested = set(type_filter.card_types) | set(type_filter.subtypes)
-    if not requested:
+    requested_count = (
+        len(type_filter.card_types)
+        + len(type_filter.subtypes)
+        + len(type_filter.keywords)
+        + len(type_filter.traits)
+        + len(type_filter.token_types)
+    )
+    if not requested_count:
         return 0.0
+
     card_types = set(row["card_types"])
     subtypes = set(row["subtypes"])
-    matched = (card_types & set(type_filter.card_types)) | (subtypes & set(type_filter.subtypes))
-    return len(matched) / len(requested)
+    card_keywords = {k.lower() for k in row["keywords"]}
+    card_traits = set(row["traits"])
+    card_token_types = set(row["token_types"])
+
+    matched = (
+        len(card_types & set(type_filter.card_types))
+        + len(subtypes & set(type_filter.subtypes))
+        + len(card_keywords & {k.lower() for k in type_filter.keywords})
+        + len(card_traits & set(type_filter.traits))
+        + len(card_token_types & set(type_filter.token_types))
+    )
+    return matched / requested_count
 
 
 def _compute_weighted_scores(
@@ -592,6 +923,9 @@ def _compute_weighted_scores(
 
         if type_filter is not None:
             type_score = _type_match_score(row, type_filter)
+            if type_filter.strict and type_score == 0.0:
+                scores[uid] = 0.0
+                continue
             scores[uid] = (
                 0.35 * vec_sim
                 + 0.25 * synergy
@@ -720,10 +1054,15 @@ async def retrieve_candidates(
         return []
 
     result: list[RetrievedCard] = []
+    seen_names: set[str] = set()
     for uid in top_ids:
         row = cards_by_id.get(uid)
         if row is None:
             continue
+        name = row["name"]
+        if name in seen_names:
+            continue
+        seen_names.add(name)
         result.append(
             RetrievedCard(
                 id=row["id"],
@@ -736,6 +1075,7 @@ async def retrieve_candidates(
                 color_identity=list(row["color_identity"]),
                 image_uri=row["image_uri"],
                 tags=list(row["tags"]),
+                token_types=list(row["token_types"]),
                 edhrec_rank=row["edhrec_rank"],
                 power=row["power"],
                 toughness=row["toughness"],
@@ -769,7 +1109,7 @@ async def _fetch_candidates(
             f"""
             SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
                    color_identity, image_uri, tags, edhrec_rank, power, toughness, rarity,
-                   card_types, subtypes
+                   card_types, subtypes, keywords, traits, token_types
             FROM cards
             WHERE id = ANY($1::uuid[])
               {land_filter}

@@ -121,6 +121,7 @@ def _card_row_to_point(row: asyncpg.Record) -> PointStruct:
             "edhrec_rank": row["edhrec_rank"],
             "card_types": list(row["card_types"]),
             "subtypes": list(row["subtypes"]),
+            "traits": list(row["traits"]),
         },
     )
 
@@ -151,7 +152,8 @@ async def run_batch_embed(
         rows = await conn.fetch(
             """
             SELECT id, name, type_line, oracle_text, keywords,
-                   color_identity, legalities, tags, edhrec_rank, card_types, subtypes
+                   color_identity, legalities, tags, edhrec_rank, card_types, subtypes, traits,
+                   token_types
             FROM cards
             WHERE embedded_at IS NULL OR updated_at > embedded_at
             ORDER BY name
@@ -199,6 +201,8 @@ async def run_batch_embed(
                     "edhrec_rank": row["edhrec_rank"],
                     "card_types": list(row["card_types"]),
                     "subtypes": list(row["subtypes"]),
+                    "traits": list(row["traits"]),
+                    "token_types": list(row["token_types"]),
                 },
             )
             points.append(point)

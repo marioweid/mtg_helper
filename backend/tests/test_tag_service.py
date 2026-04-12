@@ -1,6 +1,6 @@
 """Tests for rule-based card tag classification."""
 
-from mtg_helper.services.tag_service import classify_card
+from mtg_helper.services.tag_service import classify_card, classify_token_types, classify_traits
 
 
 def _classify(
@@ -299,3 +299,136 @@ def test_tribal_type_line() -> None:
 def test_vanilla_card_no_tags() -> None:
     tags = _classify("", type_line="Creature — Beast")
     assert tags == []
+
+
+# ── classify_traits ───────────────────────────────────────────────────────────
+
+
+def test_traits_etb_oracle_text() -> None:
+    traits = classify_traits("When this creature enters the battlefield, draw a card.", [])
+    assert "etb" in traits
+
+
+def test_traits_etb_short_pattern() -> None:
+    traits = classify_traits("When ~ enters, you gain 2 life.", [])
+    assert "etb" in traits
+
+
+def test_traits_activated_tap_cost() -> None:
+    traits = classify_traits("{T}: Draw a card.", [])
+    assert "activated" in traits
+
+
+def test_traits_activated_mana_cost() -> None:
+    traits = classify_traits("{2}: Put a +1/+1 counter on this creature.", [])
+    assert "activated" in traits
+
+
+def test_traits_evasion_flying_keyword() -> None:
+    traits = classify_traits("", ["Flying"])
+    assert "evasion" in traits
+
+
+def test_traits_evasion_menace_keyword() -> None:
+    traits = classify_traits("", ["Menace"])
+    assert "evasion" in traits
+
+
+def test_traits_evasion_cant_be_blocked() -> None:
+    traits = classify_traits("This creature can't be blocked.", [])
+    assert "evasion" in traits
+
+
+def test_traits_no_traits_vanilla() -> None:
+    traits = classify_traits("", [])
+    assert traits == []
+
+
+def test_traits_multiple_traits() -> None:
+    traits = classify_traits(
+        "When ~ enters the battlefield, draw a card. {T}: Add {G}.", ["Flying"]
+    )
+    assert "etb" in traits
+    assert "activated" in traits
+    assert "evasion" in traits
+
+
+# ── classify_token_types ──────────────────────────────────────────────────────
+
+
+def test_token_types_treasure() -> None:
+    result = classify_token_types("Create a Treasure token.")
+    assert result == ["treasure"]
+
+
+def test_token_types_food() -> None:
+    result = classify_token_types("Create a Food token.")
+    assert result == ["food"]
+
+
+def test_token_types_clue() -> None:
+    result = classify_token_types("Investigate. (Create a Clue token.)")
+    assert result == ["clue"]
+
+
+def test_token_types_blood() -> None:
+    result = classify_token_types("Create a Blood token.")
+    assert result == ["blood"]
+
+
+def test_token_types_powerstone() -> None:
+    result = classify_token_types("Create a tapped Powerstone token.")
+    assert result == ["powerstone"]
+
+
+def test_token_types_map() -> None:
+    result = classify_token_types("Create a Map token.")
+    assert result == ["map"]
+
+
+def test_token_types_incubator() -> None:
+    result = classify_token_types("Create an Incubator token.")
+    assert result == ["incubator"]
+
+
+def test_token_types_multiple() -> None:
+    result = classify_token_types(
+        "Create a Treasure token. When this creature dies, create a Food token."
+    )
+    assert "treasure" in result
+    assert "food" in result
+
+
+def test_token_types_no_match() -> None:
+    result = classify_token_types("Destroy target creature.")
+    assert result == []
+
+
+def test_token_types_empty_text() -> None:
+    result = classify_token_types(None)
+    assert result == []
+
+
+def test_token_types_zombie() -> None:
+    result = classify_token_types("Create a 2/2 black Zombie creature token.")
+    assert result == ["zombie"]
+
+
+def test_token_types_squirrel() -> None:
+    result = classify_token_types(
+        "Create two 1/1 green Squirrel creature tokens."
+    )
+    assert result == ["squirrel"]
+
+
+def test_token_types_elf() -> None:
+    result = classify_token_types("Create a 1/1 green Elf creature token.")
+    assert result == ["elf"]
+
+
+def test_token_types_creature_and_artifact() -> None:
+    result = classify_token_types(
+        "Create a Treasure token. Create a 2/2 black Zombie creature token."
+    )
+    assert "treasure" in result
+    assert "zombie" in result

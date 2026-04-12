@@ -84,6 +84,103 @@ _PAT_EXTRA_TURN = _re(r"take an extra turn|takes? an extra turn")
 _PAT_LAND_DESTROY = _re(r"destroy target land|destroy all lands?|destroy each land")
 _PAT_TRIBAL = _re(r"\btribal\b")
 
+# Token type patterns — specific token names adjacent to "token" in oracle text
+_TOKEN_TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
+    "treasure": _re(r"\btreasure token"),
+    "food": _re(r"\bfood token"),
+    "clue": _re(r"\bclue token"),
+    "blood": _re(r"\bblood token"),
+    "powerstone": _re(r"\bpowerstone token"),
+    "map": _re(r"\bmap token"),
+    "incubator": _re(r"\bincubator token"),
+    # Creature token types
+    "zombie": _re(r"\bZombie[\w\s,/]*token"),
+    "soldier": _re(r"\bSoldier[\w\s,/]*token"),
+    "spirit": _re(r"\bSpirit[\w\s,/]*token"),
+    "saproling": _re(r"\bSaproling[\w\s,/]*token"),
+    "goblin": _re(r"\bGoblin[\w\s,/]*token"),
+    "elf": _re(r"\bElf[\w\s,/]*token"),
+    "squirrel": _re(r"\bSquirrel[\w\s,/]*token"),
+    "angel": _re(r"\bAngel[\w\s,/]*token"),
+    "demon": _re(r"\bDemon[\w\s,/]*token"),
+    "dragon": _re(r"\bDragon[\w\s,/]*token"),
+    "elemental": _re(r"\bElemental[\w\s,/]*token"),
+    "beast": _re(r"\bBeast[\w\s,/]*token"),
+    "bird": _re(r"\bBird[\w\s,/]*token"),
+    "cat": _re(r"\bCat[\w\s,/]*token"),
+    "human": _re(r"\bHuman[\w\s,/]*token"),
+    "knight": _re(r"\bKnight[\w\s,/]*token"),
+    "warrior": _re(r"\bWarrior[\w\s,/]*token"),
+    "thopter": _re(r"\bThopter[\w\s,/]*token"),
+    "servo": _re(r"\bServo[\w\s,/]*token"),
+    "insect": _re(r"\bInsect[\w\s,/]*token"),
+    "rat": _re(r"\bRat[\w\s,/]*token"),
+    "snake": _re(r"\bSnake[\w\s,/]*token"),
+    "wolf": _re(r"\bWolf[\w\s,/]*token"),
+    "vampire": _re(r"\bVampire[\w\s,/]*token"),
+    "faerie": _re(r"\bFaerie[\w\s,/]*token"),
+    "merfolk": _re(r"\bMerfolk[\w\s,/]*token"),
+    "plant": _re(r"\bPlant[\w\s,/]*token"),
+    "horror": _re(r"\bHorror[\w\s,/]*token"),
+}
+
+# Trait patterns — mechanical playstyle categories not covered by tags/types
+_PAT_ETB = _re(r"when [\w\s,'/~]+ enters(?: the battlefield)?|enters the battlefield")
+_PAT_ACTIVATED = _re(r"\{[^{}]+\}[^.!?\n]*:")
+_PAT_CANT_BE_BLOCKED = _re(r"can't be blocked")
+
+# Evasion keywords from Scryfall (lowercased for set intersection)
+_EVASION_KEYWORDS = frozenset(
+    {
+        "flying",
+        "menace",
+        "trample",
+        "shadow",
+        "fear",
+        "intimidate",
+        "skulk",
+        "horsemanship",
+    }
+)
+
+
+def classify_traits(
+    oracle_text: str | None,
+    keywords: list[str],
+) -> list[str]:
+    """Classify mechanical traits from oracle text and keyword abilities.
+
+    Args:
+        oracle_text: Rules text of the card.
+        keywords: Scryfall keyword abilities list.
+
+    Returns:
+        List of trait strings (may be empty).
+    """
+    text = oracle_text or ""
+    kw_set = {k.lower() for k in keywords}
+    traits: list[str] = []
+    if _PAT_ETB.search(text):
+        traits.append("etb")
+    if _PAT_ACTIVATED.search(text):
+        traits.append("activated")
+    if kw_set & _EVASION_KEYWORDS or _PAT_CANT_BE_BLOCKED.search(text):
+        traits.append("evasion")
+    return traits
+
+
+def classify_token_types(oracle_text: str | None) -> list[str]:
+    """Classify which specific token types a card produces from oracle text.
+
+    Args:
+        oracle_text: Rules text of the card.
+
+    Returns:
+        List of token type strings matching the supported set (may be empty).
+    """
+    text = oracle_text or ""
+    return [name for name, pat in _TOKEN_TYPE_PATTERNS.items() if pat.search(text)]
+
 
 def _tag_ramp(text: str, tl: str, tags: list[str]) -> None:
     if _PAT_RAMP_ADD.search(text) or _PAT_RAMP_LAND.search(text):
@@ -219,7 +316,7 @@ def classify_card(
 
 
 async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantClient) -> None:
-    """Push updated tags from Postgres into Qdrant point payloads.
+    """Push updated tags and traits from Postgres into Qdrant point payloads.
 
     Uses concurrent set_payload calls in batches to avoid 30k sequential
     round-trips.
@@ -231,20 +328,29 @@ async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantCli
     from mtg_helper.config import settings
 
     async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT id, tags FROM cards WHERE embedded_at IS NOT NULL")
+        rows = await conn.fetch(
+            "SELECT id, tags, traits, token_types FROM cards WHERE embedded_at IS NOT NULL"
+        )
 
-    _log.info("Syncing %d card tags to Qdrant", len(rows))
+    _log.info("Syncing %d card tags/traits to Qdrant", len(rows))
 
-    async def _update_one(card_id: Any, tags: list[str]) -> None:
+    async def _update_one(
+        card_id: Any, tags: list[str], traits: list[str], token_types: list[str]
+    ) -> None:
         await qdrant_client.set_payload(
             collection_name=settings.qdrant_collection,
-            payload={"tags": tags},
+            payload={"tags": tags, "traits": traits, "token_types": token_types},
             points=[str(card_id)],
         )
 
     for i in range(0, len(rows), _QDRANT_CONCURRENCY):
         chunk = rows[i : i + _QDRANT_CONCURRENCY]
-        await asyncio.gather(*[_update_one(r["id"], list(r["tags"])) for r in chunk])
+        await asyncio.gather(
+            *[
+                _update_one(r["id"], list(r["tags"]), list(r["traits"]), list(r["token_types"]))
+                for r in chunk
+            ]
+        )
 
 
 async def run_batch_tag(
@@ -276,7 +382,7 @@ async def run_batch_tag(
 
     for i in range(0, len(rows), _BATCH_SIZE):
         batch = rows[i : i + _BATCH_SIZE]
-        updates: list[tuple[list[str], Any]] = [
+        updates: list[tuple[list[str], list[str], list[str], Any]] = [
             (
                 classify_card(
                     r["name"],
@@ -285,6 +391,8 @@ async def run_batch_tag(
                     list(r["keywords"]),
                     float(r["cmc"]) if r["cmc"] is not None else None,
                 ),
+                classify_traits(r["oracle_text"], list(r["keywords"])),
+                classify_token_types(r["oracle_text"]),
                 r["id"],
             )
             for r in batch
@@ -292,7 +400,7 @@ async def run_batch_tag(
 
         async with pool.acquire() as conn:
             await conn.executemany(
-                "UPDATE cards SET tags = $1 WHERE id = $2",
+                "UPDATE cards SET tags = $1, traits = $2, token_types = $3 WHERE id = $4",
                 updates,
             )
 
