@@ -1,22 +1,28 @@
 import type { DeckCardItem } from "@/lib/types";
 import { CATEGORY_ORDER, CATEGORY_TARGETS, COLOR_SYMBOLS, STAGE_LABELS } from "@/lib/constants";
 
+function qty(card: DeckCardItem): number {
+  return card.quantity ?? 1;
+}
+
 function avgCmc(cards: DeckCardItem[]): string {
   const nonLands = cards.filter((c) => !c.type_line?.includes("Land") && c.cmc != null);
   if (nonLands.length === 0) return "—";
-  const total = nonLands.reduce((sum, c) => sum + (c.cmc ?? 0), 0);
-  return (total / nonLands.length).toFixed(1);
+  const totalQty = nonLands.reduce((sum, c) => sum + qty(c), 0);
+  const totalCmc = nonLands.reduce((sum, c) => sum + (c.cmc ?? 0) * qty(c), 0);
+  return (totalCmc / totalQty).toFixed(1);
 }
 
 function colorCounts(cards: DeckCardItem[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const card of cards) {
     if (card.type_line?.includes("Land")) continue;
+    const q = qty(card);
     for (const color of card.color_identity) {
-      counts[color] = (counts[color] ?? 0) + 1;
+      counts[color] = (counts[color] ?? 0) + q;
     }
     if (card.color_identity.length === 0) {
-      counts["C"] = (counts["C"] ?? 0) + 1;
+      counts["C"] = (counts["C"] ?? 0) + q;
     }
   }
   return counts;
@@ -27,14 +33,16 @@ export function DeckStats({ cards }: { cards: DeckCardItem[] }) {
   let creatureCount = 0;
 
   for (const card of cards) {
+    const q = qty(card);
     const cat = card.category ?? "other";
-    categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
-    if (card.type_line?.includes("Creature")) creatureCount++;
+    categoryCounts[cat] = (categoryCounts[cat] ?? 0) + q;
+    if (card.type_line?.includes("Creature")) creatureCount += q;
   }
 
   const colors = colorCounts(cards);
   const maxColorCount = Math.max(...Object.values(colors), 1);
-  const nonLandCount = cards.filter((c) => !c.type_line?.includes("Land")).length;
+  const totalCount = cards.reduce((sum, c) => sum + qty(c), 0);
+  const nonLandCount = cards.filter((c) => !c.type_line?.includes("Land")).reduce((sum, c) => sum + qty(c), 0);
 
   const categories = [
     ...CATEGORY_ORDER.filter((c) => (categoryCounts[c] ?? 0) > 0 || CATEGORY_TARGETS[c] != null),
@@ -51,7 +59,7 @@ export function DeckStats({ cards }: { cards: DeckCardItem[] }) {
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-lg bg-white/5 px-3 py-2">
             <p className="text-gray-500">Total</p>
-            <p className="font-semibold text-white">{cards.length}</p>
+            <p className="font-semibold text-white">{totalCount}</p>
           </div>
           <div className="rounded-lg bg-white/5 px-3 py-2">
             <p className="text-gray-500">Avg CMC</p>

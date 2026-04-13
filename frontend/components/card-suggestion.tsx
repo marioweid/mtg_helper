@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import type { CardSuggestion } from "@/lib/types";
 
 const RARITY_COLORS: Record<string, string> = {
@@ -36,7 +34,6 @@ export function CardSuggestionCard({
   quantity = 1,
   onQuantityChange,
 }: Props) {
-  const [showDetails, setShowDetails] = useState(false);
   const hasDetails =
     suggestion.oracle_text != null ||
     suggestion.power != null ||
@@ -94,39 +91,29 @@ export function CardSuggestionCard({
           </div>
         )}
         {hasDetails && (
-          <div className="mt-auto">
-            <button
-              onClick={() => setShowDetails((v) => !v)}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              {showDetails ? "Hide details" : "Show details"}
-            </button>
-            {showDetails && (
-              <div className="mt-2 space-y-1.5 border-t border-white/5 pt-2">
-                {suggestion.oracle_text && (
-                  <p className="text-xs text-gray-400 italic leading-relaxed">
-                    {suggestion.oracle_text}
-                  </p>
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  {suggestion.power != null && suggestion.toughness != null && (
-                    <span className="text-xs text-gray-300 font-medium">
-                      {suggestion.power}/{suggestion.toughness}
-                    </span>
-                  )}
-                  {suggestion.cmc != null && (
-                    <span className="text-xs text-gray-500">MV: {suggestion.cmc}</span>
-                  )}
-                  {suggestion.rarity && (
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs capitalize ${RARITY_COLORS[suggestion.rarity] ?? "text-gray-400 bg-gray-800/60"}`}
-                    >
-                      {suggestion.rarity}
-                    </span>
-                  )}
-                </div>
-              </div>
+          <div className="mt-2 space-y-1.5 border-t border-white/5 pt-2">
+            {suggestion.oracle_text && (
+              <p className="text-xs text-gray-400 italic leading-relaxed">
+                {suggestion.oracle_text}
+              </p>
             )}
+            <div className="flex flex-wrap items-center gap-2">
+              {suggestion.power != null && suggestion.toughness != null && (
+                <span className="text-xs text-gray-300 font-medium">
+                  {suggestion.power}/{suggestion.toughness}
+                </span>
+              )}
+              {suggestion.cmc != null && (
+                <span className="text-xs text-gray-500">MV: {suggestion.cmc}</span>
+              )}
+              {suggestion.rarity && (
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs capitalize ${RARITY_COLORS[suggestion.rarity] ?? "text-gray-400 bg-gray-800/60"}`}
+                >
+                  {suggestion.rarity}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

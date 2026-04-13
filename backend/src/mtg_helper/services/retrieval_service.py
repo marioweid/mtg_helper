@@ -187,6 +187,24 @@ _STAGE_QUERIES: dict[str, tuple[str, list[str]]] = {
         ["tutor", "graveyard", "blink", "protection"],
     ),
     "lands": ("lands mana base mana fixing", ["ramp"]),
+    "bangers": (
+        "powerful staples synergy commander",
+        [
+            "ramp",
+            "fast_mana",
+            "draw",
+            "removal",
+            "counterspell",
+            "board_wipe",
+            "protection",
+            "tutor",
+            "graveyard",
+            "blink",
+            "token",
+            "sacrifice",
+            "aristocrats",
+        ],
+    ),
 }
 
 

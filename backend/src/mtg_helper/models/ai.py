@@ -67,3 +67,29 @@ class ChatResponse(BaseModel):
 
     reply: str
     suggestions: list[CardSuggestion]
+
+
+class DescribeMessage(BaseModel):
+    """A single turn in the description agent conversation."""
+
+    role: str
+    content: str
+
+
+class DescribeRequest(BaseModel):
+    """Request body for the deck description agent."""
+
+    commander_scryfall_id: UUID
+    partner_scryfall_id: UUID | None = None
+    bracket: int = Field(default=3, ge=1, le=4)
+    history: list[DescribeMessage] = Field(default_factory=list)
+    message: str = Field(default="", max_length=2000)
+
+
+class DescribeResponse(BaseModel):
+    """Response from the deck description agent."""
+
+    reply: str
+    done: bool
+    description: str | None = None
+    suggested_name: str | None = None

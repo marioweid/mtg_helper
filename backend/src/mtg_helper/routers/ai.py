@@ -10,6 +10,8 @@ from mtg_helper.models.ai import (
     BuildResponse,
     ChatRequest,
     ChatResponse,
+    DescribeRequest,
+    DescribeResponse,
     SuggestRequest,
     SuggestResponse,
 )
@@ -96,6 +98,29 @@ async def chat_about_deck(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    except LLMEmptyResponseError as e:
+        raise _llm_unavailable(str(e))
+    return DataResponse(data=result)
+
+
+@router.post("/describe", response_model=DataResponse[DescribeResponse])
+async def describe_deck(
+    body: DescribeRequest,
+    request: Request,
+) -> DataResponse[DescribeResponse]:
+    """Run one turn of the deck description agent to build a structured deck strategy."""
+    try:
+        result = await ai_service.describe_deck(
+            request.app.state.db_pool,
+            request.app.state.ai_client,
+            body.commander_scryfall_id,
+            body.partner_scryfall_id,
+            body.bracket,
+            [{"role": m.role, "content": m.content} for m in body.history],
+            body.message,
+        )
+    except DeckNotFoundError as e:
+        raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
     except LLMEmptyResponseError as e:
         raise _llm_unavailable(str(e))
     return DataResponse(data=result)

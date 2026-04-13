@@ -11,7 +11,13 @@ import asyncpg
 import openai
 from qdrant_client import AsyncQdrantClient
 
-from mtg_helper.models.ai import BuildResponse, CardSuggestion, ChatResponse, SuggestResponse
+from mtg_helper.models.ai import (
+    BuildResponse,
+    CardSuggestion,
+    ChatResponse,
+    DescribeResponse,
+    SuggestResponse,
+)
 from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services import (
@@ -48,6 +54,7 @@ _STAGE_META: dict[str, tuple[str, str]] = {
     "theme": ("core theme / synergy", "20-25"),
     "utility": ("utility / flex", "5-8"),
     "lands": ("mana base / lands", "35-38"),
+    "bangers": ("bangers", "top picks across all categories"),
 }
 
 _BRACKET_DESCRIPTIONS = {
@@ -434,7 +441,7 @@ def _resolve_stage(
         ValueError: If requested_stage is not a valid active stage.
     """
     if requested_stage is not None:
-        active_stages = [s for s in STAGES if s != "complete"]
+        active_stages = [s for s in STAGES if s != "complete"] + ["bangers"]
         if requested_stage not in active_stages:
             raise ValueError(f"Invalid stage: {requested_stage!r}")
         return requested_stage, False
@@ -687,3 +694,181 @@ async def chat_about_deck(
         await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
 
     return ChatResponse(reply=raw_response, suggestions=suggestions)
+
+
+# Known strategy tags the retrieval system recognizes — injected into the agent prompt
+# so the synthesized description aligns with parse_query_tags() vocabulary.
+_STRATEGY_TAGS = (
+    "ramp, token, tokens, voltron, aristocrats, graveyard, blink, stax, mill, tribal, "
+    "sacrifice, lifegain, counters, equipment, counterspell, board wipe, tutor, "
+    "protection, extra turn, group hug, fast mana, draw, removal, reanimator"
+)
+
+
+def _build_describe_system_prompt(
+    commander_name: str,
+    commander_type: str | None,
+    commander_oracle: str | None,
+    commander_keywords: list[str] | None,
+    commander_colors: list[str],
+    partner_name: str | None,
+    partner_oracle: str | None,
+    bracket: int,
+) -> str:
+    """Build the system prompt for the deck description agent.
+
+    Args:
+        commander_name: Commander's name.
+        commander_type: Commander's type line.
+        commander_oracle: Commander's oracle text.
+        commander_keywords: Commander's keyword abilities.
+        commander_colors: Commander's color identity list.
+        partner_name: Partner commander name if any.
+        partner_oracle: Partner commander oracle text if any.
+        bracket: Power level bracket (1-4).
+
+    Returns:
+        System prompt string.
+    """
+    color_str = ", ".join(commander_colors) if commander_colors else "colorless"
+    bracket_desc = _BRACKET_DESCRIPTIONS.get(bracket, "")
+    kw_str = ", ".join(commander_keywords) if commander_keywords else "none"
+
+    parts = [
+        "You are a Magic: The Gathering Commander deck strategist.",
+        "Your job is to understand the player's vision through conversation, then synthesize",
+        "a structured deck description that will improve AI card suggestions.",
+        "",
+        f"Commander: {commander_name}",
+        f"Type: {commander_type or 'unknown'}",
+        f"Color identity: {color_str}",
+    ]
+    if commander_oracle:
+        parts.append(f"Rules text: {commander_oracle}")
+    if commander_keywords:
+        parts.append(f"Keywords: {kw_str}")
+    if partner_name:
+        parts.append(f"Partner: {partner_name}")
+        if partner_oracle:
+            parts.append(f"Partner rules text: {partner_oracle}")
+
+    parts += [
+        f"\nPower level: Bracket {bracket} — {bracket_desc}",
+        "",
+        "YOUR TASK:",
+        "Ask focused questions to understand the player's deck vision.",
+        "Tailor questions specifically to this commander's abilities and color identity.",
+        "After 3-5 exchanges, synthesize a structured description.",
+        "",
+        "RULES:",
+        "- Ask ONE question at a time.",
+        "- Keep questions short and conversational.",
+        "- Reference the commander's specific abilities when relevant.",
+        "- When you have gathered enough (3-5 exchanges), output this JSON block on its own line:",
+        '  {"done": true, "name": "Deck Name", "description": "..."}',
+        "",
+        "DESCRIPTION FORMAT:",
+        "The description MUST naturally include relevant strategy keywords so the retrieval",
+        "system can find thematically matching cards. Use words from this vocabulary when",
+        f"appropriate: {_STRATEGY_TAGS}",
+        "Example: 'graveyard aristocrats deck that sacrifices tokens to trigger death effects",
+        "and drain opponents with lifegain. Focuses on recursive threats.'",
+        "",
+        "Do NOT output the JSON block until you have enough information.",
+        "Do NOT wrap the JSON in a code fence.",
+    ]
+    return "\n".join(parts)
+
+
+def _parse_describe_response(raw: str) -> tuple[str, bool, str | None, str | None]:
+    """Extract conversation reply and optional completion data from LLM response.
+
+    Args:
+        raw: Raw LLM response text.
+
+    Returns:
+        Tuple of (reply_text, is_done, description, suggested_name).
+        reply_text has the JSON block stripped if present.
+    """
+    match = re.search(r'\{[^{}]*"done"\s*:\s*true[^{}]*\}', raw, re.DOTALL)
+    if not match:
+        return raw.strip(), False, None, None
+
+    try:
+        data = json.loads(match.group())
+    except json.JSONDecodeError:
+        return raw.strip(), False, None, None
+
+    if not data.get("done"):
+        return raw.strip(), False, None, None
+
+    description = data.get("description") or None
+    suggested_name = data.get("name") or None
+    reply = raw[: match.start()].strip() or "Here's your deck strategy:"
+    return reply, True, description, suggested_name
+
+
+async def describe_deck(
+    pool: asyncpg.Pool,
+    ai_client: openai.AsyncOpenAI,
+    commander_scryfall_id: UUID,
+    partner_scryfall_id: UUID | None,
+    bracket: int,
+    history: list[dict[str, str]],
+    message: str,
+) -> DescribeResponse:
+    """Run one turn of the deck description agent.
+
+    The agent reads commander card data, asks targeted strategy questions,
+    and synthesizes a structured description when it has enough information.
+    Conversation history is client-managed (no deck exists yet).
+
+    Args:
+        pool: asyncpg connection pool.
+        ai_client: OpenAI async client.
+        commander_scryfall_id: Scryfall ID of the commander card.
+        partner_scryfall_id: Scryfall ID of the partner commander, if any.
+        bracket: Power level bracket (1-4).
+        history: Full conversation history from the client.
+        message: Latest user message (empty string for the initial prompt).
+
+    Returns:
+        DescribeResponse with reply, done flag, and optional description/name.
+
+    Raises:
+        DeckNotFoundError: If the commander card is not found in the database.
+        LLMEmptyResponseError: If the LLM returns empty content.
+    """
+    commander = await card_service.get_card_by_scryfall_id(pool, commander_scryfall_id)
+    if commander is None:
+        raise DeckNotFoundError(f"Commander card {commander_scryfall_id} not found")
+
+    partner_name: str | None = None
+    partner_oracle: str | None = None
+    if partner_scryfall_id is not None:
+        partner = await card_service.get_card_by_scryfall_id(pool, partner_scryfall_id)
+        if partner is not None:
+            partner_name = partner.name
+            partner_oracle = partner.oracle_text
+
+    system = _build_describe_system_prompt(
+        commander_name=commander.name,
+        commander_type=commander.type_line,
+        commander_oracle=commander.oracle_text,
+        commander_keywords=None,
+        commander_colors=commander.color_identity,
+        partner_name=partner_name,
+        partner_oracle=partner_oracle,
+        bracket=bracket,
+    )
+
+    user_message = message if message.strip() else "I want to build a deck with this commander."
+    raw = await _call_llm(ai_client, system, history, user_message)
+    reply, done, description, suggested_name = _parse_describe_response(raw)
+
+    return DescribeResponse(
+        reply=reply,
+        done=done,
+        description=description,
+        suggested_name=suggested_name,
+    )
