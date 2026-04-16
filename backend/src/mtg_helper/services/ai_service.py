@@ -40,6 +40,7 @@ _log = logging.getLogger(__name__)
 
 _MODEL = "gpt-4.1-mini"
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
+_FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3, "reject": 0.1}
 
 # Stage metadata: (category label, target count description)
 _STAGE_META: dict[str, tuple[str, str]] = {
@@ -313,7 +314,7 @@ async def _compute_feedback_weights(
 
     weights: dict[UUID, float] = {}
     for row in feedback_rows:
-        weights[row["card_id"]] = 1.3 if row["feedback"] == "up" else 0.3
+        weights[row["card_id"]] = _FEEDBACK_WEIGHTS.get(row["feedback"], 0.3)
 
     pref_weights = await preference_service.get_card_preference_weights(pool, owner_id)
     for card_id, pref_mult in pref_weights.items():
@@ -568,6 +569,8 @@ async def build_stage(
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
+    if resolved_stage == "lands":
+        candidates = [c for c in candidates if "Land" in (c.type_line or "")]
     suggestions = [_card_from_retrieved(c, resolved_stage, query_tags) for c in candidates]
 
     if advance_deck_stage:
@@ -820,7 +823,7 @@ def _parse_describe_response(
     raw_targets = data.get("stage_targets")
     stage_targets: dict[str, int] | None = None
     if isinstance(raw_targets, dict):
-        stage_targets = {k: int(v) for k, v in raw_targets.items() if isinstance(v, (int, float))}
+        stage_targets = {k: int(v) for k, v in raw_targets.items() if isinstance(v, int | float)}
     return reply, True, description, suggested_name, stage_targets
 
 

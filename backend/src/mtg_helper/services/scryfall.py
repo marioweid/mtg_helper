@@ -133,12 +133,12 @@ def _map_card(card: dict[str, Any]) -> dict[str, Any]:
 
 _ILLEGAL_SET_CODES: frozenset[str] = frozenset(
     {
-        "30a",   # 30th Anniversary Edition (non-tournament legal)
-        "ugl",   # Unglued (silver-bordered)
-        "unh",   # Unhinged (silver-bordered)
-        "ust",   # Unstable (silver-bordered)
-        "ced",   # Collector's Edition (gold-bordered proxy)
-        "cei",   # International Edition (gold-bordered proxy)
+        "30a",  # 30th Anniversary Edition (non-tournament legal)
+        "ugl",  # Unglued (silver-bordered)
+        "unh",  # Unhinged (silver-bordered)
+        "ust",  # Unstable (silver-bordered)
+        "ced",  # Collector's Edition (gold-bordered proxy)
+        "cei",  # International Edition (gold-bordered proxy)
         "wc97",  # World Championship Decks 1997
         "wc98",  # World Championship Decks 1998
         "wc99",  # World Championship Decks 1999
@@ -304,9 +304,7 @@ async def run_sync(
         all_cards: list[dict[str, Any]] = response.json()
 
     relevant = [
-        _map_card(c)
-        for c in all_cards
-        if _is_commander_relevant(c) and _is_commander_playable(c)
+        _map_card(c) for c in all_cards if _is_commander_relevant(c) and _is_commander_playable(c)
     ]
 
     async with pool.acquire() as conn:

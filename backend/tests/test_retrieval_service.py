@@ -128,8 +128,18 @@ def test_personal_rating_avoid_card_weight_low() -> None:
 # ── _compute_weighted_scores ──────────────────────────────────────────────────
 
 
-def _make_row(uid: UUID, edhrec_rank: int | None = 100, cmc: float = 2.0) -> dict:
-    return {"id": uid, "edhrec_rank": edhrec_rank, "cmc": Decimal(str(cmc))}
+def _make_row(
+    uid: UUID,
+    edhrec_rank: int | None = 100,
+    cmc: float = 2.0,
+    color_identity: list[str] | None = None,
+) -> dict:
+    return {
+        "id": uid,
+        "edhrec_rank": edhrec_rank,
+        "cmc": Decimal(str(cmc)),
+        "color_identity": color_identity or ["G", "B"],
+    }
 
 
 def test_weighted_score_higher_qdrant_wins() -> None:
@@ -140,6 +150,7 @@ def test_weighted_score_higher_qdrant_wins() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
     )
@@ -155,6 +166,7 @@ def test_weighted_score_fts_boosts_synergy() -> None:
         tag_overlaps={},
         fts_set={_A},
         cards_by_id=rows,
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
     )
@@ -170,6 +182,7 @@ def test_weighted_score_feedback_boosts_card() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights={_A: 1.5},
     )
@@ -184,6 +197,7 @@ def test_weighted_score_skips_missing_rows() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
     )
@@ -199,6 +213,7 @@ def test_weighted_score_range_zero_to_one() -> None:
         tag_overlaps={_A: 3, _B: 0},
         fts_set={_A},
         cards_by_id=rows,
+        commander_color_identity=["G", "B"],
         deck_cmc_counts={2: 5},
         feedback_weights={_A: 2.0, _B: 0.05},
     )
@@ -379,6 +394,7 @@ def _make_type_row(
         "id": _A,
         "edhrec_rank": 100,
         "cmc": Decimal("2"),
+        "color_identity": ["G", "B"],
         "card_types": card_types,
         "subtypes": subtypes,
         "keywords": keywords or [],
@@ -428,6 +444,7 @@ def test_weighted_score_type_filter_boosts_matching_card() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
         type_filter=tf,
@@ -443,6 +460,7 @@ def test_weighted_score_no_type_filter_unchanged_weights() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
         type_filter=None,
@@ -559,6 +577,7 @@ def test_strict_mode_zeroes_out_zero_match_cards() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
         type_filter=tf,
@@ -579,6 +598,7 @@ def test_strict_mode_partial_match_not_zeroed() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
         type_filter=tf,
@@ -597,6 +617,7 @@ def test_non_strict_mode_zero_match_not_zeroed() -> None:
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
+        commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
         type_filter=tf,

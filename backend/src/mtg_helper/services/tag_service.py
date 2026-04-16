@@ -83,6 +83,7 @@ _PAT_VOLTRON_AURA = _re(r"enchanted creature gets? \+")
 _PAT_EXTRA_TURN = _re(r"take an extra turn|takes? an extra turn")
 _PAT_LAND_DESTROY = _re(r"destroy target land|destroy all lands?|destroy each land")
 _PAT_TRIBAL = _re(r"\btribal\b")
+_PAT_ENERGY = _re(r"\{E\}|energy counter")
 
 # Token type patterns — specific token names adjacent to "token" in oracle text
 _TOKEN_TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -276,6 +277,8 @@ def _tag_protection_misc(text: str, tl: str, kw_set: set[str], tags: list[str]) 
         tags.append("land_destruction")
     if _PAT_TRIBAL.search(tl):
         tags.append("tribal")
+    if _PAT_ENERGY.search(text):
+        tags.append("energy")
 
 
 def classify_card(

@@ -415,9 +415,7 @@ def test_token_types_zombie() -> None:
 
 
 def test_token_types_squirrel() -> None:
-    result = classify_token_types(
-        "Create two 1/1 green Squirrel creature tokens."
-    )
+    result = classify_token_types("Create two 1/1 green Squirrel creature tokens.")
     assert result == ["squirrel"]
 
 

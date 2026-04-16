@@ -870,12 +870,34 @@ def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
     return matched / requested_count
 
 
+def _color_affinity_score(
+    card_colors: list[str],
+    commander_colors: set[str],
+) -> float:
+    """Score card-commander color identity overlap in [0.0, 1.0].
+
+    Args:
+        card_colors: Card's color identity letters.
+        commander_colors: Commander's color identity as a set.
+
+    Returns:
+        1.0 for full overlap, 0.3 for colorless cards, proportional otherwise.
+    """
+    if not commander_colors:
+        return 1.0
+    if not card_colors:
+        return 0.3
+    overlap = sum(1 for c in card_colors if c in commander_colors)
+    return overlap / len(card_colors)
+
+
 def _compute_weighted_scores(
     all_ids: list[UUID],
     qdrant_scores: dict[UUID, float],
     tag_overlaps: dict[UUID, int],
     fts_set: set[UUID],
     cards_by_id: dict[UUID, "asyncpg.Record"],
+    commander_color_identity: list[str],
     deck_cmc_counts: dict[int, int] | None,
     feedback_weights: dict[UUID, float] | None,
     user_profile: "profile_service.UserProfile | None" = None,
@@ -884,19 +906,21 @@ def _compute_weighted_scores(
     """Compute weighted scores for all candidate cards.
 
     Without type_filter:
-        score = 0.4 * vector_similarity
-              + 0.3 * synergy_score
+        score = 0.35 * vector_similarity
+              + 0.3  * synergy_score
+              + 0.05 * color_affinity
               + 0.05 * popularity
-              + 0.1 * curve_fit
-              + 0.1 * personal_card_rating
+              + 0.1  * curve_fit
+              + 0.1  * personal_card_rating
               + 0.05 * user_profile_score
 
     With type_filter (reallocates 0.15 to type match signal):
-        score = 0.35 * vector_similarity
+        score = 0.30 * vector_similarity
               + 0.25 * synergy_score
               + 0.15 * type_match
+              + 0.05 * color_affinity
               + 0.05 * popularity
-              + 0.1 * curve_fit
+              + 0.1  * curve_fit
               + 0.05 * personal_card_rating
               + 0.05 * user_profile_score
 
@@ -906,6 +930,7 @@ def _compute_weighted_scores(
         tag_overlaps: Tag overlap count per card from Postgres.
         fts_set: Set of card UUIDs found via full-text search.
         cards_by_id: Raw DB rows indexed by card UUID.
+        commander_color_identity: Commander's color identity letters.
         deck_cmc_counts: Current deck CMC distribution.
         feedback_weights: Per-card feedback weight multipliers.
         user_profile: Optional cross-deck user preference profile.
@@ -921,6 +946,7 @@ def _compute_weighted_scores(
         if uid in cards_by_id and cards_by_id[uid]["edhrec_rank"] is not None
     ]
     max_rank = max(edhrec_ranks, default=1) or 1
+    cmdr_colors = set(commander_color_identity)
 
     scores: dict[UUID, float] = {}
     for uid in all_ids:
@@ -939,6 +965,7 @@ def _compute_weighted_scores(
 
         curve = _curve_fit_score(row["cmc"], deck_cmc_counts)
         personal = _personal_rating(uid, feedback_weights)
+        color = _color_affinity_score(list(row["color_identity"]), cmdr_colors)
 
         if user_profile is not None:
             profile_score = profile_service.score_card(user_profile, uid, list(row["tags"]))
@@ -951,9 +978,10 @@ def _compute_weighted_scores(
                 scores[uid] = 0.0
                 continue
             scores[uid] = (
-                0.35 * vec_sim
+                0.30 * vec_sim
                 + 0.25 * synergy
                 + 0.15 * type_score
+                + 0.05 * color
                 + 0.05 * popularity
                 + 0.1 * curve
                 + 0.05 * personal
@@ -961,8 +989,9 @@ def _compute_weighted_scores(
             )
         else:
             scores[uid] = (
-                0.4 * vec_sim
+                0.35 * vec_sim
                 + 0.3 * synergy
+                + 0.05 * color
                 + 0.05 * popularity
                 + 0.1 * curve
                 + 0.1 * personal
@@ -1066,6 +1095,7 @@ async def retrieve_candidates(
         tag_overlaps,
         fts_set,
         cards_by_id,
+        commander_color_identity,
         deck_cmc_counts,
         feedback_weights,
         user_profile,

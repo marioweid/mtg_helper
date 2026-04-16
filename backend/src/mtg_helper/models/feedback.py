@@ -11,7 +11,7 @@ class FeedbackCreate(BaseModel):
     """Request body for submitting card feedback."""
 
     card_scryfall_id: UUID
-    feedback: Literal["up", "down"]
+    feedback: Literal["up", "down", "reject"]
     reason: str | None = Field(default=None, max_length=500)
 
 
