@@ -126,13 +126,56 @@ def _map_card(card: dict[str, Any]) -> dict[str, Any]:
         "edhrec_rank": card.get("edhrec_rank"),
         "card_types": card_types,
         "subtypes": subtypes,
+        "border_color": card.get("border_color"),
+        "security_stamp": card.get("security_stamp"),
     }
+
+
+_ILLEGAL_SET_CODES: frozenset[str] = frozenset(
+    {
+        "30a",   # 30th Anniversary Edition (non-tournament legal)
+        "ugl",   # Unglued (silver-bordered)
+        "unh",   # Unhinged (silver-bordered)
+        "ust",   # Unstable (silver-bordered)
+        "ced",   # Collector's Edition (gold-bordered proxy)
+        "cei",   # International Edition (gold-bordered proxy)
+        "wc97",  # World Championship Decks 1997
+        "wc98",  # World Championship Decks 1998
+        "wc99",  # World Championship Decks 1999
+        "wc00",  # World Championship Decks 2000
+        "wc01",  # World Championship Decks 2001
+        "wc02",  # World Championship Decks 2002
+        "wc03",  # World Championship Decks 2003
+        "wc04",  # World Championship Decks 2004
+    }
+)
 
 
 def _is_commander_relevant(card: dict[str, Any]) -> bool:
     """Return True if the card is relevant for Commander (legal or banned)."""
     legalities = card.get("legalities") or {}
     return legalities.get("commander") in ("legal", "banned")
+
+
+def _is_commander_playable(card: dict[str, Any]) -> bool:
+    """Return True if the card is legal to play in Commander.
+
+    Filters out non-tournament-legal sets, silver/gold-bordered cards,
+    acorn-stamped cards (Unfinity casual), Conspiracy cards, and ante cards.
+    """
+    if (card.get("set") or "").lower() in _ILLEGAL_SET_CODES:
+        return False
+    if card.get("border_color") == "gold":
+        return False
+    if card.get("security_stamp") == "acorn":
+        return False
+    type_line = card.get("type_line") or ""
+    if "Conspiracy" in type_line:
+        return False
+    oracle_text = (card.get("oracle_text") or "").lower()
+    if "playing for ante" in oracle_text:
+        return False
+    return True
 
 
 async def _fetch_bulk_data_url(client: httpx.AsyncClient) -> str:
@@ -170,10 +213,10 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
             scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
             color_identity, colors, keywords, power, toughness, legalities,
             image_uri, prices, rarity, set_code, released_at, edhrec_rank,
-            card_types, subtypes, updated_at
+            card_types, subtypes, border_color, security_stamp, updated_at
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, now()
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, now()
         )
         ON CONFLICT (scryfall_id) DO UPDATE SET
             oracle_id      = EXCLUDED.oracle_id,
@@ -196,6 +239,8 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
             edhrec_rank    = EXCLUDED.edhrec_rank,
             card_types     = EXCLUDED.card_types,
             subtypes       = EXCLUDED.subtypes,
+            border_color   = EXCLUDED.border_color,
+            security_stamp = EXCLUDED.security_stamp,
             updated_at     = now()
         """,
         [
@@ -221,6 +266,8 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
                 c["edhrec_rank"],
                 c["card_types"],
                 c["subtypes"],
+                c["border_color"],
+                c["security_stamp"],
             )
             for c in batch
         ],
@@ -256,7 +303,11 @@ async def run_sync(
         response.raise_for_status()
         all_cards: list[dict[str, Any]] = response.json()
 
-    relevant = [_map_card(c) for c in all_cards if _is_commander_relevant(c)]
+    relevant = [
+        _map_card(c)
+        for c in all_cards
+        if _is_commander_relevant(c) and _is_commander_playable(c)
+    ]
 
     async with pool.acquire() as conn:
         for i in range(0, len(relevant), _BATCH_SIZE):

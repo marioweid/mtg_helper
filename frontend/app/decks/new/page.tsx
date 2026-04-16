@@ -32,6 +32,7 @@ export default function NewDeckPage() {
   // Phase 3: confirm state
   const [deckName, setDeckName] = useState("");
   const [description, setDescription] = useState("");
+  const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export default function NewDeckPage() {
       });
       setMessages([{ role: "assistant", content: res.reply }]);
       if (res.done) {
-        handleAgentDone(res.suggested_name, res.description);
+        handleAgentDone(res.suggested_name, res.description, res.stage_targets);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start agent.");
@@ -69,9 +70,14 @@ export default function NewDeckPage() {
     }
   }
 
-  function handleAgentDone(suggestedName: string | null, desc: string | null) {
+  function handleAgentDone(
+    suggestedName: string | null,
+    desc: string | null,
+    targets: Record<string, number> | null,
+  ) {
     setDeckName(suggestedName ?? (commander ? `${commander.name} Deck` : ""));
     setDescription(desc ?? "");
+    setStageTargets(targets);
     setPhase("confirm");
   }
 
@@ -100,7 +106,7 @@ export default function NewDeckPage() {
       });
       setMessages([...nextMessages, { role: "assistant", content: res.reply }]);
       if (res.done) {
-        handleAgentDone(res.suggested_name, res.description);
+        handleAgentDone(res.suggested_name, res.description, res.stage_targets);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message.");
@@ -122,6 +128,7 @@ export default function NewDeckPage() {
         description: description.trim() || null,
         bracket,
         owner_id: ownerId || null,
+        stage_targets: stageTargets,
       });
       router.push(`/decks/${deck.id}/build`);
     } catch (err) {

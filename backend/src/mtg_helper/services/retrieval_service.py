@@ -676,6 +676,9 @@ async def _search_tags(
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND id != ALL($3::uuid[])
+              AND COALESCE(border_color, '') != 'gold'
+              AND COALESCE(security_stamp, '') != 'acorn'
+              AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
             ORDER BY
                 array_length(
@@ -728,6 +731,9 @@ async def _search_fts(
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND id != ALL($3::uuid[])
+              AND COALESCE(border_color, '') != 'gold'
+              AND COALESCE(security_stamp, '') != 'acorn'
+              AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
             ORDER BY
                 ts_rank(
@@ -1130,6 +1136,9 @@ async def _fetch_candidates(
                    card_types, subtypes, keywords, traits, token_types
             FROM cards
             WHERE id = ANY($1::uuid[])
+              AND COALESCE(border_color, '') != 'gold'
+              AND COALESCE(security_stamp, '') != 'acorn'
+              AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
             """,
             ids,

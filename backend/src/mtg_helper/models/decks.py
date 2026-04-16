@@ -16,6 +16,7 @@ class DeckCreate(BaseModel):
     description: str | None = None
     bracket: int = Field(default=3, ge=1, le=4)
     owner_id: UUID | None = None
+    stage_targets: dict[str, int] | None = None
 
 
 class DeckUpdate(BaseModel):
@@ -26,6 +27,7 @@ class DeckUpdate(BaseModel):
     bracket: int | None = Field(default=None, ge=1, le=4)
     stage: str | None = None
     owner_id: UUID | None = None
+    stage_targets: dict[str, int] | None = None
 
 
 class DeckSummary(BaseModel):
@@ -55,6 +57,7 @@ class DeckResponse(BaseModel):
     owner_id: UUID | None
     created_at: datetime
     updated_at: datetime
+    stage_targets: dict[str, int] = Field(default_factory=dict)
 
 
 class DeckCardItem(BaseModel):
@@ -90,6 +93,7 @@ class DeckDetailResponse(BaseModel):
     owner_id: UUID | None
     created_at: datetime
     updated_at: datetime
+    stage_targets: dict[str, int] = Field(default_factory=dict)
     cards: list[DeckCardItem]
 
 

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS cards (
     card_types      TEXT[] NOT NULL DEFAULT '{}',
     subtypes        TEXT[] NOT NULL DEFAULT '{}',
     token_types     TEXT[] NOT NULL DEFAULT '{}',
+    border_color    TEXT,
+    security_stamp  TEXT,
     embedded_at     TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -90,6 +92,7 @@ CREATE TABLE IF NOT EXISTS decks (
     description     TEXT,
     bracket         INTEGER CHECK (bracket BETWEEN 1 AND 4),
     stage           TEXT NOT NULL DEFAULT 'created',
+    stage_targets   JSONB NOT NULL DEFAULT '{}',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -154,6 +157,13 @@ CREATE TABLE IF NOT EXISTS conversation_turns (
     turn_order      INTEGER NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ============================================================
+-- MIGRATIONS (idempotent column additions for existing DBs)
+-- ============================================================
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS security_stamp TEXT;
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
 
 -- ============================================================
 -- VIEW: deck detail with full card info

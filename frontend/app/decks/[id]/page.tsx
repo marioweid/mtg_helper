@@ -202,12 +202,6 @@ export default function DeckDetailPage() {
           >
             {deck.stage === "complete" ? "View Build" : "Continue Building"}
           </Link>
-          <Link
-            href={`/decks/${deck.id}/chat`}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-300 hover:border-white/40 hover:text-white transition-colors"
-          >
-            Chat
-          </Link>
           <ExportButton deckId={deck.id} />
           <button
             onClick={() => void handleDeleteDeck()}

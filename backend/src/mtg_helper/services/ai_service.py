@@ -765,7 +765,17 @@ def _build_describe_system_prompt(
         "- Keep questions short and conversational.",
         "- Reference the commander's specific abilities when relevant.",
         "- When you have gathered enough (3-5 exchanges), output this JSON block on its own line:",
-        '  {"done": true, "name": "Deck Name", "description": "..."}',
+        '  {"done": true, "name": "Deck Name", "description": "...", '
+        '"stage_targets": {"ramp": 12, "interaction": 10, "draw": 8, "theme": 22, '
+        '"utility": 6, "lands": 37}}',
+        "",
+        "STAGE TARGET GUIDELINES (adjust based on player preferences):",
+        "- ramp: 8-14 (default 10-12; increase for ramp-heavy or high-CMC decks)",
+        "- interaction: 6-12 (default 8-10; increase for control/stax)",
+        "- draw: 6-12 (default 8-10; increase for draw-heavy decks)",
+        "- theme: 18-28 (default 20-25; flex based on how tight the theme is)",
+        "- utility: 3-10 (default 5-8)",
+        "- lands: 33-38 (default 35-38; lower for low-curve or mana-light builds)",
         "",
         "DESCRIPTION FORMAT:",
         "The description MUST naturally include relevant strategy keywords so the retrieval",
@@ -780,32 +790,38 @@ def _build_describe_system_prompt(
     return "\n".join(parts)
 
 
-def _parse_describe_response(raw: str) -> tuple[str, bool, str | None, str | None]:
+def _parse_describe_response(
+    raw: str,
+) -> tuple[str, bool, str | None, str | None, dict[str, int] | None]:
     """Extract conversation reply and optional completion data from LLM response.
 
     Args:
         raw: Raw LLM response text.
 
     Returns:
-        Tuple of (reply_text, is_done, description, suggested_name).
+        Tuple of (reply_text, is_done, description, suggested_name, stage_targets).
         reply_text has the JSON block stripped if present.
     """
     match = re.search(r'\{[^{}]*"done"\s*:\s*true[^{}]*\}', raw, re.DOTALL)
     if not match:
-        return raw.strip(), False, None, None
+        return raw.strip(), False, None, None, None
 
     try:
         data = json.loads(match.group())
     except json.JSONDecodeError:
-        return raw.strip(), False, None, None
+        return raw.strip(), False, None, None, None
 
     if not data.get("done"):
-        return raw.strip(), False, None, None
+        return raw.strip(), False, None, None, None
 
     description = data.get("description") or None
     suggested_name = data.get("name") or None
     reply = raw[: match.start()].strip() or "Here's your deck strategy:"
-    return reply, True, description, suggested_name
+    raw_targets = data.get("stage_targets")
+    stage_targets: dict[str, int] | None = None
+    if isinstance(raw_targets, dict):
+        stage_targets = {k: int(v) for k, v in raw_targets.items() if isinstance(v, (int, float))}
+    return reply, True, description, suggested_name, stage_targets
 
 
 async def describe_deck(
@@ -864,11 +880,12 @@ async def describe_deck(
 
     user_message = message if message.strip() else "I want to build a deck with this commander."
     raw = await _call_llm(ai_client, system, history, user_message)
-    reply, done, description, suggested_name = _parse_describe_response(raw)
+    reply, done, description, suggested_name, stage_targets = _parse_describe_response(raw)
 
     return DescribeResponse(
         reply=reply,
         done=done,
         description=description,
         suggested_name=suggested_name,
+        stage_targets=stage_targets,
     )

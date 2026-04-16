@@ -1,5 +1,6 @@
 """Deck CRUD service with color identity validation."""
 
+import json
 from uuid import UUID
 
 import asyncpg
@@ -62,6 +63,14 @@ class DeckNotFoundError(ValueError):
     """Raised when a deck does not exist."""
 
 
+def _parse_stage_targets(raw: object) -> dict[str, int]:
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        return json.loads(raw)
+    return dict(raw)
+
+
 def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
     return DeckResponse(
         id=row["id"],
@@ -74,6 +83,7 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
         owner_id=row["owner_id"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        stage_targets=_parse_stage_targets(row["stage_targets"]),
     )
 
 
@@ -153,8 +163,9 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
 
         row = await conn.fetchrow(
             """
-            INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_id,
+                               stage_targets)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
             """,
             data.name,
@@ -163,6 +174,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
             data.description,
             data.bracket,
             data.owner_id,
+            json.dumps(data.stage_targets or {}),
         )
     return _row_to_deck(row)
 
@@ -241,6 +253,7 @@ async def get_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckDetailResponse | No
         owner_id=deck_row["owner_id"],
         created_at=deck_row["created_at"],
         updated_at=deck_row["updated_at"],
+        stage_targets=_parse_stage_targets(deck_row["stage_targets"]),
         cards=[_row_to_deck_card_item(r) for r in card_rows],
     )
 
@@ -259,6 +272,10 @@ async def update_deck(pool: asyncpg.Pool, deck_id: UUID, data: DeckUpdate) -> De
     updates = data.model_dump(exclude_none=True)
     if not updates:
         return await _fetch_deck(pool, deck_id)
+
+    # Serialize JSONB fields for asyncpg
+    if "stage_targets" in updates:
+        updates["stage_targets"] = json.dumps(updates["stage_targets"])
 
     fields = ", ".join(f"{k} = ${i + 2}" for i, k in enumerate(updates))
     values = list(updates.values())

@@ -182,15 +182,20 @@ async def resolve_card_by_name(pool: asyncpg.Pool, name: str) -> CardResponse | 
         CardResponse if matched, None otherwise.
     """
     async with pool.acquire() as conn:
+        _legal_filter = (
+            " AND legalities->>'commander' = 'legal'"
+            " AND COALESCE(border_color, '') != 'gold'"
+            " AND COALESCE(security_stamp, '') != 'acorn'"
+            " AND type_line NOT LIKE '%Conspiracy%'"
+        )
         row = await conn.fetchrow(
-            "SELECT * FROM cards WHERE lower(name) = lower($1)"
-            " AND legalities->>'commander' = 'legal' LIMIT 1",
+            f"SELECT * FROM cards WHERE lower(name) = lower($1){_legal_filter} LIMIT 1",
             name,
         )
         if row is None:
             row = await conn.fetchrow(
-                "SELECT * FROM cards WHERE similarity(name, $1) > 0.4"
-                " AND legalities->>'commander' = 'legal'"
+                f"SELECT * FROM cards WHERE similarity(name, $1) > 0.4"
+                f"{_legal_filter}"
                 " ORDER BY similarity(name, $1) DESC LIMIT 1",
                 name,
             )

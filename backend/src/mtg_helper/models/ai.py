@@ -93,3 +93,4 @@ class DescribeResponse(BaseModel):
     done: bool
     description: str | None = None
     suggested_name: str | None = None
+    stage_targets: dict[str, int] | None = None
