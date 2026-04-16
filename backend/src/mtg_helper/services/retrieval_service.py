@@ -189,21 +189,7 @@ _STAGE_QUERIES: dict[str, tuple[str, list[str]]] = {
     "lands": ("lands mana base mana fixing", ["ramp"]),
     "bangers": (
         "powerful staples synergy commander",
-        [
-            "ramp",
-            "fast_mana",
-            "draw",
-            "removal",
-            "counterspell",
-            "board_wipe",
-            "protection",
-            "tutor",
-            "graveyard",
-            "blink",
-            "token",
-            "sacrifice",
-            "aristocrats",
-        ],
+        ["ramp", "draw", "removal", "board_wipe", "protection", "tutor", "token", "graveyard"],
     ),
 }
 
@@ -876,19 +862,28 @@ def _color_affinity_score(
 ) -> float:
     """Score card-commander color identity overlap in [0.0, 1.0].
 
+    Colorless cards in colored decks receive a dynamic penalty that scales
+    with commander color count: fewer colors = stricter penalty.
+
     Args:
         card_colors: Card's color identity letters.
         commander_colors: Commander's color identity as a set.
 
     Returns:
-        1.0 for full overlap, 0.3 for colorless cards, proportional otherwise.
+        1.0 for full overlap, scaled [0.16, 0.40] for colorless cards, proportional otherwise.
     """
     if not commander_colors:
         return 1.0
     if not card_colors:
-        return 0.3
+        # Scale: 1-color→0.16, 2-color→0.22, 3-color→0.28, 4-color→0.34, 5-color→0.40
+        return 0.1 + 0.06 * len(commander_colors)
     overlap = sum(1 for c in card_colors if c in commander_colors)
     return overlap / len(card_colors)
+
+
+_MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
+_MULTI_TAG_SYNERGY_THRESHOLD = 3
+_MULTI_TAG_SYNERGY_DAMPEN = 0.7
 
 
 def _compute_weighted_scores(
@@ -902,6 +897,7 @@ def _compute_weighted_scores(
     feedback_weights: dict[UUID, float] | None,
     user_profile: "profile_service.UserProfile | None" = None,
     type_filter: TypeFilter | None = None,
+    stage: str | None = None,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
@@ -924,6 +920,9 @@ def _compute_weighted_scores(
               + 0.05 * personal_card_rating
               + 0.05 * user_profile_score
 
+    Multi-modal cards (3+ tag matches) outside theme/bangers stages have their
+    synergy score dampened by 0.7x to reduce noise from versatile colorless utility cards.
+
     Args:
         all_ids: All candidate card UUIDs.
         qdrant_scores: Cosine similarity per card from Qdrant [0, 1].
@@ -935,6 +934,7 @@ def _compute_weighted_scores(
         feedback_weights: Per-card feedback weight multipliers.
         user_profile: Optional cross-deck user preference profile.
         type_filter: Optional parsed type/subtype preferences; activates type boost.
+        stage: Current build stage (used to determine synergy damping).
 
     Returns:
         Dict mapping card UUID to final weighted score.
@@ -959,6 +959,8 @@ def _compute_weighted_scores(
         raw_overlap = tag_overlaps.get(uid, 0)
         fts_bonus = 0.15 if uid in fts_set else 0.0
         synergy = min(1.0, (raw_overlap / max_overlap) + fts_bonus)
+        if raw_overlap >= _MULTI_TAG_SYNERGY_THRESHOLD and stage not in _MULTI_TAG_SYNERGY_EXEMPT:
+            synergy *= _MULTI_TAG_SYNERGY_DAMPEN
 
         rank = row["edhrec_rank"]
         popularity = (1.0 - rank / max_rank) if rank is not None else 0.0
@@ -1100,6 +1102,7 @@ async def retrieve_candidates(
         feedback_weights,
         user_profile,
         type_filter,
+        stage=stage,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
