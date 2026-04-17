@@ -20,12 +20,14 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
+from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
     card_service,
     conversation_service,
     deck_service,
     preference_service,
     profile_service,
+    ranking_weight_service,
 )
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
 from mtg_helper.services.retrieval_service import (
@@ -40,7 +42,9 @@ _log = logging.getLogger(__name__)
 
 _MODEL = "gpt-4.1-mini"
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
-_FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3, "reject": 0.1}
+_FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3}
+_REJECT_BASE: float = 0.3  # weight = _REJECT_BASE ** reject_count
+_REJECT_FLOOR: float = 0.02
 
 # Stage metadata: (category label, target count description)
 _STAGE_META: dict[str, tuple[str, str]] = {
@@ -308,13 +312,17 @@ async def _compute_feedback_weights(
 
     async with pool.acquire() as conn:
         feedback_rows = await conn.fetch(
-            "SELECT card_id, feedback FROM deck_feedback WHERE deck_id = $1",
+            "SELECT card_id, feedback, reject_count FROM deck_feedback WHERE deck_id = $1",
             deck_id,
         )
 
     weights: dict[UUID, float] = {}
     for row in feedback_rows:
-        weights[row["card_id"]] = _FEEDBACK_WEIGHTS.get(row["feedback"], 0.3)
+        if row["feedback"] == "reject":
+            count = max(1, row["reject_count"])
+            weights[row["card_id"]] = max(_REJECT_FLOOR, _REJECT_BASE**count)
+        else:
+            weights[row["card_id"]] = _FEEDBACK_WEIGHTS.get(row["feedback"], 0.3)
 
     pref_weights = await preference_service.get_card_preference_weights(pool, owner_id)
     for card_id, pref_mult in pref_weights.items():
@@ -346,6 +354,33 @@ async def _load_user_profile(
     if not await preference_service.is_user_profile_enabled(pool, owner_id):
         return None
     return await profile_service.get_user_profile(pool, owner_id, deck_id)
+
+
+async def _load_ranking_weights(
+    pool: asyncpg.Pool,
+    owner_id: UUID | None,
+) -> RankingWeights | None:
+    """Load per-user ranking weights, returning None if no owner.
+
+    Args:
+        pool: asyncpg connection pool.
+        owner_id: The account UUID, or None for anonymous decks.
+
+    Returns:
+        RankingWeights if owner exists, else None (uses defaults in retrieval).
+    """
+    if owner_id is None:
+        return None
+    try:
+        result = await ranking_weight_service.get_weights(pool, owner_id)
+        return RankingWeights(
+            semantic=result.semantic,
+            synergy=result.synergy,
+            popularity=result.popularity,
+            personal=result.personal,
+        )
+    except ranking_weight_service.AccountNotFoundError:
+        return None
 
 
 async def _load_prompt_context(
@@ -543,13 +578,19 @@ async def build_stage(
     deck_card_ids = [c.card_id for c in deck.cards]
     exclude_ids = await _resolve_exclude_ids(pool, exclude)
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
-    all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids})
+    avoid_ids = (
+        await preference_service.get_avoid_card_ids(pool, deck.owner_id)
+        if deck.owner_id
+        else []
+    )
+    all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
 
     query_text, query_tags = stage_retrieval_query(resolved_stage, deck.description)
     feedback_weights, user_profile = await asyncio.gather(
         _compute_feedback_weights(pool, deck.id, deck.owner_id),
         _load_user_profile(pool, deck.id, deck.owner_id),
     )
+    ranking_weights = await _load_ranking_weights(pool, deck.owner_id)
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
 
     limit = target if target is not None else 20
@@ -566,6 +607,7 @@ async def build_stage(
         deck_cmc_counts=deck_cmc_counts,
         feedback_weights=feedback_weights,
         user_profile=user_profile,
+        ranking_weights=ranking_weights,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 

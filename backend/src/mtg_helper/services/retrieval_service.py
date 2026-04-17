@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 from dataclasses import dataclass, field
 from decimal import Decimal
 from uuid import UUID
@@ -19,6 +20,7 @@ from qdrant_client.models import (
 )
 
 from mtg_helper.config import settings
+from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import profile_service
 from mtg_helper.services.embedding_service import embed_single
 
@@ -881,6 +883,16 @@ def _color_affinity_score(
     return overlap / len(card_colors)
 
 
+# Default signal weights (no type filter)
+_W_SEMANTIC: float = 0.25
+_W_SYNERGY: float = 0.22
+_W_POPULARITY: float = 0.20
+_W_PERSONAL: float = 0.15
+# Fixed weights (never user-tunable)
+_W_CURVE: float = 0.10
+_W_COLOR: float = 0.05
+_W_PROFILE: float = 0.03
+
 _MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
 _MULTI_TAG_SYNERGY_THRESHOLD = 3
 _MULTI_TAG_SYNERGY_DAMPEN = 0.7
@@ -898,30 +910,23 @@ def _compute_weighted_scores(
     user_profile: "profile_service.UserProfile | None" = None,
     type_filter: TypeFilter | None = None,
     stage: str | None = None,
+    ranking_weights: RankingWeights | None = None,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
-    Without type_filter:
-        score = 0.35 * vector_similarity
-              + 0.3  * synergy_score
-              + 0.05 * color_affinity
-              + 0.05 * popularity
-              + 0.1  * curve_fit
-              + 0.1  * personal_card_rating
-              + 0.05 * user_profile_score
+    Default weights (no type_filter):
+        score = w_semantic  * vector_similarity
+              + w_synergy   * synergy_score
+              + w_popularity* popularity (log-scaled EDHREC)
+              + w_personal  * personal_card_rating
+              + 0.10        * curve_fit
+              + 0.05        * color_affinity
+              + 0.03        * user_profile_score
 
-    With type_filter (reallocates 0.15 to type match signal):
-        score = 0.30 * vector_similarity
-              + 0.25 * synergy_score
-              + 0.15 * type_match
-              + 0.05 * color_affinity
-              + 0.05 * popularity
-              + 0.1  * curve_fit
-              + 0.05 * personal_card_rating
-              + 0.05 * user_profile_score
+    With type_filter, 0.15 is reallocated from semantic/synergy to a type_score signal.
 
-    Multi-modal cards (3+ tag matches) outside theme/bangers stages have their
-    synergy score dampened by 0.7x to reduce noise from versatile colorless utility cards.
+    Weights come from ``ranking_weights`` when provided; otherwise module defaults apply.
+    Multi-modal cards (3+ tag matches) outside theme/bangers stages have synergy dampened 0.7x.
 
     Args:
         all_ids: All candidate card UUIDs.
@@ -935,10 +940,13 @@ def _compute_weighted_scores(
         user_profile: Optional cross-deck user preference profile.
         type_filter: Optional parsed type/subtype preferences; activates type boost.
         stage: Current build stage (used to determine synergy damping).
+        ranking_weights: Optional per-user weight overrides.
 
     Returns:
         Dict mapping card UUID to final weighted score.
     """
+    w = ranking_weights if ranking_weights is not None else RankingWeights()
+
     max_overlap = max(tag_overlaps.values(), default=1) or 1
     edhrec_ranks = [
         cards_by_id[uid]["edhrec_rank"]
@@ -963,7 +971,9 @@ def _compute_weighted_scores(
             synergy *= _MULTI_TAG_SYNERGY_DAMPEN
 
         rank = row["edhrec_rank"]
-        popularity = (1.0 - rank / max_rank) if rank is not None else 0.0
+        popularity = (
+            max(0.0, 1.0 - math.log1p(rank) / math.log1p(max_rank)) if rank is not None else 0.0
+        )
 
         curve = _curve_fit_score(row["cmc"], deck_cmc_counts)
         personal = _personal_rating(uid, feedback_weights)
@@ -979,25 +989,28 @@ def _compute_weighted_scores(
             if type_filter.strict and type_score == 0.0:
                 scores[uid] = 0.0
                 continue
+            # With type filter: reallocate 0.15 from semantic/synergy to type_score
+            tf_semantic = max(0.0, w.semantic - 0.08)
+            tf_synergy = max(0.0, w.synergy - 0.07)
             scores[uid] = (
-                0.30 * vec_sim
-                + 0.25 * synergy
+                tf_semantic * vec_sim
+                + tf_synergy * synergy
                 + 0.15 * type_score
-                + 0.05 * color
-                + 0.05 * popularity
-                + 0.1 * curve
-                + 0.05 * personal
-                + 0.05 * profile_score
+                + _W_COLOR * color
+                + w.popularity * popularity
+                + _W_CURVE * curve
+                + w.personal * personal
+                + _W_PROFILE * profile_score
             )
         else:
             scores[uid] = (
-                0.35 * vec_sim
-                + 0.3 * synergy
-                + 0.05 * color
-                + 0.05 * popularity
-                + 0.1 * curve
-                + 0.1 * personal
-                + 0.05 * profile_score
+                w.semantic * vec_sim
+                + w.synergy * synergy
+                + _W_COLOR * color
+                + w.popularity * popularity
+                + _W_CURVE * curve
+                + w.personal * personal
+                + _W_PROFILE * profile_score
             )
 
     return scores
@@ -1036,6 +1049,7 @@ async def retrieve_candidates(
     feedback_weights: dict[UUID, float] | None = None,
     user_profile: "profile_service.UserProfile | None" = None,
     type_filter: TypeFilter | None = None,
+    ranking_weights: RankingWeights | None = None,
 ) -> list[RetrievedCard]:
     """Run hybrid retrieval and return top candidate cards with weighted scoring.
 
@@ -1056,6 +1070,7 @@ async def retrieve_candidates(
         feedback_weights: Optional per-card score multipliers (range [0.05, 2.0]).
         user_profile: Optional cross-deck user preference profile.
         type_filter: Optional type/subtype preferences for soft score boosting.
+        ranking_weights: Optional per-user signal weight overrides.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1103,6 +1118,7 @@ async def retrieve_candidates(
         user_profile,
         type_filter,
         stage=stage,
+        ranking_weights=ranking_weights,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)

@@ -23,5 +23,6 @@ class FeedbackResponse(BaseModel):
     card_id: UUID
     card_name: str
     feedback: str
+    reject_count: int = 0
     reason: str | None
     created_at: datetime

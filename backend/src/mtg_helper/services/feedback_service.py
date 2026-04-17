@@ -26,6 +26,7 @@ def _row_to_feedback(row: asyncpg.Record, card_name: str) -> FeedbackResponse:
         card_id=row["card_id"],
         card_name=card_name,
         feedback=row["feedback"],
+        reject_count=row["reject_count"],
         reason=row["reason"],
         created_at=row["created_at"],
     )
@@ -62,22 +63,42 @@ async def add_feedback(pool: asyncpg.Pool, deck_id: UUID, data: FeedbackCreate) 
         card_id = card_row["id"]
         card_name = card_row["name"]
 
-        await conn.execute(
-            "DELETE FROM deck_feedback WHERE deck_id = $1 AND card_id = $2",
-            deck_id,
-            card_id,
-        )
-        row = await conn.fetchrow(
-            """
-            INSERT INTO deck_feedback (deck_id, card_id, feedback, reason)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *
-            """,
-            deck_id,
-            card_id,
-            data.feedback,
-            data.reason,
-        )
+        if data.feedback == "reject":
+            # Compound rejects: increment count instead of replacing
+            row = await conn.fetchrow(
+                """
+                INSERT INTO deck_feedback (deck_id, card_id, feedback, reject_count, reason)
+                VALUES ($1, $2, 'reject', 1, $3)
+                ON CONFLICT (deck_id, card_id) DO UPDATE SET
+                    feedback     = 'reject',
+                    reject_count = CASE
+                        WHEN deck_feedback.feedback = 'reject'
+                        THEN deck_feedback.reject_count + 1
+                        ELSE 1
+                    END,
+                    reason = EXCLUDED.reason
+                RETURNING *
+                """,
+                deck_id,
+                card_id,
+                data.reason,
+            )
+        else:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO deck_feedback (deck_id, card_id, feedback, reject_count, reason)
+                VALUES ($1, $2, $3, 0, $4)
+                ON CONFLICT (deck_id, card_id) DO UPDATE SET
+                    feedback     = EXCLUDED.feedback,
+                    reject_count = 0,
+                    reason       = EXCLUDED.reason
+                RETURNING *
+                """,
+                deck_id,
+                card_id,
+                data.feedback,
+                data.reason,
+            )
 
     return _row_to_feedback(row, card_name)
 

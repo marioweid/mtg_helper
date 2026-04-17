@@ -133,16 +133,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_preferences_user_profile_boosting
     ON preferences (account_id) WHERE preference_type = 'user_profile_boosting';
 
 -- ============================================================
--- DECK FEEDBACK (per-deck thumbs up/down)
+-- DECK FEEDBACK (per-deck thumbs up/down/reject)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS deck_feedback (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     deck_id         UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
     card_id         UUID NOT NULL REFERENCES cards(id),
-    feedback        TEXT NOT NULL CHECK (feedback IN ('up', 'down')),
+    feedback        TEXT NOT NULL CHECK (feedback IN ('up', 'down', 'reject')),
+    reject_count    INT NOT NULL DEFAULT 0,
     reason          TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_feedback_deck_card
+    ON deck_feedback (deck_id, card_id);
 
 CREATE INDEX IF NOT EXISTS idx_deck_feedback_deck_id ON deck_feedback (deck_id);
 
@@ -159,11 +163,34 @@ CREATE TABLE IF NOT EXISTS conversation_turns (
 );
 
 -- ============================================================
+-- ACCOUNT RANKING WEIGHTS (per-user signal weight overrides)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS account_ranking_weights (
+    account_id  UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    semantic    REAL NOT NULL DEFAULT 0.25,
+    synergy     REAL NOT NULL DEFAULT 0.22,
+    popularity  REAL NOT NULL DEFAULT 0.20,
+    personal    REAL NOT NULL DEFAULT 0.15,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
 -- MIGRATIONS (idempotent column additions for existing DBs)
 -- ============================================================
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS security_stamp TEXT;
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE deck_feedback ADD COLUMN IF NOT EXISTS reject_count INT NOT NULL DEFAULT 0;
+ALTER TABLE deck_feedback DROP CONSTRAINT IF EXISTS deck_feedback_feedback_check;
+ALTER TABLE deck_feedback ADD CONSTRAINT deck_feedback_feedback_check
+    CHECK (feedback IN ('up', 'down', 'reject'));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_feedback_deck_card ON deck_feedback (deck_id, card_id);
+ALTER TABLE preferences DROP CONSTRAINT IF EXISTS preferences_preference_type_check;
+ALTER TABLE preferences ADD CONSTRAINT preferences_preference_type_check
+    CHECK (preference_type IN (
+        'pet_card', 'avoid_card', 'avoid_archetype', 'general',
+        'feedback_boosting', 'user_profile_boosting'
+    ));
 
 -- ============================================================
 -- VIEW: deck detail with full card info

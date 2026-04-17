@@ -202,6 +202,25 @@ async def is_user_profile_enabled(pool: asyncpg.Pool, account_id: UUID) -> bool:
     return bool(exists)
 
 
+async def get_avoid_card_ids(pool: asyncpg.Pool, account_id: UUID) -> list[UUID]:
+    """Return card UUIDs marked as avoid for an account.
+
+    Args:
+        pool: asyncpg connection pool.
+        account_id: The account's UUID.
+
+    Returns:
+        List of card UUIDs the user never wants suggested.
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT card_id FROM preferences "
+            "WHERE account_id = $1 AND preference_type = 'avoid_card' AND card_id IS NOT NULL",
+            account_id,
+        )
+    return [r["card_id"] for r in rows]
+
+
 async def get_card_preference_weights(
     pool: asyncpg.Pool,
     account_id: UUID,

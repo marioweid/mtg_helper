@@ -130,7 +130,7 @@ export default function NewDeckPage() {
         owner_id: ownerId || null,
         stage_targets: stageTargets,
       });
-      router.push(`/decks/${deck.id}/build`);
+      router.push(`/decks/${deck.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create deck.");
       setSubmitting(false);
