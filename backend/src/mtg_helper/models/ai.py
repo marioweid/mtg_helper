@@ -11,6 +11,8 @@ class BuildRequest(BaseModel):
     stage: str | None = None
     target: int | None = Field(default=None, ge=1, le=99)
     exclude: list[str] | None = Field(default=None, max_length=200)
+    collection_id: UUID | None = None
+    min_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class CardSuggestion(BaseModel):
@@ -47,6 +49,8 @@ class SuggestRequest(BaseModel):
 
     prompt: str = Field(min_length=1, max_length=500)
     count: int = Field(default=10, ge=1, le=25)
+    collection_id: UUID | None = None
+    min_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class SuggestResponse(BaseModel):

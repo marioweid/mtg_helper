@@ -49,6 +49,19 @@ class TypeFilter:
     strict: bool = False
 
 
+@dataclass(frozen=True)
+class CollectionFilter:
+    """Restricts retrieval to owned cards and drops low-confidence results.
+
+    When active, only cards in ``owned_card_ids`` are eligible as candidates.
+    After scoring, candidates with a weighted score below ``min_score`` are
+    dropped rather than padded — a near-empty result beats bad fills.
+    """
+
+    owned_card_ids: frozenset[UUID]
+    min_score: float = 0.0
+
+
 @dataclass
 class RetrievedCard:
     """A card retrieved via hybrid search, enriched with full DB data."""
@@ -586,6 +599,7 @@ async def _search_qdrant(
     commander_color_identity: list[str],
     exclude_ids: list[UUID],
     limit: int = 50,
+    owned_card_ids: frozenset[UUID] | None = None,
 ) -> list[tuple[UUID, float]]:
     """Semantic search via Qdrant cosine similarity.
 
@@ -595,11 +609,14 @@ async def _search_qdrant(
         commander_color_identity: Commander's color identity letters.
         exclude_ids: Card UUIDs already in the deck (excluded from results).
         limit: Maximum results to return.
+        owned_card_ids: When set, restricts results to these card UUIDs.
 
     Returns:
         List of (card_uuid, cosine_similarity) pairs, best match first.
     """
     must_conditions: list = [FieldCondition(key="commander_legal", match=MatchValue(value=True))]
+    if owned_card_ids:
+        must_conditions.append(HasIdCondition(has_id=[str(uid) for uid in owned_card_ids]))
 
     excluded_colors = _excluded_colors(commander_color_identity)
     must_not_conditions: list = []
@@ -631,6 +648,7 @@ async def _search_tags(
     exclude_ids: list[UUID],
     exclude_lands: bool = False,
     limit: int = 50,
+    owned_card_ids: frozenset[UUID] | None = None,
 ) -> list[tuple[UUID, int]]:
     """Tag-overlap search via Postgres GIN array index.
 
@@ -641,6 +659,7 @@ async def _search_tags(
         exclude_ids: Card UUIDs to exclude.
         exclude_lands: If True, exclude land cards from results.
         limit: Maximum results to return.
+        owned_card_ids: When set, restricts results to these card UUIDs.
 
     Returns:
         List of (card_uuid, tag_overlap_count) pairs, highest overlap first.
@@ -648,7 +667,11 @@ async def _search_tags(
     if not query_tags:
         return []
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
+    collection_filter = "AND id = ANY($5::uuid[])" if owned_card_ids is not None else ""
     async with pool.acquire() as conn:
+        params: list = [query_tags, commander_color_identity, exclude_ids, limit]
+        if owned_card_ids is not None:
+            params.append(list(owned_card_ids))
         rows = await conn.fetch(
             f"""
             SELECT id,
@@ -668,6 +691,7 @@ async def _search_tags(
               AND COALESCE(security_stamp, '') != 'acorn'
               AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
+              {collection_filter}
             ORDER BY
                 array_length(
                     ARRAY(
@@ -679,10 +703,7 @@ async def _search_tags(
                 edhrec_rank ASC NULLS LAST
             LIMIT $4
             """,
-            query_tags,
-            commander_color_identity,
-            exclude_ids,
-            limit,
+            *params,
         )
     return [(r["id"], r["overlap"] or 0) for r in rows]
 
@@ -694,6 +715,7 @@ async def _search_fts(
     exclude_ids: list[UUID],
     exclude_lands: bool = False,
     limit: int = 30,
+    owned_card_ids: frozenset[UUID] | None = None,
 ) -> list[UUID]:
     """Full-text search via Postgres tsvector index.
 
@@ -704,12 +726,17 @@ async def _search_fts(
         exclude_ids: Card UUIDs to exclude.
         exclude_lands: If True, exclude land cards from results.
         limit: Maximum results to return.
+        owned_card_ids: When set, restricts results to these card UUIDs.
 
     Returns:
         Ranked list of card UUIDs (best FTS rank first).
     """
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
+    collection_filter = "AND id = ANY($5::uuid[])" if owned_card_ids is not None else ""
     async with pool.acquire() as conn:
+        params: list = [query_text, commander_color_identity, exclude_ids, limit]
+        if owned_card_ids is not None:
+            params.append(list(owned_card_ids))
         rows = await conn.fetch(
             f"""
             SELECT id
@@ -723,6 +750,7 @@ async def _search_fts(
               AND COALESCE(security_stamp, '') != 'acorn'
               AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
+              {collection_filter}
             ORDER BY
                 ts_rank(
                     to_tsvector('english', COALESCE(oracle_text, '')),
@@ -730,10 +758,7 @@ async def _search_fts(
                 ) DESC
             LIMIT $4
             """,
-            query_text,
-            commander_color_identity,
-            exclude_ids,
-            limit,
+            *params,
         )
     return [r["id"] for r in rows]
 
@@ -1050,6 +1075,7 @@ async def retrieve_candidates(
     user_profile: "profile_service.UserProfile | None" = None,
     type_filter: TypeFilter | None = None,
     ranking_weights: RankingWeights | None = None,
+    collection_filter: CollectionFilter | None = None,
 ) -> list[RetrievedCard]:
     """Run hybrid retrieval and return top candidate cards with weighted scoring.
 
@@ -1071,21 +1097,31 @@ async def retrieve_candidates(
         user_profile: Optional cross-deck user preference profile.
         type_filter: Optional type/subtype preferences for soft score boosting.
         ranking_weights: Optional per-user signal weight overrides.
+        collection_filter: When set, restricts candidates to owned cards and
+            drops results below ``min_score`` instead of padding.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
     """
     exclude_lands = stage is not None and stage != "lands"
+    owned_ids = collection_filter.owned_card_ids if collection_filter else None
     query_vector = await embed_single(ai_client, query_text)
 
     semantic_results, tag_results, fts_ids = await asyncio.gather(
-        _search_qdrant(qdrant_client, query_vector, commander_color_identity, deck_card_ids),
+        _search_qdrant(
+            qdrant_client,
+            query_vector,
+            commander_color_identity,
+            deck_card_ids,
+            owned_card_ids=owned_ids,
+        ),
         _search_tags(
             pool,
             query_tags,
             commander_color_identity,
             deck_card_ids,
             exclude_lands=exclude_lands,
+            owned_card_ids=owned_ids,
         ),
         _search_fts(
             pool,
@@ -1093,6 +1129,7 @@ async def retrieve_candidates(
             commander_color_identity,
             deck_card_ids,
             exclude_lands=exclude_lands,
+            owned_card_ids=owned_ids,
         ),
     )
 
@@ -1122,7 +1159,11 @@ async def retrieve_candidates(
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
-    top_ids = sorted(scores, key=lambda uid: scores[uid], reverse=True)[:limit]
+    ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
+    threshold = collection_filter.min_score if collection_filter else 0.0
+    if threshold > 0.0:
+        ranked = [uid for uid in ranked if scores[uid] >= threshold]
+    top_ids = ranked[:limit]
     if not top_ids:
         return []
 

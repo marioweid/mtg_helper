@@ -14,6 +14,12 @@ export function Nav() {
           Decks
         </Link>
         <Link
+          href="/collections"
+          className="text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0"
+        >
+          Collections
+        </Link>
+        <Link
           href="/preferences"
           className="text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0"
         >

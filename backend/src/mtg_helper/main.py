@@ -12,7 +12,17 @@ from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.config import settings
 from mtg_helper.db import close_pool, create_pool
-from mtg_helper.routers import accounts, admin, ai, cards, decks, feedback, health, preferences
+from mtg_helper.routers import (
+    accounts,
+    admin,
+    ai,
+    cards,
+    collections,
+    decks,
+    feedback,
+    health,
+    preferences,
+)
 from mtg_helper.services import scryfall
 from mtg_helper.services.embedding_service import ensure_collection
 
@@ -71,4 +81,6 @@ app.include_router(decks.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
+app.include_router(collections.account_router, prefix="/api/v1")
+app.include_router(collections.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")

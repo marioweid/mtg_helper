@@ -39,3 +39,52 @@ async def test_get_account_not_found(client: AsyncClient) -> None:
 
     assert resp.status_code == 404
     assert resp.json()["detail"]["code"] == "ACCOUNT_NOT_FOUND"
+
+
+async def test_account_defaults_collection_fields(client: AsyncClient) -> None:
+    resp = await client.post("/api/v1/accounts", json={"display_name": "Defaults"})
+    data = resp.json()["data"]
+    assert data["collection_suggestions_enabled"] is False
+    assert data["default_collection_id"] is None
+    assert data["collection_threshold"] == 0.0
+
+
+async def test_patch_account_updates_collection_defaults(client: AsyncClient) -> None:
+    create = await client.post("/api/v1/accounts", json={"display_name": "Patch"})
+    account_id = create.json()["data"]["id"]
+    col = await client.post(
+        f"/api/v1/accounts/{account_id}/collections", json={"name": "Patch Collection"}
+    )
+    col_id = col.json()["data"]["id"]
+
+    resp = await client.patch(
+        f"/api/v1/accounts/{account_id}",
+        json={
+            "collection_suggestions_enabled": True,
+            "default_collection_id": col_id,
+            "collection_threshold": 0.25,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["collection_suggestions_enabled"] is True
+    assert data["default_collection_id"] == col_id
+    assert data["collection_threshold"] == 0.25
+
+
+async def test_patch_account_rejects_invalid_threshold(client: AsyncClient) -> None:
+    create = await client.post("/api/v1/accounts", json={"display_name": "Bad"})
+    account_id = create.json()["data"]["id"]
+
+    resp = await client.patch(f"/api/v1/accounts/{account_id}", json={"collection_threshold": 1.5})
+
+    assert resp.status_code == 422
+
+
+async def test_patch_account_not_found(client: AsyncClient) -> None:
+    resp = await client.patch(
+        "/api/v1/accounts/00000000-0000-0000-0000-000000000000",
+        json={"display_name": "Nope"},
+    )
+    assert resp.status_code == 404

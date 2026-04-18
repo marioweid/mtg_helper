@@ -6,7 +6,11 @@ import { apiClient } from "@/lib/api";
 import { PreferenceForm } from "@/components/preference-form";
 import { PreferenceList } from "@/components/preference-list";
 import { ToggleSwitch } from "@/components/toggle-switch";
-import type { PreferenceResponse, RankingWeightsResponse } from "@/lib/types";
+import type {
+  CollectionResponse,
+  PreferenceResponse,
+  RankingWeightsResponse,
+} from "@/lib/types";
 
 const DEFAULT_WEIGHTS = { semantic: 0.25, synergy: 0.22, popularity: 0.20, personal: 0.15 };
 
@@ -35,6 +39,14 @@ export default function PreferencesPage() {
   const [draftWeights, setDraftWeights] = useState(DEFAULT_WEIGHTS);
   const [weightsSaving, setWeightsSaving] = useState(false);
   const [weightsDirty, setWeightsDirty] = useState(false);
+  const [collections, setCollections] = useState<CollectionResponse[]>([]);
+  const [collectionDraft, setCollectionDraft] = useState({
+    enabled: false,
+    collectionId: "",
+    threshold: 0,
+  });
+  const [collectionDirty, setCollectionDirty] = useState(false);
+  const [collectionSaving, setCollectionSaving] = useState(false);
 
   const loadPreferences = useCallback(async (id: string) => {
     try {
@@ -51,9 +63,19 @@ export default function PreferencesPage() {
         const id = await getOrCreateAccountId();
         setAccountId(id);
         await loadPreferences(id);
-        const w = await apiClient.getRankingWeights(id);
+        const [w, acc, cols] = await Promise.all([
+          apiClient.getRankingWeights(id),
+          apiClient.getAccount(id),
+          apiClient.listCollections(id),
+        ]);
         setRankingWeights(w);
         setDraftWeights({ semantic: w.semantic, synergy: w.synergy, popularity: w.popularity, personal: w.personal });
+        setCollections(cols);
+        setCollectionDraft({
+          enabled: acc.collection_suggestions_enabled,
+          collectionId: acc.default_collection_id ?? "",
+          threshold: acc.collection_threshold,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize account");
       } finally {
@@ -86,6 +108,31 @@ export default function PreferencesPage() {
   function handleWeightsReset() {
     setDraftWeights(DEFAULT_WEIGHTS);
     setWeightsDirty(true);
+  }
+
+  async function handleCollectionSave() {
+    if (!accountId || collectionSaving) return;
+    setCollectionSaving(true);
+    try {
+      const payload: Parameters<typeof apiClient.updateAccount>[1] = {
+        collection_suggestions_enabled: collectionDraft.enabled,
+        collection_threshold: collectionDraft.threshold,
+      };
+      if (collectionDraft.collectionId) {
+        payload.default_collection_id = collectionDraft.collectionId;
+      }
+      const updated = await apiClient.updateAccount(accountId, payload);
+      setCollectionDraft({
+        enabled: updated.collection_suggestions_enabled,
+        collectionId: updated.default_collection_id ?? "",
+        threshold: updated.collection_threshold,
+      });
+      setCollectionDirty(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save collection defaults");
+    } finally {
+      setCollectionSaving(false);
+    }
   }
 
   if (loading) {
@@ -241,6 +288,90 @@ export default function PreferencesPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-semibold text-white">Collection Defaults</h2>
+          <button
+            type="button"
+            onClick={() => void handleCollectionSave()}
+            disabled={!collectionDirty || collectionSaving}
+            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs text-white transition-colors disabled:opacity-40 hover:bg-indigo-500"
+          >
+            {collectionSaving ? "Saving…" : "Save"}
+          </button>
+        </div>
+        <p className="mb-5 text-sm text-gray-400">
+          Restrict AI suggestions to cards you own. Decks with <code>inherit</code> mode use these
+          defaults.
+        </p>
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <span className="text-sm font-medium text-white">
+              Use my collection for suggestions
+            </span>
+            <p className="text-xs text-gray-500">
+              When on, inherited decks filter candidates to your default collection.
+            </p>
+          </div>
+          <ToggleSwitch
+            enabled={collectionDraft.enabled}
+            onToggle={() => {
+              setCollectionDraft((prev) => ({ ...prev, enabled: !prev.enabled }));
+              setCollectionDirty(true);
+            }}
+          />
+        </div>
+        <label className="mb-5 block">
+          <span className="text-sm font-medium text-white">Default collection</span>
+          <select
+            value={collectionDraft.collectionId}
+            onChange={(e) => {
+              setCollectionDraft((prev) => ({ ...prev, collectionId: e.target.value }));
+              setCollectionDirty(true);
+            }}
+            disabled={collections.length === 0}
+            className="mt-1.5 w-full rounded-lg border border-white/10 bg-gray-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+          >
+            <option value="">— None —</option>
+            {collections.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.card_count})
+              </option>
+            ))}
+          </select>
+          {collections.length === 0 && (
+            <p className="mt-1 text-xs text-gray-500">
+              Create a collection first to pick a default.
+            </p>
+          )}
+        </label>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-white">Minimum score threshold</span>
+              <p className="text-xs text-gray-500">
+                Drop candidates below this weighted score (quality floor).
+              </p>
+            </div>
+            <span className="ml-4 w-10 text-right text-sm tabular-nums text-indigo-300">
+              {collectionDraft.threshold.toFixed(2)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(collectionDraft.threshold * 100)}
+            onChange={(e) => {
+              setCollectionDraft((prev) => ({ ...prev, threshold: Number(e.target.value) / 100 }));
+              setCollectionDirty(true);
+            }}
+            className="w-full accent-indigo-500"
+          />
         </div>
       </section>
 

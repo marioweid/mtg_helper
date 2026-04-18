@@ -22,7 +22,9 @@ from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
+    account_service,
     card_service,
+    collection_service,
     conversation_service,
     deck_service,
     preference_service,
@@ -31,6 +33,7 @@ from mtg_helper.services import (
 )
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
 from mtg_helper.services.retrieval_service import (
+    CollectionFilter,
     RetrievedCard,
     parse_query_tags,
     parse_query_types,
@@ -530,6 +533,87 @@ async def _resolve_exclude_ids(
     return [r["id"] for r in rows]
 
 
+def _effective_min_score(
+    request_min_score: float | None, resolved_threshold: float | None
+) -> float:
+    """Return the request override if set, else the resolved threshold, else 0.0."""
+    if request_min_score is not None:
+        return request_min_score
+    return resolved_threshold or 0.0
+
+
+async def _resolve_on_mode_filter(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    request_min_score: float | None,
+) -> CollectionFilter | None:
+    """Build a filter using deck-level collection + threshold (falling back to account)."""
+    if deck.collection_id is None:
+        return None
+    threshold = deck.collection_threshold
+    if threshold is None and deck.owner_id is not None:
+        account = await account_service.get_account(pool, deck.owner_id)
+        threshold = account.collection_threshold if account else 0.0
+    owned = await collection_service.get_owned_card_ids(pool, deck.collection_id)
+    return CollectionFilter(
+        owned_card_ids=owned, min_score=_effective_min_score(request_min_score, threshold)
+    )
+
+
+async def _resolve_inherit_mode_filter(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    request_min_score: float | None,
+) -> CollectionFilter | None:
+    """Build a filter from account defaults; silent no-op when misconfigured."""
+    if deck.owner_id is None:
+        return None
+    account = await account_service.get_account(pool, deck.owner_id)
+    if (
+        account is None
+        or not account.collection_suggestions_enabled
+        or account.default_collection_id is None
+    ):
+        return None
+    owned = await collection_service.get_owned_card_ids(pool, account.default_collection_id)
+    return CollectionFilter(
+        owned_card_ids=owned,
+        min_score=_effective_min_score(request_min_score, account.collection_threshold),
+    )
+
+
+async def _resolve_collection_filter(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    request_collection_id: UUID | None,
+    request_min_score: float | None,
+) -> CollectionFilter | None:
+    """Resolve the collection filter for a request.
+
+    Resolution order: explicit request field → deck override → account default. When
+    inheritance lands on an account without a default collection or with the master
+    toggle off, no filter is applied (silent no-op).
+
+    Args:
+        pool: asyncpg connection pool.
+        deck: Already-fetched deck; avoids a second SELECT.
+        request_collection_id: Explicit per-request override (Phase 4 field).
+        request_min_score: Explicit per-request threshold override.
+
+    Returns:
+        A CollectionFilter when ownership filtering is active, otherwise None.
+    """
+    if request_collection_id is not None:
+        owned = await collection_service.get_owned_card_ids(pool, request_collection_id)
+        return CollectionFilter(owned_card_ids=owned, min_score=request_min_score or 0.0)
+
+    if deck.collection_mode == "off":
+        return None
+    if deck.collection_mode == "on":
+        return await _resolve_on_mode_filter(pool, deck, request_min_score)
+    return await _resolve_inherit_mode_filter(pool, deck, request_min_score)
+
+
 async def build_stage(
     pool: asyncpg.Pool,
     ai_client: openai.AsyncOpenAI,
@@ -538,6 +622,8 @@ async def build_stage(
     stage: str | None = None,
     target: int | None = None,
     exclude: list[str] | None = None,
+    collection_id: UUID | None = None,
+    min_score: float | None = None,
 ) -> BuildResponse:
     """Generate card suggestions for a build stage using hybrid retrieval.
 
@@ -549,6 +635,8 @@ async def build_stage(
         stage: Specific stage to generate for. If None, auto-advances to the next stage.
         target: Override target card count (determines how many candidates to return).
         exclude: Card names to exclude from suggestions (already shown to the user).
+        collection_id: When set, restricts candidates to cards owned in this collection.
+        min_score: When set, drops candidates whose weighted score falls below it.
 
     Returns:
         BuildResponse with card suggestions for the stage.
@@ -579,9 +667,7 @@ async def build_stage(
     exclude_ids = await _resolve_exclude_ids(pool, exclude)
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
     avoid_ids = (
-        await preference_service.get_avoid_card_ids(pool, deck.owner_id)
-        if deck.owner_id
-        else []
+        await preference_service.get_avoid_card_ids(pool, deck.owner_id) if deck.owner_id else []
     )
     all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
 
@@ -592,6 +678,7 @@ async def build_stage(
     )
     ranking_weights = await _load_ranking_weights(pool, deck.owner_id)
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
+    collection_filter = await _resolve_collection_filter(pool, deck, collection_id, min_score)
 
     limit = target if target is not None else 20
     candidates = await retrieve_candidates(
@@ -608,6 +695,7 @@ async def build_stage(
         feedback_weights=feedback_weights,
         user_profile=user_profile,
         ranking_weights=ranking_weights,
+        collection_filter=collection_filter,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
@@ -634,6 +722,8 @@ async def suggest_cards(
     deck_id: UUID,
     prompt: str,
     count: int,
+    collection_id: UUID | None = None,
+    min_score: float | None = None,
 ) -> SuggestResponse:
     """Return suggested cards matching a free-form prompt via hybrid retrieval.
 
@@ -644,6 +734,8 @@ async def suggest_cards(
         deck_id: The deck's UUID.
         prompt: Natural language description of desired cards.
         count: Number of cards to return.
+        collection_id: When set, restricts candidates to cards owned in this collection.
+        min_score: When set, drops candidates whose weighted score falls below it.
 
     Returns:
         SuggestResponse with validated suggestions.
@@ -668,6 +760,7 @@ async def suggest_cards(
         _load_user_profile(pool, deck.id, deck.owner_id),
     )
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
+    collection_filter = await _resolve_collection_filter(pool, deck, collection_id, min_score)
 
     candidates = await retrieve_candidates(
         pool,
@@ -682,6 +775,7 @@ async def suggest_cards(
         feedback_weights=feedback_weights,
         user_profile=user_profile,
         type_filter=type_filter,
+        collection_filter=collection_filter,
     )
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 

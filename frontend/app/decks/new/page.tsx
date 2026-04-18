@@ -6,7 +6,9 @@ import { CardSearch } from "@/components/card-search";
 import { apiClient } from "@/lib/api";
 import { getOrCreateAccountId } from "@/lib/account";
 import { BRACKET_LABELS } from "@/lib/constants";
-import type { CardResponse, DescribeMessage } from "@/lib/types";
+import type { CardResponse, CollectionResponse, DescribeMessage } from "@/lib/types";
+
+type CollectionMode = "off" | "inherit" | "on";
 
 type Phase = "select" | "chat" | "confirm";
 
@@ -35,8 +37,28 @@ export default function NewDeckPage() {
   const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Collection override state
+  const [collectionMode, setCollectionMode] = useState<CollectionMode>("inherit");
+  const [collectionId, setCollectionId] = useState("");
+  const [collectionThreshold, setCollectionThreshold] = useState<number | null>(null);
+  const [collections, setCollections] = useState<CollectionResponse[]>([]);
+
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadCollections() {
+      try {
+        const id = await getOrCreateAccountId();
+        if (!id) return;
+        const cols = await apiClient.listCollections(id);
+        setCollections(cols);
+      } catch {
+        // Collections are optional; silently skip.
+      }
+    }
+    void loadCollections();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -129,6 +151,9 @@ export default function NewDeckPage() {
         bracket,
         owner_id: ownerId || null,
         stage_targets: stageTargets,
+        collection_mode: collectionMode,
+        collection_id: collectionMode === "on" && collectionId ? collectionId : null,
+        collection_threshold: collectionMode === "on" ? collectionThreshold : null,
       });
       router.push(`/decks/${deck.id}`);
     } catch (err) {
@@ -319,6 +344,74 @@ export default function NewDeckPage() {
               />
             </div>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+          <h2 className="mb-1 font-semibold text-white">Collection Filter</h2>
+          <p className="mb-4 text-xs text-gray-500">
+            Restrict AI suggestions to cards in a collection when building this deck.
+          </p>
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            {(["off", "inherit", "on"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setCollectionMode(mode)}
+                className={`rounded-lg border px-3 py-2 text-xs capitalize transition-colors ${
+                  collectionMode === mode
+                    ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
+                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
+                }`}
+              >
+                {mode === "inherit" ? "Inherit (use account default)" : mode}
+              </button>
+            ))}
+          </div>
+          {collectionMode === "on" && (
+            <div className="flex flex-col gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-white">Collection</span>
+                <select
+                  value={collectionId}
+                  onChange={(e) => setCollectionId(e.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-white/10 bg-gray-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                >
+                  <option value="">— Pick one —</option>
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.card_count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-sm font-medium text-white">
+                    Min score (blank = inherit)
+                  </span>
+                  <span className="w-10 text-right text-sm tabular-nums text-indigo-300">
+                    {collectionThreshold === null ? "—" : collectionThreshold.toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={collectionThreshold === null ? 0 : Math.round(collectionThreshold * 100)}
+                  onChange={(e) => setCollectionThreshold(Number(e.target.value) / 100)}
+                  className="w-full accent-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCollectionThreshold(null)}
+                  className="mt-1 text-xs text-gray-500 hover:text-white transition-colors"
+                >
+                  Clear (inherit from account)
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         <div className="flex items-center justify-between text-sm text-gray-500">

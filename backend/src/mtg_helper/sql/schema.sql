@@ -175,6 +175,39 @@ CREATE TABLE IF NOT EXISTS account_ranking_weights (
 );
 
 -- ============================================================
+-- COLLECTIONS (per-account, named, Moxfield-importable)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS collections (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id  UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (account_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_collections_account ON collections(account_id);
+
+-- ============================================================
+-- COLLECTION CARDS (printings owned, keyed by card_id + foil)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS collection_cards (
+    collection_id     UUID NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+    card_id           UUID NOT NULL REFERENCES cards(id),
+    set_code          TEXT NOT NULL DEFAULT '',
+    collector_number  TEXT NOT NULL DEFAULT '',
+    foil              BOOL NOT NULL DEFAULT FALSE,
+    quantity          INT  NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    condition         TEXT,
+    language          TEXT,
+    tags              TEXT[] NOT NULL DEFAULT '{}',
+    purchase_price    NUMERIC,
+    last_modified     TIMESTAMPTZ,
+    PRIMARY KEY (collection_id, card_id, set_code, collector_number, foil)
+);
+
+CREATE INDEX IF NOT EXISTS idx_collection_cards_card ON collection_cards(card_id);
+
+-- ============================================================
 -- MIGRATIONS (idempotent column additions for existing DBs)
 -- ============================================================
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
@@ -191,6 +224,31 @@ ALTER TABLE preferences ADD CONSTRAINT preferences_preference_type_check
         'pet_card', 'avoid_card', 'avoid_archetype', 'general',
         'feedback_boosting', 'user_profile_boosting'
     ));
+
+-- Phase 5: account-level collection defaults
+ALTER TABLE accounts
+    ADD COLUMN IF NOT EXISTS collection_suggestions_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE accounts
+    ADD COLUMN IF NOT EXISTS default_collection_id UUID REFERENCES collections(id) ON DELETE SET NULL;
+ALTER TABLE accounts
+    ADD COLUMN IF NOT EXISTS collection_threshold REAL NOT NULL DEFAULT 0.0;
+ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_check;
+ALTER TABLE accounts ADD CONSTRAINT accounts_collection_threshold_check
+    CHECK (collection_threshold >= 0.0 AND collection_threshold <= 1.0);
+
+-- Phase 5: per-deck collection override
+ALTER TABLE decks
+    ADD COLUMN IF NOT EXISTS collection_mode TEXT NOT NULL DEFAULT 'inherit';
+ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_collection_mode_check;
+ALTER TABLE decks ADD CONSTRAINT decks_collection_mode_check
+    CHECK (collection_mode IN ('off', 'inherit', 'on'));
+ALTER TABLE decks
+    ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES collections(id) ON DELETE SET NULL;
+ALTER TABLE decks
+    ADD COLUMN IF NOT EXISTS collection_threshold REAL;
+ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_collection_threshold_check;
+ALTER TABLE decks ADD CONSTRAINT decks_collection_threshold_check
+    CHECK (collection_threshold IS NULL OR (collection_threshold >= 0.0 AND collection_threshold <= 1.0));
 
 -- ============================================================
 -- VIEW: deck detail with full card info
