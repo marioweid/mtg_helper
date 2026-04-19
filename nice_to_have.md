@@ -1,5 +1,8 @@
 ## 1 Fix Bugs
-- Cors on screate collection => Is new requests going over proxy ?
+- When importing collection why does it take that long to upload ? can we run into issues for scraping to much data from other sources ? what is happening on the upload ?
+- Error "'suggestion_collection_ids'" when navigating to deck
+- Done Event in deck building still not navigating
+- Avoid Long chats in deck building, should focus on the deck suggestion and interrupt after a certeain amount of time
 
 ## 2 Deploy to GCP
 - Proper user management

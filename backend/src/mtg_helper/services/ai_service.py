@@ -22,7 +22,6 @@ from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
-    account_service,
     card_service,
     collection_service,
     conversation_service,
@@ -533,85 +532,35 @@ async def _resolve_exclude_ids(
     return [r["id"] for r in rows]
 
 
-def _effective_min_score(
-    request_min_score: float | None, resolved_threshold: float | None
-) -> float:
-    """Return the request override if set, else the resolved threshold, else 0.0."""
-    if request_min_score is not None:
-        return request_min_score
-    return resolved_threshold or 0.0
-
-
-async def _resolve_on_mode_filter(
-    pool: asyncpg.Pool,
-    deck: DeckDetailResponse,
-    request_min_score: float | None,
-) -> CollectionFilter | None:
-    """Build a filter using deck-level collection + threshold (falling back to account)."""
-    if deck.collection_id is None:
-        return None
-    threshold = deck.collection_threshold
-    if threshold is None and deck.owner_id is not None:
-        account = await account_service.get_account(pool, deck.owner_id)
-        threshold = account.collection_threshold if account else 0.0
-    owned = await collection_service.get_owned_card_ids(pool, deck.collection_id)
-    return CollectionFilter(
-        owned_card_ids=owned, min_score=_effective_min_score(request_min_score, threshold)
-    )
-
-
-async def _resolve_inherit_mode_filter(
-    pool: asyncpg.Pool,
-    deck: DeckDetailResponse,
-    request_min_score: float | None,
-) -> CollectionFilter | None:
-    """Build a filter from account defaults; silent no-op when misconfigured."""
-    if deck.owner_id is None:
-        return None
-    account = await account_service.get_account(pool, deck.owner_id)
-    if (
-        account is None
-        or not account.collection_suggestions_enabled
-        or account.default_collection_id is None
-    ):
-        return None
-    owned = await collection_service.get_owned_card_ids(pool, account.default_collection_id)
-    return CollectionFilter(
-        owned_card_ids=owned,
-        min_score=_effective_min_score(request_min_score, account.collection_threshold),
-    )
-
-
 async def _resolve_collection_filter(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
-    request_collection_id: UUID | None,
-    request_min_score: float | None,
+    request_collection_ids: list[UUID] | None,
 ) -> CollectionFilter | None:
     """Resolve the collection filter for a request.
 
-    Resolution order: explicit request field → deck override → account default. When
-    inheritance lands on an account without a default collection or with the master
-    toggle off, no filter is applied (silent no-op).
+    A per-request ``collection_ids`` list overrides the deck's stored selection.
+    Empty list or empty deck selection → no filter (unrestricted suggestions).
+    Non-empty → candidates restricted to the union of owned cards across the listed
+    collections.
 
     Args:
         pool: asyncpg connection pool.
         deck: Already-fetched deck; avoids a second SELECT.
-        request_collection_id: Explicit per-request override (Phase 4 field).
-        request_min_score: Explicit per-request threshold override.
+        request_collection_ids: Optional per-request override.
 
     Returns:
         A CollectionFilter when ownership filtering is active, otherwise None.
     """
-    if request_collection_id is not None:
-        owned = await collection_service.get_owned_card_ids(pool, request_collection_id)
-        return CollectionFilter(owned_card_ids=owned, min_score=request_min_score or 0.0)
-
-    if deck.collection_mode == "off":
+    ids: list[UUID] = (
+        list(request_collection_ids)
+        if request_collection_ids is not None
+        else list(deck.suggestion_collection_ids)
+    )
+    if not ids:
         return None
-    if deck.collection_mode == "on":
-        return await _resolve_on_mode_filter(pool, deck, request_min_score)
-    return await _resolve_inherit_mode_filter(pool, deck, request_min_score)
+    owned = await collection_service.get_owned_card_ids_for_collections(pool, ids)
+    return CollectionFilter(owned_card_ids=owned)
 
 
 async def build_stage(
@@ -622,8 +571,7 @@ async def build_stage(
     stage: str | None = None,
     target: int | None = None,
     exclude: list[str] | None = None,
-    collection_id: UUID | None = None,
-    min_score: float | None = None,
+    collection_ids: list[UUID] | None = None,
 ) -> BuildResponse:
     """Generate card suggestions for a build stage using hybrid retrieval.
 
@@ -635,8 +583,8 @@ async def build_stage(
         stage: Specific stage to generate for. If None, auto-advances to the next stage.
         target: Override target card count (determines how many candidates to return).
         exclude: Card names to exclude from suggestions (already shown to the user).
-        collection_id: When set, restricts candidates to cards owned in this collection.
-        min_score: When set, drops candidates whose weighted score falls below it.
+        collection_ids: Per-request override. When provided, replaces the deck's
+            stored ``suggestion_collection_ids`` for this call only.
 
     Returns:
         BuildResponse with card suggestions for the stage.
@@ -678,7 +626,7 @@ async def build_stage(
     )
     ranking_weights = await _load_ranking_weights(pool, deck.owner_id)
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
-    collection_filter = await _resolve_collection_filter(pool, deck, collection_id, min_score)
+    collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
 
     limit = target if target is not None else 20
     candidates = await retrieve_candidates(
@@ -722,8 +670,7 @@ async def suggest_cards(
     deck_id: UUID,
     prompt: str,
     count: int,
-    collection_id: UUID | None = None,
-    min_score: float | None = None,
+    collection_ids: list[UUID] | None = None,
 ) -> SuggestResponse:
     """Return suggested cards matching a free-form prompt via hybrid retrieval.
 
@@ -734,8 +681,8 @@ async def suggest_cards(
         deck_id: The deck's UUID.
         prompt: Natural language description of desired cards.
         count: Number of cards to return.
-        collection_id: When set, restricts candidates to cards owned in this collection.
-        min_score: When set, drops candidates whose weighted score falls below it.
+        collection_ids: Per-request override. When provided, replaces the deck's
+            stored ``suggestion_collection_ids`` for this call only.
 
     Returns:
         SuggestResponse with validated suggestions.
@@ -760,7 +707,7 @@ async def suggest_cards(
         _load_user_profile(pool, deck.id, deck.owner_id),
     )
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
-    collection_filter = await _resolve_collection_filter(pool, deck, collection_id, min_score)
+    collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
 
     candidates = await retrieve_candidates(
         pool,
@@ -929,6 +876,28 @@ def _build_describe_system_prompt(
     return "\n".join(parts)
 
 
+_JSON_DECODER = json.JSONDecoder()
+
+
+def _find_done_json(raw: str) -> tuple[int, int, dict[str, object]] | None:
+    """Scan for a JSON object containing ``"done": true``.
+
+    Uses ``json.JSONDecoder.raw_decode`` at each ``{`` to parse greedily,
+    which handles nested objects (e.g. ``stage_targets``) correctly.
+
+    Returns start index, end index, and parsed dict, or None if not found.
+    """
+    for match in re.finditer(r"\{", raw):
+        start = match.start()
+        try:
+            data, consumed = _JSON_DECODER.raw_decode(raw[start:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("done") is True:
+            return start, start + consumed, data
+    return None
+
+
 def _parse_describe_response(
     raw: str,
 ) -> tuple[str, bool, str | None, str | None, dict[str, int] | None]:
@@ -941,21 +910,14 @@ def _parse_describe_response(
         Tuple of (reply_text, is_done, description, suggested_name, stage_targets).
         reply_text has the JSON block stripped if present.
     """
-    match = re.search(r'\{[^{}]*"done"\s*:\s*true[^{}]*\}', raw, re.DOTALL)
-    if not match:
+    found = _find_done_json(raw)
+    if found is None:
         return raw.strip(), False, None, None, None
 
-    try:
-        data = json.loads(match.group())
-    except json.JSONDecodeError:
-        return raw.strip(), False, None, None, None
-
-    if not data.get("done"):
-        return raw.strip(), False, None, None, None
-
+    start, end, data = found
     description = data.get("description") or None
     suggested_name = data.get("name") or None
-    reply = raw[: match.start()].strip() or "Here's your deck strategy:"
+    reply = (raw[:start] + raw[end:]).strip() or "Here's your deck strategy:"
     raw_targets = data.get("stage_targets")
     stage_targets: dict[str, int] | None = None
     if isinstance(raw_targets, dict):

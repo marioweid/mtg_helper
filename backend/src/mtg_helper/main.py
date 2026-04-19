@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.config import settings
-from mtg_helper.db import close_pool, create_pool
+from mtg_helper.db import apply_schema, close_pool, create_pool
 from mtg_helper.routers import (
     accounts,
     admin,
@@ -33,6 +33,7 @@ _log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
+    await apply_schema(app.state.db_pool)
     app.state.ai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
     app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url)
     await ensure_collection(app.state.qdrant_client)

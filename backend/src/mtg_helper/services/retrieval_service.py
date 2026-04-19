@@ -51,15 +51,13 @@ class TypeFilter:
 
 @dataclass(frozen=True)
 class CollectionFilter:
-    """Restricts retrieval to owned cards and drops low-confidence results.
+    """Restricts retrieval to a set of owned cards.
 
     When active, only cards in ``owned_card_ids`` are eligible as candidates.
-    After scoring, candidates with a weighted score below ``min_score`` are
-    dropped rather than padded — a near-empty result beats bad fills.
+    A near-empty result beats padded-in cards the user doesn't own.
     """
 
     owned_card_ids: frozenset[UUID]
-    min_score: float = 0.0
 
 
 @dataclass
@@ -1097,8 +1095,7 @@ async def retrieve_candidates(
         user_profile: Optional cross-deck user preference profile.
         type_filter: Optional type/subtype preferences for soft score boosting.
         ranking_weights: Optional per-user signal weight overrides.
-        collection_filter: When set, restricts candidates to owned cards and
-            drops results below ``min_score`` instead of padding.
+        collection_filter: When set, restricts candidates to owned cards.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1160,9 +1157,6 @@ async def retrieve_candidates(
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
-    threshold = collection_filter.min_score if collection_filter else 0.0
-    if threshold > 0.0:
-        ranked = [uid for uid in ranked if scores[uid] >= threshold]
     top_ids = ranked[:limit]
     if not top_ids:
         return []

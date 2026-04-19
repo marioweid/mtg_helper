@@ -17,9 +17,7 @@ class DeckCreate(BaseModel):
     bracket: int = Field(default=3, ge=1, le=4)
     owner_id: UUID | None = None
     stage_targets: dict[str, int] | None = None
-    collection_mode: str = Field(default="inherit", pattern="^(off|inherit|on)$")
-    collection_id: UUID | None = None
-    collection_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    suggestion_collection_ids: list[UUID] = Field(default_factory=list)
 
 
 class DeckUpdate(BaseModel):
@@ -31,9 +29,7 @@ class DeckUpdate(BaseModel):
     stage: str | None = None
     owner_id: UUID | None = None
     stage_targets: dict[str, int] | None = None
-    collection_mode: str | None = Field(default=None, pattern="^(off|inherit|on)$")
-    collection_id: UUID | None = None
-    collection_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    suggestion_collection_ids: list[UUID] | None = None
 
 
 class DeckSummary(BaseModel):
@@ -64,9 +60,7 @@ class DeckResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     stage_targets: dict[str, int] = Field(default_factory=dict)
-    collection_mode: str = "inherit"
-    collection_id: UUID | None = None
-    collection_threshold: float | None = None
+    suggestion_collection_ids: list[UUID] = Field(default_factory=list)
 
 
 class DeckCardItem(BaseModel):
@@ -103,9 +97,7 @@ class DeckDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     stage_targets: dict[str, int] = Field(default_factory=dict)
-    collection_mode: str = "inherit"
-    collection_id: UUID | None = None
-    collection_threshold: float | None = None
+    suggestion_collection_ids: list[UUID] = Field(default_factory=list)
     cards: list[DeckCardItem]
 
 

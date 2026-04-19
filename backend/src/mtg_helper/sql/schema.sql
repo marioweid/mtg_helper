@@ -225,30 +225,22 @@ ALTER TABLE preferences ADD CONSTRAINT preferences_preference_type_check
         'feedback_boosting', 'user_profile_boosting'
     ));
 
--- Phase 5: account-level collection defaults
-ALTER TABLE accounts
-    ADD COLUMN IF NOT EXISTS collection_suggestions_enabled BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE accounts
-    ADD COLUMN IF NOT EXISTS default_collection_id UUID REFERENCES collections(id) ON DELETE SET NULL;
-ALTER TABLE accounts
-    ADD COLUMN IF NOT EXISTS collection_threshold REAL NOT NULL DEFAULT 0.0;
-ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_check;
-ALTER TABLE accounts ADD CONSTRAINT accounts_collection_threshold_check
-    CHECK (collection_threshold >= 0.0 AND collection_threshold <= 1.0);
-
--- Phase 5: per-deck collection override
-ALTER TABLE decks
-    ADD COLUMN IF NOT EXISTS collection_mode TEXT NOT NULL DEFAULT 'inherit';
+-- Collection filter: per-deck list of collections that scope suggestions.
+-- Empty array = no filtering; non-empty = candidates restricted to the UNION of owned cards.
 ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_collection_mode_check;
-ALTER TABLE decks ADD CONSTRAINT decks_collection_mode_check
-    CHECK (collection_mode IN ('off', 'inherit', 'on'));
-ALTER TABLE decks
-    ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES collections(id) ON DELETE SET NULL;
-ALTER TABLE decks
-    ADD COLUMN IF NOT EXISTS collection_threshold REAL;
 ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_collection_threshold_check;
-ALTER TABLE decks ADD CONSTRAINT decks_collection_threshold_check
-    CHECK (collection_threshold IS NULL OR (collection_threshold >= 0.0 AND collection_threshold <= 1.0));
+ALTER TABLE decks DROP COLUMN IF EXISTS collection_mode;
+ALTER TABLE decks DROP COLUMN IF EXISTS collection_id;
+ALTER TABLE decks DROP COLUMN IF EXISTS collection_threshold;
+ALTER TABLE decks
+    ADD COLUMN IF NOT EXISTS suggestion_collection_ids UUID[] NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS idx_decks_suggestion_collections
+    ON decks USING GIN (suggestion_collection_ids);
+
+ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_check;
+ALTER TABLE accounts DROP COLUMN IF EXISTS collection_suggestions_enabled;
+ALTER TABLE accounts DROP COLUMN IF EXISTS default_collection_id;
+ALTER TABLE accounts DROP COLUMN IF EXISTS collection_threshold;
 
 -- ============================================================
 -- VIEW: deck detail with full card info

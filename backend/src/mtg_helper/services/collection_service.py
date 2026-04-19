@@ -514,6 +514,23 @@ async def get_owned_card_ids(pool: asyncpg.Pool, collection_id: UUID) -> frozens
     return frozenset(r["card_id"] for r in rows)
 
 
+async def get_owned_card_ids_for_collections(
+    pool: asyncpg.Pool, collection_ids: list[UUID]
+) -> frozenset[UUID]:
+    """Return the distinct `cards.id` values owned across one or more collections.
+
+    Returns an empty set when the input list is empty or when no collection rows exist.
+    """
+    if not collection_ids:
+        return frozenset()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT DISTINCT card_id FROM collection_cards WHERE collection_id = ANY($1::uuid[])",
+            list(collection_ids),
+        )
+    return frozenset(r["card_id"] for r in rows)
+
+
 async def _resolve_rows(
     pool: asyncpg.Pool, rows: list[ParsedCollectionRow]
 ) -> tuple[list[tuple[ParsedCollectionRow, UUID]], list[str]]:

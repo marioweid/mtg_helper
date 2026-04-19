@@ -11,9 +11,6 @@ def _row_to_account(row: asyncpg.Record) -> AccountResponse:
     return AccountResponse(
         id=row["id"],
         display_name=row["display_name"],
-        collection_suggestions_enabled=row["collection_suggestions_enabled"],
-        default_collection_id=row["default_collection_id"],
-        collection_threshold=row["collection_threshold"],
         created_at=row["created_at"],
     )
 

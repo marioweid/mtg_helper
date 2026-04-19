@@ -32,11 +32,12 @@ def _make_ai_client(response_text: str) -> MagicMock:
 
 def test_parse_describe_response_not_done() -> None:
     raw = "What win condition are you aiming for?"
-    reply, done, desc, name = _parse_describe_response(raw)
+    reply, done, desc, name, targets = _parse_describe_response(raw)
     assert reply == raw
     assert done is False
     assert desc is None
     assert name is None
+    assert targets is None
 
 
 def test_parse_describe_response_done_inline() -> None:
@@ -44,7 +45,7 @@ def test_parse_describe_response_done_inline() -> None:
         {"done": True, "name": "Hazel Tokens", "description": "token aristocrats"}
     )
     raw = f"Here's your strategy!\n{completion}"
-    reply, done, desc, name = _parse_describe_response(raw)
+    reply, done, desc, name, _ = _parse_describe_response(raw)
     assert done is True
     assert name == "Hazel Tokens"
     assert desc == "token aristocrats"
@@ -54,7 +55,7 @@ def test_parse_describe_response_done_inline() -> None:
 
 def test_parse_describe_response_json_only() -> None:
     completion = json.dumps({"done": True, "name": "My Deck", "description": "counters voltron"})
-    reply, done, desc, name = _parse_describe_response(completion)
+    reply, done, desc, _name, _targets = _parse_describe_response(completion)
     assert done is True
     assert desc == "counters voltron"
     assert reply  # fallback message set
@@ -62,9 +63,27 @@ def test_parse_describe_response_json_only() -> None:
 
 def test_parse_describe_response_malformed_json() -> None:
     raw = 'What is your strategy? {"done": true, "name": bad json}'
-    reply, done, desc, name = _parse_describe_response(raw)
+    _reply, done, desc, _name, _targets = _parse_describe_response(raw)
     assert done is False
     assert desc is None
+
+
+def test_parse_describe_response_with_nested_stage_targets() -> None:
+    """Regex-based parser failed on nested stage_targets. Regression guard."""
+    completion = json.dumps(
+        {
+            "done": True,
+            "name": "Nicol Bolas Discard",
+            "description": "discard control",
+            "stage_targets": {"ramp": 12, "interaction": 10, "lands": 37},
+        }
+    )
+    reply, done, desc, name, targets = _parse_describe_response(completion)
+    assert done is True
+    assert name == "Nicol Bolas Discard"
+    assert desc == "discard control"
+    assert targets == {"ramp": 12, "interaction": 10, "lands": 37}
+    assert reply  # fallback message
 
 
 # --- Integration tests for POST /decks/describe ---
