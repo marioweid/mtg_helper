@@ -16,8 +16,14 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import ai_service, deck_service
+from mtg_helper.services import ai_service, deck_service, rate_limit_service
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
+from mtg_helper.services.rate_limit_service import RateLimitExceeded
+
+# Per-key rate limits for LLM-backed endpoints. Both window and count are tuned
+# for interactive use; drop the limit when deploying to a multi-replica setup.
+_DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
+_CHAT_LIMIT = (20, 60)  # 20 calls / 60 seconds
 
 
 def _llm_unavailable(detail: str) -> HTTPException:
@@ -25,6 +31,27 @@ def _llm_unavailable(detail: str) -> HTTPException:
         status_code=502,
         detail={"code": "LLM_EMPTY_RESPONSE", "message": detail},
     )
+
+
+def _rate_key(request: Request, endpoint: str) -> str:
+    """Derive a rate-limit key from account header or client IP."""
+    account = request.headers.get("x-account-id")
+    if account:
+        return f"{endpoint}:acct:{account}"
+    ip = request.client.host if request.client else "unknown"
+    return f"{endpoint}:ip:{ip}"
+
+
+def _enforce_rate_limit(request: Request, endpoint: str, limit: tuple[int, int]) -> None:
+    """Raise 429 if the caller has exceeded the per-key rate limit."""
+    count, window = limit
+    try:
+        rate_limit_service.check(_rate_key(request, endpoint), count, window)
+    except RateLimitExceeded as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_LIMITED", "message": str(exc)},
+        ) from exc
 
 
 router = APIRouter(prefix="/decks", tags=["ai"])
@@ -54,6 +81,7 @@ async def build_stage(
             target=body.target,
             exclude=body.exclude,
             collection_ids=body.collection_ids,
+            max_price_cents=body.max_price_cents,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
@@ -78,6 +106,7 @@ async def suggest_cards(
             body.prompt,
             body.count,
             collection_ids=body.collection_ids,
+            max_price_cents=body.max_price_cents,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
@@ -91,6 +120,7 @@ async def chat_about_deck(
     request: Request,
 ) -> DataResponse[ChatResponse]:
     """Send a free-form chat message about the deck."""
+    _enforce_rate_limit(request, "chat", _CHAT_LIMIT)
     try:
         result = await ai_service.chat_about_deck(
             request.app.state.db_pool,
@@ -111,6 +141,7 @@ async def describe_deck(
     request: Request,
 ) -> DataResponse[DescribeResponse]:
     """Run one turn of the deck description agent to build a structured deck strategy."""
+    _enforce_rate_limit(request, "describe", _DESCRIBE_LIMIT)
     try:
         result = await ai_service.describe_deck(
             request.app.state.db_pool,

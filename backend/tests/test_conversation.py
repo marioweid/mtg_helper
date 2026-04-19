@@ -127,6 +127,53 @@ async def test_chat_returns_text_reply(client: AsyncClient) -> None:
     assert isinstance(data["suggestions"], list)
 
 
+async def test_chat_history_is_capped(client: AsyncClient) -> None:
+    """Only the most recent _MAX_HISTORY_TURNS turns reach the LLM."""
+    import asyncpg
+
+    from mtg_helper.services import ai_service, conversation_service
+    from mtg_helper.services.ai_service import _MAX_HISTORY_TURNS
+
+    deck_id = await _create_deck(client)
+    pool: asyncpg.Pool = app.state.db_pool
+    for i in range(30):
+        role = "user" if i % 2 == 0 else "assistant"
+        await conversation_service.append_turn(pool, deck_id, role, f"old turn {i}")
+
+    captured: dict[str, list[dict[str, str]]] = {}
+
+    async def capture(**kwargs):  # type: ignore[no-untyped-def]
+        captured["messages"] = list(kwargs.get("messages", []))
+        choice = MagicMock()
+        choice.message = MagicMock()
+        choice.message.content = "ack"
+        resp = MagicMock()
+        resp.choices = [choice]
+        return resp
+
+    mock_ai = MagicMock()
+    mock_ai.chat = MagicMock()
+    mock_ai.chat.completions = MagicMock()
+    mock_ai.chat.completions.create = AsyncMock(side_effect=capture)
+    app.state.ai_client = mock_ai
+
+    resp = await client.post(f"/api/v1/decks/{deck_id}/chat", json={"message": "next"})
+    assert resp.status_code == 200
+
+    # messages = [system, ...history, user]. history must be ≤ _MAX_HISTORY_TURNS.
+    assert captured["messages"][0]["role"] == "system"
+    assert captured["messages"][-1]["content"] == "next"
+    history_slice = captured["messages"][1:-1]
+    assert len(history_slice) <= _MAX_HISTORY_TURNS
+
+    # First retained turn should be in the last 20 (not "old turn 0").
+    assert "old turn 0" not in [m["content"] for m in history_slice]
+    assert any("old turn 29" == m["content"] for m in history_slice)
+
+    # Sanity: module constant equals expected cap.
+    assert ai_service._MAX_HISTORY_TURNS == 20
+
+
 async def test_chat_deck_not_found(client: AsyncClient) -> None:
     """Chat with non-existent deck returns 404."""
     app.state.ai_client = _make_ai_client("hello")

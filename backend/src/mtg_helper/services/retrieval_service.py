@@ -60,6 +60,16 @@ class CollectionFilter:
     owned_card_ids: frozenset[UUID]
 
 
+@dataclass(frozen=True)
+class PriceFilter:
+    """Restricts retrieval to cards with nonfoil EUR price <= max_cents.
+
+    Cards missing a EUR price are excluded (safe default: cannot verify cheap).
+    """
+
+    max_cents: int
+
+
 @dataclass
 class RetrievedCard:
     """A card retrieved via hybrid search, enriched with full DB data."""
@@ -647,6 +657,7 @@ async def _search_tags(
     exclude_lands: bool = False,
     limit: int = 50,
     owned_card_ids: frozenset[UUID] | None = None,
+    price_filter: PriceFilter | None = None,
 ) -> list[tuple[UUID, int]]:
     """Tag-overlap search via Postgres GIN array index.
 
@@ -658,6 +669,7 @@ async def _search_tags(
         exclude_lands: If True, exclude land cards from results.
         limit: Maximum results to return.
         owned_card_ids: When set, restricts results to these card UUIDs.
+        price_filter: When set, excludes cards with no EUR price or EUR > cap.
 
     Returns:
         List of (card_uuid, tag_overlap_count) pairs, highest overlap first.
@@ -665,11 +677,19 @@ async def _search_tags(
     if not query_tags:
         return []
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
-    collection_filter = "AND id = ANY($5::uuid[])" if owned_card_ids is not None else ""
+    params: list = [query_tags, commander_color_identity, exclude_ids, limit]
+    collection_filter = ""
+    if owned_card_ids is not None:
+        params.append(list(owned_card_ids))
+        collection_filter = f"AND id = ANY(${len(params)}::uuid[])"
+    price_clause = ""
+    if price_filter is not None:
+        params.append(price_filter.max_cents)
+        price_clause = (
+            f"AND (prices->>'eur') IS NOT NULL "
+            f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}"
+        )
     async with pool.acquire() as conn:
-        params: list = [query_tags, commander_color_identity, exclude_ids, limit]
-        if owned_card_ids is not None:
-            params.append(list(owned_card_ids))
         rows = await conn.fetch(
             f"""
             SELECT id,
@@ -690,6 +710,7 @@ async def _search_tags(
               AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
               {collection_filter}
+              {price_clause}
             ORDER BY
                 array_length(
                     ARRAY(
@@ -714,6 +735,7 @@ async def _search_fts(
     exclude_lands: bool = False,
     limit: int = 30,
     owned_card_ids: frozenset[UUID] | None = None,
+    price_filter: PriceFilter | None = None,
 ) -> list[UUID]:
     """Full-text search via Postgres tsvector index.
 
@@ -725,16 +747,25 @@ async def _search_fts(
         exclude_lands: If True, exclude land cards from results.
         limit: Maximum results to return.
         owned_card_ids: When set, restricts results to these card UUIDs.
+        price_filter: When set, excludes cards with no EUR price or EUR > cap.
 
     Returns:
         Ranked list of card UUIDs (best FTS rank first).
     """
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
-    collection_filter = "AND id = ANY($5::uuid[])" if owned_card_ids is not None else ""
+    params: list = [query_text, commander_color_identity, exclude_ids, limit]
+    collection_filter = ""
+    if owned_card_ids is not None:
+        params.append(list(owned_card_ids))
+        collection_filter = f"AND id = ANY(${len(params)}::uuid[])"
+    price_clause = ""
+    if price_filter is not None:
+        params.append(price_filter.max_cents)
+        price_clause = (
+            f"AND (prices->>'eur') IS NOT NULL "
+            f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}"
+        )
     async with pool.acquire() as conn:
-        params: list = [query_text, commander_color_identity, exclude_ids, limit]
-        if owned_card_ids is not None:
-            params.append(list(owned_card_ids))
         rows = await conn.fetch(
             f"""
             SELECT id
@@ -749,6 +780,7 @@ async def _search_fts(
               AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
               {collection_filter}
+              {price_clause}
             ORDER BY
                 ts_rank(
                     to_tsvector('english', COALESCE(oracle_text, '')),
@@ -1074,6 +1106,7 @@ async def retrieve_candidates(
     type_filter: TypeFilter | None = None,
     ranking_weights: RankingWeights | None = None,
     collection_filter: CollectionFilter | None = None,
+    price_filter: PriceFilter | None = None,
 ) -> list[RetrievedCard]:
     """Run hybrid retrieval and return top candidate cards with weighted scoring.
 
@@ -1096,6 +1129,7 @@ async def retrieve_candidates(
         type_filter: Optional type/subtype preferences for soft score boosting.
         ranking_weights: Optional per-user signal weight overrides.
         collection_filter: When set, restricts candidates to owned cards.
+        price_filter: When set, excludes cards above the EUR cap (nonfoil).
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1119,6 +1153,7 @@ async def retrieve_candidates(
             deck_card_ids,
             exclude_lands=exclude_lands,
             owned_card_ids=owned_ids,
+            price_filter=price_filter,
         ),
         _search_fts(
             pool,
@@ -1127,6 +1162,7 @@ async def retrieve_candidates(
             deck_card_ids,
             exclude_lands=exclude_lands,
             owned_card_ids=owned_ids,
+            price_filter=price_filter,
         ),
     )
 
@@ -1137,7 +1173,9 @@ async def retrieve_candidates(
     if not all_ids:
         return []
 
-    rows = await _fetch_candidates(pool, all_ids, exclude_lands=exclude_lands)
+    rows = await _fetch_candidates(
+        pool, all_ids, exclude_lands=exclude_lands, price_filter=price_filter
+    )
     cards_by_id = {r["id"]: r for r in rows}
 
     scores = _compute_weighted_scores(
@@ -1200,6 +1238,7 @@ async def _fetch_candidates(
     ids: list[UUID],
     *,
     exclude_lands: bool = False,
+    price_filter: PriceFilter | None = None,
 ) -> list["asyncpg.Record"]:
     """Fetch full card data from Postgres for the given card IDs.
 
@@ -1207,11 +1246,22 @@ async def _fetch_candidates(
         pool: asyncpg connection pool.
         ids: Card UUIDs to fetch.
         exclude_lands: If True, filter out land cards from results.
+        price_filter: When set, drops cards with no EUR price or EUR > cap.
+            Required here because Qdrant payload has no price data; this is
+            the safety net for semantic results.
 
     Returns:
         List of raw asyncpg records.
     """
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
+    params: list = [ids]
+    price_clause = ""
+    if price_filter is not None:
+        params.append(price_filter.max_cents)
+        price_clause = (
+            f"AND (prices->>'eur') IS NOT NULL "
+            f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}"
+        )
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             f"""
@@ -1224,7 +1274,8 @@ async def _fetch_candidates(
               AND COALESCE(security_stamp, '') != 'acorn'
               AND type_line NOT LIKE '%Conspiracy%'
               {land_filter}
+              {price_clause}
             """,
-            ids,
+            *params,
         )
     return list(rows)

@@ -49,6 +49,9 @@ export default function DeckDetailPage() {
   const [editingDescription, setEditingDescription] = useState(false);
   const [draftDescription, setDraftDescription] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [draftPriceEur, setDraftPriceEur] = useState("");
+  const [savingPrice, setSavingPrice] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -88,6 +91,31 @@ export default function DeckDetailPage() {
       alert(err instanceof Error ? err.message : "Failed to update description");
     } finally {
       setSavingDescription(false);
+    }
+  }
+
+  async function handleSavePrice() {
+    if (!deck) return;
+    const trimmed = draftPriceEur.trim();
+    let nextCents: number | null = null;
+    if (trimmed) {
+      const eur = Number.parseFloat(trimmed);
+      if (!Number.isFinite(eur) || eur < 0) {
+        alert("Enter a positive number or leave blank to clear.");
+        return;
+      }
+      nextCents = eur > 0 ? Math.round(eur * 100) : 0;
+    }
+    setSavingPrice(true);
+    try {
+      // Sentinel: 0 clears the cap server-side. null means "no change", so send 0 to clear.
+      await apiClient.updateDeck(deck.id, { max_price_cents: nextCents ?? 0 });
+      setDeck({ ...deck, max_price_cents: nextCents && nextCents > 0 ? nextCents : null });
+      setEditingPrice(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update price cap");
+    } finally {
+      setSavingPrice(false);
     }
   }
 
@@ -237,6 +265,61 @@ export default function DeckDetailPage() {
 
         {/* Sidebar */}
         <div className="flex flex-col gap-6">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">Price cap</h3>
+              {!editingPrice && (
+                <button
+                  onClick={() => {
+                    setDraftPriceEur(
+                      deck.max_price_cents ? (deck.max_price_cents / 100).toFixed(2) : "",
+                    );
+                    setEditingPrice(true);
+                  }}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  ✎ Edit
+                </button>
+              )}
+            </div>
+            {editingPrice ? (
+              <div className="flex flex-col gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={draftPriceEur}
+                  onChange={(e) => setDraftPriceEur(e.target.value)}
+                  placeholder="EUR, e.g. 0.50 (blank = no cap)"
+                  className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => void handleSavePrice()}
+                    disabled={savingPrice}
+                    className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                  >
+                    {savingPrice ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditingPrice(false)}
+                    className="rounded-md border border-white/20 px-3 py-1 text-xs text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Nonfoil Scryfall EUR. Cards without EUR price are excluded.
+                </p>
+              </div>
+            ) : deck.max_price_cents ? (
+              <p className="text-sm text-gray-300">
+                ≤ €{(deck.max_price_cents / 100).toFixed(2)} per card
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600 italic">No cap — suggestions include any price</p>
+            )}
+          </div>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <ManaCurve cards={deck.cards} />
           </div>

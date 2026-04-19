@@ -142,6 +142,70 @@ async def test_describe_completion(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_describe_history_is_truncated_before_llm(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """History sent to the LLM is capped at _MAX_HISTORY_TURNS turns."""
+    from mtg_helper.services import ai_service
+
+    captured: dict[str, list[dict[str, str]]] = {}
+
+    async def fake_call_llm(_ai, _system, history, _user):  # type: ignore[no-untyped-def]
+        captured["history"] = list(history)
+        return "What's your gameplan?"
+
+    monkeypatch.setattr(ai_service, "_call_llm", fake_call_llm)
+
+    long_history = [
+        {"role": "user" if i % 2 == 0 else "assistant", "content": f"msg {i}"} for i in range(24)
+    ]
+    resp = await client.post(
+        "/api/v1/decks/describe",
+        json={
+            "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
+            "bracket": 3,
+            "history": long_history,
+            "message": "keep going",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(captured["history"]) <= ai_service._MAX_HISTORY_TURNS
+
+
+@pytest.mark.asyncio
+async def test_describe_message_max_length_rejected(client: AsyncClient) -> None:
+    """Over-long user message is rejected by Pydantic validation."""
+    resp = await client.post(
+        "/api/v1/decks/describe",
+        json={
+            "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
+            "bracket": 3,
+            "history": [],
+            "message": "x" * 3000,
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_describe_history_length_exceeded_rejected(client: AsyncClient) -> None:
+    """Over-long history (>24 entries) is rejected by Pydantic validation."""
+    too_long = [
+        {"role": "user" if i % 2 == 0 else "assistant", "content": f"msg {i}"} for i in range(25)
+    ]
+    resp = await client.post(
+        "/api/v1/decks/describe",
+        json={
+            "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
+            "bracket": 3,
+            "history": too_long,
+            "message": "hi",
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_describe_unknown_commander(client: AsyncClient) -> None:
     """Returns 404 when commander scryfall_id is not in the DB."""
     import uuid

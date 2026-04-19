@@ -1,8 +1,8 @@
 ## 1 Fix Bugs
+- Switch Embedding and Model to Gemini (from OpenAI)
 - When importing collection why does it take that long to upload ? can we run into issues for scraping to much data from other sources ? what is happening on the upload ?
-- Error "'suggestion_collection_ids'" when navigating to deck
-- Done Event in deck building still not navigating
-- Avoid Long chats in deck building, should focus on the deck suggestion and interrupt after a certeain amount of time
+- Price Cap to Build Wizzard in Each Step, inherited from Deck view
+- Change Building Tab Card View to also include the price
 
 ## 2 Deploy to GCP
 - Proper user management

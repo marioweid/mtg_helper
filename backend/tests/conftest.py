@@ -38,6 +38,7 @@ _TEST_CARDS = [
         "rarity": "rare",
         "set_code": "rav",
         "legalities": {"commander": "legal"},
+        "prices": {"eur": "45.00"},
     },
     {
         "scryfall_id": "2d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
@@ -51,6 +52,7 @@ _TEST_CARDS = [
         "rarity": "common",
         "set_code": "pcy",
         "legalities": {"commander": "legal"},
+        "prices": {"eur": "12.00"},
     },
     {
         "scryfall_id": "3d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
@@ -63,6 +65,7 @@ _TEST_CARDS = [
         "rarity": "uncommon",
         "set_code": "lea",
         "legalities": {"commander": "legal"},
+        "prices": {"eur": "0.20"},
     },
     {
         "scryfall_id": "4d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
@@ -78,6 +81,7 @@ _TEST_CARDS = [
         "legalities": {"commander": "legal"},
         "power": "2",
         "toughness": "4",
+        "prices": {"eur": "0.15"},
     },
     {
         "scryfall_id": "5d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
@@ -93,6 +97,8 @@ _TEST_CARDS = [
         "legalities": {"commander": "legal"},
         "power": "1",
         "toughness": "2",
+        # Null EUR: card has no EUR price data.
+        "prices": {"usd": "60.00"},
     },
 ]
 
@@ -110,8 +116,8 @@ async def _setup_schema() -> None:
                 """
                 INSERT INTO cards (scryfall_id, name, color_identity, oracle_text,
                     type_line, cmc, mana_cost, rarity, set_code, legalities,
-                    power, toughness, colors, keywords)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    power, toughness, colors, keywords, prices)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                 ON CONFLICT (scryfall_id) DO NOTHING
                 """,
                 card["scryfall_id"],
@@ -128,6 +134,7 @@ async def _setup_schema() -> None:
                 card.get("toughness"),
                 card["color_identity"],
                 [],
+                json.dumps(card.get("prices") or {}),
             )
     finally:
         await conn.close()
@@ -137,6 +144,14 @@ async def _setup_schema() -> None:
 def _init_db() -> None:
     """Initialize the test database schema once per session (synchronous entry point)."""
     asyncio.run(_setup_schema())
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits() -> None:
+    """Clear the in-memory rate-limit buckets before each test."""
+    from mtg_helper.services import rate_limit_service
+
+    rate_limit_service.reset()
 
 
 @pytest_asyncio.fixture

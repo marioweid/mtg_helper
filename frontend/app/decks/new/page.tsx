@@ -33,6 +33,7 @@ export default function NewDeckPage() {
   const [deckName, setDeckName] = useState("");
   const [description, setDescription] = useState("");
   const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
+  const [maxPriceEur, setMaxPriceEur] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +122,10 @@ export default function NewDeckPage() {
     setError(null);
     try {
       const ownerId = await getOrCreateAccountId();
+      const priceTrim = maxPriceEur.trim();
+      const parsedEur = priceTrim ? Number.parseFloat(priceTrim) : NaN;
+      const maxPriceCents =
+        Number.isFinite(parsedEur) && parsedEur > 0 ? Math.round(parsedEur * 100) : null;
       const deck = await apiClient.createDeck({
         commander_scryfall_id: commander.scryfall_id,
         partner_scryfall_id: partner?.scryfall_id ?? null,
@@ -129,6 +134,7 @@ export default function NewDeckPage() {
         bracket,
         owner_id: ownerId || null,
         stage_targets: stageTargets,
+        max_price_cents: maxPriceCents,
       });
       router.push(`/decks/${deck.id}/build`);
     } catch (err) {
@@ -317,6 +323,24 @@ export default function NewDeckPage() {
                 rows={5}
                 className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
               />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm text-gray-400" htmlFor="deck-max-price">
+                Max price per card (EUR)
+              </label>
+              <input
+                id="deck-max-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={maxPriceEur}
+                onChange={(e) => setMaxPriceEur(e.target.value)}
+                placeholder="e.g. 0.50 — leave blank for no cap"
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Nonfoil Scryfall EUR. Cards without an EUR price are excluded.
+              </p>
             </div>
           </div>
         </section>

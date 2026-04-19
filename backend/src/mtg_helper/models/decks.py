@@ -18,6 +18,7 @@ class DeckCreate(BaseModel):
     owner_id: UUID | None = None
     stage_targets: dict[str, int] | None = None
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
+    max_price_cents: int | None = Field(default=None, gt=0)
 
 
 class DeckUpdate(BaseModel):
@@ -30,6 +31,7 @@ class DeckUpdate(BaseModel):
     owner_id: UUID | None = None
     stage_targets: dict[str, int] | None = None
     suggestion_collection_ids: list[UUID] | None = None
+    max_price_cents: int | None = Field(default=None, ge=0)
 
 
 class DeckSummary(BaseModel):
@@ -61,6 +63,7 @@ class DeckResponse(BaseModel):
     updated_at: datetime
     stage_targets: dict[str, int] = Field(default_factory=dict)
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
+    max_price_cents: int | None = None
 
 
 class DeckCardItem(BaseModel):
@@ -98,6 +101,7 @@ class DeckDetailResponse(BaseModel):
     updated_at: datetime
     stage_targets: dict[str, int] = Field(default_factory=dict)
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
+    max_price_cents: int | None = None
     cards: list[DeckCardItem]
 
 

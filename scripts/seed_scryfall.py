@@ -27,7 +27,9 @@ async def main() -> None:
     result = await run_sync(pool)
     await pool.close()
 
-    print(f"Done. {result['cards_processed']} cards processed in {result['duration_seconds']}s")
+    print(
+        f"Done. {result['cards_processed']} cards processed in {result['duration_seconds']}s"
+    )
 
 
 if __name__ == "__main__":

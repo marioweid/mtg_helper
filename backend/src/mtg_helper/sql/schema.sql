@@ -237,6 +237,12 @@ ALTER TABLE decks
 CREATE INDEX IF NOT EXISTS idx_decks_suggestion_collections
     ON decks USING GIN (suggestion_collection_ids);
 
+-- Price cap (EUR cents, nonfoil). NULL = no cap.
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS max_price_cents INTEGER;
+ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_max_price_cents_check;
+ALTER TABLE decks ADD CONSTRAINT decks_max_price_cents_check
+    CHECK (max_price_cents IS NULL OR max_price_cents > 0);
+
 ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_check;
 ALTER TABLE accounts DROP COLUMN IF EXISTS collection_suggestions_enabled;
 ALTER TABLE accounts DROP COLUMN IF EXISTS default_collection_id;

@@ -15,7 +15,7 @@ async def get_turns(pool: asyncpg.Pool, deck_id: UUID) -> list[dict[str, str]]:
         deck_id: The deck's UUID.
 
     Returns:
-        List of {role, content} dicts suitable for the OpenAI chat completions API.
+        List of {role, content} dicts suitable for the chat completions API.
     """
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -24,6 +24,32 @@ async def get_turns(pool: asyncpg.Pool, deck_id: UUID) -> list[dict[str, str]]:
             deck_id,
         )
     return [{"role": r["role"], "content": r["content"]} for r in rows if r["content"]]
+
+
+async def get_recent_turns(pool: asyncpg.Pool, deck_id: UUID, limit: int) -> list[dict[str, str]]:
+    """Fetch the most recent N turns for a deck in chronological order.
+
+    Caps the amount of history replayed into the LLM to keep token usage
+    bounded.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck's UUID.
+        limit: Maximum number of turns to return.
+
+    Returns:
+        List of {role, content} dicts in ascending turn order.
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT role, content FROM conversation_turns"
+            " WHERE deck_id = $1 ORDER BY turn_order DESC LIMIT $2",
+            deck_id,
+            limit,
+        )
+    turns = [{"role": r["role"], "content": r["content"]} for r in rows if r["content"]]
+    turns.reverse()
+    return turns
 
 
 async def append_turn(pool: asyncpg.Pool, deck_id: UUID, role: str, content: str) -> None:

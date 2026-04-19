@@ -12,6 +12,7 @@ class BuildRequest(BaseModel):
     target: int | None = Field(default=None, ge=1, le=99)
     exclude: list[str] | None = Field(default=None, max_length=200)
     collection_ids: list[UUID] | None = None
+    max_price_cents: int | None = Field(default=None, gt=0)
 
 
 class CardSuggestion(BaseModel):
@@ -49,6 +50,7 @@ class SuggestRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=500)
     count: int = Field(default=10, ge=1, le=25)
     collection_ids: list[UUID] | None = None
+    max_price_cents: int | None = Field(default=None, gt=0)
 
 
 class SuggestResponse(BaseModel):
@@ -61,7 +63,7 @@ class SuggestResponse(BaseModel):
 class ChatRequest(BaseModel):
     """Request body for free-form deck chat."""
 
-    message: str = Field(min_length=1, max_length=2000)
+    message: str = Field(min_length=1, max_length=1000)
 
 
 class ChatResponse(BaseModel):
@@ -75,7 +77,7 @@ class DescribeMessage(BaseModel):
     """A single turn in the description agent conversation."""
 
     role: str
-    content: str
+    content: str = Field(max_length=2000)
 
 
 class DescribeRequest(BaseModel):
@@ -84,7 +86,7 @@ class DescribeRequest(BaseModel):
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
     bracket: int = Field(default=3, ge=1, le=4)
-    history: list[DescribeMessage] = Field(default_factory=list)
+    history: list[DescribeMessage] = Field(default_factory=list, max_length=24)
     message: str = Field(default="", max_length=2000)
 
 
