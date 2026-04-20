@@ -13,6 +13,7 @@ class BuildRequest(BaseModel):
     exclude: list[str] | None = Field(default=None, max_length=200)
     collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, gt=0)
+    min_price_cents: int | None = Field(default=None, ge=0)
 
 
 class CollectionMembership(BaseModel):
@@ -60,6 +61,7 @@ class SuggestRequest(BaseModel):
     count: int = Field(default=10, ge=1, le=25)
     collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, gt=0)
+    min_price_cents: int | None = Field(default=None, ge=0)
 
 
 class SuggestResponse(BaseModel):

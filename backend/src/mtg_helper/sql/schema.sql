@@ -243,6 +243,12 @@ ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_max_price_cents_check;
 ALTER TABLE decks ADD CONSTRAINT decks_max_price_cents_check
     CHECK (max_price_cents IS NULL OR max_price_cents > 0);
 
+-- Price floor (EUR cents, nonfoil). NULL = no floor.
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS min_price_cents INTEGER;
+ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_min_price_cents_check;
+ALTER TABLE decks ADD CONSTRAINT decks_min_price_cents_check
+    CHECK (min_price_cents IS NULL OR min_price_cents >= 0);
+
 ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_check;
 ALTER TABLE accounts DROP COLUMN IF EXISTS collection_suggestions_enabled;
 ALTER TABLE accounts DROP COLUMN IF EXISTS default_collection_id;

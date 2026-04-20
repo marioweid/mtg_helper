@@ -4,14 +4,16 @@ import json
 import logging
 import time
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import asyncpg
 import httpx
-import openai
 from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.config import settings
+
+if TYPE_CHECKING:
+    from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
@@ -276,7 +278,7 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
 
 async def run_sync(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI | None = None,
+    ai_client: "LLMClient | None" = None,
     qdrant_client: AsyncQdrantClient | None = None,
 ) -> dict[str, Any]:
     """Download Scryfall oracle_cards bulk data and upsert into the cards table.
@@ -286,7 +288,7 @@ async def run_sync(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: Optional OpenAI client for post-sync embedding.
+        ai_client: Optional LLM adapter for post-sync embedding.
         qdrant_client: Optional Qdrant client for post-sync embedding.
 
     Returns:

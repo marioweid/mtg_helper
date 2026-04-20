@@ -239,7 +239,7 @@ export default function DeckDetailPage() {
         <div className="flex flex-col gap-6">
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">Price cap</h3>
+              <h3 className="text-sm font-semibold text-white">Price range</h3>
               <Link
                 href={`/decks/${deck.id}/build`}
                 className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
@@ -247,12 +247,17 @@ export default function DeckDetailPage() {
                 Edit in Build
               </Link>
             </div>
-            {deck.max_price_cents ? (
+            {deck.max_price_cents != null || deck.min_price_cents != null ? (
               <p className="text-sm text-gray-300">
-                ≤ €{(deck.max_price_cents / 100).toFixed(2)} per card
+                €{deck.min_price_cents != null ? (deck.min_price_cents / 100).toFixed(2) : "0.00"}
+                {" – "}
+                {deck.max_price_cents != null
+                  ? `€${(deck.max_price_cents / 100).toFixed(2)}`
+                  : "∞"}{" "}
+                per card
               </p>
             ) : (
-              <p className="text-sm text-gray-600 italic">No cap — suggestions include any price</p>
+              <p className="text-sm text-gray-600 italic">No range — suggestions include any price</p>
             )}
           </div>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">

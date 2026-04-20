@@ -86,6 +86,7 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
         stage_targets=_parse_stage_targets(row["stage_targets"]),
         suggestion_collection_ids=list(row["suggestion_collection_ids"] or []),
         max_price_cents=row["max_price_cents"],
+        min_price_cents=row["min_price_cents"],
     )
 
 
@@ -166,8 +167,9 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
         row = await conn.fetchrow(
             """
             INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_id,
-                               stage_targets, suggestion_collection_ids, max_price_cents)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                               stage_targets, suggestion_collection_ids, max_price_cents,
+                               min_price_cents)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
             """,
             data.name,
@@ -179,6 +181,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
             json.dumps(data.stage_targets or {}),
             list(data.suggestion_collection_ids),
             data.max_price_cents,
+            data.min_price_cents,
         )
     return _row_to_deck(row)
 
@@ -260,6 +263,7 @@ async def get_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckDetailResponse | No
         stage_targets=_parse_stage_targets(deck_row["stage_targets"]),
         suggestion_collection_ids=list(deck_row["suggestion_collection_ids"] or []),
         max_price_cents=deck_row["max_price_cents"],
+        min_price_cents=deck_row["min_price_cents"],
         cards=[_row_to_deck_card_item(r) for r in card_rows],
     )
 
@@ -286,6 +290,9 @@ async def update_deck(pool: asyncpg.Pool, deck_id: UUID, data: DeckUpdate) -> De
     # Sentinel: 0 clears the price cap back to NULL (positive check constraint).
     if updates.get("max_price_cents") == 0:
         updates["max_price_cents"] = None
+    # Min floor: 0 is equivalent to no floor; store NULL for consistency.
+    if updates.get("min_price_cents") == 0:
+        updates["min_price_cents"] = None
 
     fields = ", ".join(f"{k} = ${i + 2}" for i, k in enumerate(updates))
     values = list(updates.values())

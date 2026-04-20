@@ -82,6 +82,7 @@ async def build_stage(
             exclude=body.exclude,
             collection_ids=body.collection_ids,
             max_price_cents=body.max_price_cents,
+            min_price_cents=body.min_price_cents,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
@@ -107,6 +108,7 @@ async def suggest_cards(
             body.count,
             collection_ids=body.collection_ids,
             max_price_cents=body.max_price_cents,
+            min_price_cents=body.min_price_cents,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})

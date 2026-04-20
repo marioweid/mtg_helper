@@ -1,4 +1,4 @@
-"""AI deck building service using the OpenAI API."""
+"""AI deck building service using the Gemini API."""
 
 import asyncio
 import json
@@ -8,7 +8,6 @@ from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
-import openai
 from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import (
@@ -32,6 +31,7 @@ from mtg_helper.services import (
     ranking_weight_service,
 )
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
+from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.retrieval_service import (
     CollectionFilter,
     PriceFilter,
@@ -43,8 +43,6 @@ from mtg_helper.services.retrieval_service import (
 )
 
 _log = logging.getLogger(__name__)
-
-_MODEL = "gpt-4.1-mini"
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
 _FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3}
 _REJECT_BASE: float = 0.3  # weight = _REJECT_BASE ** reject_count
@@ -439,28 +437,24 @@ async def _load_prompt_context(
 
 
 async def _call_llm(
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     system: str,
     history: list[dict[str, str]],
     user_message: str,
 ) -> str:
     """Send a message to the LLM and return the text response."""
     messages: list[dict[str, str]] = [
-        {"role": "system", "content": system},
         *history,
         {"role": "user", "content": user_message},
     ]
-    response = await ai_client.chat.completions.create(
-        model=_MODEL,
-        max_completion_tokens=_LLM_MAX_COMPLETION_TOKENS,
-        temperature=_LLM_TEMPERATURE,
+    content = await ai_client.chat(
+        system=system,
         messages=messages,
+        temperature=_LLM_TEMPERATURE,
+        max_output_tokens=_LLM_MAX_COMPLETION_TOKENS,
     )
-    choice = response.choices[0]
-    content = choice.message.content
     if not content:
-        finish_reason = getattr(choice, "finish_reason", "unknown")
-        raise LLMEmptyResponseError(f"LLM returned empty content (finish_reason={finish_reason!r})")
+        raise LLMEmptyResponseError("LLM returned empty content")
     return content
 
 
@@ -587,14 +581,25 @@ async def _resolve_collection_filter(
 
 
 def _resolve_price_filter(
-    deck: DeckDetailResponse, request_override: int | None
+    deck: DeckDetailResponse,
+    max_override: int | None,
+    min_override: int | None = None,
 ) -> PriceFilter | None:
-    """Resolve the price cap for a request.
+    """Resolve the price filter (cap and/or floor) for a request.
 
-    A per-request ``max_price_cents`` overrides the deck's stored cap.
+    Per-request overrides replace the deck's stored values individually.
+    Returns None when neither a cap nor a positive floor is active.
     """
-    cents = request_override if request_override is not None else deck.max_price_cents
-    return PriceFilter(max_cents=cents) if cents else None
+    max_cents = max_override if max_override is not None else deck.max_price_cents
+    min_cents = min_override if min_override is not None else deck.min_price_cents
+    max_active = max_cents is not None and max_cents > 0
+    min_active = min_cents is not None and min_cents > 0
+    if not max_active and not min_active:
+        return None
+    return PriceFilter(
+        max_cents=max_cents if max_active else None,
+        min_cents=min_cents if min_active else 0,
+    )
 
 
 async def _build_ownership_map(
@@ -633,7 +638,7 @@ async def _build_ownership_map(
 
 async def build_stage(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     stage: str | None = None,
@@ -641,12 +646,13 @@ async def build_stage(
     exclude: list[str] | None = None,
     collection_ids: list[UUID] | None = None,
     max_price_cents: int | None = None,
+    min_price_cents: int | None = None,
 ) -> BuildResponse:
     """Generate card suggestions for a build stage using hybrid retrieval.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client (used for embeddings only).
+        ai_client: LLM adapter (used for embeddings only).
         qdrant_client: Qdrant async client for semantic retrieval.
         deck_id: The deck's UUID.
         stage: Specific stage to generate for. If None, auto-advances to the next stage.
@@ -696,7 +702,7 @@ async def build_stage(
     ranking_weights = await _load_ranking_weights(pool, deck.owner_id)
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
-    price_filter = _resolve_price_filter(deck, max_price_cents)
+    price_filter = _resolve_price_filter(deck, max_price_cents, min_price_cents)
 
     limit = target if target is not None else 20
     candidates = await retrieve_candidates(
@@ -741,19 +747,20 @@ async def build_stage(
 
 async def suggest_cards(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     prompt: str,
     count: int,
     collection_ids: list[UUID] | None = None,
     max_price_cents: int | None = None,
+    min_price_cents: int | None = None,
 ) -> SuggestResponse:
     """Return suggested cards matching a free-form prompt via hybrid retrieval.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client (used for embeddings only).
+        ai_client: LLM adapter (used for embeddings only).
         qdrant_client: Qdrant async client for semantic retrieval.
         deck_id: The deck's UUID.
         prompt: Natural language description of desired cards.
@@ -785,7 +792,7 @@ async def suggest_cards(
     )
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
-    price_filter = _resolve_price_filter(deck, max_price_cents)
+    price_filter = _resolve_price_filter(deck, max_price_cents, min_price_cents)
 
     candidates = await retrieve_candidates(
         pool,
@@ -814,7 +821,7 @@ async def suggest_cards(
 
 async def chat_about_deck(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     deck_id: UUID,
     message: str,
 ) -> ChatResponse:
@@ -825,7 +832,7 @@ async def chat_about_deck(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client.
+        ai_client: LLM adapter.
         deck_id: The deck's UUID.
         message: User's chat message.
 
@@ -1015,7 +1022,7 @@ def _parse_describe_response(
 
 async def describe_deck(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     commander_scryfall_id: UUID,
     partner_scryfall_id: UUID | None,
     bracket: int,
@@ -1030,7 +1037,7 @@ async def describe_deck(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client.
+        ai_client: LLM adapter.
         commander_scryfall_id: Scryfall ID of the commander card.
         partner_scryfall_id: Scryfall ID of the partner commander, if any.
         bracket: Power level bracket (1-4).

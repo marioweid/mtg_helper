@@ -9,7 +9,7 @@ from uuid import UUID
 
 # Set required env vars before importing any app module that reads config at import time.
 os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test")
-os.environ.setdefault("OPENAI_API_KEY", "test")
+os.environ.setdefault("GEMINI_API_KEY", "test")
 
 import asyncpg
 import pytest
@@ -21,6 +21,28 @@ from mtg_helper.main import app
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test"
 )
+
+
+def make_mock_llm_client(chat_text: str = "[]") -> "object":
+    """Build a mock LLMClient with `chat` and `embed` async methods.
+
+    Args:
+        chat_text: Text that `chat()` returns.
+
+    Returns:
+        MagicMock whose `.chat` returns `chat_text` and `.embed` returns one
+        1536-dim zero vector per input.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
+        return [[0.0] * 1536 for _ in texts]
+
+    ai = MagicMock()
+    ai.chat = AsyncMock(return_value=chat_text)
+    ai.embed = AsyncMock(side_effect=_embed)
+    return ai
+
 
 SCHEMA_PATH = Path(__file__).parent.parent / "src/mtg_helper/sql/schema.sql"
 

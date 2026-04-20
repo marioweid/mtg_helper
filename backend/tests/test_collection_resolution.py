@@ -17,15 +17,11 @@ from tests.conftest import (
 
 
 def _make_ai_client() -> MagicMock:
-    emb_item = MagicMock()
-    emb_item.embedding = [0.0] * 1536
-    emb_item.index = 0
-    emb_response = MagicMock()
-    emb_response.data = [emb_item]
+    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
+        return [[0.0] * 1536 for _ in texts]
 
     ai = MagicMock()
-    ai.embeddings = MagicMock()
-    ai.embeddings.create = AsyncMock(return_value=emb_response)
+    ai.embed = AsyncMock(side_effect=_embed)
     return ai
 
 

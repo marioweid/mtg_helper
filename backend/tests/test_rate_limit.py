@@ -11,15 +11,8 @@ from tests.conftest import HAZEL_SCRYFALL_ID
 
 
 def _stub_ai_client() -> MagicMock:
-    choice = MagicMock()
-    choice.message = MagicMock()
-    choice.message.content = "What's your win condition?"
-    response = MagicMock()
-    response.choices = [choice]
     ai = MagicMock()
-    ai.chat = MagicMock()
-    ai.chat.completions = MagicMock()
-    ai.chat.completions.create = AsyncMock(return_value=response)
+    ai.chat = AsyncMock(return_value="What's your win condition?")
     return ai
 
 

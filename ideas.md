@@ -1,16 +1,5 @@
 # Ideas
 
-## 1 Fix Bugs
-
-- Switch Embedding and Model to Gemini (from OpenAI)
-- - Add min price to deck filter so f.e. we can go with 0 - 50 cents, then if we dont want to see the previous we can set 50 cents-1€ f.e.
-
-## 2 Deploy to GCP
-
-- Proper user management
-- Deploy to GCP
-- Switch openai to gemini for better usage costs monitoring
-
 ## 3 Optional nice to have
 
 - Performance beyond ~10k-card collections (HasIdCondition cost in Qdrant)

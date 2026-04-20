@@ -12,18 +12,8 @@ from tests.conftest import HAZEL_SCRYFALL_ID
 
 
 def _make_ai_client(response_text: str) -> MagicMock:
-    choice = MagicMock()
-    choice.message = MagicMock()
-    choice.message.content = response_text
-    choice.finish_reason = "stop"
-
-    response = MagicMock()
-    response.choices = [choice]
-
     ai = MagicMock()
-    ai.chat = MagicMock()
-    ai.chat.completions = MagicMock()
-    ai.chat.completions.create = AsyncMock(return_value=response)
+    ai.chat = AsyncMock(return_value=response_text)
     return ai
 
 

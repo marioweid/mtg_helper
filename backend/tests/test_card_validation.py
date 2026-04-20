@@ -10,25 +10,12 @@ from tests.conftest import HAZEL_SCRYFALL_ID
 
 
 def _make_ai_client(response_text: str) -> MagicMock:
-    choice = MagicMock()
-    choice.message = MagicMock()
-    choice.message.content = response_text
-
-    response = MagicMock()
-    response.choices = [choice]
-
-    emb_item = MagicMock()
-    emb_item.embedding = [0.0] * 1536
-    emb_item.index = 0
-    emb_response = MagicMock()
-    emb_response.data = [emb_item]
+    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
+        return [[0.0] * 1536 for _ in texts]
 
     ai = MagicMock()
-    ai.chat = MagicMock()
-    ai.chat.completions = MagicMock()
-    ai.chat.completions.create = AsyncMock(return_value=response)
-    ai.embeddings = MagicMock()
-    ai.embeddings.create = AsyncMock(return_value=emb_response)
+    ai.chat = AsyncMock(return_value=response_text)
+    ai.embed = AsyncMock(side_effect=_embed)
     return ai
 
 

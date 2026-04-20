@@ -8,7 +8,6 @@ from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
-import openai
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     FieldCondition,
@@ -23,6 +22,7 @@ from mtg_helper.config import settings
 from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import profile_service
 from mtg_helper.services.embedding_service import embed_single
+from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
@@ -62,12 +62,33 @@ class CollectionFilter:
 
 @dataclass(frozen=True)
 class PriceFilter:
-    """Restricts retrieval to cards with nonfoil EUR price <= max_cents.
+    """Restricts retrieval to cards with nonfoil EUR price in a cents range.
 
-    Cards missing a EUR price are excluded (safe default: cannot verify cheap).
+    Cards missing a EUR price are excluded (safe default: cannot verify price).
+    ``min_cents`` defaults to 0 (no floor); ``max_cents`` is None for no ceiling.
     """
 
-    max_cents: int
+    max_cents: int | None = None
+    min_cents: int = 0
+
+
+def _build_price_clause(price_filter: PriceFilter | None, params: list) -> str:
+    """Append price parameters and return the matching SQL fragment.
+
+    Cards with NULL EUR price are always excluded when a filter is active.
+    Appends up to two params (min, max) to ``params`` in that order and
+    returns a SQL fragment that references them by ``$N`` position.
+    """
+    if price_filter is None:
+        return ""
+    clauses = ["AND (prices->>'eur') IS NOT NULL"]
+    if price_filter.min_cents > 0:
+        params.append(price_filter.min_cents)
+        clauses.append(f"AND ((prices->>'eur')::numeric * 100) >= ${len(params)}")
+    if price_filter.max_cents is not None:
+        params.append(price_filter.max_cents)
+        clauses.append(f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}")
+    return " ".join(clauses)
 
 
 @dataclass
@@ -683,13 +704,7 @@ async def _search_tags(
     if owned_card_ids is not None:
         params.append(list(owned_card_ids))
         collection_filter = f"AND id = ANY(${len(params)}::uuid[])"
-    price_clause = ""
-    if price_filter is not None:
-        params.append(price_filter.max_cents)
-        price_clause = (
-            f"AND (prices->>'eur') IS NOT NULL "
-            f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}"
-        )
+    price_clause = _build_price_clause(price_filter, params)
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             f"""
@@ -759,13 +774,7 @@ async def _search_fts(
     if owned_card_ids is not None:
         params.append(list(owned_card_ids))
         collection_filter = f"AND id = ANY(${len(params)}::uuid[])"
-    price_clause = ""
-    if price_filter is not None:
-        params.append(price_filter.max_cents)
-        price_clause = (
-            f"AND (prices->>'eur') IS NOT NULL "
-            f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}"
-        )
+    price_clause = _build_price_clause(price_filter, params)
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             f"""
@@ -1092,7 +1101,7 @@ def _annotate_type_signals(
 
 async def retrieve_candidates(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
     query_text: str,
     query_tags: list[str],
@@ -1116,7 +1125,7 @@ async def retrieve_candidates(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: OpenAI async client for query embedding.
+        ai_client: LLM adapter for query embedding.
         qdrant_client: Qdrant async client for semantic search.
         query_text: Text describing desired cards.
         query_tags: Pre-parsed tags for GIN search.
@@ -1257,13 +1266,7 @@ async def _fetch_candidates(
     """
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
     params: list = [ids]
-    price_clause = ""
-    if price_filter is not None:
-        params.append(price_filter.max_cents)
-        price_clause = (
-            f"AND (prices->>'eur') IS NOT NULL "
-            f"AND ((prices->>'eur')::numeric * 100) <= ${len(params)}"
-        )
+    price_clause = _build_price_clause(price_filter, params)
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             f"""

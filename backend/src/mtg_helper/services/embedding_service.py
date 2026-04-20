@@ -1,5 +1,6 @@
-"""Card embedding pipeline: generate OpenAI embeddings and store in Qdrant."""
+"""Card embedding pipeline: generate Gemini embeddings and store in Qdrant."""
 
+import asyncio
 import json
 import logging
 import time
@@ -7,15 +8,19 @@ import uuid
 from typing import Any
 
 import asyncpg
-import openai
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from mtg_helper.config import settings
+from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
 _QDRANT_UPSERT_BATCH = 500
+
+# Pace batches under the Gemini embeddings RPM quota. Tier 1 paid =
+# 100 RPM for gemini-embedding-001; 0.8s per call leaves headroom.
+_EMBED_BATCH_DELAY_SECONDS = 0.8
 
 
 def build_embedding_text(
@@ -46,37 +51,32 @@ def build_embedding_text(
 
 
 async def embed_texts(
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     texts: list[str],
 ) -> list[list[float]]:
-    """Embed a batch of texts using the configured OpenAI embedding model.
+    """Embed a batch of card texts for corpus storage.
 
     Args:
-        ai_client: Async OpenAI client.
+        ai_client: LLM adapter.
         texts: List of strings to embed.
 
     Returns:
         List of embedding vectors (one per input text).
     """
-    response = await ai_client.embeddings.create(
-        model=settings.embedding_model,
-        input=texts,
-        dimensions=settings.embedding_dimensions,
-    )
-    return [item.embedding for item in sorted(response.data, key=lambda x: x.index)]
+    return await ai_client.embed(texts, task_type="RETRIEVAL_DOCUMENT")
 
 
-async def embed_single(ai_client: openai.AsyncOpenAI, text: str) -> list[float]:
-    """Embed a single text string.
+async def embed_single(ai_client: LLMClient, text: str) -> list[float]:
+    """Embed a single search query string.
 
     Args:
-        ai_client: Async OpenAI client.
+        ai_client: LLM adapter.
         text: Text to embed.
 
     Returns:
         Embedding vector.
     """
-    vectors = await embed_texts(ai_client, [text])
+    vectors = await ai_client.embed([text], task_type="RETRIEVAL_QUERY")
     return vectors[0]
 
 
@@ -128,7 +128,7 @@ def _card_row_to_point(row: asyncpg.Record) -> PointStruct:
 
 async def run_batch_embed(
     pool: asyncpg.Pool,
-    ai_client: openai.AsyncOpenAI,
+    ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
 ) -> dict[str, Any]:
     """Embed all cards not yet in Qdrant and upsert them into the collection.
@@ -139,7 +139,7 @@ async def run_batch_embed(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: Async OpenAI client.
+        ai_client: LLM adapter.
         qdrant_client: Async Qdrant client.
 
     Returns:
@@ -168,6 +168,8 @@ async def run_batch_embed(
     batch_size = settings.embedding_batch_size
 
     for i in range(0, len(rows), batch_size):
+        if i > 0:
+            await asyncio.sleep(_EMBED_BATCH_DELAY_SECONDS)
         batch = rows[i : i + batch_size]
         texts = [
             build_embedding_text(

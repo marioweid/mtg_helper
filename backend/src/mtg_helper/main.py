@@ -4,7 +4,6 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import openai
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -25,6 +24,7 @@ from mtg_helper.routers import (
 )
 from mtg_helper.services import scryfall
 from mtg_helper.services.embedding_service import ensure_collection
+from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
@@ -34,7 +34,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
     await apply_schema(app.state.db_pool)
-    app.state.ai_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+    app.state.ai_client = LLMClient(
+        api_key=settings.gemini_api_key,
+        chat_model=settings.chat_model,
+        embed_model=settings.embedding_model,
+        embed_dim=settings.embedding_dimensions,
+    )
     app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url)
     await ensure_collection(app.state.qdrant_client)
 

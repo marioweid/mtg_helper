@@ -9,25 +9,12 @@ from tests.conftest import HAZEL_SCRYFALL_ID
 
 
 def _make_ai_client(response_text: str) -> MagicMock:
-    choice = MagicMock()
-    choice.message = MagicMock()
-    choice.message.content = response_text
-
-    response = MagicMock()
-    response.choices = [choice]
-
-    emb_item = MagicMock()
-    emb_item.embedding = [0.0] * 1536
-    emb_item.index = 0
-    emb_response = MagicMock()
-    emb_response.data = [emb_item]
+    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
+        return [[0.0] * 1536 for _ in texts]
 
     ai = MagicMock()
-    ai.chat = MagicMock()
-    ai.chat.completions = MagicMock()
-    ai.chat.completions.create = AsyncMock(return_value=response)
-    ai.embeddings = MagicMock()
-    ai.embeddings.create = AsyncMock(return_value=emb_response)
+    ai.chat = AsyncMock(return_value=response_text)
+    ai.embed = AsyncMock(side_effect=_embed)
     return ai
 
 
@@ -45,19 +32,12 @@ async def test_conversation_persists_across_chat(client: AsyncClient) -> None:
     deck_id = await _create_deck(client)
     call_messages: list = []
 
-    async def capture_create(**kwargs):  # type: ignore[no-untyped-def]
+    async def capture_chat(**kwargs: object) -> str:
         call_messages.append(kwargs.get("messages", []))
-        choice = MagicMock()
-        choice.message = MagicMock()
-        choice.message.content = "Great deck strategy!"
-        resp = MagicMock()
-        resp.choices = [choice]
-        return resp
+        return "Great deck strategy!"
 
     mock_ai = MagicMock()
-    mock_ai.chat = MagicMock()
-    mock_ai.chat.completions = MagicMock()
-    mock_ai.chat.completions.create = AsyncMock(side_effect=capture_create)
+    mock_ai.chat = AsyncMock(side_effect=capture_chat)
     app.state.ai_client = mock_ai
 
     # First message
@@ -78,32 +58,19 @@ async def test_build_uses_embeddings_not_chat_llm(client: AsyncClient) -> None:
     chat_call_count = 0
     emb_call_count = 0
 
-    async def count_chat(**kwargs):  # type: ignore[no-untyped-def]
+    async def count_chat(**_: object) -> str:
         nonlocal chat_call_count
         chat_call_count += 1
-        choice = MagicMock()
-        choice.message = MagicMock()
-        choice.message.content = "[]"
-        resp = MagicMock()
-        resp.choices = [choice]
-        return resp
+        return "[]"
 
-    async def count_embed(**kwargs):  # type: ignore[no-untyped-def]
+    async def count_embed(texts: list[str], **_: object) -> list[list[float]]:
         nonlocal emb_call_count
         emb_call_count += 1
-        emb_item = MagicMock()
-        emb_item.embedding = [0.0] * 1536
-        emb_item.index = 0
-        emb_resp = MagicMock()
-        emb_resp.data = [emb_item]
-        return emb_resp
+        return [[0.0] * 1536 for _ in texts]
 
     mock_ai = MagicMock()
-    mock_ai.chat = MagicMock()
-    mock_ai.chat.completions = MagicMock()
-    mock_ai.chat.completions.create = AsyncMock(side_effect=count_chat)
-    mock_ai.embeddings = MagicMock()
-    mock_ai.embeddings.create = AsyncMock(side_effect=count_embed)
+    mock_ai.chat = AsyncMock(side_effect=count_chat)
+    mock_ai.embed = AsyncMock(side_effect=count_embed)
     app.state.ai_client = mock_ai
 
     resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={})
@@ -140,30 +107,25 @@ async def test_chat_history_is_capped(client: AsyncClient) -> None:
         role = "user" if i % 2 == 0 else "assistant"
         await conversation_service.append_turn(pool, deck_id, role, f"old turn {i}")
 
-    captured: dict[str, list[dict[str, str]]] = {}
+    captured: dict[str, object] = {}
 
-    async def capture(**kwargs):  # type: ignore[no-untyped-def]
+    async def capture(**kwargs: object) -> str:
+        captured["system"] = kwargs.get("system")
         captured["messages"] = list(kwargs.get("messages", []))
-        choice = MagicMock()
-        choice.message = MagicMock()
-        choice.message.content = "ack"
-        resp = MagicMock()
-        resp.choices = [choice]
-        return resp
+        return "ack"
 
     mock_ai = MagicMock()
-    mock_ai.chat = MagicMock()
-    mock_ai.chat.completions = MagicMock()
-    mock_ai.chat.completions.create = AsyncMock(side_effect=capture)
+    mock_ai.chat = AsyncMock(side_effect=capture)
     app.state.ai_client = mock_ai
 
     resp = await client.post(f"/api/v1/decks/{deck_id}/chat", json={"message": "next"})
     assert resp.status_code == 200
 
-    # messages = [system, ...history, user]. history must be ≤ _MAX_HISTORY_TURNS.
-    assert captured["messages"][0]["role"] == "system"
-    assert captured["messages"][-1]["content"] == "next"
-    history_slice = captured["messages"][1:-1]
+    # System instruction is passed separately; messages contain [...history, user].
+    assert isinstance(captured["system"], str)
+    messages = captured["messages"]
+    assert messages[-1]["content"] == "next"
+    history_slice = messages[:-1]
     assert len(history_slice) <= _MAX_HISTORY_TURNS
 
     # First retained turn should be in the last 20 (not "old turn 0").
