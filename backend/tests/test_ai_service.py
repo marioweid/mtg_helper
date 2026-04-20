@@ -38,10 +38,12 @@ def _make_candidate(
         color_identity=[],
         image_uri=None,
         tags=[],
+        token_types=[],
         edhrec_rank=None,
         power=None,
         toughness=None,
         rarity="common",
+        price_eur_cents=None,
         score=score,
         signals=signals,
     )

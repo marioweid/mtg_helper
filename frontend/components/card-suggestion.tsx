@@ -2,13 +2,6 @@
 
 import type { CardSuggestion } from "@/lib/types";
 
-const RARITY_COLORS: Record<string, string> = {
-  common: "text-gray-400 bg-gray-800/60",
-  uncommon: "text-slate-300 bg-slate-700/60",
-  rare: "text-yellow-300 bg-yellow-900/40",
-  mythic: "text-orange-400 bg-orange-900/40",
-};
-
 interface Props {
   suggestion: CardSuggestion;
   status: "pending" | "accepted" | "rejected";
@@ -20,6 +13,24 @@ interface Props {
   isBasicLand?: boolean;
   quantity?: number;
   onQuantityChange?: (quantity: number) => void;
+}
+
+function formatEur(cents: number | null): string {
+  if (cents == null) return "—";
+  return `€${(cents / 100).toFixed(2)}`;
+}
+
+function dedupeChips(primary: string[], secondary: string[], cap: number): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const s of [...primary, ...secondary]) {
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(s);
+    if (result.length >= cap) break;
+  }
+  return result;
 }
 
 export function CardSuggestionCard({
@@ -34,11 +45,14 @@ export function CardSuggestionCard({
   quantity = 1,
   onQuantityChange,
 }: Props) {
-  const hasDetails =
-    suggestion.oracle_text != null ||
-    suggestion.power != null ||
-    suggestion.toughness != null ||
-    suggestion.rarity != null;
+  const isHot =
+    suggestion.highlight_reasons != null && suggestion.highlight_reasons.length > 0;
+  const chips = dedupeChips(
+    suggestion.highlight_reasons ?? [],
+    suggestion.synergies,
+    3,
+  );
+  const owned = suggestion.owned_in;
 
   return (
     <div
@@ -57,63 +71,95 @@ export function CardSuggestionCard({
             alt={suggestion.name}
             className="h-full w-full object-cover object-top"
           />
+          <div className="absolute top-1.5 right-1.5 flex gap-1">
+            <span
+              className="rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur"
+              title="Scryfall EUR, nonfoil"
+            >
+              {formatEur(suggestion.price_eur_cents)}
+            </span>
+          </div>
+          {isHot && (
+            <span
+              className="absolute top-1.5 left-1.5 text-base"
+              title={`Top pick: ${suggestion.highlight_reasons?.join(", ") ?? ""}`}
+            >
+              🔥
+            </span>
+          )}
         </div>
       )}
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div>
-          <p className="font-medium text-white leading-tight flex items-center gap-1.5">
-            {suggestion.name}
-            {isPetCard && <span className="text-red-400 flex-shrink-0 text-xs" title="Pet card">♥</span>}
+          <p className="font-medium text-white leading-tight flex items-center gap-1.5 flex-wrap">
+            <span>{suggestion.name}</span>
+            {isPetCard && (
+              <span className="text-red-400 flex-shrink-0 text-xs" title="Pet card">
+                ♥
+              </span>
+            )}
+            {!suggestion.image_uri && isHot && <span title="Top pick">🔥</span>}
           </p>
           {suggestion.mana_cost && (
             <p className="text-xs text-gray-500">{suggestion.mana_cost}</p>
           )}
           <p className="text-xs text-gray-400 mt-0.5">{suggestion.type_line}</p>
         </div>
+
+        {/* Ownership chip */}
+        <div className="flex flex-wrap gap-1">
+          {owned.length > 0 ? (
+            owned.slice(0, 2).map((c) => (
+              <span
+                key={c.id}
+                className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-xs text-emerald-300"
+                title="Owned in this collection"
+              >
+                ✓ {c.name}
+              </span>
+            ))
+          ) : (
+            <span className="rounded bg-gray-800/60 px-1.5 py-0.5 text-xs text-gray-500">
+              Unowned
+            </span>
+          )}
+          {owned.length > 2 && (
+            <span className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-xs text-emerald-300">
+              +{owned.length - 2}
+            </span>
+          )}
+        </div>
+
+        {/* Oracle text */}
+        {suggestion.oracle_text && (
+          <p className="text-xs text-gray-400 italic leading-relaxed">
+            {suggestion.oracle_text}
+          </p>
+        )}
+
+        {/* Reasoning */}
         <p className="text-xs text-gray-400 leading-relaxed">{suggestion.reasoning}</p>
-        {suggestion.highlight_reasons && suggestion.highlight_reasons.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-xs font-semibold text-amber-400">⚡ Top Pick</span>
-            {suggestion.highlight_reasons.map((r) => (
-              <span key={r} className="rounded bg-amber-900/30 px-1.5 py-0.5 text-xs text-amber-300">
-                {r}
+
+        {/* Tags row: synergy/highlight chips + price fallback when no image */}
+        {(chips.length > 0 || !suggestion.image_uri) && (
+          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-white/5 pt-2">
+            {chips.map((c) => (
+              <span
+                key={c}
+                className={`rounded px-1.5 py-0.5 text-xs ${
+                  isHot && suggestion.highlight_reasons?.includes(c)
+                    ? "bg-amber-900/30 text-amber-300"
+                    : "bg-indigo-900/40 text-indigo-300"
+                }`}
+              >
+                {c}
               </span>
             ))}
-          </div>
-        )}
-        {suggestion.synergies.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {suggestion.synergies.slice(0, 3).map((s) => (
-              <span key={s} className="rounded bg-indigo-900/40 px-1.5 py-0.5 text-xs text-indigo-300">
-                {s}
+            {!suggestion.image_uri && (
+              <span className="ml-auto text-xs text-gray-300">
+                {formatEur(suggestion.price_eur_cents)}
               </span>
-            ))}
-          </div>
-        )}
-        {hasDetails && (
-          <div className="mt-2 space-y-1.5 border-t border-white/5 pt-2">
-            {suggestion.oracle_text && (
-              <p className="text-xs text-gray-400 italic leading-relaxed">
-                {suggestion.oracle_text}
-              </p>
             )}
-            <div className="flex flex-wrap items-center gap-2">
-              {suggestion.power != null && suggestion.toughness != null && (
-                <span className="text-xs text-gray-300 font-medium">
-                  {suggestion.power}/{suggestion.toughness}
-                </span>
-              )}
-              {suggestion.cmc != null && (
-                <span className="text-xs text-gray-500">MV: {suggestion.cmc}</span>
-              )}
-              {suggestion.rarity && (
-                <span
-                  className={`rounded px-1.5 py-0.5 text-xs capitalize ${RARITY_COLORS[suggestion.rarity] ?? "text-gray-400 bg-gray-800/60"}`}
-                >
-                  {suggestion.rarity}
-                </span>
-              )}
-            </div>
           </div>
         )}
       </div>

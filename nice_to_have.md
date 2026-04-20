@@ -1,8 +1,5 @@
 ## 1 Fix Bugs
 - Switch Embedding and Model to Gemini (from OpenAI)
-- When importing collection why does it take that long to upload ? can we run into issues for scraping to much data from other sources ? what is happening on the upload ?
-- Price Cap to Build Wizzard in Each Step, inherited from Deck view
-- Change Building Tab Card View to also include the price
 
 ## 2 Deploy to GCP
 - Proper user management
@@ -16,4 +13,5 @@
 - Collection sharing / import from other users
 - Multi-format support beyond Moxfield CSV (Archidekt, MTGGoldfish)
 - Price aggregation across printings
-
+- EDHREC recommendations (json.edhrec.com/commanders/<commander>.json) Update it new if the data is older than 2 weeks, otherwise take the data from a local cache we have for these.
+- Checkout performance, is there steps we can improve/quicken

@@ -15,6 +15,7 @@ from mtg_helper.models.ai import (
     BuildResponse,
     CardSuggestion,
     ChatResponse,
+    CollectionMembership,
     DescribeResponse,
     SuggestResponse,
 )
@@ -142,6 +143,7 @@ def _card_from_retrieved(
     card: RetrievedCard,
     stage: str,
     query_tags: list[str],
+    ownership_map: dict[UUID, list[CollectionMembership]] | None = None,
 ) -> CardSuggestion:
     """Build a CardSuggestion directly from a RetrievedCard without LLM involvement.
 
@@ -149,6 +151,7 @@ def _card_from_retrieved(
         card: Retrieved card with scoring data.
         stage: Build stage name (used for category label).
         query_tags: Tags used in the retrieval query (used to derive synergies).
+        ownership_map: Optional map from scryfall_id to list of collections that own it.
 
     Returns:
         CardSuggestion populated from retrieval signals.
@@ -167,6 +170,7 @@ def _card_from_retrieved(
     reasoning = ". ".join(parts) if parts else "Relevant to stage"
 
     cmc_float: float | None = float(card.cmc) if card.cmc is not None else None
+    owned_in = (ownership_map or {}).get(card.scryfall_id, [])
 
     return CardSuggestion(
         scryfall_id=card.scryfall_id,
@@ -183,6 +187,8 @@ def _card_from_retrieved(
         reasoning=reasoning,
         synergies=synergies,
         highlight_reasons=_compute_highlight_reasons(card),
+        price_eur_cents=card.price_eur_cents,
+        owned_in=owned_in,
     )
 
 
@@ -591,6 +597,40 @@ def _resolve_price_filter(
     return PriceFilter(max_cents=cents) if cents else None
 
 
+async def _build_ownership_map(
+    pool: asyncpg.Pool,
+    owner_id: UUID | None,
+    scryfall_ids: list[UUID],
+) -> dict[UUID, list[CollectionMembership]]:
+    """Map scryfall_id -> list of account collections containing that card.
+
+    Deduplicates across multiple printings of the same oracle card in a collection.
+    """
+    if owner_id is None or not scryfall_ids:
+        return {}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT DISTINCT cards.scryfall_id AS scryfall_id,
+                   c.id AS collection_id,
+                   c.name AS collection_name
+            FROM collection_cards cc
+            JOIN collections c ON c.id = cc.collection_id
+            JOIN cards ON cards.id = cc.card_id
+            WHERE c.account_id = $1
+              AND cards.scryfall_id = ANY($2::uuid[])
+            """,
+            owner_id,
+            scryfall_ids,
+        )
+    result: dict[UUID, list[CollectionMembership]] = {}
+    for row in rows:
+        result.setdefault(row["scryfall_id"], []).append(
+            CollectionMembership(id=row["collection_id"], name=row["collection_name"])
+        )
+    return result
+
+
 async def build_stage(
     pool: asyncpg.Pool,
     ai_client: openai.AsyncOpenAI,
@@ -680,7 +720,12 @@ async def build_stage(
 
     if resolved_stage == "lands":
         candidates = [c for c in candidates if "Land" in (c.type_line or "")]
-    suggestions = [_card_from_retrieved(c, resolved_stage, query_tags) for c in candidates]
+    ownership_map = await _build_ownership_map(
+        pool, deck.owner_id, [c.scryfall_id for c in candidates]
+    )
+    suggestions = [
+        _card_from_retrieved(c, resolved_stage, query_tags, ownership_map) for c in candidates
+    ]
 
     if advance_deck_stage:
         await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage))
@@ -760,7 +805,10 @@ async def suggest_cards(
     )
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 
-    suggestions = [_card_from_retrieved(c, "theme", query_tags) for c in candidates]
+    ownership_map = await _build_ownership_map(
+        pool, deck.owner_id, [c.scryfall_id for c in candidates]
+    )
+    suggestions = [_card_from_retrieved(c, "theme", query_tags, ownership_map) for c in candidates]
     return SuggestResponse(suggestions=suggestions, unresolved=[])
 
 

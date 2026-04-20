@@ -15,6 +15,13 @@ class BuildRequest(BaseModel):
     max_price_cents: int | None = Field(default=None, gt=0)
 
 
+class CollectionMembership(BaseModel):
+    """A collection that owns the suggested card."""
+
+    id: UUID
+    name: str
+
+
 class CardSuggestion(BaseModel):
     """A single suggested card with reasoning."""
 
@@ -32,6 +39,8 @@ class CardSuggestion(BaseModel):
     reasoning: str
     synergies: list[str]
     highlight_reasons: list[str] | None = None
+    price_eur_cents: int | None = None
+    owned_in: list[CollectionMembership] = Field(default_factory=list)
 
 
 class BuildResponse(BaseModel):

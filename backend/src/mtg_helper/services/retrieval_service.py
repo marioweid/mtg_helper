@@ -89,6 +89,7 @@ class RetrievedCard:
     power: str | None
     toughness: str | None
     rarity: str | None
+    price_eur_cents: int | None
     score: float
     signals: list[str] = field(default_factory=list)
 
@@ -1226,6 +1227,7 @@ async def retrieve_candidates(
                 power=row["power"],
                 toughness=row["toughness"],
                 rarity=row["rarity"],
+                price_eur_cents=row["price_eur_cents"],
                 score=scores[uid],
                 signals=signal_map.get(uid, []),
             )
@@ -1267,7 +1269,11 @@ async def _fetch_candidates(
             f"""
             SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
                    color_identity, image_uri, tags, edhrec_rank, power, toughness, rarity,
-                   card_types, subtypes, keywords, traits, token_types
+                   card_types, subtypes, keywords, traits, token_types,
+                   CASE
+                       WHEN (prices->>'eur') IS NULL THEN NULL
+                       ELSE ROUND((prices->>'eur')::numeric * 100)::integer
+                   END AS price_eur_cents
             FROM cards
             WHERE id = ANY($1::uuid[])
               AND COALESCE(border_color, '') != 'gold'
