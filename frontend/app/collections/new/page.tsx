@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
-import { getOrCreateAccountId } from "@/lib/account";
 
 export default function NewCollectionPage() {
   const router = useRouter();
@@ -21,8 +20,7 @@ export default function NewCollectionPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const accountId = await getOrCreateAccountId();
-      const created = await apiClient.createCollection(accountId, { name: name.trim() });
+      const created = await apiClient.createCollection({ name: name.trim() });
       router.push(`/collections/${created.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === "DUPLICATE_COLLECTION") {

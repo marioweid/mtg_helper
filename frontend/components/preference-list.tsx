@@ -18,12 +18,11 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  accountId: string;
   preferences: PreferenceResponse[];
   onDeleted: () => void;
 }
 
-export function PreferenceList({ accountId, preferences, onDeleted }: Props) {
+export function PreferenceList({ preferences, onDeleted }: Props) {
   const displayPreferences = preferences.filter(
     (p) => p.preference_type !== "feedback_boosting",
   );
@@ -38,7 +37,7 @@ export function PreferenceList({ accountId, preferences, onDeleted }: Props) {
 
   async function handleDelete(id: string) {
     try {
-      await apiClient.deletePreference(accountId, id);
+      await apiClient.deletePreference(id);
       onDeleted();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete preference");

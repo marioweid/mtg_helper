@@ -70,9 +70,7 @@ async def _add_to_collection(
 
 async def _create_collection(client: AsyncClient, label: str) -> tuple[str, str]:
     account_id = await create_test_account(client, f"{label} User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": f"{label} Collection"}
-    )
+    create = await client.post("/api/v1/me/collections", json={"name": f"{label} Collection"})
     assert create.status_code == 201
     return account_id, create.json()["data"]["id"]
 
@@ -113,9 +111,9 @@ async def test_get_owned_card_ids_empty_collection(
 async def test_get_owned_card_ids_for_collections_unions_across(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    account_id = await create_test_account(client, "UnionLookup")
-    create_a = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "A"})
-    create_b = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "B"})
+    await create_test_account(client, "UnionLookup")
+    create_a = await client.post("/api/v1/me/collections", json={"name": "A"})
+    create_b = await client.post("/api/v1/me/collections", json={"name": "B"})
     col_a = create_a.json()["data"]["id"]
     col_b = create_b.json()["data"]["id"]
     await _add_to_collection(client, col_a, SOL_RING_SCRYFALL_ID, "c19", "255")

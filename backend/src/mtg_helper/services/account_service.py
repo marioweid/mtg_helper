@@ -11,6 +11,7 @@ def _row_to_account(row: asyncpg.Record) -> AccountResponse:
     return AccountResponse(
         id=row["id"],
         display_name=row["display_name"],
+        email=row["email"] if "email" in row else None,
         created_at=row["created_at"],
     )
 
@@ -29,6 +30,44 @@ async def create_account(pool: asyncpg.Pool, display_name: str) -> AccountRespon
         row = await conn.fetchrow(
             "INSERT INTO accounts (display_name) VALUES ($1) RETURNING *",
             display_name,
+        )
+    return _row_to_account(row)
+
+
+async def upsert_by_google_sub(
+    pool: asyncpg.Pool,
+    *,
+    google_sub: str,
+    email: str,
+    display_name: str,
+) -> AccountResponse:
+    """Upsert an account keyed by Google OIDC subject.
+
+    On first login for a given `google_sub`, inserts a new account row.
+    On subsequent logins, refreshes `email` (if Google reports a new value)
+    and returns the existing row.
+
+    Args:
+        pool: asyncpg connection pool.
+        google_sub: OIDC `sub` claim from the verified Google ID token.
+        email: Email claim from the ID token.
+        display_name: Best-effort display name (Google `name` claim or email).
+
+    Returns:
+        The matched or newly created account.
+    """
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO accounts (display_name, google_sub, email)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (google_sub) DO UPDATE
+            SET email = EXCLUDED.email
+            RETURNING *
+            """,
+            display_name,
+            google_sub,
+            email,
         )
     return _row_to_account(row)
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getOrCreateAccountId } from "@/lib/account";
 import { apiClient } from "@/lib/api";
 import { PreferenceForm } from "@/components/preference-form";
 import { PreferenceList } from "@/components/preference-list";
@@ -28,7 +27,6 @@ const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
 };
 
 export default function PreferencesPage() {
-  const [accountId, setAccountId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<PreferenceResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +37,9 @@ export default function PreferencesPage() {
   const [weightsSaving, setWeightsSaving] = useState(false);
   const [weightsDirty, setWeightsDirty] = useState(false);
 
-  const loadPreferences = useCallback(async (id: string) => {
+  const loadPreferences = useCallback(async () => {
     try {
-      const prefs = await apiClient.listPreferences(id);
+      const prefs = await apiClient.listPreferences();
       setPreferences(prefs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load preferences");
@@ -51,10 +49,8 @@ export default function PreferencesPage() {
   useEffect(() => {
     async function init() {
       try {
-        const id = await getOrCreateAccountId();
-        setAccountId(id);
-        await loadPreferences(id);
-        const w = await apiClient.getRankingWeights(id);
+        await loadPreferences();
+        const w = await apiClient.getRankingWeights();
         setRankingWeights(w);
         setDraftWeights({ semantic: w.semantic, synergy: w.synergy, popularity: w.popularity, personal: w.personal });
       } catch (err) {
@@ -72,10 +68,10 @@ export default function PreferencesPage() {
   }
 
   async function handleWeightsSave() {
-    if (!accountId || weightsSaving) return;
+    if (weightsSaving) return;
     setWeightsSaving(true);
     try {
-      const updated = await apiClient.updateRankingWeights(accountId, draftWeights);
+      const updated = await apiClient.updateRankingWeights(draftWeights);
       setRankingWeights(updated);
       setDraftWeights({ semantic: updated.semantic, synergy: updated.synergy, popularity: updated.popularity, personal: updated.personal });
       setWeightsDirty(false);
@@ -116,17 +112,17 @@ export default function PreferencesPage() {
   const isProfileEnabled = profilePref !== undefined;
 
   async function handleProfileToggle() {
-    if (!accountId || profileToggling) return;
+    if (profileToggling) return;
     setProfileToggling(true);
     try {
       if (profilePref) {
-        await apiClient.deletePreference(accountId, profilePref.id);
+        await apiClient.deletePreference(profilePref.id);
       } else {
-        await apiClient.createPreference(accountId, {
+        await apiClient.createPreference({
           preference_type: "user_profile_boosting",
         });
       }
-      await loadPreferences(accountId);
+      await loadPreferences();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle profile boosting");
     } finally {
@@ -135,17 +131,17 @@ export default function PreferencesPage() {
   }
 
   async function handleBoostingToggle() {
-    if (!accountId || boostingToggling) return;
+    if (boostingToggling) return;
     setBoostingToggling(true);
     try {
       if (boostingPref) {
-        await apiClient.deletePreference(accountId, boostingPref.id);
+        await apiClient.deletePreference(boostingPref.id);
       } else {
-        await apiClient.createPreference(accountId, {
+        await apiClient.createPreference({
           preference_type: "feedback_boosting",
         });
       }
-      await loadPreferences(accountId);
+      await loadPreferences();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to toggle boosting");
     } finally {
@@ -249,23 +245,15 @@ export default function PreferencesPage() {
 
       <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-6">
         <h2 className="mb-4 font-semibold text-white">Add Preference</h2>
-        {accountId && (
-          <PreferenceForm
-            accountId={accountId}
-            onCreated={() => accountId && void loadPreferences(accountId)}
-          />
-        )}
+        <PreferenceForm onCreated={() => void loadPreferences()} />
       </section>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-6">
         <h2 className="mb-4 font-semibold text-white">Your Preferences</h2>
-        {accountId && (
-          <PreferenceList
-            accountId={accountId}
-            preferences={preferences}
-            onDeleted={() => void loadPreferences(accountId)}
-          />
-        )}
+        <PreferenceList
+          preferences={preferences}
+          onDeleted={() => void loadPreferences()}
+        />
       </section>
     </div>
   );

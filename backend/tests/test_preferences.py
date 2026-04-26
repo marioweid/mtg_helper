@@ -12,7 +12,7 @@ async def test_create_pet_card_preference(client: AsyncClient) -> None:
     account_id = await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={
             "preference_type": "pet_card",
             "card_scryfall_id": str(DOUBLING_SEASON_SCRYFALL_ID),
@@ -27,10 +27,10 @@ async def test_create_pet_card_preference(client: AsyncClient) -> None:
 
 
 async def test_create_avoid_card_preference(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={
             "preference_type": "avoid_card",
             "card_scryfall_id": str(SOL_RING_SCRYFALL_ID),
@@ -44,10 +44,10 @@ async def test_create_avoid_card_preference(client: AsyncClient) -> None:
 
 
 async def test_create_avoid_archetype_preference(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "avoid_archetype", "description": "stax"},
     )
 
@@ -60,10 +60,10 @@ async def test_create_avoid_archetype_preference(client: AsyncClient) -> None:
 
 
 async def test_create_general_preference(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "general", "description": "I prefer creature-based strategies"},
     )
 
@@ -72,10 +72,10 @@ async def test_create_general_preference(client: AsyncClient) -> None:
 
 
 async def test_create_pet_card_missing_card_id_is_invalid(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "pet_card"},
     )
 
@@ -83,10 +83,10 @@ async def test_create_pet_card_missing_card_id_is_invalid(client: AsyncClient) -
 
 
 async def test_create_avoid_archetype_missing_description_is_invalid(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "avoid_archetype"},
     )
 
@@ -94,17 +94,17 @@ async def test_create_avoid_archetype_missing_description_is_invalid(client: Asy
 
 
 async def test_list_preferences(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
     await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "pet_card", "card_scryfall_id": str(DOUBLING_SEASON_SCRYFALL_ID)},
     )
     await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "avoid_archetype", "description": "infect"},
     )
 
-    resp = await client.get(f"/api/v1/accounts/{account_id}/preferences")
+    resp = await client.get("/api/v1/me/preferences")
 
     assert resp.status_code == 200
     items = resp.json()["data"]
@@ -114,45 +114,33 @@ async def test_list_preferences(client: AsyncClient) -> None:
 
 
 async def test_delete_preference(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
     create_resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={"preference_type": "general", "description": "test note"},
     )
     pref_id = create_resp.json()["data"]["id"]
 
-    del_resp = await client.delete(f"/api/v1/accounts/{account_id}/preferences/{pref_id}")
+    del_resp = await client.delete(f"/api/v1/me/preferences/{pref_id}")
     assert del_resp.status_code == 204
 
-    list_resp = await client.get(f"/api/v1/accounts/{account_id}/preferences")
+    list_resp = await client.get("/api/v1/me/preferences")
     assert list_resp.json()["data"] == []
 
 
 async def test_delete_preference_not_found(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
-    resp = await client.delete(
-        f"/api/v1/accounts/{account_id}/preferences/00000000-0000-0000-0000-000000000000"
-    )
+    resp = await client.delete("/api/v1/me/preferences/00000000-0000-0000-0000-000000000000")
 
     assert resp.status_code == 404
-
-
-async def test_create_preference_account_not_found(client: AsyncClient) -> None:
-    resp = await client.post(
-        "/api/v1/accounts/00000000-0000-0000-0000-000000000000/preferences",
-        json={"preference_type": "general", "description": "test"},
-    )
-
-    assert resp.status_code == 404
-    assert resp.json()["detail"]["code"] == "ACCOUNT_NOT_FOUND"
 
 
 async def test_create_preference_card_not_found(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
     resp = await client.post(
-        f"/api/v1/accounts/{account_id}/preferences",
+        "/api/v1/me/preferences",
         json={
             "preference_type": "pet_card",
             "card_scryfall_id": "00000000-0000-0000-0000-000000000000",
@@ -164,9 +152,9 @@ async def test_create_preference_card_not_found(client: AsyncClient) -> None:
 
 
 async def test_list_preferences_empty(client: AsyncClient) -> None:
-    account_id = await create_test_account(client)
+    await create_test_account(client)
 
-    resp = await client.get(f"/api/v1/accounts/{account_id}/preferences")
+    resp = await client.get("/api/v1/me/preferences")
 
     assert resp.status_code == 200
     assert resp.json()["data"] == []

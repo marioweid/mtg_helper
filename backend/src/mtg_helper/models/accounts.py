@@ -23,4 +23,5 @@ class AccountResponse(BaseModel):
 
     id: UUID
     display_name: str
+    email: str | None = None
     created_at: datetime

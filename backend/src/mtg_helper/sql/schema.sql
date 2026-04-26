@@ -77,8 +77,12 @@ CREATE INDEX IF NOT EXISTS idx_cards_token_types ON cards USING GIN (token_types
 CREATE TABLE IF NOT EXISTS accounts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     display_name    TEXT NOT NULL,
+    google_sub      TEXT UNIQUE,
+    email           TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS accounts_email_idx ON accounts (lower(email));
 
 -- ============================================================
 -- DECKS
@@ -253,6 +257,19 @@ ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_che
 ALTER TABLE accounts DROP COLUMN IF EXISTS collection_suggestions_enabled;
 ALTER TABLE accounts DROP COLUMN IF EXISTS default_collection_id;
 ALTER TABLE accounts DROP COLUMN IF EXISTS collection_threshold;
+
+-- Google Sign-In identity columns. google_sub is the OIDC subject claim;
+-- email is denormalized for admin gating + display.
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS google_sub TEXT;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS email TEXT;
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'accounts_google_sub_key'
+    ) THEN
+        ALTER TABLE accounts ADD CONSTRAINT accounts_google_sub_key UNIQUE (google_sub);
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS accounts_email_idx ON accounts (lower(email));
 
 -- ============================================================
 -- VIEW: deck detail with full card info

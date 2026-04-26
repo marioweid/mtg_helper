@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
-import { getStoredAccountId } from "@/lib/account";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
@@ -65,9 +64,7 @@ export default function DeckDetailPage() {
   }, [load]);
 
   useEffect(() => {
-    const accountId = getStoredAccountId();
-    if (!accountId) return;
-    apiClient.listPreferences(accountId).then((prefs) => {
+    apiClient.listPreferences().then((prefs) => {
       const names = new Set(
         prefs
           .filter((p) => p.preference_type === "pet_card" && p.card_name)

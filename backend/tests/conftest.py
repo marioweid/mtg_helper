@@ -186,19 +186,56 @@ async def db_pool(_init_db: None) -> AsyncGenerator[asyncpg.Pool]:
 
 @pytest_asyncio.fixture
 async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
-    """HTTP test client with the real FastAPI app and test DB pool."""
+    """HTTP test client with the real FastAPI app and test DB pool.
+
+    Installs a default `get_current_account` override returning a freshly
+    inserted account so endpoints gated by the auth dep work without bearer
+    tokens. Tests that need a different account use `create_test_account` or
+    `set_current_account` to swap the override.
+    """
     from unittest.mock import AsyncMock, MagicMock
+
+    from mtg_helper.auth import get_current_account, get_current_admin
+    from mtg_helper.models.accounts import AccountResponse
 
     app.state.db_pool = db_pool
 
-    # Minimal Qdrant mock: search returns empty list so retrieval falls back
-    # to tag + FTS signals only, keeping AI tests independent of vector index.
     mock_qdrant = MagicMock()
     mock_qdrant.search = AsyncMock(return_value=[])
     app.state.qdrant_client = mock_qdrant
 
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO accounts (display_name, email) VALUES ($1, $2) RETURNING *",
+            "Default Test User",
+            "default@test.local",
+        )
+    default_account = AccountResponse(
+        id=row["id"],
+        display_name=row["display_name"],
+        email=row["email"],
+        created_at=row["created_at"],
+    )
+
+    app.dependency_overrides[get_current_account] = lambda: default_account
+    app.dependency_overrides[get_current_admin] = lambda: default_account
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+    app.dependency_overrides.clear()
+
+
+def set_current_account(account: object) -> None:
+    """Override the auth dependency to return `account` (an AccountResponse).
+
+    Use inside tests that need to switch identities (e.g. rate-limit tests
+    that exercise per-account buckets).
+    """
+    from mtg_helper.auth import get_current_account, get_current_admin
+
+    app.dependency_overrides[get_current_account] = lambda: account
+    app.dependency_overrides[get_current_admin] = lambda: account
 
 
 # Convenience UUIDs for tests
@@ -210,10 +247,28 @@ DOCKSIDE_SCRYFALL_ID = UUID("5d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 
 
 async def create_test_account(client: AsyncClient, display_name: str = "Test User") -> str:
-    """Helper: create an account and return its ID."""
-    resp = await client.post("/api/v1/accounts", json={"display_name": display_name})
-    assert resp.status_code == 201
-    return resp.json()["data"]["id"]
+    """Insert an account directly and switch the auth override to it.
+
+    Subsequent requests in the same test see this account from
+    `get_current_account`. Returns the new account's UUID as a string.
+    """
+    from mtg_helper.models.accounts import AccountResponse
+
+    pool: asyncpg.Pool = app.state.db_pool
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO accounts (display_name, email) VALUES ($1, $2) RETURNING *",
+            display_name,
+            f"{display_name.lower().replace(' ', '.')}@test.local",
+        )
+    account = AccountResponse(
+        id=row["id"],
+        display_name=row["display_name"],
+        email=row["email"],
+        created_at=row["created_at"],
+    )
+    set_current_account(account)
+    return str(account.id)
 
 
 async def create_test_deck(

@@ -1,6 +1,9 @@
 """Application configuration loaded from environment variables."""
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Annotated
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -31,6 +34,17 @@ class Settings(BaseSettings):
     # Pagination defaults
     default_limit: int = 20
     max_limit: int = 100
+
+    # Google Sign-In. Empty client id disables auth (dev/test only).
+    google_oauth_client_id: str = ""
+    admin_emails: Annotated[list[str], NoDecode] = []
+
+    @field_validator("admin_emails", mode="before")
+    @classmethod
+    def _split_admin_emails(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [e.strip() for e in v.split(",") if e.strip()]
+        return v
 
 
 settings = Settings()

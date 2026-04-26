@@ -1,10 +1,13 @@
 """AI deck building endpoints."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
+from mtg_helper.auth import get_current_account
+from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
     BuildResponse,
@@ -20,6 +23,8 @@ from mtg_helper.services import ai_service, deck_service, rate_limit_service
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
 
+CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
+
 # Per-key rate limits for LLM-backed endpoints. Both window and count are tuned
 # for interactive use; drop the limit when deploying to a multi-replica setup.
 _DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
@@ -33,20 +38,12 @@ def _llm_unavailable(detail: str) -> HTTPException:
     )
 
 
-def _rate_key(request: Request, endpoint: str) -> str:
-    """Derive a rate-limit key from account header or client IP."""
-    account = request.headers.get("x-account-id")
-    if account:
-        return f"{endpoint}:acct:{account}"
-    ip = request.client.host if request.client else "unknown"
-    return f"{endpoint}:ip:{ip}"
-
-
-def _enforce_rate_limit(request: Request, endpoint: str, limit: tuple[int, int]) -> None:
-    """Raise 429 if the caller has exceeded the per-key rate limit."""
+def _enforce_rate_limit(account: AccountResponse, endpoint: str, limit: tuple[int, int]) -> None:
+    """Raise 429 if the caller has exceeded the per-account rate limit."""
     count, window = limit
+    key = f"{endpoint}:acct:{account.id}"
     try:
-        rate_limit_service.check(_rate_key(request, endpoint), count, window)
+        rate_limit_service.check(key, count, window)
     except RateLimitExceeded as exc:
         raise HTTPException(
             status_code=429,
@@ -120,9 +117,10 @@ async def chat_about_deck(
     deck_id: UUID,
     body: ChatRequest,
     request: Request,
+    account: CurrentAccount,
 ) -> DataResponse[ChatResponse]:
     """Send a free-form chat message about the deck."""
-    _enforce_rate_limit(request, "chat", _CHAT_LIMIT)
+    _enforce_rate_limit(account, "chat", _CHAT_LIMIT)
     try:
         result = await ai_service.chat_about_deck(
             request.app.state.db_pool,
@@ -141,9 +139,10 @@ async def chat_about_deck(
 async def describe_deck(
     body: DescribeRequest,
     request: Request,
+    account: CurrentAccount,
 ) -> DataResponse[DescribeResponse]:
     """Run one turn of the deck description agent to build a structured deck strategy."""
-    _enforce_rate_limit(request, "describe", _DESCRIBE_LIMIT)
+    _enforce_rate_limit(account, "describe", _DESCRIBE_LIMIT)
     try:
         result = await ai_service.describe_deck(
             request.app.state.db_pool,

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardSearch } from "@/components/card-search";
 import { apiClient } from "@/lib/api";
-import { getOrCreateAccountId } from "@/lib/account";
+import { getCurrentAccountId } from "@/lib/account";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse, DescribeMessage } from "@/lib/types";
 
@@ -120,7 +120,7 @@ export default function NewDeckPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const ownerId = await getOrCreateAccountId();
+      const ownerId = await getCurrentAccountId();
       const deck = await apiClient.createDeck({
         commander_scryfall_id: commander.scryfall_id,
         partner_scryfall_id: partner?.scryfall_id ?? null,

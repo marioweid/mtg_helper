@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
-import { getOrCreateAccountId } from "@/lib/account";
 import { DeleteCollectionButton } from "@/components/delete-collection-button";
 import type { CollectionResponse } from "@/lib/types";
 
@@ -13,8 +12,7 @@ export default function CollectionsPage() {
 
   const load = useCallback(async () => {
     try {
-      const accountId = await getOrCreateAccountId();
-      const items = await apiClient.listCollections(accountId);
+      const items = await apiClient.listCollections();
       setCollections(items);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load collections.");

@@ -4,15 +4,15 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient
 
+from mtg_helper.auth import get_current_account, get_current_admin
 from mtg_helper.config import settings
 from mtg_helper.db import apply_schema, close_pool, create_pool
 from mtg_helper.routers import (
-    accounts,
     admin,
     ai,
     cards,
@@ -20,7 +20,7 @@ from mtg_helper.routers import (
     decks,
     feedback,
     health,
-    preferences,
+    me,
 )
 from mtg_helper.services import scryfall
 from mtg_helper.services.embedding_service import ensure_collection
@@ -80,13 +80,14 @@ async def generic_exception_handler(_request: Request, exc: Exception) -> JSONRe
     )
 
 
+_authed = [Depends(get_current_account)]
+_admin = [Depends(get_current_admin)]
+
 app.include_router(health.router)
-app.include_router(accounts.router, prefix="/api/v1")
-app.include_router(cards.router, prefix="/api/v1")
-app.include_router(decks.router, prefix="/api/v1")
-app.include_router(ai.router, prefix="/api/v1")
-app.include_router(feedback.router, prefix="/api/v1")
-app.include_router(preferences.router, prefix="/api/v1")
-app.include_router(collections.account_router, prefix="/api/v1")
-app.include_router(collections.router, prefix="/api/v1")
-app.include_router(admin.router, prefix="/api/v1")
+app.include_router(me.router, prefix="/api/v1")
+app.include_router(cards.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(ai.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(feedback.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(collections.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(admin.router, prefix="/api/v1", dependencies=_admin)

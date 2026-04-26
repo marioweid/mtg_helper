@@ -6,7 +6,6 @@ import { apiClient } from "@/lib/api";
 import type { CardResponse, PreferenceType } from "@/lib/types";
 
 interface Props {
-  accountId: string;
   onCreated: () => void;
 }
 
@@ -17,7 +16,7 @@ const TYPES: { value: PreferenceType; label: string }[] = [
   { value: "general", label: "General Note" },
 ];
 
-export function PreferenceForm({ accountId, onCreated }: Props) {
+export function PreferenceForm({ onCreated }: Props) {
   const [type, setType] = useState<PreferenceType>("pet_card");
   const [card, setCard] = useState<CardResponse | null>(null);
   const [description, setDescription] = useState("");
@@ -40,7 +39,7 @@ export function PreferenceForm({ accountId, onCreated }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      await apiClient.createPreference(accountId, {
+      await apiClient.createPreference({
         preference_type: type,
         card_scryfall_id: needsCard && card ? card.scryfall_id : null,
         description: needsText ? description.trim() : null,

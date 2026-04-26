@@ -104,9 +104,7 @@ def test_parse_header_only_raises() -> None:
 
 async def test_create_collection(client: AsyncClient) -> None:
     account_id = await create_test_account(client, "Coll User")
-    resp = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Paper Binder"}
-    )
+    resp = await client.post("/api/v1/me/collections", json={"name": "Paper Binder"})
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["name"] == "Paper Binder"
@@ -115,27 +113,18 @@ async def test_create_collection(client: AsyncClient) -> None:
 
 
 async def test_create_collection_duplicate_name_conflict(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Dup User")
-    await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Main"})
-    resp = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Main"})
+    await create_test_account(client, "Dup User")
+    await client.post("/api/v1/me/collections", json={"name": "Main"})
+    resp = await client.post("/api/v1/me/collections", json={"name": "Main"})
     assert resp.status_code == 409
     assert resp.json()["detail"]["code"] == "DUPLICATE_COLLECTION"
 
 
-async def test_create_collection_account_not_found(client: AsyncClient) -> None:
-    resp = await client.post(
-        "/api/v1/accounts/00000000-0000-0000-0000-000000000000/collections",
-        json={"name": "Ghost"},
-    )
-    assert resp.status_code == 404
-    assert resp.json()["detail"]["code"] == "ACCOUNT_NOT_FOUND"
-
-
 async def test_list_collections(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "List User")
-    await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "A"})
-    await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "B"})
-    resp = await client.get(f"/api/v1/accounts/{account_id}/collections")
+    await create_test_account(client, "List User")
+    await client.post("/api/v1/me/collections", json={"name": "A"})
+    await client.post("/api/v1/me/collections", json={"name": "B"})
+    resp = await client.get("/api/v1/me/collections")
     assert resp.status_code == 200
     items = resp.json()["data"]
     names = {i["name"] for i in items}
@@ -143,8 +132,8 @@ async def test_list_collections(client: AsyncClient) -> None:
 
 
 async def test_rename_collection(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Rename User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Old"})
+    await create_test_account(client, "Rename User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Old"})
     cid = create.json()["data"]["id"]
     resp = await client.patch(f"/api/v1/collections/{cid}", json={"name": "New"})
     assert resp.status_code == 200
@@ -152,8 +141,8 @@ async def test_rename_collection(client: AsyncClient) -> None:
 
 
 async def test_delete_collection(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Del User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Trash"})
+    await create_test_account(client, "Del User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Trash"})
     cid = create.json()["data"]["id"]
     resp = await client.delete(f"/api/v1/collections/{cid}")
     assert resp.status_code == 204
@@ -165,8 +154,8 @@ async def test_delete_collection(client: AsyncClient) -> None:
 
 
 async def test_add_card_to_collection(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Add User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Add User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     resp = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -184,8 +173,8 @@ async def test_add_card_to_collection(client: AsyncClient) -> None:
 
 
 async def test_add_card_increments_on_duplicate_printing(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Inc User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Inc User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     payload = {
         "scryfall_id": str(SOL_RING_SCRYFALL_ID),
@@ -202,8 +191,8 @@ async def test_add_card_increments_on_duplicate_printing(client: AsyncClient) ->
 
 
 async def test_list_cards_pagination(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Page User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Page User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     for sid, sc, cn in [
         (SOL_RING_SCRYFALL_ID, "c19", "255"),
@@ -225,8 +214,8 @@ async def test_list_cards_pagination(client: AsyncClient) -> None:
 
 
 async def test_update_card_quantity(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Patch User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Patch User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     add = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -244,8 +233,8 @@ async def test_update_card_quantity(client: AsyncClient) -> None:
 
 
 async def test_remove_card_from_collection(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Rem User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Rem User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     add = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -267,8 +256,8 @@ async def test_remove_card_from_collection(client: AsyncClient) -> None:
 
 
 async def test_add_card_by_name(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Name User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Name User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     resp = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -282,8 +271,8 @@ async def test_add_card_by_name(client: AsyncClient) -> None:
 
 
 async def test_add_card_by_fuzzy_name(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Fuzzy User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Fuzzy User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     resp = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -294,8 +283,8 @@ async def test_add_card_by_fuzzy_name(client: AsyncClient) -> None:
 
 
 async def test_add_card_by_name_not_found(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Miss User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Miss User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     resp = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -306,16 +295,16 @@ async def test_add_card_by_name_not_found(client: AsyncClient) -> None:
 
 
 async def test_add_card_requires_identifier(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "None User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "None User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     resp = await client.post(f"/api/v1/collections/{cid}/cards", json={"quantity": 1})
     assert resp.status_code == 422
 
 
 async def test_add_card_rejects_both_identifiers(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Both User")
-    create = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "Box"})
+    await create_test_account(client, "Both User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Box"})
     cid = create.json()["data"]["id"]
     resp = await client.post(
         f"/api/v1/collections/{cid}/cards",
@@ -328,10 +317,8 @@ async def test_add_card_rejects_both_identifiers(client: AsyncClient) -> None:
 
 
 async def test_import_merge_basic(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Import User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Binder"}
-    )
+    await create_test_account(client, "Import User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Binder"})
     cid = create.json()["data"]["id"]
     csv_text = (
         '"Count","Tradelist Count","Name","Edition","Condition","Language","Foil",'
@@ -352,10 +339,8 @@ async def test_import_merge_basic(client: AsyncClient) -> None:
 
 
 async def test_import_merge_second_time_increments(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Inc2 User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Binder"}
-    )
+    await create_test_account(client, "Inc2 User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Binder"})
     cid = create.json()["data"]["id"]
     csv_text = '"Count","Name","Edition","Collector Number"\n"1","Sol Ring","c19","255"'
     await client.post(f"/api/v1/collections/{cid}/import", json={"csv": csv_text, "mode": "merge"})
@@ -371,10 +356,8 @@ async def test_import_merge_second_time_increments(client: AsyncClient) -> None:
 
 
 async def test_import_replace_clears_previous(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Replace User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Binder"}
-    )
+    await create_test_account(client, "Replace User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Binder"})
     cid = create.json()["data"]["id"]
     await client.post(
         f"/api/v1/collections/{cid}/import",
@@ -401,10 +384,8 @@ async def test_import_replace_clears_previous(client: AsyncClient) -> None:
 
 
 async def test_import_unresolved_reported(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Unres User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Binder"}
-    )
+    await create_test_account(client, "Unres User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Binder"})
     cid = create.json()["data"]["id"]
     csv_text = (
         '"Count","Name","Edition","Collector Number"\n'
@@ -422,10 +403,8 @@ async def test_import_unresolved_reported(client: AsyncClient) -> None:
 
 
 async def test_import_malformed_csv_returns_422(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "Bad User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Binder"}
-    )
+    await create_test_account(client, "Bad User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Binder"})
     cid = create.json()["data"]["id"]
     resp = await client.post(
         f"/api/v1/collections/{cid}/import",
@@ -435,10 +414,8 @@ async def test_import_malformed_csv_returns_422(client: AsyncClient) -> None:
 
 
 async def test_export_round_trip(client: AsyncClient) -> None:
-    account_id = await create_test_account(client, "RT User")
-    create = await client.post(
-        f"/api/v1/accounts/{account_id}/collections", json={"name": "Binder"}
-    )
+    await create_test_account(client, "RT User")
+    create = await client.post("/api/v1/me/collections", json={"name": "Binder"})
     cid = create.json()["data"]["id"]
     original = (
         '"Count","Tradelist Count","Name","Edition","Condition","Language","Foil",'
@@ -455,7 +432,7 @@ async def test_export_round_trip(client: AsyncClient) -> None:
     assert "255" in text
 
     # Import the export into a fresh collection and verify contents match.
-    create2 = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": "RT2"})
+    create2 = await client.post("/api/v1/me/collections", json={"name": "RT2"})
     cid2 = create2.json()["data"]["id"]
     import2 = await client.post(
         f"/api/v1/collections/{cid2}/import", json={"csv": text, "mode": "merge"}

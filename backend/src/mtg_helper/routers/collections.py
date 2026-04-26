@@ -9,7 +9,6 @@ from mtg_helper.models.collections import (
     CollectionCardAdd,
     CollectionCardItem,
     CollectionCardUpdate,
-    CollectionCreate,
     CollectionImportRequest,
     CollectionImportResponse,
     CollectionResponse,
@@ -18,13 +17,11 @@ from mtg_helper.models.collections import (
 from mtg_helper.models.common import DataResponse, PaginationMeta
 from mtg_helper.services import collection_service
 from mtg_helper.services.collection_service import (
-    AccountNotFoundError,
     CardNotFoundError,
     CollectionNotFoundError,
     DuplicateCollectionNameError,
 )
 
-account_router = APIRouter(prefix="/accounts", tags=["collections"])
 router = APIRouter(prefix="/collections", tags=["collections"])
 
 
@@ -36,47 +33,6 @@ def _not_found(collection_id: UUID) -> HTTPException:
             "message": f"Collection {collection_id} not found",
         },
     )
-
-
-@account_router.get(
-    "/{account_id}/collections",
-    response_model=DataResponse[list[CollectionResponse]],
-)
-async def list_collections(
-    account_id: UUID, request: Request
-) -> DataResponse[list[CollectionResponse]]:
-    """List all collections for an account."""
-    try:
-        items = await collection_service.list_collections(request.app.state.db_pool, account_id)
-    except AccountNotFoundError as e:
-        raise HTTPException(
-            status_code=404, detail={"code": "ACCOUNT_NOT_FOUND", "message": str(e)}
-        )
-    return DataResponse(data=items)
-
-
-@account_router.post(
-    "/{account_id}/collections",
-    response_model=DataResponse[CollectionResponse],
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_collection(
-    account_id: UUID, body: CollectionCreate, request: Request
-) -> DataResponse[CollectionResponse]:
-    """Create a new collection for an account."""
-    try:
-        item = await collection_service.create_collection(
-            request.app.state.db_pool, account_id, body.name
-        )
-    except AccountNotFoundError as e:
-        raise HTTPException(
-            status_code=404, detail={"code": "ACCOUNT_NOT_FOUND", "message": str(e)}
-        )
-    except DuplicateCollectionNameError as e:
-        raise HTTPException(
-            status_code=409, detail={"code": "DUPLICATE_COLLECTION", "message": str(e)}
-        )
-    return DataResponse(data=item)
 
 
 @router.get("/{collection_id}", response_model=DataResponse[CollectionResponse])

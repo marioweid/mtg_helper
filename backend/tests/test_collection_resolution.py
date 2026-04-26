@@ -60,7 +60,7 @@ async def _add_to_collection(
 
 
 async def _create_collection(client: AsyncClient, account_id: str, name: str) -> str:
-    resp = await client.post(f"/api/v1/accounts/{account_id}/collections", json={"name": name})
+    resp = await client.post("/api/v1/me/collections", json={"name": name})
     assert resp.status_code == 201
     return resp.json()["data"]["id"]
 
