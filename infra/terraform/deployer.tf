@@ -31,6 +31,14 @@ resource "google_project_iam_member" "deployer_compute_viewer" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# Required for `gcloud compute ssh` against an instance whose service account
+# is `google_service_account.vm`. Without actAs on that SA, IAP SSH is denied.
+resource "google_service_account_iam_member" "deployer_actas_vm_sa" {
+  service_account_id = google_service_account.vm.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "${var.vm_name}-github"
   display_name              = "GitHub Actions"
