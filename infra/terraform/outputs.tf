@@ -19,3 +19,13 @@ output "snapshot_policy" {
   description = "Resource policy attached to the data disk; lists auto snapshots via gcloud compute snapshots list."
   value       = google_compute_resource_policy.daily_snapshot.name
 }
+
+output "deployer_service_account" {
+  description = "Email of the SA the GitHub Actions workflow impersonates."
+  value       = google_service_account.deployer.email
+}
+
+output "workload_identity_provider" {
+  description = "Full provider resource name to put in the GitHub workflow's `workload_identity_provider` input."
+  value       = google_iam_workload_identity_pool_provider.github.name
+}

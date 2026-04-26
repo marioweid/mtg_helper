@@ -49,3 +49,14 @@ variable "snapshot_retention_days" {
   type        = number
   default     = 7
 }
+
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the deployer SA via WIF (format: \"owner/repo\")."
+  type        = string
+}
+
+variable "github_branch" {
+  description = "Branch ref allowed to deploy (e.g. \"main\"). Other refs are denied by the WIF condition."
+  type        = string
+  default     = "main"
+}
