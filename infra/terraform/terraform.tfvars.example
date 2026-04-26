@@ -1,0 +1,7 @@
+project_id       = "<project_id>"
+region           = "europe-west1"
+zone             = "europe-west1-b"
+vm_name          = "mtg-helper"
+machine_type     = "e2-medium"
+data_disk_gb     = 50
+admin_iam_member = "user:<email>"

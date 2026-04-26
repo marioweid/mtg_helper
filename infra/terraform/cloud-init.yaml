@@ -1,0 +1,38 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+apt:
+  sources:
+    docker:
+      source: "deb [arch=amd64 signed-by=$KEY_FILE] https://download.docker.com/linux/debian bookworm stable"
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+runcmd:
+  - systemctl enable --now docker
+  - |
+    set -euo pipefail
+    DEV=$(readlink -f /dev/disk/by-id/google-data)
+    if ! blkid "$DEV" >/dev/null 2>&1; then
+      mkfs.ext4 -F -L mtg-data "$DEV"
+    fi
+    mkdir -p /srv/mtg-helper/data
+    if ! grep -q "/srv/mtg-helper/data" /etc/fstab; then
+      echo "LABEL=mtg-data /srv/mtg-helper/data ext4 defaults,nofail 0 2" >> /etc/fstab
+    fi
+    mount -a
+    mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
+  - |
+    for u in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1}'); do
+      usermod -aG docker "$u" || true
+    done

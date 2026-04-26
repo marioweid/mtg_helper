@@ -1,0 +1,40 @@
+# docker-compose.prod.yml — override; do not run standalone.
+# Use: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  qdrant:
+    ports: !reset []
+    volumes:
+      - ./qdrant/production.yaml:/qdrant/config/production.yaml:ro
+      - /srv/mtg-helper/data/qdrant:/qdrant/storage
+    restart: unless-stopped
+
+  postgres:
+    ports: !reset []
+    volumes:
+      - /srv/mtg-helper/data/postgres:/var/lib/postgresql/data
+      - ./backend/src/mtg_helper/sql/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    restart: unless-stopped
+
+  backend:
+    ports: !reset []
+    volumes: !reset []
+    command:
+      [
+        "uv",
+        "run",
+        "uvicorn",
+        "mtg_helper.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    restart: unless-stopped
+
+  frontend:
+    ports: !reset []
+    volumes: !reset []
+    restart: unless-stopped
+
+  scryfall-sync:
+    restart: unless-stopped

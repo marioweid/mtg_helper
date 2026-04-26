@@ -1,0 +1,39 @@
+variable "project_id" {
+  description = "GCP project that hosts the mtg-helper VM."
+  type        = string
+}
+
+variable "region" {
+  description = "GCP region."
+  type        = string
+  default     = "europe-west1"
+}
+
+variable "zone" {
+  description = "GCP zone for the VM and data disk."
+  type        = string
+  default     = "europe-west1-b"
+}
+
+variable "vm_name" {
+  description = "Compute Engine instance name (also used as firewall target tag)."
+  type        = string
+  default     = "mtg-helper"
+}
+
+variable "machine_type" {
+  description = "VM machine type."
+  type        = string
+  default     = "e2-medium"
+}
+
+variable "data_disk_gb" {
+  description = "Size in GB of the persistent data disk mounted at /srv/mtg-helper/data."
+  type        = number
+  default     = 50
+}
+
+variable "admin_iam_member" {
+  description = "IAM member that receives roles/iap.tunnelResourceAccessor + roles/compute.osLogin (e.g. \"user:you@example.com\")."
+  type        = string
+}
