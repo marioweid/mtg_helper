@@ -22,10 +22,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.id_token) token.idToken = account.id_token;
       return token;
     },
-    // The session is exposed to the browser. Keep idToken on the JWT only —
-    // the server-side proxy (app/api/[...path]/route.ts) reads it via auth()
-    // and forwards as a Bearer token to the backend.
-    async session({ session }) {
+    async session({ session, token }) {
+      if (token.idToken) session.idToken = token.idToken;
       return session;
     },
   },

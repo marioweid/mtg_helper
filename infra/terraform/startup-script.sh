@@ -30,3 +30,28 @@ mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
 for u in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1}'); do
   usermod -aG docker "$u" || true
 done
+
+# --- Atuin (shell history) — system-wide install -----------------------------
+if ! command -v atuin >/dev/null 2>&1; then
+  ATUIN_VERSION=$(curl -fsSL https://api.github.com/repos/atuinsh/atuin/releases/latest \
+    | grep -m1 '"tag_name"' | cut -d'"' -f4)
+  ARCH=$(uname -m)
+  TARBALL="atuin-${ARCH}-unknown-linux-gnu.tar.gz"
+  TMP=$(mktemp -d)
+  curl -fsSL "https://github.com/atuinsh/atuin/releases/download/${ATUIN_VERSION}/${TARBALL}" \
+    -o "${TMP}/atuin.tar.gz"
+  tar -xzf "${TMP}/atuin.tar.gz" -C "${TMP}"
+  install -m 0755 "${TMP}/atuin-${ARCH}-unknown-linux-gnu/atuin" /usr/local/bin/atuin
+  rm -rf "${TMP}"
+fi
+
+# Bash system-wide init (idempotent; only loads for interactive shells).
+if ! grep -q 'atuin init bash' /etc/bash.bashrc; then
+  cat >> /etc/bash.bashrc <<'EOF'
+
+# atuin shell history
+if [[ $- == *i* ]] && command -v atuin >/dev/null 2>&1; then
+  eval "$(atuin init bash --disable-up-arrow)"
+fi
+EOF
+fi
