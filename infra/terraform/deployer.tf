@@ -18,7 +18,7 @@ resource "google_project_iam_member" "deployer_iap_tunnel" {
 
 resource "google_project_iam_member" "deployer_os_login" {
   project = var.project_id
-  role    = "roles/compute.osLogin"
+  role    = "roles/compute.osAdminLogin"
   member  = "serviceAccount:${google_service_account.deployer.email}"
 
   depends_on = [google_project_service.oslogin]

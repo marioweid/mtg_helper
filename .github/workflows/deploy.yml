@@ -41,6 +41,8 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Deploy on VM
+        env:
+          REPO_DIR: /opt/mtg-helper
         run: |
           set -euo pipefail
           gcloud compute ssh "$VM_NAME" \
@@ -48,12 +50,15 @@ jobs:
             --project="$VM_PROJECT" \
             --tunnel-through-iap \
             --quiet \
-            --command='set -euo pipefail
-              cd ~/mtg-helper
-              git fetch --quiet origin main
-              git reset --hard origin/main
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-                --env-file .env.prod build frontend backend
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-                --env-file .env.prod up -d --remove-orphans
-              docker image prune -f'
+            --command="sudo bash -s" <<'EOF'
+          set -euo pipefail
+          REPO_DIR=/opt/mtg-helper
+          cd "$REPO_DIR"
+          git fetch --quiet origin main
+          git reset --hard origin/main
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            --env-file .env.prod build frontend backend
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            --env-file .env.prod up -d --remove-orphans
+          docker image prune -f
+          EOF
