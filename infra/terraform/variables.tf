@@ -37,3 +37,15 @@ variable "admin_iam_member" {
   description = "IAM member that receives roles/iap.tunnelResourceAccessor + roles/compute.osLogin (e.g. \"user:you@example.com\")."
   type        = string
 }
+
+variable "snapshot_start_time" {
+  description = "UTC start window (HH:00) for the daily data-disk snapshot."
+  type        = string
+  default     = "03:00"
+}
+
+variable "snapshot_retention_days" {
+  description = "Days to keep auto-created snapshots before deletion."
+  type        = number
+  default     = 7
+}
