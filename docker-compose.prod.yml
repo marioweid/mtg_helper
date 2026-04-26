@@ -18,6 +18,8 @@ services:
   backend:
     ports: !reset []
     volumes: !reset []
+    env_file: !override
+      - ./.env.prod
     command:
       [
         "uv",

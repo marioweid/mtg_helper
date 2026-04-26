@@ -34,7 +34,7 @@ resource "google_compute_instance" "vm" {
 
   metadata = {
     enable-oslogin = "TRUE"
-    user-data      = file("${path.module}/cloud-init.yaml")
+    startup-script = file("${path.module}/startup-script.sh")
   }
 
   service_account {
