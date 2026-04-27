@@ -24,11 +24,15 @@ class UserProfile:
     """tag → normalized relative preference [0, 1]."""
 
 
-_cache: dict[UUID, tuple[float, UserProfile]] = {}
+_cache: dict[str, tuple[float, UserProfile]] = {}
 
 
-def _is_cache_valid(account_id: UUID) -> bool:
-    entry = _cache.get(account_id)
+def _norm(email: str) -> str:
+    return email.strip().lower()
+
+
+def _is_cache_valid(email: str) -> bool:
+    entry = _cache.get(email)
     if entry is None:
         return False
     return (time.monotonic() - entry[0]) < _CACHE_TTL_SECONDS
@@ -36,20 +40,20 @@ def _is_cache_valid(account_id: UUID) -> bool:
 
 async def _count_other_decks(
     pool: asyncpg.Pool,
-    account_id: UUID,
+    email: str,
     exclude_deck_id: UUID,
 ) -> int:
     async with pool.acquire() as conn:
         return await conn.fetchval(
-            "SELECT COUNT(*) FROM decks WHERE owner_id = $1 AND id != $2",
-            account_id,
+            "SELECT COUNT(*) FROM decks WHERE lower(owner_email) = $1 AND id != $2",
+            email,
             exclude_deck_id,
         )
 
 
 async def _compute_cross_deck_feedback(
     pool: asyncpg.Pool,
-    account_id: UUID,
+    email: str,
     exclude_deck_id: UUID,
 ) -> dict[UUID, int]:
     async with pool.acquire() as conn:
@@ -59,10 +63,10 @@ async def _compute_cross_deck_feedback(
                    SUM(CASE WHEN df.feedback = 'up' THEN 1 ELSE -1 END) AS net
             FROM deck_feedback df
             JOIN decks d ON df.deck_id = d.id
-            WHERE d.owner_id = $1 AND d.id != $2
+            WHERE lower(d.owner_email) = $1 AND d.id != $2
             GROUP BY df.card_id
             """,
-            account_id,
+            email,
             exclude_deck_id,
         )
     return {r["card_id"]: r["net"] for r in rows}
@@ -70,7 +74,7 @@ async def _compute_cross_deck_feedback(
 
 async def _compute_tag_preferences(
     pool: asyncpg.Pool,
-    account_id: UUID,
+    email: str,
     exclude_deck_id: UUID,
 ) -> dict[str, float]:
     async with pool.acquire() as conn:
@@ -80,10 +84,10 @@ async def _compute_tag_preferences(
             FROM deck_cards dc
             JOIN decks d ON dc.deck_id = d.id
             JOIN cards c ON dc.card_id = c.id
-            WHERE d.owner_id = $1 AND d.id != $2
+            WHERE lower(d.owner_email) = $1 AND d.id != $2
             GROUP BY tag
             """,
-            account_id,
+            email,
             exclude_deck_id,
         )
         global_rows = await conn.fetch(
@@ -115,36 +119,37 @@ async def _compute_tag_preferences(
 
 async def get_user_profile(
     pool: asyncpg.Pool,
-    account_id: UUID,
+    email: str,
     exclude_deck_id: UUID,
 ) -> UserProfile | None:
     """Return a user's implicit preference profile derived from their other decks.
 
     Args:
         pool: asyncpg connection pool.
-        account_id: The account's UUID.
+        email: The owner's email (canonical deck-ownership key).
         exclude_deck_id: Deck being built — excluded from profile computation.
 
     Returns:
         UserProfile if the user has at least 2 decks, otherwise None.
     """
-    if _is_cache_valid(account_id):
-        return _cache[account_id][1]
+    key = _norm(email)
+    if _is_cache_valid(key):
+        return _cache[key][1]
 
-    other_deck_count = await _count_other_decks(pool, account_id, exclude_deck_id)
+    other_deck_count = await _count_other_decks(pool, key, exclude_deck_id)
     if other_deck_count < _MIN_DECKS_FOR_PROFILE - 1:
         return None
 
     feedback, tag_prefs = await asyncio.gather(
-        _compute_cross_deck_feedback(pool, account_id, exclude_deck_id),
-        _compute_tag_preferences(pool, account_id, exclude_deck_id),
+        _compute_cross_deck_feedback(pool, key, exclude_deck_id),
+        _compute_tag_preferences(pool, key, exclude_deck_id),
     )
 
     if not feedback and not tag_prefs:
         return None
 
     profile = UserProfile(feedback=feedback, tag_prefs=tag_prefs)
-    _cache[account_id] = (time.monotonic(), profile)
+    _cache[key] = (time.monotonic(), profile)
     return profile
 
 

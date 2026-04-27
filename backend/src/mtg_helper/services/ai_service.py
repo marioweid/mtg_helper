@@ -312,24 +312,24 @@ def _suggestion_from_card(card: CardResponse, raw: dict) -> CardSuggestion:
 async def _compute_feedback_weights(
     pool: asyncpg.Pool,
     deck_id: UUID,
-    owner_id: UUID | None,
+    account_id: UUID | None,
 ) -> dict[UUID, float] | None:
     """Compute per-card score multipliers from feedback and preferences.
 
-    Returns None if feedback boosting is disabled or the deck has no owner.
+    Returns None if feedback boosting is disabled or no account is provided.
     Weights are clamped to [0.05, 2.0].
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID (for per-deck thumbs up/down).
-        owner_id: The account UUID (for account-level pet/avoid weights).
+        account_id: The account UUID (for account-level pet/avoid weights).
 
     Returns:
         Dict mapping card UUID to combined weight, or None to skip weighting.
     """
-    if owner_id is None:
+    if account_id is None:
         return None
-    if not await preference_service.is_feedback_boosting_enabled(pool, owner_id):
+    if not await preference_service.is_feedback_boosting_enabled(pool, account_id):
         return None
 
     async with pool.acquire() as conn:
@@ -346,7 +346,7 @@ async def _compute_feedback_weights(
         else:
             weights[row["card_id"]] = _FEEDBACK_WEIGHTS.get(row["feedback"], 0.3)
 
-    pref_weights = await preference_service.get_card_preference_weights(pool, owner_id)
+    pref_weights = await preference_service.get_card_preference_weights(pool, account_id)
     for card_id, pref_mult in pref_weights.items():
         weights[card_id] = weights.get(card_id, 1.0) * pref_mult
 
@@ -359,42 +359,44 @@ async def _compute_feedback_weights(
 async def _load_user_profile(
     pool: asyncpg.Pool,
     deck_id: UUID,
-    owner_id: UUID | None,
+    account_id: UUID | None,
+    email: str | None,
 ) -> "profile_service.UserProfile | None":
     """Load the cross-deck user profile if the feature is enabled.
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck being built (excluded from profile).
-        owner_id: The account UUID.
+        account_id: The account UUID (for preference flag).
+        email: The owner's email (canonical deck-ownership key).
 
     Returns:
         UserProfile if enabled and sufficient deck history exists, else None.
     """
-    if owner_id is None:
+    if account_id is None or email is None:
         return None
-    if not await preference_service.is_user_profile_enabled(pool, owner_id):
+    if not await preference_service.is_user_profile_enabled(pool, account_id):
         return None
-    return await profile_service.get_user_profile(pool, owner_id, deck_id)
+    return await profile_service.get_user_profile(pool, email, deck_id)
 
 
 async def _load_ranking_weights(
     pool: asyncpg.Pool,
-    owner_id: UUID | None,
+    account_id: UUID | None,
 ) -> RankingWeights | None:
-    """Load per-user ranking weights, returning None if no owner.
+    """Load per-user ranking weights, returning None if no account.
 
     Args:
         pool: asyncpg connection pool.
-        owner_id: The account UUID, or None for anonymous decks.
+        account_id: The account UUID, or None for anonymous decks.
 
     Returns:
-        RankingWeights if owner exists, else None (uses defaults in retrieval).
+        RankingWeights if account exists, else None (uses defaults in retrieval).
     """
-    if owner_id is None:
+    if account_id is None:
         return None
     try:
-        result = await ranking_weight_service.get_weights(pool, owner_id)
+        result = await ranking_weight_service.get_weights(pool, account_id)
         return RankingWeights(
             semantic=result.semantic,
             synergy=result.synergy,
@@ -408,19 +410,21 @@ async def _load_ranking_weights(
 async def _load_prompt_context(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
+    account_id: UUID | None,
 ) -> tuple[dict[str, list[str]] | None, list[str]]:
     """Load account preferences and downvoted cards for prompt injection (used for chat).
 
     Args:
         pool: asyncpg connection pool.
-        deck: Deck detail (owner_id used to fetch preferences).
+        deck: Deck detail.
+        account_id: Authenticated account UUID for preference lookup.
 
     Returns:
         Tuple of (preferences dict or None, list of downvoted card names).
     """
     prefs: dict[str, list[str]] | None = None
-    if deck.owner_id is not None:
-        prefs = await preference_service.get_preferences_for_prompt(pool, deck.owner_id)
+    if account_id is not None:
+        prefs = await preference_service.get_preferences_for_prompt(pool, account_id)
 
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -604,14 +608,14 @@ def _resolve_price_filter(
 
 async def _build_ownership_map(
     pool: asyncpg.Pool,
-    owner_id: UUID | None,
+    account_id: UUID | None,
     scryfall_ids: list[UUID],
 ) -> dict[UUID, list[CollectionMembership]]:
     """Map scryfall_id -> list of account collections containing that card.
 
     Deduplicates across multiple printings of the same oracle card in a collection.
     """
-    if owner_id is None or not scryfall_ids:
+    if account_id is None or not scryfall_ids:
         return {}
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -625,7 +629,7 @@ async def _build_ownership_map(
             WHERE c.account_id = $1
               AND cards.scryfall_id = ANY($2::uuid[])
             """,
-            owner_id,
+            account_id,
             scryfall_ids,
         )
     result: dict[UUID, list[CollectionMembership]] = {}
@@ -642,6 +646,7 @@ async def build_stage(
     qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     account_id: UUID,
+    email: str,
     stage: str | None = None,
     target: int | None = None,
     exclude: list[str] | None = None,
@@ -669,7 +674,7 @@ async def build_stage(
         DeckNotFoundError: If the deck does not exist.
         ValueError: If an invalid stage name is provided.
     """
-    deck = await deck_service.get_deck(pool, deck_id, account_id)
+    deck = await deck_service.get_deck(pool, deck_id, email)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 
@@ -690,17 +695,15 @@ async def build_stage(
     deck_card_ids = [c.card_id for c in deck.cards]
     exclude_ids = await _resolve_exclude_ids(pool, exclude)
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
-    avoid_ids = (
-        await preference_service.get_avoid_card_ids(pool, deck.owner_id) if deck.owner_id else []
-    )
+    avoid_ids = await preference_service.get_avoid_card_ids(pool, account_id)
     all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
 
     query_text, query_tags = stage_retrieval_query(resolved_stage, deck.description)
     feedback_weights, user_profile = await asyncio.gather(
-        _compute_feedback_weights(pool, deck.id, deck.owner_id),
-        _load_user_profile(pool, deck.id, deck.owner_id),
+        _compute_feedback_weights(pool, deck.id, account_id),
+        _load_user_profile(pool, deck.id, account_id, email),
     )
-    ranking_weights = await _load_ranking_weights(pool, deck.owner_id)
+    ranking_weights = await _load_ranking_weights(pool, account_id)
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
     price_filter = _resolve_price_filter(deck, max_price_cents, min_price_cents)
@@ -728,7 +731,7 @@ async def build_stage(
     if resolved_stage == "lands":
         candidates = [c for c in candidates if "Land" in (c.type_line or "")]
     ownership_map = await _build_ownership_map(
-        pool, deck.owner_id, [c.scryfall_id for c in candidates]
+        pool, account_id, [c.scryfall_id for c in candidates]
     )
     suggestions = [
         _card_from_retrieved(c, resolved_stage, query_tags, ownership_map) for c in candidates
@@ -752,6 +755,7 @@ async def suggest_cards(
     qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     account_id: UUID,
+    email: str,
     prompt: str,
     count: int,
     collection_ids: list[UUID] | None = None,
@@ -776,7 +780,7 @@ async def suggest_cards(
     Raises:
         DeckNotFoundError: If the deck does not exist.
     """
-    deck = await deck_service.get_deck(pool, deck_id, account_id)
+    deck = await deck_service.get_deck(pool, deck_id, email)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 
@@ -789,8 +793,8 @@ async def suggest_cards(
     query_tags = parse_query_tags(prompt)
     type_filter = parse_query_types(prompt)
     feedback_weights, user_profile = await asyncio.gather(
-        _compute_feedback_weights(pool, deck.id, deck.owner_id),
-        _load_user_profile(pool, deck.id, deck.owner_id),
+        _compute_feedback_weights(pool, deck.id, account_id),
+        _load_user_profile(pool, deck.id, account_id, email),
     )
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
@@ -815,7 +819,7 @@ async def suggest_cards(
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 
     ownership_map = await _build_ownership_map(
-        pool, deck.owner_id, [c.scryfall_id for c in candidates]
+        pool, account_id, [c.scryfall_id for c in candidates]
     )
     suggestions = [_card_from_retrieved(c, "theme", query_tags, ownership_map) for c in candidates]
     return SuggestResponse(suggestions=suggestions, unresolved=[])
@@ -826,6 +830,7 @@ async def chat_about_deck(
     ai_client: LLMClient,
     deck_id: UUID,
     account_id: UUID,
+    email: str,
     message: str,
 ) -> ChatResponse:
     """Handle a free-form chat message about the deck.
@@ -845,7 +850,7 @@ async def chat_about_deck(
     Raises:
         DeckNotFoundError: If the deck does not exist.
     """
-    deck = await deck_service.get_deck(pool, deck_id, account_id)
+    deck = await deck_service.get_deck(pool, deck_id, email)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 
@@ -857,7 +862,7 @@ async def chat_about_deck(
     if deck.partner_id:
         partner = await card_service.get_card_by_id(pool, deck.partner_id)
 
-    prefs, downvoted = await _load_prompt_context(pool, deck)
+    prefs, downvoted = await _load_prompt_context(pool, deck, account_id)
     system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
     history = await conversation_service.get_recent_turns(pool, deck_id, _MAX_HISTORY_TURNS)
     raw_response = await _call_llm(ai_client, system, history, message)

@@ -194,21 +194,21 @@ async def test_delete_deck(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_create_deck_owner_derived_from_auth(client: AsyncClient) -> None:
-    """Owner reflects the authed account; client-supplied owner_id is ignored."""
-    account_id = await create_test_account(client, "Owner Derived")
-    bogus = "00000000-0000-0000-0000-000000000099"
+    """Owner reflects the authed account; client-supplied owner_email is ignored."""
+    await create_test_account(client, "Owner Derived")
+    bogus = "bogus@evil.test"
     resp = await client.post(
         "/api/v1/decks",
         json={
             "commander_scryfall_id": HAZEL_ID,
             "name": "Auth Owned Deck",
-            "owner_id": bogus,
+            "owner_email": bogus,
         },
     )
     assert resp.status_code == 201
     deck = resp.json()["data"]
-    assert deck["owner_id"] == account_id
-    assert deck["owner_id"] != bogus
+    assert deck["owner_email"] == "owner.derived@test.local"
+    assert deck["owner_email"] != bogus
 
 
 @pytest.mark.asyncio

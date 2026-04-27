@@ -3,7 +3,6 @@
 import logging
 import re
 from dataclasses import dataclass
-from uuid import UUID
 
 import asyncpg
 
@@ -178,7 +177,7 @@ async def _resolve_non_commanders(
 
 
 async def import_deck(
-    pool: asyncpg.Pool, data: DeckImportRequest, account_id: UUID
+    pool: asyncpg.Pool, data: DeckImportRequest, email: str
 ) -> DeckImportResponse:
     """Import a deck from a pasted text deck list.
 
@@ -189,7 +188,7 @@ async def import_deck(
     Args:
         pool: asyncpg connection pool.
         data: Import request with deck list text and deck metadata.
-        account_id: The authenticated account's UUID; stored as deck owner.
+        email: The authenticated account's email; stored as deck owner.
 
     Returns:
         DeckImportResponse with the created deck and per-card results.
@@ -232,7 +231,7 @@ async def import_deck(
             description=data.description,
             bracket=data.bracket,
         ),
-        account_id,
+        email,
     )
 
     commander_identity = set(commander_card.color_identity)

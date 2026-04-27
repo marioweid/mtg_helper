@@ -38,6 +38,19 @@ def _llm_unavailable(detail: str) -> HTTPException:
     )
 
 
+def _require_email(account: AccountResponse) -> str:
+    """Return the account's email or raise 403 if missing.
+
+    Auth strips tokens without an ``email`` claim, so this is defensive only.
+    """
+    if not account.email:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "EMAIL_REQUIRED", "message": "Account has no email"},
+        )
+    return account.email
+
+
 def _enforce_rate_limit(account: AccountResponse, endpoint: str, limit: tuple[int, int]) -> None:
     """Raise 429 if the caller has exceeded the per-account rate limit."""
     count, window = limit
@@ -69,6 +82,7 @@ async def build_stage(
     account: CurrentAccount,
 ) -> DataResponse[BuildResponse]:
     """Advance the deck to the next build stage and return card suggestions."""
+    email = _require_email(account)
     try:
         result = await ai_service.build_stage(
             request.app.state.db_pool,
@@ -76,6 +90,7 @@ async def build_stage(
             request.app.state.qdrant_client,
             deck_id,
             account.id,
+            email,
             stage=body.stage,
             target=body.target,
             exclude=body.exclude,
@@ -98,6 +113,7 @@ async def suggest_cards(
     account: CurrentAccount,
 ) -> DataResponse[SuggestResponse]:
     """Get card suggestions for a deck based on a free-form prompt."""
+    email = _require_email(account)
     try:
         result = await ai_service.suggest_cards(
             request.app.state.db_pool,
@@ -105,6 +121,7 @@ async def suggest_cards(
             request.app.state.qdrant_client,
             deck_id,
             account.id,
+            email,
             body.prompt,
             body.count,
             collection_ids=body.collection_ids,
@@ -124,6 +141,7 @@ async def chat_about_deck(
     account: CurrentAccount,
 ) -> DataResponse[ChatResponse]:
     """Send a free-form chat message about the deck."""
+    email = _require_email(account)
     _enforce_rate_limit(account, "chat", _CHAT_LIMIT)
     try:
         result = await ai_service.chat_about_deck(
@@ -131,6 +149,7 @@ async def chat_about_deck(
             request.app.state.ai_client,
             deck_id,
             account.id,
+            email,
             body.message,
         )
     except DeckNotFoundError as e:
@@ -172,7 +191,8 @@ async def export_moxfield(
     account: CurrentAccount,
 ) -> Response:
     """Export the deck in Moxfield-compatible plain text format."""
-    result = await deck_service.export_moxfield(request.app.state.db_pool, deck_id, account.id)
+    email = _require_email(account)
+    result = await deck_service.export_moxfield(request.app.state.db_pool, deck_id, email)
     if result is None:
         raise _deck_not_found(deck_id)
     _deck_name, export_text = result

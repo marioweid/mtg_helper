@@ -82,14 +82,16 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS accounts_email_idx ON accounts (lower(email));
+-- Email is the canonical owner key for decks. Enforce case-insensitive uniqueness.
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_email_unique_idx
+    ON accounts (lower(email)) WHERE email IS NOT NULL;
 
 -- ============================================================
 -- DECKS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS decks (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id        UUID REFERENCES accounts(id) ON DELETE SET NULL,
+    owner_email     TEXT,
     name            TEXT NOT NULL,
     commander_id    UUID NOT NULL REFERENCES cards(id),
     partner_id      UUID REFERENCES cards(id),
@@ -269,7 +271,24 @@ DO $$ BEGIN
         ALTER TABLE accounts ADD CONSTRAINT accounts_google_sub_key UNIQUE (google_sub);
     END IF;
 END $$;
-CREATE INDEX IF NOT EXISTS accounts_email_idx ON accounts (lower(email));
+-- Replace non-unique email index with case-insensitive unique index.
+DROP INDEX IF EXISTS accounts_email_idx;
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_email_unique_idx
+    ON accounts (lower(email)) WHERE email IS NOT NULL;
+
+-- Migrate deck ownership from owner_id (UUID FK) to owner_email (TEXT).
+-- Email is unique app-wide, immutable enough for ownership, and avoids
+-- orphaning when the accounts row is recreated under a new UUID.
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS owner_email TEXT;
+UPDATE decks d
+   SET owner_email = a.email
+  FROM accounts a
+ WHERE d.owner_email IS NULL
+   AND d.owner_id = a.id
+   AND a.email IS NOT NULL;
+ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_owner_id_fkey;
+ALTER TABLE decks DROP COLUMN IF EXISTS owner_id;
+CREATE INDEX IF NOT EXISTS idx_decks_owner_email ON decks (lower(owner_email));
 
 -- ============================================================
 -- VIEW: deck detail with full card info

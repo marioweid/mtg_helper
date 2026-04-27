@@ -58,7 +58,7 @@ class DeckResponse(BaseModel):
     stage: str
     commander_id: UUID
     partner_id: UUID | None
-    owner_id: UUID | None
+    owner_email: str | None
     created_at: datetime
     updated_at: datetime
     stage_targets: dict[str, int] = Field(default_factory=dict)
@@ -97,7 +97,7 @@ class DeckDetailResponse(BaseModel):
     stage: str
     commander_id: UUID
     partner_id: UUID | None
-    owner_id: UUID | None
+    owner_email: str | None
     created_at: datetime
     updated_at: datetime
     stage_targets: dict[str, int] = Field(default_factory=dict)
