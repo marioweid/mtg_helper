@@ -53,6 +53,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     "Content-Type": "application/json",
     ...((options?.headers as Record<string, string> | undefined) ?? {}),
   };
+  // Server-side (RSC) calls bypass the Next proxy and hit BACKEND_ORIGIN
+  // directly, so they must inject the bearer token themselves.
+  if (typeof window === "undefined" && !headers["authorization"]) {
+    const { auth } = await import("@/auth");
+    const session = await auth();
+    if (session?.idToken) headers["authorization"] = `Bearer ${session.idToken}`;
+  }
   const res = await fetch(`${CLIENT_BASE}${path}`, {
     ...options,
     headers,
