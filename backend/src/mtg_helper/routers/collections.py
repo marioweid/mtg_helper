@@ -81,11 +81,20 @@ async def list_cards(
     request: Request,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    type: str | None = Query(default=None, max_length=64),
+    min_price_cents: int | None = Query(default=None, ge=0),
+    max_price_cents: int | None = Query(default=None, ge=0),
 ) -> DataResponse[list[CollectionCardItem]]:
-    """List cards in a collection with pagination."""
+    """List cards in a collection with pagination and optional type/price filters."""
     try:
         items, total = await collection_service.list_cards(
-            request.app.state.db_pool, collection_id, limit, offset
+            request.app.state.db_pool,
+            collection_id,
+            limit,
+            offset,
+            type_filter=type,
+            min_price_cents=min_price_cents,
+            max_price_cents=max_price_cents,
         )
     except CollectionNotFoundError:
         raise _not_found(collection_id)

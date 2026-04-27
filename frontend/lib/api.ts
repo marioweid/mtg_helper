@@ -272,10 +272,24 @@ export const apiClient = {
         throw new ApiError("DELETE_FAILED", "Failed to delete collection");
     }),
 
-  listCollectionCards: (id: string, params?: { limit?: number; offset?: number }) => {
+  listCollectionCards: (
+    id: string,
+    params?: {
+      limit?: number;
+      offset?: number;
+      type?: string | null;
+      min_price_cents?: number | null;
+      max_price_cents?: number | null;
+    },
+  ) => {
     const qs = new URLSearchParams();
     if (params?.limit !== undefined) qs.set("limit", String(params.limit));
     if (params?.offset !== undefined) qs.set("offset", String(params.offset));
+    if (params?.type) qs.set("type", params.type);
+    if (params?.min_price_cents != null)
+      qs.set("min_price_cents", String(params.min_price_cents));
+    if (params?.max_price_cents != null)
+      qs.set("max_price_cents", String(params.max_price_cents));
     const q = qs.toString();
     return fetch(`${CLIENT_BASE}/collections/${id}/cards${q ? `?${q}` : ""}`).then(async (res) => {
       if (!res.ok) throw new ApiError("FETCH_FAILED", "Failed to load cards");

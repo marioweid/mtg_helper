@@ -308,46 +308,95 @@ def _row_to_card_item(row: asyncpg.Record) -> CollectionCardItem:
 
 
 async def list_cards(
-    pool: asyncpg.Pool, collection_id: UUID, limit: int = 50, offset: int = 0
+    pool: asyncpg.Pool,
+    collection_id: UUID,
+    limit: int = 50,
+    offset: int = 0,
+    type_filter: str | None = None,
+    min_price_cents: int | None = None,
+    max_price_cents: int | None = None,
 ) -> tuple[list[CollectionCardItem], int]:
-    """List cards in a collection with pagination.
+    """List cards in a collection with pagination and optional filters.
 
     Args:
         pool: asyncpg connection pool.
         collection_id: Collection UUID.
         limit: Max rows per page.
         offset: Pagination offset.
+        type_filter: Optional case-insensitive substring of ``cards.type_line``.
+        min_price_cents: Optional inclusive lower bound on Scryfall EUR price (cents).
+        max_price_cents: Optional inclusive upper bound on Scryfall EUR price (cents).
+            When either price bound is set, cards without an EUR price are excluded.
 
     Returns:
-        Tuple of (items, total count).
+        Tuple of (items, total count) reflecting the filtered set.
 
     Raises:
         CollectionNotFoundError: If the collection does not exist.
     """
+    filter_sql, filter_params = _build_collection_card_filter(
+        type_filter, min_price_cents, max_price_cents
+    )
     async with pool.acquire() as conn:
         exists = await conn.fetchval("SELECT 1 FROM collections WHERE id = $1", collection_id)
         if exists is None:
             raise CollectionNotFoundError(f"Collection {collection_id} not found")
+
+        base_params: list[object] = [collection_id, *filter_params]
+        list_params = [*base_params, limit, offset]
         rows = await conn.fetch(
-            """
+            f"""
             SELECT cc.card_id, cc.set_code, cc.collector_number, cc.quantity, cc.foil,
                    cc.condition, cc.language, cc.tags, cc.purchase_price, cc.last_modified,
                    c.scryfall_id, c.name, c.image_uri, c.color_identity, c.type_line
             FROM collection_cards cc
             JOIN cards c ON cc.card_id = c.id
-            WHERE cc.collection_id = $1
+            WHERE cc.collection_id = $1{filter_sql}
             ORDER BY c.name ASC
-            LIMIT $2 OFFSET $3
+            LIMIT ${len(base_params) + 1} OFFSET ${len(base_params) + 2}
             """,
-            collection_id,
-            limit,
-            offset,
+            *list_params,
         )
         total: int = await conn.fetchval(
-            "SELECT count(*) FROM collection_cards WHERE collection_id = $1",
-            collection_id,
+            f"""
+            SELECT count(*)
+            FROM collection_cards cc
+            JOIN cards c ON cc.card_id = c.id
+            WHERE cc.collection_id = $1{filter_sql}
+            """,
+            *base_params,
         )
     return [_row_to_card_item(r) for r in rows], total
+
+
+def _build_collection_card_filter(
+    type_filter: str | None,
+    min_price_cents: int | None,
+    max_price_cents: int | None,
+) -> tuple[str, list[object]]:
+    """Build the WHERE-clause fragment + params for collection card filters.
+
+    Param positions are anchored to ``$2..`` since the caller uses ``$1`` for
+    the collection_id.
+    """
+    clauses: list[str] = []
+    params: list[object] = []
+    next_pos = 2
+    if type_filter:
+        params.append(f"%{type_filter}%")
+        clauses.append(f"AND c.type_line ILIKE ${next_pos}")
+        next_pos += 1
+    if min_price_cents is not None or max_price_cents is not None:
+        clauses.append("AND (c.prices->>'eur') IS NOT NULL")
+        if min_price_cents is not None:
+            params.append(min_price_cents)
+            clauses.append(f"AND ((c.prices->>'eur')::numeric * 100) >= ${next_pos}")
+            next_pos += 1
+        if max_price_cents is not None:
+            params.append(max_price_cents)
+            clauses.append(f"AND ((c.prices->>'eur')::numeric * 100) <= ${next_pos}")
+            next_pos += 1
+    return (" " + " ".join(clauses) if clauses else ""), params
 
 
 async def _resolve_add_target(pool: asyncpg.Pool, data: CollectionCardAdd) -> UUID:
