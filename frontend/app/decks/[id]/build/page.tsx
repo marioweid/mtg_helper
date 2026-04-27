@@ -93,6 +93,16 @@ const COLOR_TO_BASIC: Record<string, string> = {
   G: "Forest",
 };
 
+const TYPE_FILTER_OPTIONS = [
+  "Creature",
+  "Instant",
+  "Sorcery",
+  "Artifact",
+  "Enchantment",
+  "Planeswalker",
+  "Land",
+] as const;
+
 function basicLandsForIdentity(identity: string): readonly string[] {
   const colors = identity
     .split(",")
@@ -340,6 +350,8 @@ export default function BuildPage() {
   const [pricePanelDraft, setPricePanelDraft] = useState("");
   const [pricePanelMinDraft, setPricePanelMinDraft] = useState("");
   const [savingPriceCap, setSavingPriceCap] = useState(false);
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [typePanelOpen, setTypePanelOpen] = useState(false);
 
   useEffect(() => {
     apiClient
@@ -784,6 +796,19 @@ export default function BuildPage() {
 
   const activeStageState = state.stages[state.activeStage];
 
+  function matchesTypeFilters(typeLine: string | null | undefined): boolean {
+    if (typeFilters.length === 0) return true;
+    const tl = typeLine ?? "";
+    return typeFilters.some((t) => tl.includes(t));
+  }
+
+  const filteredSuggestions = activeStageState
+    ? activeStageState.suggestions.filter((s) => matchesTypeFilters(s.type_line))
+    : [];
+  const filteredPromptSuggestions = promptSuggestions.filter((s) =>
+    matchesTypeFilters(s.type_line),
+  );
+
   return (
     <div>
       {/* Header */}
@@ -927,6 +952,63 @@ export default function BuildPage() {
                 className="text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50"
               >
                 Clear range
+              </button>
+            )}
+          </div>
+        </div>
+      </details>
+
+      {/* Type filter panel */}
+      <details
+        open={typePanelOpen}
+        onToggle={(e) => setTypePanelOpen((e.target as HTMLDetailsElement).open)}
+        className="mb-4 rounded-xl border border-white/10 bg-white/5"
+      >
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-white hover:bg-white/5 flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <span>Card type filter</span>
+            {typeFilters.length > 0 && (
+              <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
+                {typeFilters.length} active
+              </span>
+            )}
+          </span>
+          <span className="text-xs text-gray-400">{typePanelOpen ? "▲" : "▼"}</span>
+        </summary>
+        <div className="border-t border-white/10 px-4 py-3">
+          <p className="mb-3 text-xs text-gray-400">
+            Hide suggestions that don&apos;t match the selected types. Affects the active stage&apos;s
+            displayed suggestions only — does not refetch.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {TYPE_FILTER_OPTIONS.map((t) => {
+              const active = typeFilters.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() =>
+                    setTypeFilters((prev) =>
+                      active ? prev.filter((x) => x !== t) : [...prev, t],
+                    )
+                  }
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                    active
+                      ? "border-indigo-500 bg-indigo-600/40 text-indigo-100"
+                      : "border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+            {typeFilters.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setTypeFilters([])}
+                className="rounded-full px-2.5 py-0.5 text-xs text-gray-500 hover:text-white"
+              >
+                Clear
               </button>
             )}
           </div>
@@ -1197,7 +1279,7 @@ export default function BuildPage() {
                       Custom Suggestions
                     </p>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                      {promptSuggestions.map((s) => (
+                      {filteredPromptSuggestions.map((s) => (
                         <CardSuggestionCard
                           key={s.scryfall_id}
                           suggestion={s}
@@ -1238,8 +1320,14 @@ export default function BuildPage() {
           {/* Suggestions grid */}
           {activeStageState.loaded && activeStageState.suggestions.length > 0 && (
             <>
+              {typeFilters.length > 0 && (
+                <p className="mb-2 text-xs text-gray-500">
+                  Showing {filteredSuggestions.length} of {activeStageState.suggestions.length}{" "}
+                  suggestions matching type filter.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                {activeStageState.suggestions.map((s) => (
+                {filteredSuggestions.map((s) => (
                   <CardSuggestionCard
                     key={s.scryfall_id}
                     suggestion={s}
