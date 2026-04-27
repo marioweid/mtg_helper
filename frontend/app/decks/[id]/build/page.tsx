@@ -85,6 +85,28 @@ function detectCategory(card: CardResponse, fallback: string): string {
 
 const BASIC_LAND_NAMES = ["Forest", "Island", "Plains", "Mountain", "Swamp", "Wastes"] as const;
 
+const COLOR_TO_BASIC: Record<string, string> = {
+  W: "Plains",
+  U: "Island",
+  B: "Swamp",
+  R: "Mountain",
+  G: "Forest",
+};
+
+function basicLandsForIdentity(identity: string): readonly string[] {
+  const colors = identity
+    .split(",")
+    .map((c) => c.trim().toUpperCase())
+    .filter(Boolean);
+  if (colors.length === 0) return ["Wastes"];
+  const allowed = new Set<string>();
+  for (const c of colors) {
+    const land = COLOR_TO_BASIC[c];
+    if (land) allowed.add(land);
+  }
+  return BASIC_LAND_NAMES.filter((n) => allowed.has(n));
+}
+
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
   for (const card of cards) {
@@ -294,6 +316,7 @@ export default function BuildPage() {
   const [deckListOpen, setDeckListOpen] = useState(false);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<CardResponse[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -389,7 +412,7 @@ export default function BuildPage() {
 
   // Debounced card search
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim() && !searchType) {
       setSearchResults([]);
       return;
     }
@@ -397,7 +420,8 @@ export default function BuildPage() {
       setSearchLoading(true);
       apiClient
         .searchCards({
-          q: searchQuery.trim(),
+          ...(searchQuery.trim() && { q: searchQuery.trim() }),
+          ...(searchType && { type: searchType }),
           commander_legal: true,
           ...(deckColorIdentity && { color_identity: deckColorIdentity }),
           limit: 20,
@@ -407,7 +431,7 @@ export default function BuildPage() {
         .finally(() => setSearchLoading(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, deckColorIdentity]);
+  }, [searchQuery, searchType, deckColorIdentity]);
 
   const loadStage = useCallback(
     async (stage: string) => {
@@ -1014,7 +1038,7 @@ export default function BuildPage() {
             <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Basic Lands</p>
               <div className="flex flex-wrap gap-2">
-                {BASIC_LAND_NAMES.map((name) => (
+                {basicLandsForIdentity(deckColorIdentity).map((name) => (
                   <div key={name} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
                     <span className="text-xs font-medium text-gray-300 w-14">{name}</span>
                     <button
@@ -1073,6 +1097,42 @@ export default function BuildPage() {
                   className="w-full rounded-lg bg-white/10 px-3 py-2 text-sm text-white
                     placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    "Creature",
+                    "Instant",
+                    "Sorcery",
+                    "Artifact",
+                    "Enchantment",
+                    "Planeswalker",
+                    "Land",
+                  ].map((t) => {
+                    const active = searchType === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setSearchType(active ? null : t)}
+                        className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                          active
+                            ? "border-indigo-500 bg-indigo-600/40 text-indigo-100"
+                            : "border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                  {searchType && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchType(null)}
+                      className="rounded-full px-2.5 py-0.5 text-xs text-gray-500 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 {searchLoading && <p className="mt-2 text-xs text-gray-500">Searching...</p>}
                 {!searchLoading && searchResults.length > 0 && (
                   <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
@@ -1086,9 +1146,11 @@ export default function BuildPage() {
                     ))}
                   </div>
                 )}
-                {!searchLoading && searchQuery.trim() && searchResults.length === 0 && (
-                  <p className="mt-2 text-xs text-gray-500">No results.</p>
-                )}
+                {!searchLoading &&
+                  (searchQuery.trim() || searchType) &&
+                  searchResults.length === 0 && (
+                    <p className="mt-2 text-xs text-gray-500">No results.</p>
+                  )}
               </div>
             )}
           </div>
@@ -1165,15 +1227,15 @@ export default function BuildPage() {
             </p>
           )}
 
-          {/* Loading */}
-          {activeStageState.loading && (
+          {/* Loading (initial only — keep grid visible during load-more) */}
+          {activeStageState.loading && !activeStageState.loaded && (
             <div className="flex items-center justify-center py-20 text-gray-500">
               Generating suggestions...
             </div>
           )}
 
           {/* Suggestions grid */}
-          {!activeStageState.loading && activeStageState.suggestions.length > 0 && (
+          {activeStageState.loaded && activeStageState.suggestions.length > 0 && (
             <>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {activeStageState.suggestions.map((s) => (
@@ -1224,8 +1286,11 @@ export default function BuildPage() {
           )}
 
           {/* Load More button (shown after initial load) */}
-          {!activeStageState.loading && activeStageState.loaded && (
-            <div className="mt-6 flex justify-end">
+          {activeStageState.loaded && (
+            <div className="mt-6 flex items-center justify-end gap-3">
+              {activeStageState.loading && (
+                <span className="text-xs text-gray-500">Loading more…</span>
+              )}
               <button
                 onClick={() =>
                   void loadMore(
@@ -1234,7 +1299,8 @@ export default function BuildPage() {
                     activeStageState.rejectedNames,
                   )
                 }
-                className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                disabled={activeStageState.loading}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50"
               >
                 Load More
               </button>

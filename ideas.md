@@ -1,5 +1,8 @@
 # Ideas
-
+- Ramp count does not change when adding cards in ramp/interaction/draw/theme/utility section
+- Add Filter Values like Sourcery artifacts create f.e.
+- Load more button in tabs should not return back to top instead stay at same hight in the list and append to the bottom
+- Only show basic Lands in COmmander identity f.e. dont show islands for black/green commander
 ## 3 Optional nice to have
 
 - Performance beyond ~10k-card collections (HasIdCondition cost in Qdrant)

@@ -154,7 +154,7 @@ def _card_from_retrieved(
     Returns:
         CardSuggestion populated from retrieval signals.
     """
-    category = _STAGE_META.get(stage, (stage, ""))[0]
+    category = stage
     matching_tags = [t for t in card.tags if t in query_tags]
     synergies = matching_tags or card.tags[:3]
 
