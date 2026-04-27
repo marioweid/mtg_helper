@@ -66,6 +66,7 @@ async def build_stage(
     deck_id: UUID,
     body: BuildRequest,
     request: Request,
+    account: CurrentAccount,
 ) -> DataResponse[BuildResponse]:
     """Advance the deck to the next build stage and return card suggestions."""
     try:
@@ -74,6 +75,7 @@ async def build_stage(
             request.app.state.ai_client,
             request.app.state.qdrant_client,
             deck_id,
+            account.id,
             stage=body.stage,
             target=body.target,
             exclude=body.exclude,
@@ -93,6 +95,7 @@ async def suggest_cards(
     deck_id: UUID,
     body: SuggestRequest,
     request: Request,
+    account: CurrentAccount,
 ) -> DataResponse[SuggestResponse]:
     """Get card suggestions for a deck based on a free-form prompt."""
     try:
@@ -101,6 +104,7 @@ async def suggest_cards(
             request.app.state.ai_client,
             request.app.state.qdrant_client,
             deck_id,
+            account.id,
             body.prompt,
             body.count,
             collection_ids=body.collection_ids,
@@ -126,6 +130,7 @@ async def chat_about_deck(
             request.app.state.db_pool,
             request.app.state.ai_client,
             deck_id,
+            account.id,
             body.message,
         )
     except DeckNotFoundError as e:
@@ -164,9 +169,10 @@ async def describe_deck(
 async def export_moxfield(
     deck_id: UUID,
     request: Request,
+    account: CurrentAccount,
 ) -> Response:
     """Export the deck in Moxfield-compatible plain text format."""
-    result = await deck_service.export_moxfield(request.app.state.db_pool, deck_id)
+    result = await deck_service.export_moxfield(request.app.state.db_pool, deck_id, account.id)
     if result is None:
         raise _deck_not_found(deck_id)
     _deck_name, export_text = result

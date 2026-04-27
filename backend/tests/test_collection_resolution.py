@@ -68,14 +68,13 @@ async def _create_collection(client: AsyncClient, account_id: str, name: str) ->
 async def _create_deck(
     client: AsyncClient,
     *,
-    owner_id: str,
+    owner_id: str,  # noqa: ARG001 — auth override drives ownership
     suggestion_collection_ids: list[str] | None = None,
     name: str = "Resolution Deck",
 ) -> str:
     payload: dict = {
         "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
         "name": name,
-        "owner_id": owner_id,
     }
     if suggestion_collection_ids is not None:
         payload["suggestion_collection_ids"] = suggestion_collection_ids

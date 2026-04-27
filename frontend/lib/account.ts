@@ -17,7 +17,3 @@ export async function getCurrentAccount(): Promise<AccountResponse> {
   return inflight;
 }
 
-export async function getCurrentAccountId(): Promise<string> {
-  const acc = await getCurrentAccount();
-  return acc.id;
-}

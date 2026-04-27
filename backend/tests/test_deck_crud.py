@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import create_test_account
+
 HAZEL_ID = "4d7b8d2c-36f5-40e7-91de-9c8c1b44da67"
 SOL_RING_ID = "3d7b8d2c-36f5-40e7-91de-9c8c1b44da67"
 DOUBLING_SEASON_ID = "1d7b8d2c-36f5-40e7-91de-9c8c1b44da67"
@@ -187,4 +189,124 @@ async def test_delete_deck(client: AsyncClient) -> None:
     assert resp.status_code == 204
 
     resp = await client.get(f"/api/v1/decks/{deck_id}")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_deck_owner_derived_from_auth(client: AsyncClient) -> None:
+    """Owner reflects the authed account; client-supplied owner_id is ignored."""
+    account_id = await create_test_account(client, "Owner Derived")
+    bogus = "00000000-0000-0000-0000-000000000099"
+    resp = await client.post(
+        "/api/v1/decks",
+        json={
+            "commander_scryfall_id": HAZEL_ID,
+            "name": "Auth Owned Deck",
+            "owner_id": bogus,
+        },
+    )
+    assert resp.status_code == 201
+    deck = resp.json()["data"]
+    assert deck["owner_id"] == account_id
+    assert deck["owner_id"] != bogus
+
+
+@pytest.mark.asyncio
+async def test_list_decks_filters_by_account(client: AsyncClient) -> None:
+    """Each account only sees its own decks."""
+    alice_id = await create_test_account(client, "Alice List")
+    await client.post(
+        "/api/v1/decks",
+        json={"commander_scryfall_id": HAZEL_ID, "name": "Alice Deck"},
+    )
+
+    bob_id = await create_test_account(client, "Bob List")
+    bob_resp = await client.get("/api/v1/decks")
+    assert bob_resp.status_code == 200
+    bob_data = bob_resp.json()
+    assert bob_data["meta"]["total"] == 0
+    assert bob_data["data"] == []
+
+    # Switch back to Alice — her deck still shows up.
+    from mtg_helper.main import app
+    from mtg_helper.models.accounts import AccountResponse
+    from tests.conftest import set_current_account
+
+    pool = app.state.db_pool
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM accounts WHERE id = $1", alice_id)
+    set_current_account(
+        AccountResponse(
+            id=row["id"],
+            display_name=row["display_name"],
+            email=row["email"],
+            created_at=row["created_at"],
+        )
+    )
+    alice_resp = await client.get("/api/v1/decks")
+    assert alice_resp.status_code == 200
+    alice_names = [d["name"] for d in alice_resp.json()["data"]]
+    assert "Alice Deck" in alice_names
+    assert bob_id != alice_id
+
+
+@pytest.mark.asyncio
+async def test_get_deck_cross_account_returns_404(client: AsyncClient) -> None:
+    """Reading another account's deck returns the same 404 as a missing deck."""
+    await create_test_account(client, "Owner Get")
+    create = await client.post(
+        "/api/v1/decks",
+        json={"commander_scryfall_id": HAZEL_ID, "name": "Owner Only"},
+    )
+    deck_id = create.json()["data"]["id"]
+
+    await create_test_account(client, "Stranger Get")
+    resp = await client.get(f"/api/v1/decks/{deck_id}")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_add_card_cross_account_returns_404(client: AsyncClient) -> None:
+    """Cross-account writes to /decks/{id}/cards 404 to avoid existence leak."""
+    await create_test_account(client, "Owner AddCard")
+    create = await client.post(
+        "/api/v1/decks",
+        json={"commander_scryfall_id": HAZEL_ID, "name": "Owner Only Cards"},
+    )
+    deck_id = create.json()["data"]["id"]
+
+    await create_test_account(client, "Stranger AddCard")
+    resp = await client.post(
+        f"/api/v1/decks/{deck_id}/cards",
+        json={"card_scryfall_id": SOL_RING_ID},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"]["code"] == "DECK_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_update_deck_cross_account_returns_404(client: AsyncClient) -> None:
+    await create_test_account(client, "Owner Update")
+    create = await client.post(
+        "/api/v1/decks",
+        json={"commander_scryfall_id": HAZEL_ID, "name": "Patch Mine"},
+    )
+    deck_id = create.json()["data"]["id"]
+
+    await create_test_account(client, "Stranger Update")
+    resp = await client.patch(f"/api/v1/decks/{deck_id}", json={"name": "Hijacked"})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_deck_cross_account_returns_404(client: AsyncClient) -> None:
+    await create_test_account(client, "Owner Del")
+    create = await client.post(
+        "/api/v1/decks",
+        json={"commander_scryfall_id": HAZEL_ID, "name": "Don't Touch"},
+    )
+    deck_id = create.json()["data"]["id"]
+
+    await create_test_account(client, "Stranger Del")
+    resp = await client.delete(f"/api/v1/decks/{deck_id}")
     assert resp.status_code == 404

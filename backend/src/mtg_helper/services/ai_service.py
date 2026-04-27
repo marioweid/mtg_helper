@@ -641,6 +641,7 @@ async def build_stage(
     ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
+    account_id: UUID,
     stage: str | None = None,
     target: int | None = None,
     exclude: list[str] | None = None,
@@ -668,7 +669,7 @@ async def build_stage(
         DeckNotFoundError: If the deck does not exist.
         ValueError: If an invalid stage name is provided.
     """
-    deck = await deck_service.get_deck(pool, deck_id)
+    deck = await deck_service.get_deck(pool, deck_id, account_id)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 
@@ -750,6 +751,7 @@ async def suggest_cards(
     ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
+    account_id: UUID,
     prompt: str,
     count: int,
     collection_ids: list[UUID] | None = None,
@@ -774,7 +776,7 @@ async def suggest_cards(
     Raises:
         DeckNotFoundError: If the deck does not exist.
     """
-    deck = await deck_service.get_deck(pool, deck_id)
+    deck = await deck_service.get_deck(pool, deck_id, account_id)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 
@@ -823,6 +825,7 @@ async def chat_about_deck(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
     deck_id: UUID,
+    account_id: UUID,
     message: str,
 ) -> ChatResponse:
     """Handle a free-form chat message about the deck.
@@ -842,7 +845,7 @@ async def chat_about_deck(
     Raises:
         DeckNotFoundError: If the deck does not exist.
     """
-    deck = await deck_service.get_deck(pool, deck_id)
+    deck = await deck_service.get_deck(pool, deck_id, account_id)
     if deck is None:
         raise DeckNotFoundError(f"Deck {deck_id} not found")
 

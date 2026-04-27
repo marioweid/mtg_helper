@@ -111,7 +111,6 @@ export interface DeckCreate {
   name: string;
   description?: string | null;
   bracket?: number;
-  owner_id?: string | null;
   stage_targets?: Record<string, number> | null;
   suggestion_collection_ids?: string[];
   max_price_cents?: number | null;
@@ -212,7 +211,6 @@ export interface DeckImportRequest {
   name: string;
   description?: string | null;
   bracket?: number;
-  owner_id?: string | null;
 }
 
 export interface DeckImportResponse {

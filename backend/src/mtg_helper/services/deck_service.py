@@ -110,6 +110,17 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
     )
 
 
+async def _assert_owner(conn: asyncpg.Connection, deck_id: UUID, account_id: UUID) -> None:
+    """Raise DeckNotFoundError if the deck doesn't exist or isn't owned by the account.
+
+    Uses the same 404 for missing and cross-account hits so existence does not
+    leak across users.
+    """
+    row = await conn.fetchrow("SELECT owner_id FROM decks WHERE id = $1", deck_id)
+    if row is None or row["owner_id"] != account_id:
+        raise DeckNotFoundError(f"Deck {deck_id} not found")
+
+
 async def _resolve_scryfall_id(conn: asyncpg.Connection, scryfall_id: UUID) -> UUID:
     """Resolve a Scryfall ID to an internal card UUID.
 
@@ -145,12 +156,13 @@ def _check_color_identity(card_identity: list[str], commander_identity: list[str
         )
 
 
-async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
-    """Create a new deck.
+async def create_deck(pool: asyncpg.Pool, data: DeckCreate, account_id: UUID) -> DeckResponse:
+    """Create a new deck owned by the given account.
 
     Args:
         pool: asyncpg connection pool.
         data: Deck creation parameters.
+        account_id: The authenticated account's UUID; stored as ``owner_id``.
 
     Returns:
         The created DeckResponse.
@@ -177,7 +189,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
             partner_id,
             data.description,
             data.bracket,
-            data.owner_id,
+            account_id,
             json.dumps(data.stage_targets or {}),
             list(data.suggestion_collection_ids),
             data.max_price_cents,
@@ -187,12 +199,13 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate) -> DeckResponse:
 
 
 async def list_decks(
-    pool: asyncpg.Pool, limit: int = 20, offset: int = 0
+    pool: asyncpg.Pool, account_id: UUID, limit: int = 20, offset: int = 0
 ) -> tuple[list[DeckSummary], int]:
-    """List all decks with commander info and card count.
+    """List the given account's decks with commander info and card count.
 
     Args:
         pool: asyncpg connection pool.
+        account_id: The authenticated account's UUID; restricts results.
         limit: Max results to return.
         offset: Pagination offset.
 
@@ -208,13 +221,17 @@ async def list_decks(
                 (SELECT count(*) FROM deck_cards WHERE deck_id = d.id)::int AS card_count
             FROM decks d
             JOIN cards c ON d.commander_id = c.id
+            WHERE d.owner_id = $1
             ORDER BY d.updated_at DESC
-            LIMIT $1 OFFSET $2
+            LIMIT $2 OFFSET $3
             """,
+            account_id,
             limit,
             offset,
         )
-        total: int = await conn.fetchval("SELECT count(*) FROM decks")
+        total: int = await conn.fetchval(
+            "SELECT count(*) FROM decks WHERE owner_id = $1", account_id
+        )
 
     summaries = [
         DeckSummary(
@@ -233,19 +250,25 @@ async def list_decks(
     return summaries, total
 
 
-async def get_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckDetailResponse | None:
+async def get_deck(
+    pool: asyncpg.Pool, deck_id: UUID, account_id: UUID | None = None
+) -> DeckDetailResponse | None:
     """Fetch a deck with all its cards.
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID.
+        account_id: When provided, the deck must be owned by this account or the
+            call returns None (treated as 404 by callers).
 
     Returns:
-        DeckDetailResponse or None if not found.
+        DeckDetailResponse or None if not found / not owned.
     """
     async with pool.acquire() as conn:
         deck_row = await conn.fetchrow("SELECT * FROM decks WHERE id = $1", deck_id)
         if deck_row is None:
+            return None
+        if account_id is not None and deck_row["owner_id"] != account_id:
             return None
         card_rows = await conn.fetch("SELECT * FROM deck_detail_view WHERE deck_id = $1", deck_id)
 
@@ -268,16 +291,23 @@ async def get_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckDetailResponse | No
     )
 
 
-async def update_deck(pool: asyncpg.Pool, deck_id: UUID, data: DeckUpdate) -> DeckResponse | None:
+async def update_deck(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    data: DeckUpdate,
+    account_id: UUID | None = None,
+) -> DeckResponse | None:
     """Update deck metadata. Only provided fields are changed.
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID.
         data: Fields to update.
+        account_id: When provided, scopes the update to decks owned by this
+            account; cross-account updates return None (404 to the caller).
 
     Returns:
-        Updated DeckResponse or None if not found.
+        Updated DeckResponse or None if not found / not owned.
     """
     updates = data.model_dump(exclude_none=True)
     if not updates:
@@ -298,10 +328,16 @@ async def update_deck(pool: asyncpg.Pool, deck_id: UUID, data: DeckUpdate) -> De
     values = list(updates.values())
 
     async with pool.acquire() as conn:
+        if account_id is not None:
+            owner_clause = f" AND owner_id = ${len(updates) + 2}"
+            args: list[object] = [deck_id, *values, account_id]
+        else:
+            owner_clause = ""
+            args = [deck_id, *values]
         row = await conn.fetchrow(
-            f"UPDATE decks SET {fields}, updated_at = now() WHERE id = $1 RETURNING *",
-            deck_id,
-            *values,
+            f"UPDATE decks SET {fields}, updated_at = now() "
+            f"WHERE id = $1{owner_clause} RETURNING *",
+            *args,
         )
     return _row_to_deck(row) if row else None
 
@@ -312,23 +348,33 @@ async def _fetch_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckResponse | None:
     return _row_to_deck(row) if row else None
 
 
-async def delete_deck(pool: asyncpg.Pool, deck_id: UUID) -> bool:
+async def delete_deck(pool: asyncpg.Pool, deck_id: UUID, account_id: UUID | None = None) -> bool:
     """Delete a deck and all its cards (cascade).
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID.
+        account_id: When provided, only deletes if the deck is owned by this
+            account. Returns False otherwise.
 
     Returns:
-        True if deleted, False if not found.
+        True if deleted, False if not found / not owned.
     """
     async with pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM decks WHERE id = $1", deck_id)
+        if account_id is None:
+            result = await conn.execute("DELETE FROM decks WHERE id = $1", deck_id)
+        else:
+            result = await conn.execute(
+                "DELETE FROM decks WHERE id = $1 AND owner_id = $2", deck_id, account_id
+            )
     return result == "DELETE 1"
 
 
 async def add_card_to_deck(
-    pool: asyncpg.Pool, deck_id: UUID, data: DeckCardAdd
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    data: DeckCardAdd,
+    account_id: UUID | None = None,
 ) -> DeckCardResponse:
     """Add a card to a deck, enforcing color identity.
 
@@ -346,6 +392,8 @@ async def add_card_to_deck(
         ColorIdentityError: If the card violates the commander's color identity.
     """
     async with pool.acquire() as conn:
+        if account_id is not None:
+            await _assert_owner(conn, deck_id, account_id)
         deck_row = await conn.fetchrow("SELECT commander_id FROM decks WHERE id = $1", deck_id)
         if deck_row is None:
             raise DeckNotFoundError(f"Deck {deck_id} not found")
@@ -388,7 +436,9 @@ async def add_card_to_deck(
     )
 
 
-async def export_moxfield(pool: asyncpg.Pool, deck_id: UUID) -> tuple[str, str] | None:
+async def export_moxfield(
+    pool: asyncpg.Pool, deck_id: UUID, account_id: UUID | None = None
+) -> tuple[str, str] | None:
     """Export a deck in Moxfield-compatible text format.
 
     Produces a plain-text deck list with commanders tagged *CMDR* and cards
@@ -397,11 +447,13 @@ async def export_moxfield(pool: asyncpg.Pool, deck_id: UUID) -> tuple[str, str] 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID.
+        account_id: When provided, the deck must be owned by this account or
+            the call returns None.
 
     Returns:
-        Tuple of (deck_name, export_text) or None if deck not found.
+        Tuple of (deck_name, export_text) or None if deck not found / not owned.
     """
-    deck = await get_deck(pool, deck_id)
+    deck = await get_deck(pool, deck_id, account_id)
     if deck is None:
         return None
 
@@ -432,18 +484,30 @@ async def export_moxfield(pool: asyncpg.Pool, deck_id: UUID) -> tuple[str, str] 
     return deck.name, "\n".join(lines)
 
 
-async def remove_card_from_deck(pool: asyncpg.Pool, deck_id: UUID, scryfall_id: UUID) -> bool:
+async def remove_card_from_deck(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    scryfall_id: UUID,
+    account_id: UUID | None = None,
+) -> bool:
     """Remove a card from a deck by Scryfall ID.
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID.
         scryfall_id: Scryfall ID of the card to remove.
+        account_id: When provided, only succeeds if the deck is owned by this
+            account.
 
     Returns:
-        True if removed, False if not found.
+        True if removed, False if not found / not owned.
     """
     async with pool.acquire() as conn:
+        if account_id is not None:
+            try:
+                await _assert_owner(conn, deck_id, account_id)
+            except DeckNotFoundError:
+                return False
         card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
         if card_row is None:
             return False

@@ -203,16 +203,38 @@ async def test_import_color_violation_reported(client: AsyncClient) -> None:
     assert data["imported_count"] == 1  # Sol Ring added; Rhystic Study skipped
 
 
-async def test_import_with_owner(client: AsyncClient) -> None:
+async def test_import_owner_derived_from_auth(client: AsyncClient) -> None:
+    """Imported deck's owner_id reflects the authenticated account, ignoring any
+    client-supplied value."""
     account_id = await create_test_account(client, "Import Owner")
     text = "1 Hazel of the Rootbloom *CMDR*\n1 Sol Ring"
     resp = await client.post(
         "/api/v1/decks/import",
-        json={"deck_list": text, "name": "Owner Test", "owner_id": account_id},
+        json={"deck_list": text, "name": "Owner Test"},
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["deck"]["owner_id"] == account_id
+
+
+async def test_import_ignores_client_supplied_owner_id(client: AsyncClient) -> None:
+    """Pydantic drops unknown fields by default; a stale `owner_id` in the body
+    must not override the authenticated account."""
+    account_id = await create_test_account(client, "Auth Wins")
+    text = "1 Hazel of the Rootbloom *CMDR*\n1 Sol Ring"
+    bogus = "00000000-0000-0000-0000-000000000099"
+    resp = await client.post(
+        "/api/v1/decks/import",
+        json={
+            "deck_list": text,
+            "name": "Auth Wins Test",
+            "owner_id": bogus,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    assert data["deck"]["owner_id"] == account_id
+    assert data["deck"]["owner_id"] != bogus
 
 
 async def test_import_with_bracket(client: AsyncClient) -> None:

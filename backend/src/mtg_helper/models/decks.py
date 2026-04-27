@@ -15,7 +15,6 @@ class DeckCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = None
     bracket: int = Field(default=3, ge=1, le=4)
-    owner_id: UUID | None = None
     stage_targets: dict[str, int] | None = None
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
     max_price_cents: int | None = Field(default=None, gt=0)
@@ -29,7 +28,6 @@ class DeckUpdate(BaseModel):
     description: str | None = None
     bracket: int | None = Field(default=None, ge=1, le=4)
     stage: str | None = None
-    owner_id: UUID | None = None
     stage_targets: dict[str, int] | None = None
     suggestion_collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, ge=0)
@@ -139,7 +137,6 @@ class DeckImportRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = None
     bracket: int = Field(default=3, ge=1, le=4)
-    owner_id: UUID | None = None
 
 
 class DeckImportResponse(BaseModel):

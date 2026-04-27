@@ -275,15 +275,19 @@ async def create_test_deck(
     client: AsyncClient,
     *,
     name: str = "Test Deck",
-    owner_id: str | None = None,
+    owner_id: str | None = None,  # noqa: ARG001 — kept for backwards-compat with callers
 ) -> str:
-    """Helper: create a deck (with optional owner) and return its ID."""
+    """Helper: create a deck owned by the current authenticated account.
+
+    The ``owner_id`` argument is kept for caller compatibility but ignored;
+    server now derives ownership from the auth dependency. Tests that need a
+    specific owner should call ``create_test_account`` first to switch the
+    auth override.
+    """
     payload: dict = {
         "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
         "name": name,
     }
-    if owner_id is not None:
-        payload["owner_id"] = owner_id
     resp = await client.post("/api/v1/decks", json=payload)
     assert resp.status_code == 201
     return resp.json()["data"]["id"]

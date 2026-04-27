@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
-import { getCurrentAccountId } from "@/lib/account";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { DeckImportResponse } from "@/lib/types";
 
@@ -32,13 +31,11 @@ export default function ImportDeckPage() {
     setError(null);
     setResult(null);
     try {
-      const ownerId = await getCurrentAccountId();
       const imported = await apiClient.importDeck({
         deck_list: deckList,
         name: name.trim(),
         description: description.trim() || null,
         bracket,
-        owner_id: ownerId || null,
       });
       setResult(imported);
     } catch (err) {

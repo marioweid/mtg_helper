@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardSearch } from "@/components/card-search";
 import { apiClient } from "@/lib/api";
-import { getCurrentAccountId } from "@/lib/account";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse, DescribeMessage } from "@/lib/types";
 
@@ -120,14 +119,12 @@ export default function NewDeckPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const ownerId = await getCurrentAccountId();
       const deck = await apiClient.createDeck({
         commander_scryfall_id: commander.scryfall_id,
         partner_scryfall_id: partner?.scryfall_id ?? null,
         name: deckName.trim() || `${commander.name} Deck`,
         description: description.trim() || null,
         bracket,
-        owner_id: ownerId || null,
         stage_targets: stageTargets,
       });
       router.push(`/decks/${deck.id}/build`);
