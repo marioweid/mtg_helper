@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { signOut } from "@/auth";
 
 export function Nav() {
   return (
@@ -25,6 +26,20 @@ export function Nav() {
         >
           Preferences
         </Link>
+        <form
+          action={async () => {
+            "use server";
+            await signOut({ redirectTo: "/signin" });
+          }}
+          className="ml-auto flex-shrink-0"
+        >
+          <button
+            type="submit"
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Sign out
+          </button>
+        </form>
       </div>
     </nav>
   );
