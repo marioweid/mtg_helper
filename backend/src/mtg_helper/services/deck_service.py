@@ -280,6 +280,10 @@ async def get_deck(
             if owner is None or owner.lower() != _normalize_email(email):
                 return None
         card_rows = await conn.fetch("SELECT * FROM deck_detail_view WHERE deck_id = $1", deck_id)
+        commander_identity = await _get_color_identity(conn, deck_row["commander_id"])
+        if deck_row["partner_id"]:
+            partner_identity = await _get_color_identity(conn, deck_row["partner_id"])
+            commander_identity = sorted(set(commander_identity) | set(partner_identity))
 
     return DeckDetailResponse(
         id=deck_row["id"],
@@ -289,6 +293,7 @@ async def get_deck(
         stage=deck_row["stage"],
         commander_id=deck_row["commander_id"],
         partner_id=deck_row["partner_id"],
+        commander_color_identity=commander_identity,
         owner_email=deck_row["owner_email"],
         created_at=deck_row["created_at"],
         updated_at=deck_row["updated_at"],

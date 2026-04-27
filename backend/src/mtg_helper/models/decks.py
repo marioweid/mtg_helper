@@ -97,6 +97,7 @@ class DeckDetailResponse(BaseModel):
     stage: str
     commander_id: UUID
     partner_id: UUID | None
+    commander_color_identity: list[str] = Field(default_factory=list)
     owner_email: str | None
     created_at: datetime
     updated_at: datetime

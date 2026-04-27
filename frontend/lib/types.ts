@@ -95,6 +95,7 @@ export interface DeckDetailResponse {
   stage: string;
   commander_id: string;
   partner_id: string | null;
+  commander_color_identity: string[];
   owner_email: string | null;
   created_at: string;
   updated_at: string;

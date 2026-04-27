@@ -377,14 +377,12 @@ export default function BuildPage() {
     apiClient
       .getDeck(deckId)
       .then((deck) => {
-        const allColors = new Set<string>();
         const counts: Record<string, number> = {};
         for (const card of deck.cards) {
-          for (const c of card.color_identity) allColors.add(c);
           const cat = card.category ?? "other";
           counts[cat] = (counts[cat] ?? 0) + (card.quantity ?? 1);
         }
-        setDeckColorIdentity([...allColors].join(","));
+        setDeckColorIdentity(deck.commander_color_identity.join(","));
         setDeckCategoryCounts(counts);
         setDeckCards(deck.cards);
         setSelectedCollectionIds(deck.suggestion_collection_ids);
@@ -722,6 +720,7 @@ export default function BuildPage() {
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });
+      void refreshDeck();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add card");
       setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "pending" }));
@@ -741,6 +740,7 @@ export default function BuildPage() {
     setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "pending" }));
     try {
       await apiClient.removeCard(deckId, suggestion.scryfall_id);
+      void refreshDeck();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to remove card");
       setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "accepted" }));
@@ -775,6 +775,7 @@ export default function BuildPage() {
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });
+      void refreshDeck();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add card");
       setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "rejected" }));
