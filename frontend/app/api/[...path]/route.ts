@@ -27,7 +27,7 @@ async function forward(
   }
 
   const session = await auth();
-  if (!session) {
+  if (!session || session.error === "RefreshFailed" || !session.idToken) {
     return NextResponse.json(
       { error: { code: "UNAUTHENTICATED", message: "sign in required" } },
       { status: 401 },
