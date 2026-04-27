@@ -280,14 +280,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS accounts_email_unique_idx
 -- Email is unique app-wide, immutable enough for ownership, and avoids
 -- orphaning when the accounts row is recreated under a new UUID.
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS owner_email TEXT;
-UPDATE decks d
-   SET owner_email = a.email
-  FROM accounts a
- WHERE d.owner_email IS NULL
-   AND d.owner_id = a.id
-   AND a.email IS NOT NULL;
-ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_owner_id_fkey;
-ALTER TABLE decks DROP COLUMN IF EXISTS owner_id;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'decks' AND column_name = 'owner_id'
+    ) THEN
+        EXECUTE $mig$
+            UPDATE decks d
+               SET owner_email = a.email
+              FROM accounts a
+             WHERE d.owner_email IS NULL
+               AND d.owner_id = a.id
+               AND a.email IS NOT NULL
+        $mig$;
+        ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_owner_id_fkey;
+        ALTER TABLE decks DROP COLUMN IF EXISTS owner_id;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_decks_owner_email ON decks (lower(owner_email));
 
 -- ============================================================

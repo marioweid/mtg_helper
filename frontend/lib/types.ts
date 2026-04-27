@@ -60,7 +60,7 @@ export interface DeckResponse {
   stage: string;
   commander_id: string;
   partner_id: string | null;
-  owner_id: string | null;
+  owner_email: string | null;
   created_at: string;
   updated_at: string;
   stage_targets: Record<string, number>;
@@ -95,7 +95,7 @@ export interface DeckDetailResponse {
   stage: string;
   commander_id: string;
   partner_id: string | null;
-  owner_id: string | null;
+  owner_email: string | null;
   created_at: string;
   updated_at: string;
   stage_targets: Record<string, number>;
