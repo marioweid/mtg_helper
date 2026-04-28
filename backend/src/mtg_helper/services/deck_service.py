@@ -1,6 +1,8 @@
 """Deck CRUD service with color identity validation."""
 
+import asyncio
 import json
+import logging
 from uuid import UUID
 
 import asyncpg
@@ -15,6 +17,8 @@ from mtg_helper.models.decks import (
     DeckSummary,
     DeckUpdate,
 )
+
+_log = logging.getLogger(__name__)
 
 # Ordered list of build stages. "created" is the initial state before any stage.
 STAGES: list[str] = ["ramp", "interaction", "draw", "theme", "utility", "lands", "complete"]
@@ -201,7 +205,23 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             data.max_price_cents,
             data.min_price_cents,
         )
-    return _row_to_deck(row)
+    deck = _row_to_deck(row)
+    asyncio.create_task(_safe_edhrec_refresh(pool, deck.commander_id))
+    return deck
+
+
+async def _safe_edhrec_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
+    """Pre-warm the EDHREC cache for a freshly created deck's commander.
+
+    Errors are logged and swallowed so deck creation never fails because of an
+    EDHREC outage or slug miss.
+    """
+    from mtg_helper.services import edhrec_service
+
+    try:
+        await edhrec_service.get_or_refresh(pool, commander_id)
+    except Exception:
+        _log.exception("Background EDHREC refresh failed for commander %s", commander_id)
 
 
 async def list_decks(

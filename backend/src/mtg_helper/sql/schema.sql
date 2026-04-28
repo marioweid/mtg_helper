@@ -301,6 +301,22 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_decks_owner_email ON decks (lower(owner_email));
 
 -- ============================================================
+-- EDHREC COMMANDER RECOMMENDATIONS (cached per commander)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS edhrec_commander_recs (
+    commander_id  UUID PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
+    slug          TEXT NOT NULL,
+    payload       JSONB NOT NULL,
+    fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- New ranking weight: per-commander EDHREC inclusion. Heavy default.
+ALTER TABLE account_ranking_weights
+    ADD COLUMN IF NOT EXISTS deck_inclusion REAL NOT NULL DEFAULT 0.20;
+ALTER TABLE account_ranking_weights
+    ALTER COLUMN popularity SET DEFAULT 0.10;
+
+-- ============================================================
 -- VIEW: deck detail with full card info
 -- ============================================================
 CREATE OR REPLACE VIEW deck_detail_view AS

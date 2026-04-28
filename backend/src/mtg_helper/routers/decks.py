@@ -61,9 +61,7 @@ async def list_decks(
 ) -> DataResponse[list[DeckSummary]]:
     """List the authenticated account's decks with commander info and card count."""
     email = _require_email(account)
-    decks, total = await deck_service.list_decks(
-        request.app.state.db_pool, email, limit, offset
-    )
+    decks, total = await deck_service.list_decks(request.app.state.db_pool, email, limit, offset)
     return DataResponse(data=decks, meta=PaginationMeta(total=total, limit=limit, offset=offset))
 
 
@@ -163,9 +161,7 @@ async def add_card(
     """Add a card to a deck, enforcing color identity rules."""
     email = _require_email(account)
     try:
-        card = await deck_service.add_card_to_deck(
-            request.app.state.db_pool, deck_id, body, email
-        )
+        card = await deck_service.add_card_to_deck(request.app.state.db_pool, deck_id, body, email)
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
     except CardNotFoundError as e:

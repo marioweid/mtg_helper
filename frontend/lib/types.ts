@@ -244,6 +244,7 @@ export interface RankingWeights {
   synergy: number;
   popularity: number;
   personal: number;
+  deck_inclusion: number;
 }
 
 export interface RankingWeightsResponse extends RankingWeights {
@@ -256,6 +257,7 @@ export interface RankingWeightsUpdate {
   synergy: number;
   popularity: number;
   personal: number;
+  deck_inclusion: number;
 }
 
 // Collections

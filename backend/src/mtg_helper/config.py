@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     database_url: str
     gemini_api_key: str = ""
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
+    edhrec_base_url: str = "https://json.edhrec.com/pages/commanders"
 
     # Qdrant vector search
     qdrant_url: str = "http://qdrant:6333"

@@ -7,8 +7,9 @@ from pydantic import BaseModel, Field
 
 _DEFAULT_SEMANTIC: float = 0.25
 _DEFAULT_SYNERGY: float = 0.22
-_DEFAULT_POPULARITY: float = 0.20
+_DEFAULT_POPULARITY: float = 0.10
 _DEFAULT_PERSONAL: float = 0.15
+_DEFAULT_DECK_INCLUSION: float = 0.20
 
 
 class RankingWeights(BaseModel):
@@ -18,6 +19,7 @@ class RankingWeights(BaseModel):
     synergy: float = Field(default=_DEFAULT_SYNERGY, ge=0.0, le=1.0)
     popularity: float = Field(default=_DEFAULT_POPULARITY, ge=0.0, le=1.0)
     personal: float = Field(default=_DEFAULT_PERSONAL, ge=0.0, le=1.0)
+    deck_inclusion: float = Field(default=_DEFAULT_DECK_INCLUSION, ge=0.0, le=1.0)
 
 
 class RankingWeightsResponse(RankingWeights):
@@ -34,3 +36,4 @@ class RankingWeightsUpdate(BaseModel):
     synergy: float = Field(ge=0.0, le=1.0)
     popularity: float = Field(ge=0.0, le=1.0)
     personal: float = Field(ge=0.0, le=1.0)
+    deck_inclusion: float = Field(ge=0.0, le=1.0)

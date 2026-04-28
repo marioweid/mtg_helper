@@ -10,20 +10,28 @@ import type {
   RankingWeightsResponse,
 } from "@/lib/types";
 
-const DEFAULT_WEIGHTS = { semantic: 0.25, synergy: 0.22, popularity: 0.20, personal: 0.15 };
+const DEFAULT_WEIGHTS = {
+  semantic: 0.25,
+  synergy: 0.22,
+  popularity: 0.10,
+  personal: 0.15,
+  deck_inclusion: 0.20,
+};
 
 const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   semantic: "Semantic Match",
   synergy: "Tag Synergy",
   popularity: "EDHREC Popularity",
   personal: "Personal Feedback",
+  deck_inclusion: "Used in Other Decks",
 };
 
 const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   semantic: "How closely a card matches the deck strategy description",
   synergy: "How many relevant tags a card shares with the deck",
-  popularity: "How often the card appears in similar decks on EDHREC",
+  popularity: "How often the card appears anywhere on EDHREC (global rank)",
   personal: "Your accept/reject history for this deck",
+  deck_inclusion: "How often the card appears in EDHREC decks for your specific commander",
 };
 
 export default function PreferencesPage() {
@@ -52,7 +60,13 @@ export default function PreferencesPage() {
         await loadPreferences();
         const w = await apiClient.getRankingWeights();
         setRankingWeights(w);
-        setDraftWeights({ semantic: w.semantic, synergy: w.synergy, popularity: w.popularity, personal: w.personal });
+        setDraftWeights({
+          semantic: w.semantic,
+          synergy: w.synergy,
+          popularity: w.popularity,
+          personal: w.personal,
+          deck_inclusion: w.deck_inclusion,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize account");
       } finally {
@@ -73,7 +87,13 @@ export default function PreferencesPage() {
     try {
       const updated = await apiClient.updateRankingWeights(draftWeights);
       setRankingWeights(updated);
-      setDraftWeights({ semantic: updated.semantic, synergy: updated.synergy, popularity: updated.popularity, personal: updated.personal });
+      setDraftWeights({
+        semantic: updated.semantic,
+        synergy: updated.synergy,
+        popularity: updated.popularity,
+        personal: updated.personal,
+        deck_inclusion: updated.deck_inclusion,
+      });
       setWeightsDirty(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save ranking weights");

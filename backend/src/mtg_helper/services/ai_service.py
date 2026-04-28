@@ -725,6 +725,8 @@ async def build_stage(
         ranking_weights=ranking_weights,
         collection_filter=collection_filter,
         price_filter=price_filter,
+        commander_id=deck.commander_id,
+        bracket=deck.bracket,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
@@ -815,6 +817,8 @@ async def suggest_cards(
         type_filter=type_filter,
         collection_filter=collection_filter,
         price_filter=price_filter,
+        commander_id=deck.commander_id,
+        bracket=deck.bracket,
     )
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 

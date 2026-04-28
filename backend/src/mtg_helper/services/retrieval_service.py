@@ -20,7 +20,7 @@ from qdrant_client.models import (
 
 from mtg_helper.config import settings
 from mtg_helper.models.ranking_weights import RankingWeights
-from mtg_helper.services import profile_service
+from mtg_helper.services import edhrec_service, profile_service
 from mtg_helper.services.embedding_service import embed_single
 from mtg_helper.services.llm_client import LLMClient
 
@@ -976,6 +976,7 @@ def _compute_weighted_scores(
     type_filter: TypeFilter | None = None,
     stage: str | None = None,
     ranking_weights: RankingWeights | None = None,
+    edhrec_inclusion: dict[UUID, float] | None = None,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
@@ -1049,6 +1050,8 @@ def _compute_weighted_scores(
         else:
             profile_score = 0.5
 
+        inclusion = edhrec_inclusion.get(uid, 0.0) if edhrec_inclusion else 0.0
+
         if type_filter is not None:
             type_score = _type_match_score(row, type_filter)
             if type_filter.strict and type_score == 0.0:
@@ -1066,6 +1069,7 @@ def _compute_weighted_scores(
                 + _W_CURVE * curve
                 + w.personal * personal
                 + _W_PROFILE * profile_score
+                + w.deck_inclusion * inclusion
             )
         else:
             scores[uid] = (
@@ -1076,6 +1080,7 @@ def _compute_weighted_scores(
                 + _W_CURVE * curve
                 + w.personal * personal
                 + _W_PROFILE * profile_score
+                + w.deck_inclusion * inclusion
             )
 
     return scores
@@ -1099,6 +1104,20 @@ def _annotate_type_signals(
                 entry.append("type")
 
 
+def _annotate_edhrec_signals(
+    signal_map: dict[UUID, list[str]],
+    edhrec_inclusion: dict[UUID, float],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+) -> None:
+    """Add 'edhrec' to signal_map for cards present in the commander's EDHREC lists."""
+    for uid, weight in edhrec_inclusion.items():
+        if weight <= 0.0 or uid not in cards_by_id:
+            continue
+        entry = signal_map.setdefault(uid, [])
+        if "edhrec" not in entry:
+            entry.append("edhrec")
+
+
 async def retrieve_candidates(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
@@ -1117,6 +1136,8 @@ async def retrieve_candidates(
     ranking_weights: RankingWeights | None = None,
     collection_filter: CollectionFilter | None = None,
     price_filter: PriceFilter | None = None,
+    commander_id: UUID | None = None,
+    bracket: int | None = None,
 ) -> list[RetrievedCard]:
     """Run hybrid retrieval and return top candidate cards with weighted scoring.
 
@@ -1140,6 +1161,9 @@ async def retrieve_candidates(
         ranking_weights: Optional per-user signal weight overrides.
         collection_filter: When set, restricts candidates to owned cards.
         price_filter: When set, excludes cards above the EUR cap (nonfoil).
+        commander_id: When set, fetches EDHREC commander recommendations and
+            applies the deck_inclusion ranking signal.
+        bracket: Deck bracket; gates EDHREC's gamechangers category.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1179,7 +1203,28 @@ async def retrieve_candidates(
     qdrant_scores, tag_overlaps, fts_set, signal_map = _build_signal_map(
         semantic_results, tag_results, fts_ids
     )
-    all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set})
+
+    edhrec_inclusion: dict[UUID, float] = {}
+    if commander_id is not None:
+        try:
+            payload = await edhrec_service.get_or_refresh(pool, commander_id)
+            edhrec_inclusion = await edhrec_service.score_inclusion(
+                pool,
+                payload,
+                commander_color_identity,
+                bracket=bracket,
+            )
+        except Exception:
+            _log.exception("EDHREC inclusion lookup failed; continuing without boost")
+
+    # Include EDHREC-only matches as candidates so a high-synergy card not
+    # surfaced by semantic/tag/FTS still has a path into the result set.
+    edhrec_extra = [
+        uid
+        for uid in edhrec_inclusion
+        if uid not in qdrant_scores and uid not in tag_overlaps and uid not in fts_set
+    ]
+    all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set, *edhrec_extra})
     if not all_ids:
         return []
 
@@ -1201,9 +1246,11 @@ async def retrieve_candidates(
         type_filter,
         stage=stage,
         ranking_weights=ranking_weights,
+        edhrec_inclusion=edhrec_inclusion,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
+    _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
     ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
     top_ids = ranked[:limit]
     if not top_ids:

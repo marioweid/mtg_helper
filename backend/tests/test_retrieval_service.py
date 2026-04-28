@@ -205,6 +205,48 @@ def test_weighted_score_skips_missing_rows() -> None:
     assert _B not in scores
 
 
+def test_weighted_score_edhrec_inclusion_boosts_card() -> None:
+    rows = {_A: _make_row(_A), _B: _make_row(_B)}
+    scores = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.5, _B: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        edhrec_inclusion={_A: 1.0},
+    )
+    assert scores[_A] > scores[_B]
+
+
+def test_weighted_score_edhrec_inclusion_none_is_noop() -> None:
+    rows = {_A: _make_row(_A), _B: _make_row(_B)}
+    base = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.5, _B: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
+        feedback_weights=None,
+    )
+    explicit_none = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.5, _B: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        edhrec_inclusion=None,
+    )
+    assert base == explicit_none
+
+
 def test_weighted_score_range_zero_to_one() -> None:
     rows = {_A: _make_row(_A, edhrec_rank=1), _B: _make_row(_B, edhrec_rank=10000)}
     scores = _compute_weighted_scores(
