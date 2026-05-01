@@ -85,6 +85,7 @@ class DeckCardItem(BaseModel):
     category: str | None
     added_by: str
     ai_reasoning: str | None
+    qualifying_stages: list[str] = Field(default_factory=list)
 
 
 class DeckDetailResponse(BaseModel):

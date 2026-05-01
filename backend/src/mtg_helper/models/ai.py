@@ -42,6 +42,7 @@ class CardSuggestion(BaseModel):
     highlight_reasons: list[str] | None = None
     price_eur_cents: int | None = None
     owned_in: list[CollectionMembership] = Field(default_factory=list)
+    qualifying_stages: list[str] = Field(default_factory=list)
 
 
 class BuildResponse(BaseModel):

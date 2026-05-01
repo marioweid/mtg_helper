@@ -17,6 +17,7 @@ from mtg_helper.models.decks import (
     DeckSummary,
     DeckUpdate,
 )
+from mtg_helper.services.retrieval_service import card_qualifying_stages
 
 _log = logging.getLogger(__name__)
 
@@ -95,6 +96,10 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
 
 
 def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
+    tags = list(row["tags"] or []) if "tags" in row.keys() else []
+    stages = card_qualifying_stages(tags, row["type_line"])
+    if row["category"] and row["category"] not in stages:
+        stages.append(row["category"])
     return DeckCardItem(
         deck_card_id=row["deck_card_id"],
         card_id=row["card_id"],
@@ -111,6 +116,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         category=row["category"],
         added_by=row["added_by"],
         ai_reasoning=row["ai_reasoning"],
+        qualifying_stages=stages,
     )
 
 

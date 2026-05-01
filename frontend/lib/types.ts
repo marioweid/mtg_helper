@@ -85,6 +85,7 @@ export interface DeckCardItem {
   category: string | null;
   added_by: string;
   ai_reasoning: string | null;
+  qualifying_stages: string[];
 }
 
 export interface DeckDetailResponse {
@@ -169,6 +170,7 @@ export interface CardSuggestion {
   highlight_reasons: string[] | null;
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
+  qualifying_stages: string[];
 }
 
 export interface BuildResponse {

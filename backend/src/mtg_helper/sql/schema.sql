@@ -336,6 +336,7 @@ SELECT
     c.oracle_text,
     c.color_identity,
     c.image_uri,
-    c.rarity
+    c.rarity,
+    c.tags
 FROM deck_cards dc
 JOIN cards c ON dc.card_id = c.id;

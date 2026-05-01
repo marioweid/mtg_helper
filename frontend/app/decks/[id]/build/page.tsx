@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useEffect, useCallback, useState } from "react";
+import { useReducer, useEffect, useCallback, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient, ApiError } from "@/lib/api";
@@ -115,6 +115,20 @@ function basicLandsForIdentity(identity: string): readonly string[] {
     if (land) allowed.add(land);
   }
   return BASIC_LAND_NAMES.filter((n) => allowed.has(n));
+}
+
+function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const card of cards) {
+    const stages =
+      card.qualifying_stages && card.qualifying_stages.length > 0
+        ? card.qualifying_stages
+        : [card.category ?? "other"];
+    for (const stage of stages) {
+      counts[stage] = (counts[stage] ?? 0) + (card.quantity ?? 1);
+    }
+  }
+  return counts;
 }
 
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
@@ -352,6 +366,13 @@ export default function BuildPage() {
   const [savingPriceCap, setSavingPriceCap] = useState(false);
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [typePanelOpen, setTypePanelOpen] = useState(false);
+  const [globalRejectedIds, setGlobalRejectedIds] = useState<Set<string>>(new Set());
+  const [globalRejectedNames, setGlobalRejectedNames] = useState<string[]>([]);
+
+  const acceptedScryfallIds = useMemo(
+    () => new Set(deckCards.map((c) => c.scryfall_id)),
+    [deckCards],
+  );
 
   useEffect(() => {
     apiClient
@@ -372,12 +393,7 @@ export default function BuildPage() {
   const refreshDeck = useCallback(async () => {
     try {
       const deck = await apiClient.getDeck(deckId);
-      const counts: Record<string, number> = {};
-      for (const card of deck.cards) {
-        const cat = card.category ?? "other";
-        counts[cat] = (counts[cat] ?? 0) + (card.quantity ?? 1);
-      }
-      setDeckCategoryCounts(counts);
+      setDeckCategoryCounts(computeStageCounts(deck.cards));
       setDeckCards(deck.cards);
     } catch {
       /* non-critical */
@@ -389,13 +405,8 @@ export default function BuildPage() {
     apiClient
       .getDeck(deckId)
       .then((deck) => {
-        const counts: Record<string, number> = {};
-        for (const card of deck.cards) {
-          const cat = card.category ?? "other";
-          counts[cat] = (counts[cat] ?? 0) + (card.quantity ?? 1);
-        }
         setDeckColorIdentity(deck.commander_color_identity.join(","));
-        setDeckCategoryCounts(counts);
+        setDeckCategoryCounts(computeStageCounts(deck.cards));
         setDeckCards(deck.cards);
         setSelectedCollectionIds(deck.suggestion_collection_ids);
         setMaxPriceCents(deck.max_price_cents ?? null);
@@ -444,10 +455,15 @@ export default function BuildPage() {
   }, [searchQuery, searchType, deckColorIdentity]);
 
   const loadStage = useCallback(
-    async (stage: string) => {
+    async (stage: string, extraExclude: string[] = []) => {
       dispatch({ type: "LOAD_START", stage });
       try {
-        const result = await apiClient.buildStage(deckId, { stage, target: 80 });
+        const exclude = extraExclude.length > 0 ? extraExclude : undefined;
+        const result = await apiClient.buildStage(deckId, {
+          stage,
+          target: 80,
+          ...(exclude ? { exclude } : {}),
+        });
         dispatch({
           type: "LOAD_SUCCESS",
           stage,
@@ -474,7 +490,7 @@ export default function BuildPage() {
     ) => {
       dispatch({ type: "LOAD_START", stage });
       try {
-        const exclude = [...existingNames, ...rejectedNames];
+        const exclude = [...existingNames, ...rejectedNames, ...globalRejectedNames];
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
@@ -495,7 +511,7 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId],
+    [deckId, globalRejectedNames],
   );
 
   function switchStage(stage: string) {
@@ -621,6 +637,14 @@ export default function BuildPage() {
       scryfallId: suggestion.scryfall_id,
       cardName: suggestion.name,
     });
+    setGlobalRejectedIds((prev) => {
+      const next = new Set(prev);
+      next.add(suggestion.scryfall_id);
+      return next;
+    });
+    setGlobalRejectedNames((prev) =>
+      prev.includes(suggestion.name) ? prev : [...prev, suggestion.name],
+    );
     try {
       await apiClient.addFeedback(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
@@ -741,6 +765,14 @@ export default function BuildPage() {
 
   async function handlePromptReject(suggestion: CardSuggestion) {
     setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "rejected" }));
+    setGlobalRejectedIds((prev) => {
+      const next = new Set(prev);
+      next.add(suggestion.scryfall_id);
+      return next;
+    });
+    setGlobalRejectedNames((prev) =>
+      prev.includes(suggestion.name) ? prev : [...prev, suggestion.name],
+    );
     try {
       await apiClient.addFeedback(deckId, { card_scryfall_id: suggestion.scryfall_id, feedback: "down" });
     } catch {
@@ -802,12 +834,26 @@ export default function BuildPage() {
     return typeFilters.some((t) => tl.includes(t));
   }
 
+  function isHiddenCrossStage(s: CardSuggestion, status: SuggestionStatus): boolean {
+    if (globalRejectedIds.has(s.scryfall_id) && status !== "rejected") return true;
+    if (acceptedScryfallIds.has(s.scryfall_id) && status !== "accepted") return true;
+    return false;
+  }
+
   const filteredSuggestions = activeStageState
-    ? activeStageState.suggestions.filter((s) => matchesTypeFilters(s.type_line))
+    ? activeStageState.suggestions.filter((s) => {
+        if (!matchesTypeFilters(s.type_line)) return false;
+        const status = activeStageState.statuses[s.scryfall_id] ?? "pending";
+        if (isHiddenCrossStage(s, status)) return false;
+        return true;
+      })
     : [];
-  const filteredPromptSuggestions = promptSuggestions.filter((s) =>
-    matchesTypeFilters(s.type_line),
-  );
+  const filteredPromptSuggestions = promptSuggestions.filter((s) => {
+    if (!matchesTypeFilters(s.type_line)) return false;
+    const status = promptStatuses[s.scryfall_id] ?? "pending";
+    if (isHiddenCrossStage(s, status)) return false;
+    return true;
+  });
 
   return (
     <div>

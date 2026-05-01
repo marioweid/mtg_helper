@@ -36,6 +36,7 @@ from mtg_helper.services.retrieval_service import (
     CollectionFilter,
     PriceFilter,
     RetrievedCard,
+    card_qualifying_stages,
     parse_query_tags,
     parse_query_types,
     retrieve_candidates,
@@ -169,6 +170,9 @@ def _card_from_retrieved(
 
     cmc_float: float | None = float(card.cmc) if card.cmc is not None else None
     owned_in = (ownership_map or {}).get(card.scryfall_id, [])
+    qualifying_stages = card_qualifying_stages(card.tags, card.type_line)
+    if stage not in qualifying_stages:
+        qualifying_stages.append(stage)
 
     return CardSuggestion(
         scryfall_id=card.scryfall_id,
@@ -187,6 +191,7 @@ def _card_from_retrieved(
         highlight_reasons=_compute_highlight_reasons(card),
         price_eur_cents=card.price_eur_cents,
         owned_in=owned_in,
+        qualifying_stages=qualifying_stages,
     )
 
 

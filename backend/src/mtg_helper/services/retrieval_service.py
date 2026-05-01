@@ -219,6 +219,38 @@ _TOKEN_TYPE_NAMES: dict[str, str] = {
     "horror": "horror",
 }
 
+# Stages that a card auto-cross-counts into based on tags / type. Theme is
+# deck-specific (no tag mapping) and bangers is a tag superset that would
+# double-count everything; both are excluded from auto-membership.
+_STAGE_TAG_MEMBERSHIP: dict[str, frozenset[str]] = {
+    "ramp": frozenset({"ramp", "fast_mana"}),
+    "interaction": frozenset({"removal", "counterspell", "board_wipe", "protection"}),
+    "draw": frozenset({"draw"}),
+    "utility": frozenset({"tutor", "graveyard", "blink", "protection"}),
+}
+
+
+def card_qualifying_stages(tags: list[str], type_line: str | None) -> list[str]:
+    """Return the build stages this card naturally fits into.
+
+    A card may qualify for multiple stages — e.g. a card tagged both `ramp`
+    and `draw` qualifies for both. Lands always qualify for the `lands`
+    stage by type. `theme` and `bangers` are excluded.
+
+    Args:
+        tags: Tag list from `cards.tags`.
+        type_line: Card type line (used to detect lands).
+
+    Returns:
+        Deduplicated list of stage names.
+    """
+    tag_set = set(tags)
+    stages = [s for s, req in _STAGE_TAG_MEMBERSHIP.items() if tag_set & req]
+    if type_line and "Land" in type_line and "lands" not in stages:
+        stages.append("lands")
+    return stages
+
+
 # Maps stage names to (query_text, query_tags)
 _STAGE_QUERIES: dict[str, tuple[str, list[str]]] = {
     "ramp": ("mana ramp acceleration mana rocks mana dorks", ["ramp", "fast_mana"]),
