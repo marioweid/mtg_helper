@@ -37,6 +37,14 @@ resource "google_compute_instance" "vm" {
     startup-script = file("${path.module}/startup-script.sh")
   }
 
+  scheduling {
+    provisioning_model          = var.spot_vm ? "SPOT" : "STANDARD"
+    preemptible                 = var.spot_vm
+    automatic_restart           = !var.spot_vm
+    on_host_maintenance         = var.spot_vm ? "TERMINATE" : "MIGRATE"
+    instance_termination_action = var.spot_vm ? "STOP" : null
+  }
+
   service_account {
     email  = google_service_account.vm.email
     scopes = ["cloud-platform"]

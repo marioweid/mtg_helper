@@ -60,3 +60,15 @@ variable "github_branch" {
   type        = string
   default     = "main"
 }
+
+variable "spot_vm" {
+  description = "Run the VM as Spot (~70% cheaper, can be preempted ≤24h). Auto-restart job recovers it."
+  type        = bool
+  default     = true
+}
+
+variable "auto_restart_schedule" {
+  description = "Cron schedule for the auto-restart job that brings the spot VM back after preemption."
+  type        = string
+  default     = "* * * * *"
+}

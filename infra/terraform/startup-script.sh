@@ -26,6 +26,13 @@ fi
 mountpoint -q /srv/mtg-helper/data || mount -a
 mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
 
+# --- Repo lives on the data disk so it survives VM replacement (spot preempt,
+# image upgrades, etc). Symlink /opt/mtg-helper → /srv/mtg-helper/data/repo.
+if [ ! -L /opt/mtg-helper ]; then
+  rm -rf /opt/mtg-helper
+  ln -s /srv/mtg-helper/data/repo /opt/mtg-helper
+fi
+
 # --- Add real users (uid >= 1000) to the docker group ------------------------
 for u in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1}'); do
   usermod -aG docker "$u" || true
@@ -54,4 +61,16 @@ if [[ $- == *i* ]] && command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init bash --disable-up-arrow)"
 fi
 EOF
+fi
+
+# --- Bring the stack up. Containers also have restart: unless-stopped, so
+# subsequent reboots are no-ops; this handles the cold-start case (initial
+# bootstrap, boot-disk replacement, post-`docker compose down`).
+if [ -f /opt/mtg-helper/.env.prod ] && [ -f /opt/mtg-helper/docker-compose.prod.yml ]; then
+  cd /opt/mtg-helper
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    docker info >/dev/null 2>&1 && break
+    sleep 2
+  done
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
 fi
