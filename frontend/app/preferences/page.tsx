@@ -16,6 +16,7 @@ const DEFAULT_WEIGHTS = {
   popularity: 0.10,
   personal: 0.15,
   deck_inclusion: 0.20,
+  moxfield_inclusion: 0.20,
 };
 
 const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
@@ -24,6 +25,7 @@ const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   popularity: "EDHREC Popularity",
   personal: "Personal Feedback",
   deck_inclusion: "Used in Other Decks",
+  moxfield_inclusion: "Moxfield Top Decks",
 };
 
 const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
@@ -32,6 +34,7 @@ const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   popularity: "How often the card appears anywhere on EDHREC (global rank)",
   personal: "Your accept/reject history for this deck",
   deck_inclusion: "How often the card appears in EDHREC decks for your specific commander",
+  moxfield_inclusion: "Cards from the most-liked Moxfield decks for this commander",
 };
 
 export default function PreferencesPage() {
@@ -66,6 +69,7 @@ export default function PreferencesPage() {
           popularity: w.popularity,
           personal: w.personal,
           deck_inclusion: w.deck_inclusion,
+          moxfield_inclusion: w.moxfield_inclusion,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize account");
@@ -93,6 +97,7 @@ export default function PreferencesPage() {
         popularity: updated.popularity,
         personal: updated.personal,
         deck_inclusion: updated.deck_inclusion,
+        moxfield_inclusion: updated.moxfield_inclusion,
       });
       setWeightsDirty(false);
     } catch (err) {

@@ -317,6 +317,21 @@ ALTER TABLE account_ranking_weights
     ALTER COLUMN popularity SET DEFAULT 0.10;
 
 -- ============================================================
+-- MOXFIELD TOP-DECK RECOMMENDATIONS (cached per commander)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS moxfield_commander_recs (
+    commander_id      UUID PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
+    moxfield_card_id  TEXT,
+    payload           JSONB NOT NULL,
+    fetched_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Per-commander Moxfield top-decks inclusion weight. Heavy default so the
+-- signal mirrors deck_inclusion (EDHREC) out of the box.
+ALTER TABLE account_ranking_weights
+    ADD COLUMN IF NOT EXISTS moxfield_inclusion REAL NOT NULL DEFAULT 0.20;
+
+-- ============================================================
 -- VIEW: deck detail with full card info
 -- ============================================================
 CREATE OR REPLACE VIEW deck_detail_view AS

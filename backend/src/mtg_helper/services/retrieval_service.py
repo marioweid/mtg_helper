@@ -20,7 +20,7 @@ from qdrant_client.models import (
 
 from mtg_helper.config import settings
 from mtg_helper.models.ranking_weights import RankingWeights
-from mtg_helper.services import edhrec_service, profile_service
+from mtg_helper.services import edhrec_service, moxfield_recs_service, profile_service
 from mtg_helper.services.embedding_service import embed_single
 from mtg_helper.services.llm_client import LLMClient
 
@@ -1009,6 +1009,7 @@ def _compute_weighted_scores(
     stage: str | None = None,
     ranking_weights: RankingWeights | None = None,
     edhrec_inclusion: dict[UUID, float] | None = None,
+    moxfield_inclusion: dict[UUID, float] | None = None,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
@@ -1083,6 +1084,7 @@ def _compute_weighted_scores(
             profile_score = 0.5
 
         inclusion = edhrec_inclusion.get(uid, 0.0) if edhrec_inclusion else 0.0
+        mox_inclusion = moxfield_inclusion.get(uid, 0.0) if moxfield_inclusion else 0.0
 
         if type_filter is not None:
             type_score = _type_match_score(row, type_filter)
@@ -1102,6 +1104,7 @@ def _compute_weighted_scores(
                 + w.personal * personal
                 + _W_PROFILE * profile_score
                 + w.deck_inclusion * inclusion
+                + w.moxfield_inclusion * mox_inclusion
             )
         else:
             scores[uid] = (
@@ -1113,6 +1116,7 @@ def _compute_weighted_scores(
                 + w.personal * personal
                 + _W_PROFILE * profile_score
                 + w.deck_inclusion * inclusion
+                + w.moxfield_inclusion * mox_inclusion
             )
 
     return scores
@@ -1148,6 +1152,48 @@ def _annotate_edhrec_signals(
         entry = signal_map.setdefault(uid, [])
         if "edhrec" not in entry:
             entry.append("edhrec")
+
+
+async def _fetch_inclusion_signals(
+    pool: asyncpg.Pool,
+    commander_id: UUID | None,
+    commander_color_identity: list[str],
+    bracket: int | None,
+) -> tuple[dict[UUID, float], dict[UUID, float]]:
+    """Fetch EDHREC + Moxfield inclusion scores; swallow per-source failures."""
+    edhrec_inclusion: dict[UUID, float] = {}
+    moxfield_inclusion: dict[UUID, float] = {}
+    if commander_id is None:
+        return edhrec_inclusion, moxfield_inclusion
+    try:
+        payload = await edhrec_service.get_or_refresh(pool, commander_id)
+        edhrec_inclusion = await edhrec_service.score_inclusion(
+            pool, payload, commander_color_identity, bracket=bracket
+        )
+    except Exception:
+        _log.exception("EDHREC inclusion lookup failed; continuing without boost")
+    try:
+        mox_payload = await moxfield_recs_service.get_or_refresh(pool, commander_id)
+        moxfield_inclusion = await moxfield_recs_service.score_inclusion(
+            pool, mox_payload, commander_color_identity
+        )
+    except Exception:
+        _log.exception("Moxfield inclusion lookup failed; continuing without boost")
+    return edhrec_inclusion, moxfield_inclusion
+
+
+def _annotate_moxfield_signals(
+    signal_map: dict[UUID, list[str]],
+    moxfield_inclusion: dict[UUID, float],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+) -> None:
+    """Add 'moxfield' to signal_map for cards present in top-liked Moxfield decks."""
+    for uid, weight in moxfield_inclusion.items():
+        if weight <= 0.0 or uid not in cards_by_id:
+            continue
+        entry = signal_map.setdefault(uid, [])
+        if "moxfield" not in entry:
+            entry.append("moxfield")
 
 
 async def retrieve_candidates(
@@ -1236,27 +1282,18 @@ async def retrieve_candidates(
         semantic_results, tag_results, fts_ids
     )
 
-    edhrec_inclusion: dict[UUID, float] = {}
-    if commander_id is not None:
-        try:
-            payload = await edhrec_service.get_or_refresh(pool, commander_id)
-            edhrec_inclusion = await edhrec_service.score_inclusion(
-                pool,
-                payload,
-                commander_color_identity,
-                bracket=bracket,
-            )
-        except Exception:
-            _log.exception("EDHREC inclusion lookup failed; continuing without boost")
+    edhrec_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
+        pool, commander_id, commander_color_identity, bracket
+    )
 
-    # Include EDHREC-only matches as candidates so a high-synergy card not
-    # surfaced by semantic/tag/FTS still has a path into the result set.
-    edhrec_extra = [
+    # Include EDHREC- and Moxfield-only matches as candidates so a high-synergy
+    # card not surfaced by semantic/tag/FTS still has a path into the result set.
+    extra_ids = [
         uid
-        for uid in edhrec_inclusion
+        for uid in {*edhrec_inclusion, *moxfield_inclusion}
         if uid not in qdrant_scores and uid not in tag_overlaps and uid not in fts_set
     ]
-    all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set, *edhrec_extra})
+    all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set, *extra_ids})
     if not all_ids:
         return []
 
@@ -1279,10 +1316,12 @@ async def retrieve_candidates(
         stage=stage,
         ranking_weights=ranking_weights,
         edhrec_inclusion=edhrec_inclusion,
+        moxfield_inclusion=moxfield_inclusion,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
+    _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
     ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
     top_ids = ranked[:limit]
     if not top_ids:

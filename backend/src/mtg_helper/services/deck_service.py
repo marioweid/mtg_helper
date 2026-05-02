@@ -213,6 +213,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
         )
     deck = _row_to_deck(row)
     asyncio.create_task(_safe_edhrec_refresh(pool, deck.commander_id))
+    asyncio.create_task(_safe_moxfield_refresh(pool, deck.commander_id))
     return deck
 
 
@@ -228,6 +229,16 @@ async def _safe_edhrec_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
         await edhrec_service.get_or_refresh(pool, commander_id)
     except Exception:
         _log.exception("Background EDHREC refresh failed for commander %s", commander_id)
+
+
+async def _safe_moxfield_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
+    """Pre-warm the Moxfield top-decks cache for a freshly created deck's commander."""
+    from mtg_helper.services import moxfield_recs_service
+
+    try:
+        await moxfield_recs_service.get_or_refresh(pool, commander_id)
+    except Exception:
+        _log.exception("Background Moxfield refresh failed for commander %s", commander_id)
 
 
 async def list_decks(

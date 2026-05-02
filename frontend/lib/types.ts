@@ -247,6 +247,7 @@ export interface RankingWeights {
   popularity: number;
   personal: number;
   deck_inclusion: number;
+  moxfield_inclusion: number;
 }
 
 export interface RankingWeightsResponse extends RankingWeights {
@@ -260,6 +261,7 @@ export interface RankingWeightsUpdate {
   popularity: number;
   personal: number;
   deck_inclusion: number;
+  moxfield_inclusion: number;
 }
 
 // Collections

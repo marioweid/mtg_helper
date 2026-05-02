@@ -10,6 +10,7 @@ _DEFAULT_SYNERGY: float = 0.22
 _DEFAULT_POPULARITY: float = 0.10
 _DEFAULT_PERSONAL: float = 0.15
 _DEFAULT_DECK_INCLUSION: float = 0.20
+_DEFAULT_MOXFIELD_INCLUSION: float = 0.20
 
 
 class RankingWeights(BaseModel):
@@ -20,6 +21,7 @@ class RankingWeights(BaseModel):
     popularity: float = Field(default=_DEFAULT_POPULARITY, ge=0.0, le=1.0)
     personal: float = Field(default=_DEFAULT_PERSONAL, ge=0.0, le=1.0)
     deck_inclusion: float = Field(default=_DEFAULT_DECK_INCLUSION, ge=0.0, le=1.0)
+    moxfield_inclusion: float = Field(default=_DEFAULT_MOXFIELD_INCLUSION, ge=0.0, le=1.0)
 
 
 class RankingWeightsResponse(RankingWeights):
@@ -37,3 +39,4 @@ class RankingWeightsUpdate(BaseModel):
     popularity: float = Field(ge=0.0, le=1.0)
     personal: float = Field(ge=0.0, le=1.0)
     deck_inclusion: float = Field(ge=0.0, le=1.0)
+    moxfield_inclusion: float = Field(ge=0.0, le=1.0)

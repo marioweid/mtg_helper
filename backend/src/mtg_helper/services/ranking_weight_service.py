@@ -44,8 +44,9 @@ async def get_weights(pool: asyncpg.Pool, account_id: UUID) -> RankingWeightsRes
             row = await conn.fetchrow(
                 """
                 INSERT INTO account_ranking_weights
-                    (account_id, semantic, synergy, popularity, personal, deck_inclusion)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                    (account_id, semantic, synergy, popularity, personal,
+                     deck_inclusion, moxfield_inclusion)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT (account_id) DO UPDATE SET account_id = EXCLUDED.account_id
                 RETURNING *
                 """,
@@ -55,6 +56,7 @@ async def get_weights(pool: asyncpg.Pool, account_id: UUID) -> RankingWeightsRes
                 defaults.popularity,
                 defaults.personal,
                 defaults.deck_inclusion,
+                defaults.moxfield_inclusion,
             )
     return _row_to_response(row)
 
@@ -80,7 +82,14 @@ async def update_weights(
         if not account_exists:
             raise AccountNotFoundError(f"Account {account_id} not found")
 
-        total = data.semantic + data.synergy + data.popularity + data.personal + data.deck_inclusion
+        total = (
+            data.semantic
+            + data.synergy
+            + data.popularity
+            + data.personal
+            + data.deck_inclusion
+            + data.moxfield_inclusion
+        )
         if total > _TUNABLE_SUM_CAP:
             scale = _TUNABLE_SUM_CAP / total
             semantic = data.semantic * scale
@@ -88,25 +97,29 @@ async def update_weights(
             popularity = data.popularity * scale
             personal = data.personal * scale
             deck_inclusion = data.deck_inclusion * scale
+            moxfield_inclusion = data.moxfield_inclusion * scale
         else:
             semantic = data.semantic
             synergy = data.synergy
             popularity = data.popularity
             personal = data.personal
             deck_inclusion = data.deck_inclusion
+            moxfield_inclusion = data.moxfield_inclusion
 
         row = await conn.fetchrow(
             """
             INSERT INTO account_ranking_weights
-                (account_id, semantic, synergy, popularity, personal, deck_inclusion, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, now())
+                (account_id, semantic, synergy, popularity, personal,
+                 deck_inclusion, moxfield_inclusion, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, now())
             ON CONFLICT (account_id) DO UPDATE SET
-                semantic       = EXCLUDED.semantic,
-                synergy        = EXCLUDED.synergy,
-                popularity     = EXCLUDED.popularity,
-                personal       = EXCLUDED.personal,
-                deck_inclusion = EXCLUDED.deck_inclusion,
-                updated_at     = now()
+                semantic           = EXCLUDED.semantic,
+                synergy            = EXCLUDED.synergy,
+                popularity         = EXCLUDED.popularity,
+                personal           = EXCLUDED.personal,
+                deck_inclusion     = EXCLUDED.deck_inclusion,
+                moxfield_inclusion = EXCLUDED.moxfield_inclusion,
+                updated_at         = now()
             RETURNING *
             """,
             account_id,
@@ -115,6 +128,7 @@ async def update_weights(
             popularity,
             personal,
             deck_inclusion,
+            moxfield_inclusion,
         )
     return _row_to_response(row)
 
@@ -127,5 +141,6 @@ def _row_to_response(row: asyncpg.Record) -> RankingWeightsResponse:
         popularity=row["popularity"],
         personal=row["personal"],
         deck_inclusion=row["deck_inclusion"],
+        moxfield_inclusion=row["moxfield_inclusion"],
         updated_at=row["updated_at"],
     )
