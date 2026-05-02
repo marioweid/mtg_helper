@@ -8,11 +8,16 @@ from httpx import AsyncClient
 
 from mtg_helper.main import app
 from mtg_helper.services.ai_service import (
+    _ALLOWED_CARD_TYPES,
+    _ALLOWED_SUBTYPES,
     _BANGER_SCORE_THRESHOLD,
+    _canonicalize,
     _compute_highlight_reasons,
+    _merge_type_filters,
+    _resolve_structured_type_filter,
 )
 from mtg_helper.services.deck_service import STAGES
-from mtg_helper.services.retrieval_service import RetrievedCard
+from mtg_helper.services.retrieval_service import RetrievedCard, TypeFilter
 from tests.conftest import (
     HAZEL_SCRYFALL_ID,
     SOL_RING_SCRYFALL_ID,
@@ -68,6 +73,52 @@ async def _create_deck(client: AsyncClient) -> str:
     )
     assert resp.status_code == 201
     return resp.json()["data"]["id"]
+
+
+# ── structured type filter helpers ────────────────────────────────────────────
+
+
+def test_canonicalize_drops_unknown_terms() -> None:
+    """Unknown values are silently dropped; known values are title-cased and deduped."""
+    assert _canonicalize(["creature", "Creature", "wibble"], _ALLOWED_CARD_TYPES) == ["Creature"]
+
+
+def test_canonicalize_empty_input_returns_empty() -> None:
+    assert _canonicalize(None, _ALLOWED_CARD_TYPES) == []
+    assert _canonicalize([], _ALLOWED_SUBTYPES) == []
+
+
+def test_resolve_structured_type_filter_builds_strict_match_all() -> None:
+    tf = _resolve_structured_type_filter(["Creature"], ["equipment"])
+    assert tf is not None
+    assert tf.card_types == ["Creature"]
+    assert tf.subtypes == ["Equipment"]
+    assert tf.strict is True
+    assert tf.match_all_categories is True
+
+
+def test_resolve_structured_type_filter_empty_returns_none() -> None:
+    assert _resolve_structured_type_filter(None, None) is None
+    assert _resolve_structured_type_filter([], []) is None
+    # All-unknown values also collapse to None.
+    assert _resolve_structured_type_filter(["wibble"], ["wobble"]) is None
+
+
+def test_merge_type_filters_unions_categories_and_propagates_flags() -> None:
+    structured = TypeFilter(
+        card_types=["Creature"],
+        subtypes=["Equipment"],
+        strict=True,
+        match_all_categories=True,
+    )
+    parsed = TypeFilter(card_types=["Artifact"], subtypes=[], keywords=["flying"])
+    merged = _merge_type_filters(structured, parsed)
+    assert merged is not None
+    assert set(merged.card_types) == {"Creature", "Artifact"}
+    assert merged.subtypes == ["Equipment"]
+    assert merged.keywords == ["flying"]
+    assert merged.strict is True
+    assert merged.match_all_categories is True
 
 
 # ── build_stage ───────────────────────────────────────────────────────────────

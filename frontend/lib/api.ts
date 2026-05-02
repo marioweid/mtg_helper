@@ -167,6 +167,8 @@ export const apiClient = {
       collection_ids?: string[];
       max_price_cents?: number | null;
       min_price_cents?: number | null;
+      card_types?: string[];
+      subtypes?: string[];
     },
   ) =>
     request<BuildResponse>(`/decks/${deckId}/build`, {
@@ -178,6 +180,8 @@ export const apiClient = {
         collection_ids: opts?.collection_ids ?? null,
         max_price_cents: opts?.max_price_cents ?? null,
         min_price_cents: opts?.min_price_cents ?? null,
+        card_types: opts?.card_types && opts.card_types.length > 0 ? opts.card_types : null,
+        subtypes: opts?.subtypes && opts.subtypes.length > 0 ? opts.subtypes : null,
       }),
     }),
 
@@ -189,6 +193,8 @@ export const apiClient = {
       collection_ids?: string[];
       max_price_cents?: number | null;
       min_price_cents?: number | null;
+      card_types?: string[];
+      subtypes?: string[];
     },
   ) =>
     request<SuggestResponse>(`/decks/${deckId}/suggest`, {
@@ -199,6 +205,8 @@ export const apiClient = {
         collection_ids: opts?.collection_ids ?? null,
         max_price_cents: opts?.max_price_cents ?? null,
         min_price_cents: opts?.min_price_cents ?? null,
+        card_types: opts?.card_types && opts.card_types.length > 0 ? opts.card_types : null,
+        subtypes: opts?.subtypes && opts.subtypes.length > 0 ? opts.subtypes : null,
       }),
     }),
 

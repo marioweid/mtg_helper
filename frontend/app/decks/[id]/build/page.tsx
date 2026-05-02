@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useEffect, useCallback, useMemo, useState } from "react";
+import { useReducer, useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient, ApiError } from "@/lib/api";
@@ -93,7 +93,7 @@ const COLOR_TO_BASIC: Record<string, string> = {
   G: "Forest",
 };
 
-const TYPE_FILTER_OPTIONS = [
+const PRIMARY_TYPE_OPTIONS = [
   "Creature",
   "Instant",
   "Sorcery",
@@ -101,6 +101,19 @@ const TYPE_FILTER_OPTIONS = [
   "Enchantment",
   "Planeswalker",
   "Land",
+  "Battle",
+] as const;
+
+const SUBTYPE_OPTIONS = [
+  "Equipment",
+  "Aura",
+  "Vehicle",
+  "Saga",
+  "Background",
+  "Class",
+  "Food",
+  "Treasure",
+  "Clue",
 ] as const;
 
 function basicLandsForIdentity(identity: string): readonly string[] {
@@ -364,8 +377,10 @@ export default function BuildPage() {
   const [pricePanelDraft, setPricePanelDraft] = useState("");
   const [pricePanelMinDraft, setPricePanelMinDraft] = useState("");
   const [savingPriceCap, setSavingPriceCap] = useState(false);
-  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [cardTypeFilters, setCardTypeFilters] = useState<string[]>([]);
+  const [subtypeFilters, setSubtypeFilters] = useState<string[]>([]);
   const [typePanelOpen, setTypePanelOpen] = useState(false);
+  const totalTypeFilters = cardTypeFilters.length + subtypeFilters.length;
   const [globalRejectedIds, setGlobalRejectedIds] = useState<Set<string>>(new Set());
   const [globalRejectedNames, setGlobalRejectedNames] = useState<string[]>([]);
 
@@ -463,6 +478,8 @@ export default function BuildPage() {
           stage,
           target: 80,
           ...(exclude ? { exclude } : {}),
+          card_types: cardTypeFilters,
+          subtypes: subtypeFilters,
         });
         dispatch({
           type: "LOAD_SUCCESS",
@@ -479,7 +496,7 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId],
+    [deckId, cardTypeFilters, subtypeFilters],
   );
 
   const loadMore = useCallback(
@@ -495,6 +512,8 @@ export default function BuildPage() {
           stage,
           target: 80,
           exclude,
+          card_types: cardTypeFilters,
+          subtypes: subtypeFilters,
         });
         dispatch({
           type: "LOAD_MORE_SUCCESS",
@@ -511,7 +530,7 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId, globalRejectedNames],
+    [deckId, globalRejectedNames, cardTypeFilters, subtypeFilters],
   );
 
   function switchStage(stage: string) {
@@ -530,6 +549,17 @@ export default function BuildPage() {
       void loadStage(firstStage);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refetch when type/subtype filters change (skip the initial render)
+  const typeFilterMounted = useRef(false);
+  useEffect(() => {
+    if (!typeFilterMounted.current) {
+      typeFilterMounted.current = true;
+      return;
+    }
+    dispatch({ type: "INVALIDATE_ALL" });
+    void loadStage(state.activeStage);
+  }, [cardTypeFilters, subtypeFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function persistSelectedCollections(next: string[]) {
     setSelectedCollectionIds(next);
@@ -733,7 +763,10 @@ export default function BuildPage() {
     setPromptStatuses({});
     setPromptQuantities({});
     try {
-      const result = await apiClient.suggestCards(deckId, promptInput.trim(), 10);
+      const result = await apiClient.suggestCards(deckId, promptInput.trim(), 10, {
+        card_types: cardTypeFilters,
+        subtypes: subtypeFilters,
+      });
       setPromptSuggestions(result.suggestions);
       const statuses: Record<string, SuggestionStatus> = {};
       for (const s of result.suggestions) statuses[s.scryfall_id] = "pending";
@@ -828,12 +861,6 @@ export default function BuildPage() {
 
   const activeStageState = state.stages[state.activeStage];
 
-  function matchesTypeFilters(typeLine: string | null | undefined): boolean {
-    if (typeFilters.length === 0) return true;
-    const tl = typeLine ?? "";
-    return typeFilters.some((t) => tl.includes(t));
-  }
-
   function isHiddenCrossStage(s: CardSuggestion, status: SuggestionStatus): boolean {
     if (globalRejectedIds.has(s.scryfall_id) && status !== "rejected") return true;
     if (acceptedScryfallIds.has(s.scryfall_id) && status !== "accepted") return true;
@@ -842,14 +869,12 @@ export default function BuildPage() {
 
   const filteredSuggestions = activeStageState
     ? activeStageState.suggestions.filter((s) => {
-        if (!matchesTypeFilters(s.type_line)) return false;
         const status = activeStageState.statuses[s.scryfall_id] ?? "pending";
         if (isHiddenCrossStage(s, status)) return false;
         return true;
       })
     : [];
   const filteredPromptSuggestions = promptSuggestions.filter((s) => {
-    if (!matchesTypeFilters(s.type_line)) return false;
     const status = promptStatuses[s.scryfall_id] ?? "pending";
     if (isHiddenCrossStage(s, status)) return false;
     return true;
@@ -1013,51 +1038,99 @@ export default function BuildPage() {
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-white hover:bg-white/5 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <span>Card type filter</span>
-            {typeFilters.length > 0 && (
+            {totalTypeFilters > 0 && (
               <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
-                {typeFilters.length} active
+                {totalTypeFilters} active
               </span>
             )}
           </span>
           <span className="text-xs text-gray-400">{typePanelOpen ? "▲" : "▼"}</span>
         </summary>
-        <div className="border-t border-white/10 px-4 py-3">
-          <p className="mb-3 text-xs text-gray-400">
-            Hide suggestions that don&apos;t match the selected types. Affects the active stage&apos;s
-            displayed suggestions only — does not refetch.
+        <div className="border-t border-white/10 px-4 py-3 space-y-4">
+          <p className="text-xs text-gray-400">
+            Restrict suggestions by primary type and/or subtype. Cards must match at least one
+            selection in every active group (e.g. Creature + Equipment = creature-equipment hybrids).
+            Triggers a refetch.
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {TYPE_FILTER_OPTIONS.map((t) => {
-              const active = typeFilters.includes(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() =>
-                    setTypeFilters((prev) =>
-                      active ? prev.filter((x) => x !== t) : [...prev, t],
-                    )
-                  }
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-                    active
-                      ? "border-indigo-500 bg-indigo-600/40 text-indigo-100"
-                      : "border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-            {typeFilters.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setTypeFilters([])}
-                className="rounded-full px-2.5 py-0.5 text-xs text-gray-500 hover:text-white"
-              >
-                Clear
-              </button>
-            )}
+
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Primary type
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {PRIMARY_TYPE_OPTIONS.map((t) => {
+                const active = cardTypeFilters.includes(t);
+                return (
+                  <label
+                    key={t}
+                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                      active
+                        ? "border-indigo-500 bg-indigo-600/30 text-indigo-100"
+                        : "border-white/10 text-gray-300 hover:border-white/20 hover:text-white"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() =>
+                        setCardTypeFilters((prev) =>
+                          active ? prev.filter((x) => x !== t) : [...prev, t],
+                        )
+                      }
+                      className="h-3 w-3 accent-indigo-500"
+                    />
+                    {t}
+                  </label>
+                );
+              })}
+            </div>
           </div>
+
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Subtype
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {SUBTYPE_OPTIONS.map((t) => {
+                const active = subtypeFilters.includes(t);
+                return (
+                  <label
+                    key={t}
+                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                      active
+                        ? "border-indigo-500 bg-indigo-600/30 text-indigo-100"
+                        : "border-white/10 text-gray-300 hover:border-white/20 hover:text-white"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() =>
+                        setSubtypeFilters((prev) =>
+                          active ? prev.filter((x) => x !== t) : [...prev, t],
+                        )
+                      }
+                      className="h-3 w-3 accent-indigo-500"
+                    />
+                    {t}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {totalTypeFilters > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setCardTypeFilters([]);
+                setSubtypeFilters([]);
+              }}
+              className="text-xs text-gray-400 underline-offset-2 hover:text-white hover:underline"
+            >
+              Clear all filters
+            </button>
+          )}
         </div>
       </details>
 
@@ -1366,12 +1439,6 @@ export default function BuildPage() {
           {/* Suggestions grid */}
           {activeStageState.loaded && activeStageState.suggestions.length > 0 && (
             <>
-              {typeFilters.length > 0 && (
-                <p className="mb-2 text-xs text-gray-500">
-                  Showing {filteredSuggestions.length} of {activeStageState.suggestions.length}{" "}
-                  suggestions matching type filter.
-                </p>
-              )}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                 {filteredSuggestions.map((s) => (
                   <CardSuggestionCard

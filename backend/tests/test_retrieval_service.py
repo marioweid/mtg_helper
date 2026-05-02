@@ -5,6 +5,7 @@ from uuid import UUID
 
 from mtg_helper.services.retrieval_service import (
     TypeFilter,
+    _apply_trusted_quota,
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
@@ -263,6 +264,107 @@ def test_weighted_score_edhrec_inclusion_none_is_noop() -> None:
     assert base == explicit_none
 
 
+# ── _apply_trusted_quota ──────────────────────────────────────────────────────
+
+
+def _ids(prefix: str, count: int) -> list[UUID]:
+    return [UUID(f"{prefix}{i:04x}-0000-0000-0000-000000000000") for i in range(count)]
+
+
+def test_trusted_quota_reserves_low_scoring_edhrec_cards() -> None:
+    semantic = _ids("aaaa", 30)
+    trusted = _ids("bbbb", 8)
+    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
+    scores.update({uid: 0.30 + i * 0.001 for i, uid in enumerate(trusted)})
+    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    edhrec = {uid: 0.9 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=20)
+
+    assert len(top) == 20
+    assert set(trusted).issubset(set(top)), "all trusted cards must survive truncation"
+
+
+def test_trusted_quota_caps_at_half_limit() -> None:
+    semantic = _ids("aaaa", 20)
+    trusted = _ids("bbbb", 15)
+    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
+    scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
+    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    moxfield = {uid: 0.8 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
+
+    assert len(top) == 10
+    reserved_count = sum(1 for uid in top if uid in set(trusted))
+    assert reserved_count == 5, f"quota must cap at limit//2 (5), got {reserved_count}"
+
+
+def test_trusted_quota_skips_zero_score_cards() -> None:
+    """Strict type filter zeros non-matching cards; quota must not reserve them."""
+    semantic = _ids("aaaa", 5)
+    trusted = _ids("bbbb", 3)
+    scores = {uid: 0.5 for uid in semantic}
+    scores.update({uid: 0.0 for uid in trusted})  # zeroed by strict type filter
+    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    edhrec = {uid: 0.9 for uid in trusted}
+
+    # limit=5 forces composite truncation: zeroed trusted cards rank last and
+    # are dropped because the quota pass excludes score==0 entries.
+    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=5)
+
+    assert set(top) == set(semantic), "zeroed trusted cards must not survive"
+
+
+def test_trusted_quota_no_signals_falls_through() -> None:
+    semantic = _ids("aaaa", 5)
+    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
+    cards_by_id = {uid: {"id": uid} for uid in semantic}
+
+    top = _apply_trusted_quota(scores, {}, {}, cards_by_id, limit=3)
+
+    assert top == sorted(scores, key=lambda u: scores[u], reverse=True)[:3]
+
+
+def test_trusted_quota_picks_highest_inclusion_first() -> None:
+    trusted = _ids("bbbb", 4)
+    scores = {uid: 0.1 for uid in trusted}
+    cards_by_id = {uid: {"id": uid} for uid in trusted}
+    edhrec = {trusted[0]: 0.2, trusted[1]: 0.9, trusted[2]: 0.5, trusted[3]: 0.7}
+
+    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=4)
+
+    # quota = 4 // 2 = 2; should pick trusted[1] (0.9) and trusted[3] (0.7) first
+    assert top[:2] == [trusted[1], trusted[3]]
+
+
+def test_trusted_quota_limit_zero_returns_empty() -> None:
+    trusted = _ids("bbbb", 3)
+    scores = {uid: 0.5 for uid in trusted}
+    cards_by_id = {uid: {"id": uid} for uid in trusted}
+    edhrec = {uid: 0.9 for uid in trusted}
+
+    assert _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=0) == []
+
+
+def test_trusted_quota_skips_cards_missing_from_db() -> None:
+    """Trusted card filtered out by _fetch_candidates is also skipped from quota."""
+    semantic = _ids("aaaa", 5)
+    trusted = _ids("bbbb", 2)
+    # In real flow `_compute_weighted_scores` skips uids missing from cards_by_id,
+    # so neither scores nor cards_by_id have entries for the filtered-out trusted.
+    scores = {uid: 0.5 for uid in semantic}
+    cards_by_id = {uid: {"id": uid} for uid in semantic}
+    edhrec = {uid: 0.9 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=10)
+
+    assert set(top) == set(semantic)
+
+
+# ── _compute_weighted_scores: range ───────────────────────────────────────────
+
+
 def test_weighted_score_range_zero_to_one() -> None:
     rows = {_A: _make_row(_A, edhrec_rank=1), _B: _make_row(_B, edhrec_rank=10000)}
     scores = _compute_weighted_scores(
@@ -485,6 +587,44 @@ def test_type_match_score_subtype_match() -> None:
     row = _make_type_row(["Creature"], ["Elf", "Druid"])
     tf = TypeFilter(card_types=[], subtypes=["Elf"])
     assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_match_all_categories_excludes_partial() -> None:
+    """Match-all-categories: Creature + Equipment requires both categories to hit."""
+    creature_only = _make_type_row(["Creature"], ["Human"])
+    artifact_equipment = _make_type_row(["Artifact"], ["Equipment"])
+    creature_equipment = _make_type_row(["Artifact", "Creature"], ["Equipment"])
+    tf = TypeFilter(
+        card_types=["Creature"],
+        subtypes=["Equipment"],
+        match_all_categories=True,
+    )
+    assert _type_match_score(creature_only, tf) == 0.0  # type: ignore[arg-type]
+    assert _type_match_score(artifact_equipment, tf) == 0.0  # type: ignore[arg-type]
+    assert _type_match_score(creature_equipment, tf) == 1.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_match_all_or_within_category() -> None:
+    """Multiple subtypes act as OR within the subtypes category."""
+    row_equipment = _make_type_row(["Artifact"], ["Equipment"])
+    row_aura = _make_type_row(["Enchantment"], ["Aura"])
+    row_neither = _make_type_row(["Creature"], ["Human"])
+    tf = TypeFilter(
+        card_types=[],
+        subtypes=["Equipment", "Aura"],
+        match_all_categories=True,
+    )
+    assert _type_match_score(row_equipment, tf) > 0  # type: ignore[arg-type]
+    assert _type_match_score(row_aura, tf) > 0  # type: ignore[arg-type]
+    assert _type_match_score(row_neither, tf) == 0.0  # type: ignore[arg-type]
+
+
+def test_type_match_score_match_all_off_keeps_or_semantics() -> None:
+    """Default match_all_categories=False preserves additive across-category scoring."""
+    row = _make_type_row(["Creature"], ["Human"])
+    tf = TypeFilter(card_types=["Artifact"], subtypes=["Human"])
+    # 1 match (Human) of 2 requested categories' terms = 0.5; survives without strict.
+    assert _type_match_score(row, tf) == 0.5  # type: ignore[arg-type]
 
 
 # ── _compute_weighted_scores with type_filter ─────────────────────────────────

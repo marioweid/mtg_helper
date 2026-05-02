@@ -36,6 +36,7 @@ from mtg_helper.services.retrieval_service import (
     CollectionFilter,
     PriceFilter,
     RetrievedCard,
+    TypeFilter,
     card_qualifying_stages,
     parse_query_tags,
     parse_query_types,
@@ -589,6 +590,78 @@ async def _resolve_collection_filter(
     return CollectionFilter(owned_card_ids=owned)
 
 
+_ALLOWED_CARD_TYPES: frozenset[str] = frozenset(
+    {"Artifact", "Creature", "Enchantment", "Instant", "Land", "Planeswalker", "Sorcery", "Battle"}
+)
+_ALLOWED_SUBTYPES: frozenset[str] = frozenset(
+    {"Equipment", "Aura", "Vehicle", "Saga", "Background", "Class", "Food", "Treasure", "Clue"}
+)
+
+
+def _canonicalize(values: list[str] | None, allow: frozenset[str]) -> list[str]:
+    """Title-case incoming filter terms and keep only those in the allow-list."""
+    if not values:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in values:
+        canonical = v.strip().title()
+        if canonical in allow and canonical not in seen:
+            seen.add(canonical)
+            out.append(canonical)
+    return out
+
+
+def _resolve_structured_type_filter(
+    card_types: list[str] | None,
+    subtypes: list[str] | None,
+) -> TypeFilter | None:
+    """Build a strict, AND-across-categories TypeFilter from request fields.
+
+    Returns None when both lists are empty after canonicalization.
+    """
+    canonical_types = _canonicalize(card_types, _ALLOWED_CARD_TYPES)
+    canonical_subs = _canonicalize(subtypes, _ALLOWED_SUBTYPES)
+    if not canonical_types and not canonical_subs:
+        return None
+    return TypeFilter(
+        card_types=canonical_types,
+        subtypes=canonical_subs,
+        strict=True,
+        match_all_categories=True,
+    )
+
+
+def _merge_type_filters(
+    primary: TypeFilter | None,
+    secondary: TypeFilter | None,
+) -> TypeFilter | None:
+    """Union two TypeFilters; primary's strict/match_all flags win when set."""
+    if primary is None:
+        return secondary
+    if secondary is None:
+        return primary
+
+    def _union(a: list[str], b: list[str]) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for item in [*a, *b]:
+            if item not in seen:
+                seen.add(item)
+                result.append(item)
+        return result
+
+    return TypeFilter(
+        card_types=_union(primary.card_types, secondary.card_types),
+        subtypes=_union(primary.subtypes, secondary.subtypes),
+        keywords=_union(primary.keywords, secondary.keywords),
+        traits=_union(primary.traits, secondary.traits),
+        token_types=_union(primary.token_types, secondary.token_types),
+        strict=primary.strict or secondary.strict,
+        match_all_categories=primary.match_all_categories or secondary.match_all_categories,
+    )
+
+
 def _resolve_price_filter(
     deck: DeckDetailResponse,
     max_override: int | None,
@@ -658,6 +731,8 @@ async def build_stage(
     collection_ids: list[UUID] | None = None,
     max_price_cents: int | None = None,
     min_price_cents: int | None = None,
+    card_types: list[str] | None = None,
+    subtypes: list[str] | None = None,
 ) -> BuildResponse:
     """Generate card suggestions for a build stage using hybrid retrieval.
 
@@ -712,6 +787,7 @@ async def build_stage(
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
     price_filter = _resolve_price_filter(deck, max_price_cents, min_price_cents)
+    type_filter = _resolve_structured_type_filter(card_types, subtypes)
 
     limit = target if target is not None else 20
     candidates = await retrieve_candidates(
@@ -732,6 +808,7 @@ async def build_stage(
         price_filter=price_filter,
         commander_id=deck.commander_id,
         bracket=deck.bracket,
+        type_filter=type_filter,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
@@ -768,6 +845,8 @@ async def suggest_cards(
     collection_ids: list[UUID] | None = None,
     max_price_cents: int | None = None,
     min_price_cents: int | None = None,
+    card_types: list[str] | None = None,
+    subtypes: list[str] | None = None,
 ) -> SuggestResponse:
     """Return suggested cards matching a free-form prompt via hybrid retrieval.
 
@@ -798,7 +877,9 @@ async def suggest_cards(
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
     deck_card_ids = list({*(c.card_id for c in deck.cards), *commander_ids})
     query_tags = parse_query_tags(prompt)
-    type_filter = parse_query_types(prompt)
+    parsed_filter = parse_query_types(prompt)
+    structured_filter = _resolve_structured_type_filter(card_types, subtypes)
+    type_filter = _merge_type_filters(structured_filter, parsed_filter)
     feedback_weights, user_profile = await asyncio.gather(
         _compute_feedback_weights(pool, deck.id, account_id),
         _load_user_profile(pool, deck.id, account_id, email),

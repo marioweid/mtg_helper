@@ -38,7 +38,11 @@ class TypeFilter:
     """Parsed type/subtype/keyword/trait preferences from a user query.
 
     When present, cards matching these criteria get a score boost during fusion.
-    When strict=True, cards with zero matches are scored 0.0 (hard-filtered out).
+    When ``strict=True``, cards with zero matches are scored 0.0 (hard-filtered out).
+    When ``match_all_categories=True``, the score is 0.0 unless the card matches
+    at least one term in *every* non-empty category — used by the structured UI
+    filter so "Creature + Equipment" returns only creature-equipment hybrids
+    instead of any creature OR any equipment.
     """
 
     card_types: list[str]
@@ -47,6 +51,7 @@ class TypeFilter:
     traits: list[str] = field(default_factory=list)
     token_types: list[str] = field(default_factory=list)
     strict: bool = False
+    match_all_categories: bool = False
 
 
 @dataclass(frozen=True)
@@ -945,13 +950,19 @@ def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
     card_traits = set(row["traits"])
     card_token_types = set(row["token_types"])
 
-    matched = (
-        len(card_types & set(type_filter.card_types))
-        + len(subtypes & set(type_filter.subtypes))
-        + len(card_keywords & {k.lower() for k in type_filter.keywords})
-        + len(card_traits & set(type_filter.traits))
-        + len(card_token_types & set(type_filter.token_types))
+    per_category = (
+        (type_filter.card_types, card_types & set(type_filter.card_types)),
+        (type_filter.subtypes, subtypes & set(type_filter.subtypes)),
+        (type_filter.keywords, card_keywords & {k.lower() for k in type_filter.keywords}),
+        (type_filter.traits, card_traits & set(type_filter.traits)),
+        (type_filter.token_types, card_token_types & set(type_filter.token_types)),
     )
+    if type_filter.match_all_categories:
+        for requested, matched_set in per_category:
+            if requested and not matched_set:
+                return 0.0
+
+    matched = sum(len(matched_set) for _, matched_set in per_category)
     return matched / requested_count
 
 
@@ -1196,6 +1207,59 @@ def _annotate_moxfield_signals(
             entry.append("moxfield")
 
 
+_TRUSTED_QUOTA_FRACTION: float = 0.5
+
+
+def _apply_trusted_quota(
+    scores: dict[UUID, float],
+    edhrec_inclusion: dict[UUID, float],
+    moxfield_inclusion: dict[UUID, float],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+    limit: int,
+) -> list[UUID]:
+    """Select top-N UIDs reserving a quota for trusted EDHREC/Moxfield cards.
+
+    Up to ``floor(limit * 0.5)`` slots are reserved for cards with the highest
+    EDHREC or Moxfield inclusion score, sorted by trusted score desc then
+    composite score desc. Remaining slots are filled from the composite ranking,
+    skipping already-reserved UIDs. Trusted cards with zero composite score
+    (e.g., zeroed by a strict type filter) or missing from ``cards_by_id``
+    (filtered out at DB fetch) are excluded from the quota pass.
+
+    Args:
+        scores: Final composite scores per card UUID.
+        edhrec_inclusion: EDHREC inclusion scores per card UUID.
+        moxfield_inclusion: Moxfield inclusion scores per card UUID.
+        cards_by_id: Raw DB rows indexed by card UUID.
+        limit: Maximum number of UIDs to return.
+
+    Returns:
+        Ordered list of UUIDs (reserved trusted slots first, then composite fill).
+    """
+    if limit <= 0:
+        return []
+
+    composite_ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
+
+    trusted: list[tuple[UUID, float]] = []
+    for uid in {*edhrec_inclusion, *moxfield_inclusion}:
+        if uid not in cards_by_id or scores.get(uid, 0.0) <= 0.0:
+            continue
+        trusted_score = max(edhrec_inclusion.get(uid, 0.0), moxfield_inclusion.get(uid, 0.0))
+        if trusted_score <= 0.0:
+            continue
+        trusted.append((uid, trusted_score))
+
+    trusted.sort(key=lambda item: (item[1], scores.get(item[0], 0.0)), reverse=True)
+    quota = min(int(limit * _TRUSTED_QUOTA_FRACTION), len(trusted))
+    reserved = [uid for uid, _ in trusted[:quota]]
+    reserved_set = set(reserved)
+
+    remaining = limit - len(reserved)
+    fill = [uid for uid in composite_ranked if uid not in reserved_set][:remaining]
+    return reserved + fill
+
+
 async def retrieve_candidates(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
@@ -1322,8 +1386,7 @@ async def retrieve_candidates(
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
-    ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
-    top_ids = ranked[:limit]
+    top_ids = _apply_trusted_quota(scores, edhrec_inclusion, moxfield_inclusion, cards_by_id, limit)
     if not top_ids:
         return []
 

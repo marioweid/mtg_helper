@@ -14,6 +14,8 @@ class BuildRequest(BaseModel):
     collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, gt=0)
     min_price_cents: int | None = Field(default=None, ge=0)
+    card_types: list[str] | None = Field(default=None, max_length=10)
+    subtypes: list[str] | None = Field(default=None, max_length=10)
 
 
 class CollectionMembership(BaseModel):
@@ -63,6 +65,8 @@ class SuggestRequest(BaseModel):
     collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, gt=0)
     min_price_cents: int | None = Field(default=None, ge=0)
+    card_types: list[str] | None = Field(default=None, max_length=10)
+    subtypes: list[str] | None = Field(default=None, max_length=10)
 
 
 class SuggestResponse(BaseModel):
