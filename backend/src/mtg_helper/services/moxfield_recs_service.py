@@ -25,7 +25,7 @@ _log = logging.getLogger(__name__)
 
 _DEFAULT_MAX_AGE = timedelta(days=28)
 _REQUEST_TIMEOUT = 30.0
-_TOP_DECKS = 5
+_TOP_DECKS = 10
 _SEARCH_PAGE_SIZE = 64
 
 _SENTINEL_PAYLOAD: dict[str, Any] = {

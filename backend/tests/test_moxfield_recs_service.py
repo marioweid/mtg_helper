@@ -187,8 +187,8 @@ async def test_score_inclusion_resolves_scryfall_to_id(db_pool: asyncpg.Pool) ->
         "moxfield_card_id": "MOX",
         "decks": [],
         "by_scryfall": {
-            str(SOL_RING_SCRYFALL_ID): 5,  # in all 5 decks → 1.0
-            str(HAZEL_SCRYFALL_ID): 1,  # 1/5 → 0.2
+            str(SOL_RING_SCRYFALL_ID): 10,  # in all 10 decks → 1.0
+            str(HAZEL_SCRYFALL_ID): 1,  # 1/10 → 0.1
         },
     }
     scores = await score_inclusion(db_pool, payload, ["G", "W"])
@@ -197,7 +197,7 @@ async def test_score_inclusion_resolves_scryfall_to_id(db_pool: asyncpg.Pool) ->
         sol = await conn.fetchval(sql, SOL_RING_SCRYFALL_ID)
         hazel = await conn.fetchval(sql, HAZEL_SCRYFALL_ID)
     assert scores[sol] == pytest.approx(1.0)
-    assert scores[hazel] == pytest.approx(0.2)
+    assert scores[hazel] == pytest.approx(0.1)
 
 
 @pytest.mark.asyncio
