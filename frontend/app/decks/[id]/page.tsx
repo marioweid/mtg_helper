@@ -111,6 +111,16 @@ export default function DeckDetailPage() {
     }
   }
 
+  async function handleMoveCard(scryfallId: string, category: string) {
+    if (!deck) return;
+    try {
+      await apiClient.updateCardCategory(deck.id, scryfallId, category);
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to move card");
+    }
+  }
+
   if (error) {
     return (
       <p className="rounded-lg border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
@@ -219,6 +229,7 @@ export default function DeckDetailPage() {
               category={cat}
               cards={groups[cat] ?? []}
               onRemove={handleRemoveCard}
+              onMove={handleMoveCard}
               petCardNames={petCardNames}
             />
           ))}

@@ -54,6 +54,19 @@ _INITIAL_WIZARD_STAGE = QUICKSTART_STAGE_ORDER[0]
 # color/category rejections.
 _OVERFETCH_MULTIPLIER = 2
 
+# Default basic-land mapping. The lands stage of quickstart fills the mana
+# base entirely with basics distributed across the commander's color identity
+# — duals are intentionally left for the user to swap in. A colorless commander
+# falls back to Wastes.
+_COLOR_TO_BASIC: dict[str, str] = {
+    "W": "Plains",
+    "U": "Island",
+    "B": "Swamp",
+    "R": "Mountain",
+    "G": "Forest",
+}
+_COLORLESS_BASIC = "Wastes"
+
 
 @dataclass
 class QuickstartStageResult:
@@ -130,20 +143,35 @@ async def quickstart(
         email,
     )
 
+    # Shared running counts mirror the wizard's `computeStageCounts` view
+    # (cards with overlapping qualifying_stages count toward each stage). This
+    # keeps "X / target" displays honest after quickstart.
+    stage_counts: dict[str, int] = dict.fromkeys(QUICKSTART_STAGE_ORDER, 0)
     results: list[QuickstartStageResult] = []
     for stage in QUICKSTART_STAGE_ORDER:
-        result = await _build_and_accept_stage(
-            pool,
-            ai_client,
-            qdrant_client,
-            deck_id=deck.id,
-            account_id=account_id,
-            email=email,
-            stage=stage,
-            target=QUICKSTART_TARGETS[stage],
-            max_price_cents=max_price_cents,
-            min_price_cents=min_price_cents,
-        )
+        if stage == "lands":
+            result = await _fill_basic_lands(
+                pool,
+                deck_id=deck.id,
+                email=email,
+                color_identity=commander.color_identity,
+                target=QUICKSTART_TARGETS[stage],
+            )
+            stage_counts[stage] += result.accepted
+        else:
+            result = await _build_and_accept_stage(
+                pool,
+                ai_client,
+                qdrant_client,
+                deck_id=deck.id,
+                account_id=account_id,
+                email=email,
+                stage=stage,
+                target=QUICKSTART_TARGETS[stage],
+                max_price_cents=max_price_cents,
+                min_price_cents=min_price_cents,
+                stage_counts=stage_counts,
+            )
         results.append(result)
         if on_progress is not None:
             await on_progress(result)
@@ -161,6 +189,65 @@ async def quickstart(
     return final, results
 
 
+def _distribute_basics(color_identity: list[str], target: int) -> dict[str, int]:
+    """Split ``target`` basic-land slots across the commander's colors.
+
+    Colorless commanders get ``Wastes``. Multi-color commanders get an even
+    split with the remainder spread across the leading colors. Always returns
+    counts that sum to ``target``.
+    """
+    if not color_identity:
+        return {_COLORLESS_BASIC: target}
+    basics = [_COLOR_TO_BASIC[c] for c in color_identity if c in _COLOR_TO_BASIC]
+    if not basics:
+        return {_COLORLESS_BASIC: target}
+    base, remainder = divmod(target, len(basics))
+    return {name: base + (1 if i < remainder else 0) for i, name in enumerate(basics)}
+
+
+async def _fill_basic_lands(
+    pool: asyncpg.Pool,
+    *,
+    deck_id: UUID,
+    email: str,
+    color_identity: list[str],
+    target: int,
+) -> QuickstartStageResult:
+    """Fill the lands stage with basics distributed across the commander's colors.
+
+    Quickstart deliberately does not seed duals — the user can swap them in
+    from the wizard. This keeps the starting mana base predictable, budget-
+    neutral, and easy to reason about.
+    """
+    distribution = _distribute_basics(color_identity, target)
+    accepted = 0
+    for basic_name, qty in distribution.items():
+        if qty <= 0:
+            continue
+        card = await card_service.resolve_card_by_name(pool, basic_name)
+        if card is None:
+            _log.warning("Basic land %s missing from local DB; skipping", basic_name)
+            continue
+        try:
+            await deck_service.add_card_to_deck(
+                pool,
+                deck_id,
+                DeckCardAdd(
+                    card_scryfall_id=card.scryfall_id,
+                    quantity=qty,
+                    category="lands",
+                    added_by="ai",
+                    ai_reasoning=None,
+                ),
+                email,
+            )
+        except (CardNotFoundError, ColorIdentityError) as exc:
+            _log.debug("Quickstart skipping basic %s: %s", basic_name, exc)
+            continue
+        accepted += qty
+    return QuickstartStageResult(stage="lands", target=target, accepted=accepted)
+
+
 async def _build_and_accept_stage(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
@@ -173,8 +260,16 @@ async def _build_and_accept_stage(
     target: int,
     max_price_cents: int | None,
     min_price_cents: int | None,
+    stage_counts: dict[str, int],
 ) -> QuickstartStageResult:
-    """Run one stage of build_stage and accept up to ``target`` cards."""
+    """Run one stage of build_stage and accept cards until ``target`` is met.
+
+    Acceptance respects each suggestion's ``qualifying_stages`` and the shared
+    ``stage_counts`` map, so cards that fill multiple stages are not greedily
+    counted against this stage's quota when those stages are already met. This
+    mirrors how the build wizard's ``computeStageCounts`` view will display
+    counts after quickstart returns.
+    """
     response = await ai_service.build_stage(
         pool,
         ai_client,
@@ -189,7 +284,7 @@ async def _build_and_accept_stage(
     )
     accepted = 0
     for suggestion in response.suggestions:
-        if accepted >= target:
+        if stage_counts[stage] >= target:
             break
         try:
             await deck_service.add_card_to_deck(
@@ -212,4 +307,10 @@ async def _build_and_accept_stage(
             )
             continue
         accepted += 1
+        # A card with no qualifying_stages falls back to its assigned category
+        # in the wizard view — mirror that here so counts stay aligned.
+        contributing = list(suggestion.qualifying_stages) or [stage]
+        for s in contributing:
+            if s in stage_counts:
+                stage_counts[s] += 1
     return QuickstartStageResult(stage=stage, target=target, accepted=accepted)

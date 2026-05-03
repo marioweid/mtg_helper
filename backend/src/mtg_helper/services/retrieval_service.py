@@ -1210,6 +1210,44 @@ def _annotate_moxfield_signals(
 _TRUSTED_QUOTA_FRACTION: float = 0.5
 
 
+def _filter_inclusion_by_stage(
+    inclusion: dict[UUID, float],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+    stage: str | None,
+) -> dict[UUID, float]:
+    """Drop trusted (EDHREC/Moxfield) cards that don't fit the active stage.
+
+    Stages with explicit tag membership (ramp/interaction/draw/utility) keep
+    only cards whose tags overlap. The ``lands`` stage keeps only lands. The
+    catch-all stages (``theme``, ``bangers``, ``None``) pass through unchanged
+    — there a high-trust card from EDHREC/Moxfield is always fair game.
+
+    Without this filter, the trusted quota injects globally popular staples
+    (Sol Ring, Arcane Signet) into every stage's top results, including the
+    interaction and draw stages where they have no thematic fit.
+    """
+    if stage is None or stage in {"theme", "bangers"}:
+        return inclusion
+    if stage == "lands":
+        return {
+            uid: w
+            for uid, w in inclusion.items()
+            if uid in cards_by_id and "Land" in (cards_by_id[uid]["type_line"] or "")
+        }
+    required = _STAGE_TAG_MEMBERSHIP.get(stage, frozenset())
+    if not required:
+        return inclusion
+    filtered: dict[UUID, float] = {}
+    for uid, w in inclusion.items():
+        row = cards_by_id.get(uid)
+        if row is None:
+            continue
+        tags = set(row["tags"] or [])
+        if tags & required:
+            filtered[uid] = w
+    return filtered
+
+
 def _apply_trusted_quota(
     scores: dict[UUID, float],
     edhrec_inclusion: dict[UUID, float],
@@ -1365,6 +1403,11 @@ async def retrieve_candidates(
         pool, all_ids, exclude_lands=exclude_lands, price_filter=price_filter
     )
     cards_by_id = {r["id"]: r for r in rows}
+
+    # Trusted-card boost only fires when the card actually fits the stage —
+    # otherwise Sol Ring keeps showing up under "interaction" etc.
+    edhrec_inclusion = _filter_inclusion_by_stage(edhrec_inclusion, cards_by_id, stage)
+    moxfield_inclusion = _filter_inclusion_by_stage(moxfield_inclusion, cards_by_id, stage)
 
     scores = _compute_weighted_scores(
         all_ids,

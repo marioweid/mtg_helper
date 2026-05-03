@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse
@@ -219,6 +220,33 @@ async def add_card(
             status_code=422, detail={"code": "COLOR_IDENTITY_VIOLATION", "message": str(e)}
         )
     return DataResponse(data=card)
+
+
+class DeckCardCategoryUpdate(BaseModel):
+    """Request body for moving a card between deck categories."""
+
+    category: str | None = Field(default=None, max_length=50)
+
+
+@router.patch("/{deck_id}/cards/{scryfall_id}", status_code=204)
+async def update_card_category(
+    deck_id: UUID,
+    scryfall_id: UUID,
+    body: DeckCardCategoryUpdate,
+    request: Request,
+    account: CurrentAccount,
+) -> Response:
+    """Move a card to a different category bucket within the deck."""
+    email = _require_email(account)
+    updated = await deck_service.update_deck_card_category(
+        request.app.state.db_pool, deck_id, scryfall_id, body.category, email
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "CARD_NOT_IN_DECK", "message": f"Card {scryfall_id} not in deck"},
+        )
+    return Response(status_code=204)
 
 
 @router.delete("/{deck_id}/cards/{scryfall_id}", status_code=204)

@@ -1240,9 +1240,18 @@ export default function BuildPage() {
             <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Basic Lands</p>
               <div className="flex flex-wrap gap-2">
-                {basicLandsForIdentity(deckColorIdentity).map((name) => (
+                {basicLandsForIdentity(deckColorIdentity).map((name) => {
+                  const current =
+                    deckCards.find((c) => c.name === name)?.quantity ?? 0;
+                  return (
                   <div key={name} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
                     <span className="text-xs font-medium text-gray-300 w-14">{name}</span>
+                    <span
+                      className={`text-xs w-8 text-right tabular-nums ${current > 0 ? "text-green-400" : "text-gray-600"}`}
+                      title="Currently in deck"
+                    >
+                      ×{current}
+                    </span>
                     <button
                       onClick={() => setBasicLandQuantities((prev) => ({ ...prev, [name]: Math.max(1, (prev[name] ?? 1) - 1) }))}
                       className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-gray-300 hover:bg-white/20 text-xs"
@@ -1275,7 +1284,8 @@ export default function BuildPage() {
                       {basicLandAdding[name] ? "…" : "Add"}
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

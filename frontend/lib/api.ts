@@ -159,6 +159,16 @@ export const apiClient = {
       if (!res.ok && res.status !== 204) throw new ApiError("DELETE_FAILED", "Failed to delete deck");
     }),
 
+  updateCardCategory: (deckId: string, scryfallId: string, category: string | null) =>
+    fetch(`${CLIENT_BASE}/decks/${deckId}/cards/${scryfallId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category }),
+    }).then((res) => {
+      if (!res.ok && res.status !== 204)
+        throw new ApiError("UPDATE_FAILED", "Failed to update card category");
+    }),
+
   removeCard: (deckId: string, scryfallId: string) =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/cards/${scryfallId}`, {
       method: "DELETE",

@@ -8,12 +8,12 @@ import { apiClient, ApiError } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse } from "@/lib/types";
 
-type PricePreset = "budget" | "mid" | "open";
+type PricePreset = "budget" | "mid" | "high";
 
-const PRICE_PRESETS: Record<PricePreset, { label: string; cents: number | null; hint: string }> = {
-  budget: { label: "Budget", cents: 5000, hint: "≤ €50 per card" },
-  mid: { label: "Mid", cents: 20000, hint: "≤ €200 per card" },
-  open: { label: "Open", cents: null, hint: "no price cap" },
+const PRICE_PRESETS: Record<PricePreset, { label: string; cents: number; hint: string }> = {
+  budget: { label: "Budget", cents: 50, hint: "≤ €0.50 per card" },
+  mid: { label: "Mid", cents: 500, hint: "≤ €5 per card" },
+  high: { label: "High", cents: 5000, hint: "≤ €50 per card" },
 };
 
 const SPINNER_MESSAGES = [

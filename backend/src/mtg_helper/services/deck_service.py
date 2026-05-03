@@ -538,6 +538,44 @@ async def export_moxfield(
     return deck.name, "\n".join(lines)
 
 
+async def update_deck_card_category(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    scryfall_id: UUID,
+    category: str | None,
+    email: str | None = None,
+) -> bool:
+    """Move a deck card into a different category bucket.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck's UUID.
+        scryfall_id: Scryfall ID of the card to recategorize.
+        category: New category name, or ``None`` to clear.
+        email: When provided, only succeeds if the deck is owned by this email.
+
+    Returns:
+        True if a row was updated, False if the card isn't in the deck or the
+        caller doesn't own it.
+    """
+    async with pool.acquire() as conn:
+        if email is not None:
+            try:
+                await _assert_owner(conn, deck_id, email)
+            except DeckNotFoundError:
+                return False
+        card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
+        if card_row is None:
+            return False
+        result = await conn.execute(
+            "UPDATE deck_cards SET category = $3 WHERE deck_id = $1 AND card_id = $2",
+            deck_id,
+            card_row["id"],
+            category,
+        )
+    return result == "UPDATE 1"
+
+
 async def remove_card_from_deck(
     pool: asyncpg.Pool,
     deck_id: UUID,
