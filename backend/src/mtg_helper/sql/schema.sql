@@ -258,6 +258,9 @@ ALTER TABLE decks ADD CONSTRAINT decks_min_price_cents_check
 -- deck_cards: replace single `category TEXT` with `categories TEXT[]` so a card
 -- can belong to multiple buckets (e.g. ramp + draw) the way the wizard already
 -- counts them via qualifying_stages. Backfill from the old column then drop it.
+-- The deck_detail_view depends on the column, so drop the view first; the
+-- CREATE OR REPLACE VIEW at the bottom of this file rebuilds it against the
+-- new column.
 ALTER TABLE deck_cards
     ADD COLUMN IF NOT EXISTS categories TEXT[] NOT NULL DEFAULT '{}';
 DO $$ BEGIN
@@ -269,6 +272,7 @@ DO $$ BEGIN
         SET categories = ARRAY[category]
         WHERE category IS NOT NULL
           AND (categories IS NULL OR cardinality(categories) = 0);
+        DROP VIEW IF EXISTS deck_detail_view;
         ALTER TABLE deck_cards DROP COLUMN category;
     END IF;
 END $$;
