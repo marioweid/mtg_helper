@@ -240,7 +240,9 @@ def card_qualifying_stages(tags: list[str], type_line: str | None) -> list[str]:
 
     A card may qualify for multiple stages — e.g. a card tagged both `ramp`
     and `draw` qualifies for both. Lands always qualify for the `lands`
-    stage by type. `theme` and `bangers` are excluded.
+    stage by type and never for the non-land stages (basics auto-tag as
+    ``ramp`` from "Add {G}" oracle text — that boost only makes sense for
+    nonland cards). `theme` and `bangers` are excluded.
 
     Args:
         tags: Tag list from `cards.tags`.
@@ -249,11 +251,11 @@ def card_qualifying_stages(tags: list[str], type_line: str | None) -> list[str]:
     Returns:
         Deduplicated list of stage names.
     """
+    is_land = bool(type_line and "Land" in type_line)
+    if is_land:
+        return ["lands"]
     tag_set = set(tags)
-    stages = [s for s, req in _STAGE_TAG_MEMBERSHIP.items() if tag_set & req]
-    if type_line and "Land" in type_line and "lands" not in stages:
-        stages.append("lands")
-    return stages
+    return [s for s, req in _STAGE_TAG_MEMBERSHIP.items() if tag_set & req]
 
 
 # Maps stage names to (query_text, query_tags)

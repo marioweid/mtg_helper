@@ -7,6 +7,7 @@ a complete draft already populated.
 """
 
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from uuid import UUID
@@ -36,14 +37,14 @@ QUICKSTART_STAGE_ORDER: tuple[str, ...] = (
     "lands",
 )
 
-# Per-stage acceptance targets. Sums to ~90 cards (commander + 89).
+# Per-stage acceptance targets. Sums to ~89 nonland + 36 lands = 99 + commander.
 QUICKSTART_TARGETS: dict[str, int] = {
     "theme": 22,
     "ramp": 10,
     "interaction": 8,
     "draw": 8,
     "utility": 5,
-    "lands": 37,
+    "lands": 36,
 }
 
 # Land the user at stage 1 of the wizard so they can review/swap from the
@@ -66,6 +67,10 @@ _COLOR_TO_BASIC: dict[str, str] = {
     "G": "Forest",
 }
 _COLORLESS_BASIC = "Wastes"
+
+# Match a colored pip in a Scryfall mana cost string. Hybrid pips ({W/U}) and
+# Phyrexian pips ({W/P}) count for each color they include.
+_PIP_RE = re.compile(r"\{([^}]+)\}")
 
 
 @dataclass
@@ -189,20 +194,61 @@ async def quickstart(
     return final, results
 
 
-def _distribute_basics(color_identity: list[str], target: int) -> dict[str, int]:
+def _count_pips(mana_costs: list[str]) -> dict[str, int]:
+    """Count colored pip occurrences in a list of mana cost strings.
+
+    Hybrid pips (e.g. ``{W/U}``) count once for each color they include so a
+    deck with hybrid spells biases its mana base toward both colors.
+    """
+    counts = {c: 0 for c in _COLOR_TO_BASIC}
+    for cost in mana_costs:
+        if not cost:
+            continue
+        for symbol in _PIP_RE.findall(cost):
+            for ch in symbol.upper():
+                if ch in counts:
+                    counts[ch] += 1
+    return counts
+
+
+def _distribute_basics(
+    color_identity: list[str],
+    target: int,
+    pip_counts: dict[str, int] | None = None,
+) -> dict[str, int]:
     """Split ``target`` basic-land slots across the commander's colors.
 
-    Colorless commanders get ``Wastes``. Multi-color commanders get an even
-    split with the remainder spread across the leading colors. Always returns
-    counts that sum to ``target``.
+    When ``pip_counts`` is provided, basics are distributed proportionally to
+    each color's pip count in the deck's nonland cards (with at least one
+    basic per color in the commander's identity). Otherwise the split is even
+    with the remainder spread across the leading colors. Colorless commanders
+    get ``Wastes``. Always returns counts that sum to ``target``.
     """
     if not color_identity:
         return {_COLORLESS_BASIC: target}
-    basics = [_COLOR_TO_BASIC[c] for c in color_identity if c in _COLOR_TO_BASIC]
+    basics = [(c, _COLOR_TO_BASIC[c]) for c in color_identity if c in _COLOR_TO_BASIC]
     if not basics:
         return {_COLORLESS_BASIC: target}
-    base, remainder = divmod(target, len(basics))
-    return {name: base + (1 if i < remainder else 0) for i, name in enumerate(basics)}
+
+    n = len(basics)
+    pips = pip_counts or {}
+    weights = [max(1, pips.get(color, 0)) for color, _ in basics]
+    total_weight = sum(weights)
+
+    # Reserve 1 land per color so no in-identity color gets starved, then
+    # distribute the rest proportional to weights.
+    reserved = min(n, target)
+    extras = target - reserved
+    raw = [w / total_weight * extras for w in weights]
+    floors = [int(x) for x in raw]
+    remainder = extras - sum(floors)
+    # Hand out the remainder to the largest fractional parts.
+    fractional_order = sorted(
+        range(n), key=lambda i: (raw[i] - floors[i], weights[i]), reverse=True
+    )
+    for i in fractional_order[:remainder]:
+        floors[i] += 1
+    return {name: 1 + floors[i] for i, (_, name) in enumerate(basics)}
 
 
 async def _fill_basic_lands(
@@ -215,11 +261,20 @@ async def _fill_basic_lands(
 ) -> QuickstartStageResult:
     """Fill the lands stage with basics distributed across the commander's colors.
 
+    Distribution is weighted by the colored mana pip counts of the deck's
+    existing nonland cards so a deck heavy in green spells gets more Forests.
     Quickstart deliberately does not seed duals — the user can swap them in
     from the wizard. This keeps the starting mana base predictable, budget-
     neutral, and easy to reason about.
     """
-    distribution = _distribute_basics(color_identity, target)
+    deck = await deck_service.get_deck(pool, deck_id, email)
+    mana_costs = (
+        [c.mana_cost or "" for c in deck.cards if c.type_line and "Land" not in c.type_line]
+        if deck is not None
+        else []
+    )
+    pip_counts = _count_pips(mana_costs)
+    distribution = _distribute_basics(color_identity, target, pip_counts)
     accepted = 0
     for basic_name, qty in distribution.items():
         if qty <= 0:
