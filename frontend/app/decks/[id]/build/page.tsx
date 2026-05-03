@@ -7,11 +7,12 @@ import { apiClient, ApiError } from "@/lib/api";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardSearchResult } from "@/components/card-search-result";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
-import type {
-  CardSuggestion,
-  CardResponse,
-  CollectionResponse,
-  DeckCardItem,
+import {
+  bucketsFor,
+  type CardSuggestion,
+  type CardResponse,
+  type CollectionResponse,
+  type DeckCardItem,
 } from "@/lib/types";
 import { CATEGORY_ORDER, STAGE_LABELS, STAGE_DEFAULTS, CATEGORY_TARGETS } from "@/lib/constants";
 
@@ -136,7 +137,9 @@ function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
     const stages =
       card.qualifying_stages && card.qualifying_stages.length > 0
         ? card.qualifying_stages
-        : [card.category ?? "other"];
+        : card.categories.length > 0
+          ? card.categories
+          : ["other"];
     for (const stage of stages) {
       counts[stage] = (counts[stage] ?? 0) + (card.quantity ?? 1);
     }
@@ -147,9 +150,9 @@ function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
   for (const card of cards) {
-    const cat = card.category ?? "other";
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(card);
+    for (const cat of bucketsFor(card)) {
+      (groups[cat] ??= []).push(card);
+    }
   }
   return groups;
 }
@@ -649,7 +652,7 @@ export default function BuildPage() {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
         ...(qty !== undefined && { quantity: qty }),
-        category: suggestion.category,
+        categories: [suggestion.category],
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });
@@ -704,7 +707,7 @@ export default function BuildPage() {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
         ...(qty !== undefined && { quantity: qty }),
-        category: suggestion.category,
+        categories: [suggestion.category],
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });
@@ -721,7 +724,7 @@ export default function BuildPage() {
     try {
       await apiClient.addCard(deckId, {
         card_scryfall_id: card.scryfall_id,
-        category,
+        categories: [category],
         added_by: "user",
       });
       void refreshDeck();
@@ -745,7 +748,7 @@ export default function BuildPage() {
       await apiClient.addCard(deckId, {
         card_scryfall_id: card.scryfall_id,
         quantity,
-        category: "lands",
+        categories: ["lands"],
         added_by: "user",
       });
       void refreshDeck();
@@ -785,7 +788,7 @@ export default function BuildPage() {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
         ...(qty !== undefined && { quantity: qty }),
-        category: suggestion.category,
+        categories: [suggestion.category],
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });
@@ -848,7 +851,7 @@ export default function BuildPage() {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
         ...(qty !== undefined && { quantity: qty }),
-        category: suggestion.category,
+        categories: [suggestion.category],
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });

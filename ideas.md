@@ -1,5 +1,11 @@
 # Ideas
 
+1. Load more button does not load more after a couple of loads
+2. Can we improve card parsing so that cards can be more reliable be categorized to one of the specific categories and also the keywords etc. are better matched. 
+3. Total Card count not shown in deck builder. If it fits, we can als ouse an LLm here since the parsing is one done once and than only delta for new sets so cost are ok for this one.
+4. Quick view in deckbuilder category that shows total cards and the cards in the current category (except banger)
+5. Combo Section and also if a card has a lot of combo potential show combos with that card
+
 Mobile/responsive pass + in-app feedback button. Game store users will pull this up on phones at the table. The build wizard's grid + filter dropdown work on desktop; haven't seen them on a 390px
 viewport. Bundle this with a small "Send feedback" button that writes to a feedback table — you'll get more honest signal than asking after the session. Tradeoff: low-glamour work, but cuts the
 highest-probability "this is broken" first impressions.

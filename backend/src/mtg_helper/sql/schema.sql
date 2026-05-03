@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS deck_cards (
     deck_id         UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
     card_id         UUID NOT NULL REFERENCES cards(id),
     quantity        INTEGER NOT NULL DEFAULT 1,
-    category        TEXT,
+    categories      TEXT[] NOT NULL DEFAULT '{}',
     added_by        TEXT NOT NULL DEFAULT 'user' CHECK (added_by IN ('user', 'ai')),
     ai_reasoning    TEXT,
     UNIQUE (deck_id, card_id)
@@ -255,6 +255,24 @@ ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_min_price_cents_check;
 ALTER TABLE decks ADD CONSTRAINT decks_min_price_cents_check
     CHECK (min_price_cents IS NULL OR min_price_cents >= 0);
 
+-- deck_cards: replace single `category TEXT` with `categories TEXT[]` so a card
+-- can belong to multiple buckets (e.g. ramp + draw) the way the wizard already
+-- counts them via qualifying_stages. Backfill from the old column then drop it.
+ALTER TABLE deck_cards
+    ADD COLUMN IF NOT EXISTS categories TEXT[] NOT NULL DEFAULT '{}';
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'deck_cards' AND column_name = 'category'
+    ) THEN
+        UPDATE deck_cards
+        SET categories = ARRAY[category]
+        WHERE category IS NOT NULL
+          AND (categories IS NULL OR cardinality(categories) = 0);
+        ALTER TABLE deck_cards DROP COLUMN category;
+    END IF;
+END $$;
+
 ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_collection_threshold_check;
 ALTER TABLE accounts DROP COLUMN IF EXISTS collection_suggestions_enabled;
 ALTER TABLE accounts DROP COLUMN IF EXISTS default_collection_id;
@@ -339,7 +357,7 @@ SELECT
     dc.deck_id,
     dc.id          AS deck_card_id,
     dc.quantity,
-    dc.category,
+    dc.categories,
     dc.added_by,
     dc.ai_reasoning,
     c.id           AS card_id,

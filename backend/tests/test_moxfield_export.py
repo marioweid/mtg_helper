@@ -16,7 +16,7 @@ async def _create_deck_with_card(client: AsyncClient) -> str:
 
     await client.post(
         f"/api/v1/decks/{deck_id}/cards",
-        json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "category": "ramp"},
+        json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "categories": ["ramp"]},
     )
     return deck_id
 

@@ -331,16 +331,20 @@ async def _bulk_insert_cards(
             card_id = scryfall_to_id.get(scryfall_id_str)
             if card_id is None:
                 continue
-            inserts.append((deck_id, card_id, quantity, category))
+            categories = [category] if category else []
+            inserts.append((deck_id, card_id, quantity, categories))
 
         if inserts:
             await conn.executemany(
                 """
-                INSERT INTO deck_cards (deck_id, card_id, quantity, category, added_by)
-                VALUES ($1, $2, $3, $4, 'user')
+                INSERT INTO deck_cards (deck_id, card_id, quantity, categories, added_by)
+                VALUES ($1, $2, $3, $4::text[], 'user')
                 ON CONFLICT (deck_id, card_id)
                 DO UPDATE SET quantity = EXCLUDED.quantity,
-                              category = COALESCE(EXCLUDED.category, deck_cards.category)
+                              categories = CASE
+                                  WHEN cardinality(EXCLUDED.categories) > 0 THEN EXCLUDED.categories
+                                  ELSE deck_cards.categories
+                              END
                 """,
                 inserts,
             )

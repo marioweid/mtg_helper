@@ -102,7 +102,7 @@ async def test_add_card_valid(client: AsyncClient) -> None:
     # Sol Ring is colorless — always legal
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/cards",
-        json={"card_scryfall_id": SOL_RING_ID, "category": "ramp"},
+        json={"card_scryfall_id": SOL_RING_ID, "categories": ["ramp"]},
     )
     assert resp.status_code == 201
     assert resp.json()["data"]["name"] == "Sol Ring"
@@ -119,7 +119,7 @@ async def test_add_card_valid_color_identity(client: AsyncClient) -> None:
     # Doubling Season is G — legal in GW deck
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/cards",
-        json={"card_scryfall_id": DOUBLING_SEASON_ID, "category": "theme"},
+        json={"card_scryfall_id": DOUBLING_SEASON_ID, "categories": ["theme"]},
     )
     assert resp.status_code == 201
 

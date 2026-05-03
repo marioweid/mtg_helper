@@ -223,23 +223,28 @@ async def add_card(
 
 
 class DeckCardCategoryUpdate(BaseModel):
-    """Request body for moving a card between deck categories."""
+    """Request body for changing a card's category tags."""
 
-    category: str | None = Field(default=None, max_length=50)
+    categories: list[str] = Field(default_factory=list, max_length=10)
 
 
 @router.patch("/{deck_id}/cards/{scryfall_id}", status_code=204)
-async def update_card_category(
+async def update_card_categories(
     deck_id: UUID,
     scryfall_id: UUID,
     body: DeckCardCategoryUpdate,
     request: Request,
     account: CurrentAccount,
 ) -> Response:
-    """Move a card to a different category bucket within the deck."""
+    """Replace a card's category tag set within the deck.
+
+    A card may belong to multiple categories (e.g. ramp + draw). An empty list
+    clears all manual categories — auto-bucketing via qualifying_stages still
+    applies in the wizard view.
+    """
     email = _require_email(account)
-    updated = await deck_service.update_deck_card_category(
-        request.app.state.db_pool, deck_id, scryfall_id, body.category, email
+    updated = await deck_service.update_deck_card_categories(
+        request.app.state.db_pool, deck_id, scryfall_id, body.categories, email
     )
     if not updated:
         raise HTTPException(

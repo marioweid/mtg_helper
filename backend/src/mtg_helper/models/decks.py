@@ -82,7 +82,7 @@ class DeckCardItem(BaseModel):
     image_uri: str | None
     rarity: str | None
     quantity: int
-    category: str | None
+    categories: list[str] = Field(default_factory=list)
     added_by: str
     ai_reasoning: str | None
     qualifying_stages: list[str] = Field(default_factory=list)
@@ -114,7 +114,7 @@ class DeckCardAdd(BaseModel):
 
     card_scryfall_id: UUID
     quantity: int = Field(default=1, ge=1)
-    category: str | None = None
+    categories: list[str] = Field(default_factory=list)
     added_by: str = Field(default="user", pattern="^(user|ai)$")
     ai_reasoning: str | None = None
 
@@ -128,7 +128,7 @@ class DeckCardResponse(BaseModel):
     scryfall_id: UUID
     name: str
     quantity: int
-    category: str | None
+    categories: list[str]
     added_by: str
 
 

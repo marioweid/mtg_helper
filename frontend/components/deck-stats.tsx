@@ -1,4 +1,4 @@
-import type { DeckCardItem } from "@/lib/types";
+import { bucketsFor, type DeckCardItem } from "@/lib/types";
 import { CATEGORY_ORDER, CATEGORY_TARGETS, COLOR_SYMBOLS, STAGE_LABELS } from "@/lib/constants";
 
 function qty(card: DeckCardItem): number {
@@ -34,8 +34,9 @@ export function DeckStats({ cards }: { cards: DeckCardItem[] }) {
 
   for (const card of cards) {
     const q = qty(card);
-    const cat = card.category ?? "other";
-    categoryCounts[cat] = (categoryCounts[cat] ?? 0) + q;
+    for (const cat of bucketsFor(card)) {
+      categoryCounts[cat] = (categoryCounts[cat] ?? 0) + q;
+    }
     if (card.type_line?.includes("Creature")) creatureCount += q;
   }
 

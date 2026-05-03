@@ -8,15 +8,29 @@ interface Props {
   category: string;
   cards: DeckCardItem[];
   onRemove?: (scryfallId: string) => void;
-  onMove?: (scryfallId: string, category: string) => void | Promise<void>;
+  onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
   petCardNames?: Set<string>;
 }
 
-const CATEGORY_OPTIONS = CATEGORY_ORDER;
+// Bangers is a retrieval-only stage; users shouldn't tag cards into it manually.
+const CATEGORY_OPTIONS = CATEGORY_ORDER.filter((c) => c !== "bangers");
 
-export function DeckCategoryGroup({ category, cards, onRemove, onMove, petCardNames }: Props) {
+export function DeckCategoryGroup({
+  category,
+  cards,
+  onRemove,
+  onSetCategories,
+  petCardNames,
+}: Props) {
   const [expanded, setExpanded] = useState(true);
   const [openCard, setOpenCard] = useState<string | null>(null);
+
+  function toggleCategory(card: DeckCardItem, cat: string) {
+    if (!onSetCategories) return;
+    const has = card.categories.includes(cat);
+    const next = has ? card.categories.filter((c) => c !== cat) : [...card.categories, cat];
+    void onSetCategories(card.scryfall_id, next);
+  }
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
@@ -74,24 +88,41 @@ export function DeckCategoryGroup({ category, cards, onRemove, onMove, petCardNa
                       <p className="text-xs text-gray-600 italic">No oracle text.</p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      {onMove && (
-                        <label className="flex items-center gap-2 text-xs text-gray-400">
-                          <span>Move to:</span>
-                          <select
-                            value={card.category ?? ""}
-                            onChange={(e) => void onMove(card.scryfall_id, e.target.value)}
-                            className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
-                          >
-                            {CATEGORY_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt} className="bg-gray-900">
+                    {onSetCategories && (
+                      <div>
+                        <p className="mb-1.5 text-xs uppercase tracking-wide text-gray-500">
+                          Categories
+                          <span className="ml-2 normal-case tracking-normal text-gray-600">
+                            (dotted = auto from card text)
+                          </span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {CATEGORY_OPTIONS.map((opt) => {
+                            const active = card.categories.includes(opt);
+                            const auto = !active && card.qualifying_stages.includes(opt);
+                            const cls = active
+                              ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
+                              : auto
+                                ? "border-dashed border-gray-600 bg-white/5 text-gray-400 hover:border-gray-400"
+                                : "border-white/10 bg-white/5 text-gray-500 hover:border-white/20 hover:text-gray-300";
+                            return (
+                              <button
+                                key={opt}
+                                onClick={() => toggleCategory(card, opt)}
+                                className={`rounded border px-2 py-0.5 text-xs transition-colors ${cls}`}
+                                title={auto ? "Auto-tagged from card text — click to make explicit" : undefined}
+                              >
                                 {STAGE_LABELS[opt] ?? opt}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                      {onRemove && (
+                                {auto && <span className="ml-1 text-[10px] text-gray-500">auto</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {onRemove && (
+                      <div className="flex">
                         <button
                           onClick={() => onRemove(card.scryfall_id)}
                           className="ml-auto rounded border border-red-500/40 px-2 py-1 text-xs text-red-400 hover:border-red-500/70 hover:text-red-300 transition-colors"
@@ -99,8 +130,8 @@ export function DeckCategoryGroup({ category, cards, onRemove, onMove, petCardNa
                         >
                           Remove
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </li>

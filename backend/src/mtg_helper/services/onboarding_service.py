@@ -290,7 +290,7 @@ async def _fill_basic_lands(
                 DeckCardAdd(
                     card_scryfall_id=card.scryfall_id,
                     quantity=qty,
-                    category="lands",
+                    categories=["lands"],
                     added_by="ai",
                     ai_reasoning=None,
                 ),
@@ -347,7 +347,7 @@ async def _build_and_accept_stage(
                 deck_id,
                 DeckCardAdd(
                     card_scryfall_id=suggestion.scryfall_id,
-                    category=stage,
+                    categories=[stage],
                     added_by="ai",
                     ai_reasoning=suggestion.reasoning,
                 ),

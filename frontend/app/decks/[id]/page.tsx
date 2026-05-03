@@ -10,14 +10,14 @@ import { ManaCurve } from "@/components/mana-curve";
 import { ManaSymbols } from "@/components/mana-symbols";
 import { ExportButton } from "@/components/export-button";
 import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
-import type { DeckCardItem, DeckDetailResponse } from "@/lib/types";
+import { bucketsFor, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
   for (const card of cards) {
-    const cat = card.category ?? "other";
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(card);
+    for (const cat of bucketsFor(card)) {
+      (groups[cat] ??= []).push(card);
+    }
   }
   return groups;
 }
@@ -111,13 +111,13 @@ export default function DeckDetailPage() {
     }
   }
 
-  async function handleMoveCard(scryfallId: string, category: string) {
+  async function handleSetCategories(scryfallId: string, categories: string[]) {
     if (!deck) return;
     try {
-      await apiClient.updateCardCategory(deck.id, scryfallId, category);
+      await apiClient.updateCardCategories(deck.id, scryfallId, categories);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to move card");
+      alert(err instanceof Error ? err.message : "Failed to update categories");
     }
   }
 
@@ -229,7 +229,7 @@ export default function DeckDetailPage() {
               category={cat}
               cards={groups[cat] ?? []}
               onRemove={handleRemoveCard}
-              onMove={handleMoveCard}
+              onSetCategories={handleSetCategories}
               petCardNames={petCardNames}
             />
           ))}

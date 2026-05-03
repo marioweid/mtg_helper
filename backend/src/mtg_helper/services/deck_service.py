@@ -97,9 +97,11 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
 
 def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
     tags = list(row["tags"] or []) if "tags" in row.keys() else []
+    categories = list(row["categories"] or [])
     stages = card_qualifying_stages(tags, row["type_line"])
-    if row["category"] and row["category"] not in stages:
-        stages.append(row["category"])
+    for cat in categories:
+        if cat not in stages:
+            stages.append(cat)
     return DeckCardItem(
         deck_card_id=row["deck_card_id"],
         card_id=row["card_id"],
@@ -113,7 +115,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         image_uri=row["image_uri"],
         rarity=row["rarity"],
         quantity=row["quantity"],
-        category=row["category"],
+        categories=categories,
         added_by=row["added_by"],
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
@@ -459,19 +461,22 @@ async def add_card_to_deck(
 
         row = await conn.fetchrow(
             """
-            INSERT INTO deck_cards (deck_id, card_id, quantity, category, added_by, ai_reasoning)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO deck_cards (deck_id, card_id, quantity, categories, added_by, ai_reasoning)
+            VALUES ($1, $2, $3, $4::text[], $5, $6)
             ON CONFLICT (deck_id, card_id)
             DO UPDATE SET
                 quantity     = EXCLUDED.quantity,
-                category     = COALESCE(EXCLUDED.category, deck_cards.category),
+                categories   = CASE
+                                 WHEN cardinality(EXCLUDED.categories) > 0 THEN EXCLUDED.categories
+                                 ELSE deck_cards.categories
+                               END,
                 ai_reasoning = COALESCE(EXCLUDED.ai_reasoning, deck_cards.ai_reasoning)
             RETURNING id, deck_id, card_id
             """,
             deck_id,
             card_id,
             data.quantity,
-            data.category,
+            list(data.categories),
             data.added_by,
             data.ai_reasoning,
         )
@@ -485,7 +490,7 @@ async def add_card_to_deck(
         scryfall_id=card_row["scryfall_id"],
         name=card_row["name"],
         quantity=data.quantity,
-        category=data.category,
+        categories=list(data.categories),
         added_by=data.added_by,
     )
 
@@ -528,7 +533,7 @@ async def export_moxfield(
 
     by_category: dict[str, list[str]] = {}
     for card in deck.cards:
-        cat = card.category or "other"
+        cat = card.categories[0] if card.categories else "other"
         by_category.setdefault(cat, []).append(f"{card.quantity} {card.name}")
 
     for category in sorted(by_category):
@@ -538,20 +543,24 @@ async def export_moxfield(
     return deck.name, "\n".join(lines)
 
 
-async def update_deck_card_category(
+async def update_deck_card_categories(
     pool: asyncpg.Pool,
     deck_id: UUID,
     scryfall_id: UUID,
-    category: str | None,
+    categories: list[str],
     email: str | None = None,
 ) -> bool:
-    """Move a deck card into a different category bucket.
+    """Replace the category tag set on a deck card.
+
+    A card can belong to multiple buckets (e.g. ramp + draw); pass an empty
+    list to clear all manual categories. The card will still be auto-bucketed
+    by its ``qualifying_stages`` derived from the cards table.
 
     Args:
         pool: asyncpg connection pool.
         deck_id: The deck's UUID.
         scryfall_id: Scryfall ID of the card to recategorize.
-        category: New category name, or ``None`` to clear.
+        categories: New category list (replaces any existing categories).
         email: When provided, only succeeds if the deck is owned by this email.
 
     Returns:
@@ -568,10 +577,10 @@ async def update_deck_card_category(
         if card_row is None:
             return False
         result = await conn.execute(
-            "UPDATE deck_cards SET category = $3 WHERE deck_id = $1 AND card_id = $2",
+            "UPDATE deck_cards SET categories = $3::text[] WHERE deck_id = $1 AND card_id = $2",
             deck_id,
             card_row["id"],
-            category,
+            list(categories),
         )
     return result == "UPDATE 1"
 

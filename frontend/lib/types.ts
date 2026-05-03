@@ -82,7 +82,7 @@ export interface DeckCardItem {
   image_uri: string | null;
   rarity: string | null;
   quantity: number;
-  category: string | null;
+  categories: string[];
   added_by: string;
   ai_reasoning: string | null;
   qualifying_stages: string[];
@@ -131,7 +131,7 @@ export interface DeckUpdate {
 export interface DeckCardAdd {
   card_scryfall_id: string;
   quantity?: number;
-  category?: string | null;
+  categories?: string[];
   added_by?: "user" | "ai";
   ai_reasoning?: string | null;
 }
@@ -143,7 +143,7 @@ export interface DeckCardResponse {
   scryfall_id: string;
   name: string;
   quantity: number;
-  category: string | null;
+  categories: string[];
   added_by: string;
 }
 
@@ -206,6 +206,17 @@ export interface DescribeResponse {
   description: string | null;
   suggested_name: string | null;
   stage_targets: Record<string, number> | null;
+}
+
+/**
+ * Buckets a deck card belongs to: union of user-set categories and the
+ * auto-derived qualifying_stages. Falls back to "other" when both are empty.
+ */
+export function bucketsFor(card: DeckCardItem): string[] {
+  const buckets = new Set<string>(card.categories);
+  for (const s of card.qualifying_stages) buckets.add(s);
+  if (buckets.size === 0) buckets.add("other");
+  return [...buckets];
 }
 
 // Import
