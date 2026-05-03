@@ -7,12 +7,20 @@ import type { CardResponse } from "@/lib/types";
 interface Props {
   placeholder?: string;
   typeFilter?: string;
+  commanderLegal?: boolean;
   onSelect: (card: CardResponse) => void;
   selected?: CardResponse | null;
   onClear?: () => void;
 }
 
-export function CardSearch({ placeholder, typeFilter, onSelect, selected, onClear }: Props) {
+export function CardSearch({
+  placeholder,
+  typeFilter,
+  commanderLegal,
+  onSelect,
+  selected,
+  onClear,
+}: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +43,7 @@ export function CardSearch({ placeholder, typeFilter, onSelect, selected, onClea
           limit: 10,
         };
         if (typeFilter) searchParams.type = typeFilter;
+        if (commanderLegal) searchParams.commander_legal = true;
         const cards = await apiClient.searchCards(searchParams);
         setResults(cards);
         setOpen(true);
@@ -44,7 +53,7 @@ export function CardSearch({ placeholder, typeFilter, onSelect, selected, onClea
         setLoading(false);
       }
     }, 300);
-  }, [query, typeFilter]);
+  }, [query, typeFilter, commanderLegal]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

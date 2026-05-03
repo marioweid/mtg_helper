@@ -137,7 +137,14 @@ export default function NewDeckPage() {
   if (phase === "select") {
     return (
       <div className="mx-auto max-w-2xl">
-        <h1 className="mb-8 text-2xl font-bold text-white">New Deck</h1>
+        <h1 className="mb-2 text-2xl font-bold text-white">New Deck</h1>
+        <p className="mb-6 text-xs text-gray-500">
+          New here? Try the{" "}
+          <a href="/onboarding" className="text-indigo-400 hover:text-indigo-300 underline">
+            one-click quickstart
+          </a>{" "}
+          instead — it builds a sample deck for you.
+        </p>
 
         <div className="flex flex-col gap-6">
           <section className="rounded-xl border border-white/10 bg-white/5 p-6">

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { DeckImportResponse } from "@/lib/types";
 
+type Mode = "text" | "url";
+
 export default function ImportDeckPage() {
-  const router = useRouter();
-  const [deckList, setDeckList] = useState("");
+  const [mode, setMode] = useState<Mode>("text");
+
+  // Shared
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [bracket, setBracket] = useState(3);
@@ -17,7 +19,13 @@ export default function ImportDeckPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DeckImportResponse | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Text mode
+  const [deckList, setDeckList] = useState("");
+
+  // URL mode
+  const [url, setUrl] = useState("");
+
+  async function submitText(e: React.FormEvent) {
     e.preventDefault();
     if (!deckList.trim()) {
       setError("Please paste a deck list.");
@@ -34,6 +42,29 @@ export default function ImportDeckPage() {
       const imported = await apiClient.importDeck({
         deck_list: deckList,
         name: name.trim(),
+        description: description.trim() || null,
+        bracket,
+      });
+      setResult(imported);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed.");
+      setSubmitting(false);
+    }
+  }
+
+  async function submitUrl(e: React.FormEvent) {
+    e.preventDefault();
+    if (!url.trim()) {
+      setError("Please paste a Moxfield or Archidekt URL.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    setResult(null);
+    try {
+      const imported = await apiClient.importDeckUrl({
+        url: url.trim(),
+        name: name.trim() || null,
         description: description.trim() || null,
         bracket,
       });
@@ -119,36 +150,73 @@ export default function ImportDeckPage() {
         <h1 className="text-2xl font-bold text-white">Import Deck</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-1 font-semibold text-white">Deck List</h2>
-          <p className="mb-4 text-xs text-gray-500">
-            Paste your deck list from Moxfield, MTGO, TappedOut, or any similar format.
-            Mark your commander with <code className="text-indigo-400">*CMDR*</code> at the end of the line.
-          </p>
-          <textarea
-            value={deckList}
-            onChange={(e) => setDeckList(e.target.value)}
-            placeholder={`1 Hazel of the Rootbloom *CMDR*\n\n// Ramp\n1 Sol Ring\n1 Arcane Signet\n\n// Lands\n37 Forest`}
-            rows={20}
-            spellCheck={false}
-            className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y font-mono"
-          />
-        </section>
+      <div className="mb-6 inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+        {(["url", "text"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => {
+              setMode(m);
+              setError(null);
+            }}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              mode === m
+                ? "bg-indigo-600 text-white"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            {m === "url" ? "From URL" : "Paste Text"}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={mode === "url" ? submitUrl : submitText} className="flex flex-col gap-6">
+        {mode === "url" ? (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+            <h2 className="mb-1 font-semibold text-white">Deck URL</h2>
+            <p className="mb-4 text-xs text-gray-500">
+              Paste a public Moxfield or Archidekt deck URL. The deck name and
+              description will be taken from the source unless you override below.
+            </p>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://www.moxfield.com/decks/abc123"
+              className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+            />
+          </section>
+        ) : (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+            <h2 className="mb-1 font-semibold text-white">Deck List</h2>
+            <p className="mb-4 text-xs text-gray-500">
+              Paste your deck list from Moxfield, MTGO, TappedOut, or any similar format.
+              Mark your commander with <code className="text-indigo-400">*CMDR*</code> at the end of the line.
+            </p>
+            <textarea
+              value={deckList}
+              onChange={(e) => setDeckList(e.target.value)}
+              placeholder={`1 Hazel of the Rootbloom *CMDR*\n\n// Ramp\n1 Sol Ring\n1 Arcane Signet\n\n// Lands\n37 Forest`}
+              rows={20}
+              spellCheck={false}
+              className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y font-mono"
+            />
+          </section>
+        )}
 
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
           <h2 className="mb-4 font-semibold text-white">Deck Details</h2>
           <div className="flex flex-col gap-4">
             <div>
               <label className="mb-1.5 block text-sm text-gray-400" htmlFor="name">
-                Name
+                Name {mode === "url" && <span className="text-gray-600">(optional — falls back to source name)</span>}
               </label>
               <input
                 id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Hazel Deck"
+                placeholder={mode === "url" ? "Override (optional)" : "My Hazel Deck"}
                 className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
@@ -198,7 +266,7 @@ export default function ImportDeckPage() {
           disabled={submitting}
           className="rounded-lg bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? "Importing..." : "Import Deck"}
+          {submitting ? "Importing..." : mode === "url" ? "Import from URL" : "Import Deck"}
         </button>
       </form>
     </div>

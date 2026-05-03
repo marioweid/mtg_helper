@@ -181,9 +181,8 @@ async def import_deck(
 ) -> DeckImportResponse:
     """Import a deck from a pasted text deck list.
 
-    Parses the deck list, resolves card names against the local DB using fuzzy
-    matching, creates the deck with stage 'complete', and bulk-inserts all cards.
-    Color identity violations and unresolved names are collected and returned.
+    Thin wrapper: parses the text, then delegates to :func:`import_parsed_entries`
+    which is shared with the URL-based import path.
 
     Args:
         pool: asyncpg connection pool.
@@ -207,7 +206,51 @@ async def import_deck(
             "e.g. '1 Hazel of the Rootbloom *CMDR*'."
         )
 
-    # Resolve commander(s) — first is main, second is partner.
+    return await import_parsed_entries(
+        pool,
+        commanders=commanders,
+        non_commanders=non_commanders,
+        name=data.name,
+        description=data.description,
+        bracket=data.bracket,
+        email=email,
+    )
+
+
+async def import_parsed_entries(
+    pool: asyncpg.Pool,
+    *,
+    commanders: list[ParsedCard],
+    non_commanders: list[ParsedCard],
+    name: str,
+    description: str | None,
+    bracket: int,
+    email: str,
+) -> DeckImportResponse:
+    """Resolve already-parsed entries, create a deck, bulk-insert cards.
+
+    Shared backend for both text imports and URL imports. The caller is
+    responsible for parsing and for ensuring at least one commander entry.
+
+    Args:
+        pool: asyncpg connection pool.
+        commanders: ParsedCard entries flagged as commanders. First = main,
+            second (if present) = partner.
+        non_commanders: Non-commander ParsedCard entries (the mainboard).
+        name: Deck name.
+        description: Optional deck description.
+        bracket: Deck bracket (1–4).
+        email: Authenticated account email — owner of the new deck.
+
+    Returns:
+        DeckImportResponse with the created deck and per-card results.
+
+    Raises:
+        CardNotFoundError: If the main commander cannot be resolved.
+    """
+    if not commanders:
+        raise ValueError("import_parsed_entries requires at least one commander entry")
+
     commander_card = await card_service.resolve_card_by_name(pool, commanders[0].name)
     if commander_card is None:
         raise CardNotFoundError(
@@ -221,15 +264,14 @@ async def import_deck(
         if partner_card is None:
             _log.warning("Partner '%s' not found, ignoring", commanders[1].name)
 
-    # Create the deck (stage defaults to "created"; we update it after import).
     deck = await deck_service.create_deck(
         pool,
         DeckCreate(
             commander_scryfall_id=commander_card.scryfall_id,
             partner_scryfall_id=partner_card.scryfall_id if partner_card else None,
-            name=data.name,
-            description=data.description,
-            bracket=data.bracket,
+            name=name,
+            description=description,
+            bracket=bracket,
         ),
         email,
     )
@@ -239,23 +281,20 @@ async def import_deck(
         pool, non_commanders, commander_identity
     )
 
-    # Bulk insert resolved cards directly to avoid N sequential round-trips.
     if resolved_cards:
         await _bulk_insert_cards(pool, deck.id, resolved_cards)
 
-    # Advance stage to "complete" — imported decks skip the build wizard.
     await deck_service.update_deck(pool, deck.id, deck_service.DeckUpdate(stage="complete"))
 
     _log.info(
         "Imported deck '%s' (%s): %d cards, %d unresolved, %d color violations",
-        data.name,
+        name,
         deck.id,
         len(resolved_cards),
         len(unresolved),
         len(color_violations),
     )
 
-    # Re-fetch to get updated stage.
     updated_deck = await deck_service._fetch_deck(pool, deck.id)
 
     return DeckImportResponse(

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
     edhrec_base_url: str = "https://json.edhrec.com/pages/commanders"
     moxfield_base_url: str = "https://api2.moxfield.com"
+    archidekt_base_url: str = "https://archidekt.com/api"
 
     # Qdrant vector search
     qdrant_url: str = "http://qdrant:6333"

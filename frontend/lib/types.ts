@@ -216,11 +216,39 @@ export interface DeckImportRequest {
   bracket?: number;
 }
 
+export interface DeckUrlImportRequest {
+  url: string;
+  name?: string | null;
+  description?: string | null;
+  bracket?: number;
+}
+
 export interface DeckImportResponse {
   deck: DeckResponse;
   imported_count: number;
   unresolved: string[];
   color_violations: string[];
+}
+
+// Onboarding
+export interface QuickstartRequest {
+  commander_scryfall_id: string;
+  partner_scryfall_id?: string | null;
+  bracket?: number;
+  max_price_cents?: number | null;
+  min_price_cents?: number | null;
+  name?: string | null;
+}
+
+export interface QuickstartStageResult {
+  stage: string;
+  target: number;
+  accepted: number;
+}
+
+export interface QuickstartResponse {
+  deck: DeckResponse;
+  stages: QuickstartStageResult[];
 }
 
 // Feedback

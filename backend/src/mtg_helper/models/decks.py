@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AnyHttpUrl, BaseModel, Field
 
 
 class DeckCreate(BaseModel):
@@ -137,6 +137,15 @@ class DeckImportRequest(BaseModel):
 
     deck_list: str = Field(min_length=1, max_length=50000)
     name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    bracket: int = Field(default=3, ge=1, le=4)
+
+
+class DeckUrlImportRequest(BaseModel):
+    """Request body for importing a deck from a Moxfield/Archidekt URL."""
+
+    url: AnyHttpUrl
+    name: str | None = Field(default=None, max_length=200)
     description: str | None = None
     bracket: int = Field(default=3, ge=1, le=4)
 

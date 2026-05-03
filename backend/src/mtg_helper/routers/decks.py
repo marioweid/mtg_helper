@@ -19,12 +19,17 @@ from mtg_helper.models.decks import (
     DeckResponse,
     DeckSummary,
     DeckUpdate,
+    DeckUrlImportRequest,
 )
-from mtg_helper.services import deck_service, import_service
+from mtg_helper.services import deck_service, deck_url_import_service, import_service
 from mtg_helper.services.deck_service import (
     CardNotFoundError,
     ColorIdentityError,
     DeckNotFoundError,
+)
+from mtg_helper.services.deck_url_import_service import (
+    DeckFetchError,
+    UnsupportedDeckUrlError,
 )
 
 router = APIRouter(prefix="/decks", tags=["decks"])
@@ -104,6 +109,49 @@ async def import_deck(
         raise HTTPException(
             status_code=422,
             detail={"code": "PARSE_ERROR", "message": str(e)},
+        )
+    return DataResponse(data=result)
+
+
+@router.post(
+    "/import-url",
+    response_model=DataResponse[DeckImportResponse],
+    status_code=201,
+)
+async def import_deck_from_url(
+    body: DeckUrlImportRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[DeckImportResponse]:
+    """Import a deck from a Moxfield or Archidekt URL.
+
+    Fetches the deck from the source's public API and persists it locally with
+    stage 'complete'. The deck's name comes from the source unless overridden.
+    """
+    email = _require_email(account)
+    try:
+        result = await deck_url_import_service.import_from_url(
+            request.app.state.db_pool,
+            str(body.url),
+            email,
+            name_override=body.name,
+            description_override=body.description,
+            bracket=body.bracket,
+        )
+    except UnsupportedDeckUrlError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "UNSUPPORTED_URL", "message": str(e)},
+        )
+    except CardNotFoundError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "COMMANDER_NOT_FOUND", "message": str(e)},
+        )
+    except DeckFetchError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "UPSTREAM_FETCH_FAILED", "message": str(e)},
         )
     return DataResponse(data=result)
 

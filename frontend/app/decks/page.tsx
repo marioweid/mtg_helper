@@ -76,14 +76,23 @@ export default async function DecksPage() {
       </div>
 
       {decks.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-white/20 py-20 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-white/20 py-20 text-center">
           <p className="text-gray-400">No decks yet.</p>
-          <Link
-            href="/decks/new"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
-          >
-            Build your first deck
-          </Link>
+          <p className="text-xs text-gray-500">Pick a commander and we&apos;ll build a sample deck in under a minute.</p>
+          <div className="mt-2 flex flex-col items-center gap-2 sm:flex-row">
+            <Link
+              href="/onboarding"
+              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            >
+              Start here →
+            </Link>
+            <Link
+              href="/decks/new"
+              className="rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+            >
+              Build manually
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

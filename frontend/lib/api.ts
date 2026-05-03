@@ -18,6 +18,7 @@ import type {
   DeckDetailResponse,
   DeckImportRequest,
   DeckImportResponse,
+  DeckUrlImportRequest,
   DeckResponse,
   DeckSummary,
   DeckUpdate,
@@ -28,6 +29,8 @@ import type {
   PaginationMeta,
   PreferenceCreate,
   PreferenceResponse,
+  QuickstartRequest,
+  QuickstartResponse,
   RankingWeightsResponse,
   RankingWeightsUpdate,
   SuggestResponse,
@@ -129,6 +132,12 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
+  importDeckUrl: (body: DeckUrlImportRequest) =>
+    request<DeckImportResponse>("/decks/import-url", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   getDeck: (id: string) => request<DeckDetailResponse>(`/decks/${id}`),
 
   updateDeck: (deckId: string, body: DeckUpdate) =>
@@ -155,6 +164,13 @@ export const apiClient = {
       method: "DELETE",
     }).then((res) => {
       if (!res.ok && res.status !== 204) throw new ApiError("DELETE_FAILED", "Failed to remove card");
+    }),
+
+  // Onboarding
+  quickstart: (body: QuickstartRequest) =>
+    request<QuickstartResponse>("/onboarding/quickstart", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   // AI
