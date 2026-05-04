@@ -11,6 +11,9 @@ import { ManaSymbols } from "@/components/mana-symbols";
 import { ExportButton } from "@/components/export-button";
 import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
+import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
+
+type GroupingMode = "tags" | "types";
 
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
@@ -49,6 +52,7 @@ export default function DeckDetailPage() {
   const [draftDescription, setDraftDescription] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [groupingMode, setGroupingMode] = useState<GroupingMode>("tags");
 
   const load = useCallback(async () => {
     try {
@@ -135,8 +139,10 @@ export default function DeckDetailPage() {
     );
   }
 
-  const groups = groupByCategory(deck.cards);
-  const categories = sortedCategories(groups);
+  const groups =
+    groupingMode === "types" ? groupByPrimaryType(deck.cards) : groupByCategory(deck.cards);
+  const categories =
+    groupingMode === "types" ? sortedPrimaryTypes(groups) : sortedCategories(groups);
   const colors = colorIdentityFromCards(deck.cards);
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
   const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] : null;
@@ -223,6 +229,31 @@ export default function DeckDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* Card list */}
         <div className="flex flex-col gap-3">
+          {deck.cards.length > 0 && (
+            <div
+              role="group"
+              aria-label="Group cards by"
+              className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-xs"
+            >
+              {(["tags", "types"] as const).map((mode) => {
+                const active = groupingMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setGroupingMode(mode)}
+                    aria-pressed={active}
+                    className={`px-3 py-1.5 capitalize transition-colors ${
+                      active
+                        ? "bg-indigo-600 text-white"
+                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {categories.map((cat) => (
             <DeckCategoryGroup
               key={cat}
