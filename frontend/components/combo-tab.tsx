@@ -158,7 +158,7 @@ function PieceCard({ piece }: { piece: { card: { name: string; image_uri: string
         <img
           src={card.image_uri}
           alt={card.name}
-          className={`h-24 w-[60px] rounded object-cover ${
+          className={`h-24 w-[60px] rounded-[4.5%] object-cover ${
             in_deck ? "ring-1 ring-emerald-500/60" : "ring-1 ring-amber-500/60"
           }`}
         />

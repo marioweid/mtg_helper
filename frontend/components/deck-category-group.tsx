@@ -100,7 +100,7 @@ export function DeckCategoryGroup({
                     <img
                       src={card.image_uri}
                       alt=""
-                      className="w-56 rounded-lg shadow-2xl ring-1 ring-white/20"
+                      className="w-56 rounded-[4.5%] shadow-2xl"
                     />
                   </div>
                 )}

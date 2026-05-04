@@ -59,11 +59,11 @@ export function CardSuggestionCard({
       }`}
     >
       {suggestion.image_uri ? (
-        <div className="relative bg-black/40">
+        <div className="relative">
           <img
             src={suggestion.image_uri}
             alt={suggestion.name}
-            className="block w-full h-auto"
+            className="block w-full h-auto rounded-[4.5%]"
           />
           {/* Top-left icons: hot + combo */}
           <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
