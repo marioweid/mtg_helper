@@ -245,7 +245,7 @@ async def get_or_refresh(
         _log.warning("Commander %s not found; returning empty Moxfield payload", commander_id)
         return _SENTINEL_PAYLOAD
 
-    if row is not None and _row_age(row) < max_age:
+    if row is not None and _row_age(row) < max_age and not _is_empty_payload(row["payload"]):
         return _parse(row["payload"])
 
     owned_client = client is None
@@ -386,3 +386,15 @@ def _parse(payload: Any) -> dict[str, Any]:
     if isinstance(payload, str):
         return json.loads(payload)
     return _SENTINEL_PAYLOAD
+
+
+def _is_empty_payload(payload: Any) -> bool:
+    """Return True for sentinel rows that carry no usable inclusion signal.
+
+    Rows written while Moxfield was Cloudflare-blocked store the sentinel
+    (``by_scryfall = {}``) and would otherwise sit cached for 28 days.
+    Treating them as stale forces a refresh on the next request — once the
+    upstream block clears (curl_cffi rollout, etc.), suggestions auto-recover.
+    """
+    parsed = _parse(payload)
+    return not parsed.get("by_scryfall")

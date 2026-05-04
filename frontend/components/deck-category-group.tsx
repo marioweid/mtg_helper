@@ -33,7 +33,7 @@ export function DeckCategoryGroup({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+    <div className="rounded-xl border border-white/10 bg-white/5">
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"

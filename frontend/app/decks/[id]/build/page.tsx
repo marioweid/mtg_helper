@@ -1485,7 +1485,7 @@ export default function BuildPage() {
           {/* Suggestions grid */}
           {activeStageState.loaded && activeStageState.suggestions.length > 0 && (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {filteredSuggestions.map((s) => (
                   <CardSuggestionCard
                     key={s.scryfall_id}
