@@ -17,6 +17,8 @@ from typing import Any
 
 import asyncpg
 import httpx
+from curl_cffi.requests import AsyncSession as CurlAsyncSession
+from curl_cffi.requests.errors import RequestsError
 
 from mtg_helper.config import settings
 from mtg_helper.models.decks import DeckImportResponse
@@ -26,6 +28,12 @@ from mtg_helper.services.import_service import _SECTION_TO_CATEGORY, ParsedCard
 _log = logging.getLogger(__name__)
 
 _REQUEST_TIMEOUT = 30.0
+
+# Moxfield's API sits behind Cloudflare's bot challenge — plain httpx hits a
+# 403 + JS challenge HTML page. ``curl_cffi`` impersonates Chrome's TLS/JA3
+# fingerprint at the libcurl layer, which is what the challenge actually
+# checks. ``httpx`` is still used for non-Cloudflare sources (Archidekt).
+_IMPERSONATE_TARGET = "chrome"
 
 # URL → (source, deck_id). Allow trailing path segments (slug, subroute).
 _MOXFIELD_URL = re.compile(
@@ -86,6 +94,27 @@ def parse_deck_url(url: str) -> tuple[str, str]:
     )
 
 
+_CLOUDFLARE_HTML_MARKERS = (
+    "Attention Required! | Cloudflare",
+    "challenge-platform",
+    "cf-error-details",
+)
+
+
+def _looks_like_cloudflare(response: Any) -> bool:
+    """Detect a Cloudflare bot-challenge HTML body.
+
+    The challenge page is served with 403 (sometimes 503) and an HTML body
+    with characteristic markers. Distinguishing it from a private-deck 403
+    lets us surface a different, paste-text-friendly error.
+    """
+    body = getattr(response, "text", "") or ""
+    if not body or len(body) < 50:
+        return False
+    snippet = body[:2000]
+    return any(marker in snippet for marker in _CLOUDFLARE_HTML_MARKERS)
+
+
 # ── Moxfield ─────────────────────────────────────────────────────────────────
 
 
@@ -120,7 +149,7 @@ def _moxfield_card_name(entry: dict[str, Any]) -> str | None:
     return None
 
 
-async def fetch_moxfield_deck(deck_id: str, *, client: httpx.AsyncClient) -> FetchedDeck:
+async def fetch_moxfield_deck(deck_id: str, *, client: Any) -> FetchedDeck:
     """Fetch and translate a Moxfield deck.
 
     Calls ``GET {moxfield_base_url}/v3/decks/all/{deck_id}`` and walks
@@ -130,7 +159,11 @@ async def fetch_moxfield_deck(deck_id: str, *, client: httpx.AsyncClient) -> Fet
 
     Args:
         deck_id: Moxfield public deck id (the slug from the URL).
-        client: Injected httpx client.
+        client: Injected HTTP client. Production uses curl_cffi's
+            ``AsyncSession`` impersonating Chrome (Moxfield is behind
+            Cloudflare); tests inject ``httpx.AsyncClient`` with a mock
+            transport. Both expose ``.get()`` returning a response with
+            ``.status_code``, ``.text``, and ``.json()``.
 
     Returns:
         FetchedDeck with ``source='moxfield'``.
@@ -142,8 +175,14 @@ async def fetch_moxfield_deck(deck_id: str, *, client: httpx.AsyncClient) -> Fet
     url = f"{settings.moxfield_base_url}/v3/decks/all/{deck_id}"
     try:
         response = await client.get(url)
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, RequestsError) as exc:
         raise DeckFetchError(f"Could not reach Moxfield: {exc}") from exc
+    if response.status_code in (401, 403, 503) and _looks_like_cloudflare(response):
+        raise DeckFetchError(
+            "Moxfield is currently blocking automated imports (Cloudflare "
+            "challenge). Open the deck on moxfield.com, copy the deck list, "
+            "and use 'Paste deck text' instead."
+        )
     if response.status_code in (401, 403):
         raise DeckFetchError(
             "Moxfield blocked the request — the deck may be private or rate "
@@ -241,7 +280,7 @@ def _archidekt_should_skip(categories: list[str]) -> bool:
     return False
 
 
-async def fetch_archidekt_deck(deck_id: str, *, client: httpx.AsyncClient) -> FetchedDeck:
+async def fetch_archidekt_deck(deck_id: str, *, client: Any) -> FetchedDeck:
     """Fetch and translate an Archidekt deck.
 
     Calls ``GET {archidekt_base_url}/decks/{deck_id}/`` and iterates the
@@ -250,7 +289,7 @@ async def fetch_archidekt_deck(deck_id: str, *, client: httpx.AsyncClient) -> Fe
 
     Args:
         deck_id: Archidekt numeric deck id from the URL.
-        client: Injected httpx client.
+        client: Injected HTTP client (curl_cffi or httpx, both compatible).
 
     Returns:
         FetchedDeck with ``source='archidekt'``.
@@ -262,7 +301,7 @@ async def fetch_archidekt_deck(deck_id: str, *, client: httpx.AsyncClient) -> Fe
     url = f"{settings.archidekt_base_url}/decks/{deck_id}/"
     try:
         response = await client.get(url)
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, RequestsError) as exc:
         raise DeckFetchError(f"Could not reach Archidekt: {exc}") from exc
     if response.status_code == 404:
         raise DeckFetchError(f"Archidekt deck '{deck_id}' was not found.")
@@ -333,9 +372,26 @@ def _archidekt_split_cards(
 # ── Orchestration ────────────────────────────────────────────────────────────
 
 
-def _make_client() -> httpx.AsyncClient:
-    """Create the default httpx client. Indirection lets tests inject a mock."""
-    return httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)
+def _make_client() -> Any:
+    """Create the production HTTP client (Chrome-impersonating curl_cffi).
+
+    Tests inject ``httpx.AsyncClient`` directly; this factory only fires in
+    production. Both clients expose the subset of the API we use.
+    """
+    return CurlAsyncSession(impersonate=_IMPERSONATE_TARGET, timeout=_REQUEST_TIMEOUT)
+
+
+async def _close_client(client: Any) -> None:
+    """Close an owned client regardless of whether it's httpx or curl_cffi."""
+    aclose = getattr(client, "aclose", None)
+    if callable(aclose):
+        await aclose()
+        return
+    close = getattr(client, "close", None)
+    if callable(close):
+        result = close()
+        if hasattr(result, "__await__"):
+            await result
 
 
 async def import_from_url(
@@ -346,7 +402,7 @@ async def import_from_url(
     name_override: str | None = None,
     description_override: str | None = None,
     bracket: int = 3,
-    client: httpx.AsyncClient | None = None,
+    client: Any = None,
 ) -> DeckImportResponse:
     """Fetch a deck from a Moxfield/Archidekt URL and persist it locally.
 
@@ -378,7 +434,7 @@ async def import_from_url(
             fetched = await fetch_archidekt_deck(deck_id, client=http_client)
     finally:
         if owned_client:
-            await http_client.aclose()
+            await _close_client(http_client)
 
     if not fetched.commanders:
         raise DeckFetchError(

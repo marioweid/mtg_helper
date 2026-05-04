@@ -184,6 +184,22 @@ async def test_fetch_moxfield_deck_5xx_raises() -> None:
             await fetch_moxfield_deck("flaky", client=client)
 
 
+async def test_fetch_moxfield_deck_cloudflare_challenge_directs_to_paste() -> None:
+    """Cloudflare-fronted 403 surfaces a paste-text suggestion."""
+    cloudflare_html = (
+        "<!DOCTYPE html><html><head>"
+        "<title>Attention Required! | Cloudflare</title></head>"
+        "<body><div id='challenge-platform'></div></body></html>"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, text=cloudflare_html, headers={"content-type": "text/html"})
+
+    async with _mock_client(httpx.MockTransport(handler)) as client:
+        with pytest.raises(DeckFetchError, match="Paste deck text"):
+            await fetch_moxfield_deck("blocked", client=client)
+
+
 # ── fetch_archidekt_deck ─────────────────────────────────────────────────────
 
 

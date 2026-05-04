@@ -18,8 +18,14 @@ from uuid import UUID
 
 import asyncpg
 import httpx
+from curl_cffi.requests import AsyncSession as CurlAsyncSession
+from curl_cffi.requests.errors import RequestsError
 
 from mtg_helper.config import settings
+
+# Moxfield's API is behind Cloudflare's bot challenge. ``curl_cffi`` impersonates
+# a real Chrome TLS fingerprint, which is what the challenge actually checks.
+_IMPERSONATE_TARGET = "chrome"
 
 _log = logging.getLogger(__name__)
 
@@ -44,7 +50,7 @@ async def fetch_moxfield_card_id(
     scryfall_id: str,
     name: str,
     *,
-    client: httpx.AsyncClient,
+    client: Any,
 ) -> str | None:
     """Look up the Moxfield card id for a commander.
 
@@ -95,7 +101,7 @@ def _is_precon(deck: dict[str, Any]) -> bool:
 async def fetch_top_decks(
     moxfield_card_id: str,
     *,
-    client: httpx.AsyncClient,
+    client: Any,
 ) -> list[dict[str, Any]]:
     """Fetch the top-liked decks for a commander, dropping precons.
 
@@ -148,7 +154,7 @@ async def fetch_top_decks(
 async def fetch_deck_cards(
     deck_id: str,
     *,
-    client: httpx.AsyncClient,
+    client: Any,
 ) -> list[str]:
     """Fetch the mainboard scryfall ids for a Moxfield deck.
 
@@ -243,19 +249,21 @@ async def get_or_refresh(
         return _parse(row["payload"])
 
     owned_client = client is None
-    http_client = client or httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)
+    http_client = client or CurlAsyncSession(
+        impersonate=_IMPERSONATE_TARGET, timeout=_REQUEST_TIMEOUT
+    )
     try:
         payload = await _refresh_payload(
             commander["scryfall_id"], commander["name"], client=http_client
         )
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, RequestsError) as exc:
         _log.warning("Transient Moxfield error for %s: %s", commander["name"], exc)
         if row is not None:
             return _parse(row["payload"])
         return _SENTINEL_PAYLOAD
     finally:
         if owned_client:
-            await http_client.aclose()
+            await _close_client(http_client)
 
     payload_to_store = payload if payload is not None else _SENTINEL_PAYLOAD
     async with pool.acquire() as conn:
@@ -280,7 +288,7 @@ async def _refresh_payload(
     scryfall_id: str | UUID,
     commander_name: str,
     *,
-    client: httpx.AsyncClient,
+    client: Any,
 ) -> dict[str, Any] | None:
     """Run the lookup → search → per-deck fetch pipeline."""
     moxfield_card_id = await fetch_moxfield_card_id(str(scryfall_id), commander_name, client=client)
@@ -295,11 +303,24 @@ async def _refresh_payload(
     for summary in deck_summaries:
         try:
             cards = await fetch_deck_cards(summary["id"], client=client)
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, RequestsError) as exc:
             _log.warning("Skipping Moxfield deck %s due to error: %s", summary["id"], exc)
             continue
         deck_cards.append(cards)
     return _aggregate_payload(moxfield_card_id, deck_summaries, deck_cards)
+
+
+async def _close_client(client: Any) -> None:
+    """Close a moxfield client (httpx or curl_cffi) without crashing on either."""
+    aclose = getattr(client, "aclose", None)
+    if callable(aclose):
+        await aclose()
+        return
+    close = getattr(client, "close", None)
+    if callable(close):
+        result = close()
+        if hasattr(result, "__await__"):
+            await result
 
 
 async def score_inclusion(
