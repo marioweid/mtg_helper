@@ -1211,6 +1211,11 @@ def _annotate_moxfield_signals(
 
 _TRUSTED_QUOTA_FRACTION: float = 0.5
 
+# Hard cap on the inner candidate pool. Each Load More click bumps the requested
+# limit (frontend sends target=80 with the growing exclude list); inner searches
+# scale with that limit. 1000 leaves plenty of headroom before stages exhaust.
+_MAX_INNER_POOL: int = 1000
+
 
 def _filter_inclusion_by_stage(
     inclusion: dict[UUID, float],
@@ -1250,12 +1255,35 @@ def _filter_inclusion_by_stage(
     return filtered
 
 
+def _theme_pinned_uncategorizable(
+    trusted: list[tuple[UUID, float]],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+    limit: int,
+) -> list[UUID]:
+    """Return trusted cards with no qualifying stage, capped at ``limit``.
+
+    Used by the theme stage to guarantee top-deck staples that don't match any
+    mechanical stage (e.g. enchantress cost-reducers) keep a slot.
+    """
+    pinned: list[UUID] = []
+    for uid, _ in trusted:
+        row = cards_by_id.get(uid)
+        if row is None:
+            continue
+        if not card_qualifying_stages(list(row["tags"] or []), row["type_line"]):
+            pinned.append(uid)
+        if len(pinned) >= limit:
+            break
+    return pinned
+
+
 def _apply_trusted_quota(
     scores: dict[UUID, float],
     edhrec_inclusion: dict[UUID, float],
     moxfield_inclusion: dict[UUID, float],
     cards_by_id: dict[UUID, "asyncpg.Record"],
     limit: int,
+    stage: str | None = None,
 ) -> list[UUID]:
     """Select top-N UIDs reserving a quota for trusted EDHREC/Moxfield cards.
 
@@ -1266,12 +1294,19 @@ def _apply_trusted_quota(
     (e.g., zeroed by a strict type filter) or missing from ``cards_by_id``
     (filtered out at DB fetch) are excluded from the quota pass.
 
+    For the ``theme`` stage, trusted cards whose tags match no other build
+    stage (uncategorizable — they cannot land in ramp/draw/interaction/etc.)
+    receive guaranteed reserved slots ahead of the regular trusted quota.
+    Without this, Enchantress-style cost-reducers and other mechanically
+    untagged staples pulled from top decks are squeezed out of every stage.
+
     Args:
         scores: Final composite scores per card UUID.
         edhrec_inclusion: EDHREC inclusion scores per card UUID.
         moxfield_inclusion: Moxfield inclusion scores per card UUID.
         cards_by_id: Raw DB rows indexed by card UUID.
         limit: Maximum number of UIDs to return.
+        stage: Active build stage; controls the theme uncategorizable-pin pass.
 
     Returns:
         Ordered list of UUIDs (reserved trusted slots first, then composite fill).
@@ -1291,13 +1326,17 @@ def _apply_trusted_quota(
         trusted.append((uid, trusted_score))
 
     trusted.sort(key=lambda item: (item[1], scores.get(item[0], 0.0)), reverse=True)
-    quota = min(int(limit * _TRUSTED_QUOTA_FRACTION), len(trusted))
-    reserved = [uid for uid, _ in trusted[:quota]]
-    reserved_set = set(reserved)
 
-    remaining = limit - len(reserved)
+    pinned = _theme_pinned_uncategorizable(trusted, cards_by_id, limit) if stage == "theme" else []
+    pinned_set = set(pinned)
+
+    quota = min(int(limit * _TRUSTED_QUOTA_FRACTION), len(trusted))
+    reserved = [uid for uid, _ in trusted[:quota] if uid not in pinned_set]
+    reserved_set = pinned_set | set(reserved)
+
+    remaining = limit - len(pinned) - len(reserved)
     fill = [uid for uid in composite_ranked if uid not in reserved_set][:remaining]
-    return reserved + fill
+    return pinned + reserved + fill
 
 
 async def retrieve_candidates(
@@ -1354,12 +1393,20 @@ async def retrieve_candidates(
     owned_ids = collection_filter.owned_card_ids if collection_filter else None
     query_vector = await embed_single(ai_client, query_text)
 
+    # Scale inner-search pool with the requested limit + already-excluded count
+    # so the Load More flow (which keeps growing ``deck_card_ids`` with shown
+    # cards) doesn't drain the candidate set after a few clicks.
+    headroom = limit + len(deck_card_ids)
+    pool_size = min(_MAX_INNER_POOL, max(headroom, 50))
+    fts_pool_size = min(_MAX_INNER_POOL, max(headroom, 30))
+
     semantic_results, tag_results, fts_ids = await asyncio.gather(
         _search_qdrant(
             qdrant_client,
             query_vector,
             commander_color_identity,
             deck_card_ids,
+            limit=pool_size,
             owned_card_ids=owned_ids,
         ),
         _search_tags(
@@ -1368,6 +1415,7 @@ async def retrieve_candidates(
             commander_color_identity,
             deck_card_ids,
             exclude_lands=exclude_lands,
+            limit=pool_size,
             owned_card_ids=owned_ids,
             price_filter=price_filter,
         ),
@@ -1377,6 +1425,7 @@ async def retrieve_candidates(
             commander_color_identity,
             deck_card_ids,
             exclude_lands=exclude_lands,
+            limit=fts_pool_size,
             owned_card_ids=owned_ids,
             price_filter=price_filter,
         ),
@@ -1431,7 +1480,9 @@ async def retrieve_candidates(
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
-    top_ids = _apply_trusted_quota(scores, edhrec_inclusion, moxfield_inclusion, cards_by_id, limit)
+    top_ids = _apply_trusted_quota(
+        scores, edhrec_inclusion, moxfield_inclusion, cards_by_id, limit, stage=stage
+    )
     if not top_ids:
         return []
 

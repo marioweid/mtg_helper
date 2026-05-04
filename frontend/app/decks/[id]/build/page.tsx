@@ -29,6 +29,7 @@ interface StageState {
   error: string | null;
   target: number;
   unresolved: string[];
+  exhausted: boolean;
 }
 
 interface WizardState {
@@ -72,6 +73,7 @@ function makeStageState(stage: string): StageState {
     error: null,
     target: STAGE_DEFAULTS[stage] ?? 10,
     unresolved: [],
+    exhausted: false,
   };
 }
 
@@ -214,6 +216,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
             statuses,
             quantities: {},
             unresolved: action.unresolved,
+            exhausted: false,
           },
         },
       };
@@ -238,6 +241,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         ...newSuggestions.map((s) => s.scryfall_id),
       ]);
       const newBuffer = action.buffer.filter((s) => !allIds.has(s.scryfall_id));
+      const exhausted = newSuggestions.length === 0 && newBuffer.length === 0;
       return {
         ...state,
         stages: {
@@ -249,6 +253,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
             buffer: newBuffer,
             statuses: newStatuses,
             unresolved: mergedUnresolved,
+            exhausted,
           },
         },
       };
@@ -1506,19 +1511,23 @@ export default function BuildPage() {
               {activeStageState.loading && (
                 <span className="text-xs text-gray-500">Loading more…</span>
               )}
-              <button
-                onClick={() =>
-                  void loadMore(
-                    state.activeStage,
-                    activeStageState.suggestions.map((s) => s.name),
-                    activeStageState.rejectedNames,
-                  )
-                }
-                disabled={activeStageState.loading}
-                className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50"
-              >
-                Load More
-              </button>
+              {activeStageState.exhausted ? (
+                <span className="text-xs text-gray-500">No more suggestions for this stage.</span>
+              ) : (
+                <button
+                  onClick={() =>
+                    void loadMore(
+                      state.activeStage,
+                      activeStageState.suggestions.map((s) => s.name),
+                      activeStageState.rejectedNames,
+                    )
+                  }
+                  disabled={activeStageState.loading}
+                  className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Load More
+                </button>
+              )}
             </div>
           )}
         </div>
