@@ -1,8 +1,8 @@
 # Ideas
+1. Quick view in deckbuilder category that shows total cards and the cards in the current category
 
-1. Can we improve card parsing so that cards can be more reliable be categorized to one of the specific categories and also the keywords etc. are better matched.
-2. Quick view in deckbuilder category that shows total cards and the cards in the current category (except banger)
-3. Combo Section and also if a card has a lot of combo potential show combos with that card
+2. Can we improve card parsing so that cards can be more reliable be categorized to one of the specific categories and also the keywords etc. are better matched.
+
 
 Mobile/responsive pass + in-app feedback button. Game store users will pull this up on phones at the table. The build wizard's grid + filter dropdown work on desktop; haven't seen them on a 390px
 viewport. Bundle this with a small "Send feedback" button that writes to a feedback table — you'll get more honest signal than asking after the session. Tradeoff: low-glamour work, but cuts the

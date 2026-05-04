@@ -86,6 +86,7 @@ class DeckCardItem(BaseModel):
     added_by: str
     ai_reasoning: str | None
     qualifying_stages: list[str] = Field(default_factory=list)
+    price_eur_cents: int | None = None
 
 
 class DeckDetailResponse(BaseModel):

@@ -119,6 +119,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         added_by=row["added_by"],
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
+        price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
     )
 
 

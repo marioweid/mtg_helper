@@ -86,6 +86,7 @@ export interface DeckCardItem {
   added_by: string;
   ai_reasoning: string | null;
   qualifying_stages: string[];
+  price_eur_cents: number | null;
 }
 
 export interface DeckDetailResponse {

@@ -82,6 +82,11 @@ export function DeckCategoryGroup({
                   {card.mana_cost && (
                     <span className="text-xs text-gray-500 flex-shrink-0">{card.mana_cost}</span>
                   )}
+                  <span className="w-16 text-right text-xs text-gray-300 flex-shrink-0 tabular-nums">
+                    {card.price_eur_cents != null
+                      ? `€${(card.price_eur_cents / 100).toFixed(2)}`
+                      : "—"}
+                  </span>
                   <span className="text-gray-600 text-xs flex-shrink-0">{isOpen ? "▴" : "▾"}</span>
                 </button>
 

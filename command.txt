@@ -1,0 +1,40 @@
+# Run from /opt/mtg-helper on the prod VM.
+# Pulls latest code, applies the deck_detail_view migration, restarts backend.
+
+cd /opt/mtg-helper
+git pull
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
+  psql -U mtg -d mtg_helper <<'SQL'
+CREATE OR REPLACE VIEW deck_detail_view AS
+SELECT
+    dc.deck_id,
+    dc.id          AS deck_card_id,
+    dc.quantity,
+    dc.categories,
+    dc.added_by,
+    dc.ai_reasoning,
+    c.id           AS card_id,
+    c.scryfall_id,
+    c.name,
+    c.mana_cost,
+    c.cmc,
+    c.type_line,
+    c.oracle_text,
+    c.color_identity,
+    c.image_uri,
+    c.rarity,
+    c.tags,
+    CASE
+        WHEN (c.prices->>'eur') IS NULL THEN NULL
+        ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
+    END           AS price_eur_cents
+FROM deck_cards dc
+JOIN cards c ON dc.card_id = c.id;
+SQL
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend
+
+# Verify (optional): the column should be listed.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
+  psql -U mtg -d mtg_helper -c "\d deck_detail_view" | grep price_eur_cents

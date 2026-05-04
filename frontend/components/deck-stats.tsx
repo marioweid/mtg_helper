@@ -44,6 +44,13 @@ export function DeckStats({ cards }: { cards: DeckCardItem[] }) {
   const maxColorCount = Math.max(...Object.values(colors), 1);
   const totalCount = cards.reduce((sum, c) => sum + qty(c), 0);
   const nonLandCount = cards.filter((c) => !c.type_line?.includes("Land")).reduce((sum, c) => sum + qty(c), 0);
+  const totalPriceCents = cards.reduce(
+    (sum, c) => sum + (c.price_eur_cents ?? 0) * qty(c),
+    0,
+  );
+  const pricedCount = cards.filter((c) => c.price_eur_cents != null).length;
+  const totalPrice =
+    pricedCount === 0 ? "—" : `€${(totalPriceCents / 100).toFixed(2)}`;
 
   const categories = [
     ...CATEGORY_ORDER.filter((c) => (categoryCounts[c] ?? 0) > 0 || CATEGORY_TARGETS[c] != null),
@@ -73,6 +80,17 @@ export function DeckStats({ cards }: { cards: DeckCardItem[] }) {
           <div className="rounded-lg bg-white/5 px-3 py-2">
             <p className="text-gray-500">Non-land</p>
             <p className="font-semibold text-white">{nonLandCount}</p>
+          </div>
+          <div
+            className="col-span-2 rounded-lg bg-white/5 px-3 py-2"
+            title={
+              pricedCount < cards.length
+                ? `${cards.length - pricedCount} card(s) without a Scryfall EUR price are excluded`
+                : undefined
+            }
+          >
+            <p className="text-gray-500">Total price</p>
+            <p className="font-semibold text-white tabular-nums">{totalPrice}</p>
           </div>
         </div>
       </div>

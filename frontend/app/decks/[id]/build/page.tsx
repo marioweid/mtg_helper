@@ -1442,7 +1442,7 @@ export default function BuildPage() {
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
                       Custom Suggestions
                     </p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                       {filteredPromptSuggestions.map((s) => (
                         <CardSuggestionCard
                           key={s.scryfall_id}
