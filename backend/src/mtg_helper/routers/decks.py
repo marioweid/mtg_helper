@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse
+from mtg_helper.models.combos import ComboListResponse
 from mtg_helper.models.common import DataResponse, PaginationMeta
 from mtg_helper.models.decks import (
     DeckCardAdd,
@@ -22,7 +23,13 @@ from mtg_helper.models.decks import (
     DeckUpdate,
     DeckUrlImportRequest,
 )
-from mtg_helper.services import deck_service, deck_url_import_service, import_service
+from mtg_helper.services import (
+    combo_service,
+    deck_service,
+    deck_url_import_service,
+    import_service,
+)
+from mtg_helper.services.combo_service import ComboFetchError
 from mtg_helper.services.deck_service import (
     CardNotFoundError,
     ColorIdentityError,
@@ -169,6 +176,28 @@ async def get_deck(
     if deck is None:
         raise _not_found(deck_id)
     return DataResponse(data=deck)
+
+
+@router.get("/{deck_id}/combos", response_model=DataResponse[ComboListResponse])
+async def get_deck_combos(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[ComboListResponse]:
+    """Active and almost-there (one card missing) combos for the deck."""
+    email = _require_email(account)
+    pool = request.app.state.db_pool
+    deck = await deck_service.get_deck(pool, deck_id, email)
+    if deck is None:
+        raise _not_found(deck_id)
+    try:
+        combos = await combo_service.fetch_combos(pool, deck)
+    except ComboFetchError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "UPSTREAM_FETCH_FAILED", "message": str(e)},
+        )
+    return DataResponse(data=combos)
 
 
 @router.patch("/{deck_id}", response_model=DataResponse[DeckResponse])

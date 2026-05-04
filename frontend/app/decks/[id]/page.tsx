@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
+import { ComboTab } from "@/components/combo-tab";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
@@ -14,6 +15,7 @@ import { bucketsFor, type DeckCardItem, type DeckDetailResponse } from "@/lib/ty
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
 type GroupingMode = "tags" | "types";
+type DeckTab = "cards" | "combos";
 
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
@@ -53,6 +55,7 @@ export default function DeckDetailPage() {
   const [savingDescription, setSavingDescription] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("tags");
+  const [tab, setTab] = useState<DeckTab>("cards");
 
   const load = useCallback(async () => {
     try {
@@ -227,51 +230,82 @@ export default function DeckDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        {/* Card list */}
+        {/* Card list / combos */}
         <div className="flex flex-col gap-3">
-          {deck.cards.length > 0 && (
-            <div
-              role="group"
-              aria-label="Group cards by"
-              className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-xs"
-            >
-              {(["tags", "types"] as const).map((mode) => {
-                const active = groupingMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => setGroupingMode(mode)}
-                    aria-pressed={active}
-                    className={`px-3 py-1.5 capitalize transition-colors ${
-                      active
-                        ? "bg-indigo-600 text-white"
-                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                );
-              })}
-            </div>
+          <div
+            role="tablist"
+            aria-label="Deck view"
+            className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-sm"
+          >
+            {(["cards", "combos"] as const).map((t) => {
+              const active = tab === t;
+              return (
+                <button
+                  key={t}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t)}
+                  className={`px-4 py-1.5 capitalize transition-colors ${
+                    active
+                      ? "bg-indigo-600 text-white"
+                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+
+          {tab === "cards" && (
+            <>
+              {deck.cards.length > 0 && (
+                <div
+                  role="group"
+                  aria-label="Group cards by"
+                  className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-xs"
+                >
+                  {(["tags", "types"] as const).map((mode) => {
+                    const active = groupingMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => setGroupingMode(mode)}
+                        aria-pressed={active}
+                        className={`px-3 py-1.5 capitalize transition-colors ${
+                          active
+                            ? "bg-indigo-600 text-white"
+                            : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {categories.map((cat) => (
+                <DeckCategoryGroup
+                  key={cat}
+                  category={cat}
+                  cards={groups[cat] ?? []}
+                  onRemove={handleRemoveCard}
+                  onSetCategories={handleSetCategories}
+                  petCardNames={petCardNames}
+                />
+              ))}
+              {deck.cards.length === 0 && (
+                <div className="rounded-xl border border-dashed border-white/20 py-12 text-center text-gray-500">
+                  No cards yet.{" "}
+                  <Link href={`/decks/${deck.id}/build`} className="text-indigo-400 hover:underline">
+                    Start building
+                  </Link>
+                </div>
+              )}
+            </>
           )}
-          {categories.map((cat) => (
-            <DeckCategoryGroup
-              key={cat}
-              category={cat}
-              cards={groups[cat] ?? []}
-              onRemove={handleRemoveCard}
-              onSetCategories={handleSetCategories}
-              petCardNames={petCardNames}
-            />
-          ))}
-          {deck.cards.length === 0 && (
-            <div className="rounded-xl border border-dashed border-white/20 py-12 text-center text-gray-500">
-              No cards yet.{" "}
-              <Link href={`/decks/${deck.id}/build`} className="text-indigo-400 hover:underline">
-                Start building
-              </Link>
-            </div>
-          )}
+
+          {tab === "combos" && <ComboTab deckId={deck.id} />}
         </div>
 
         {/* Sidebar */}

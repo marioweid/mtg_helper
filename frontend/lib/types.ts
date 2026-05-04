@@ -226,6 +226,33 @@ export function bucketsFor(card: DeckCardItem): string[] {
   return [...buckets];
 }
 
+// Combos (Commander Spellbook)
+export interface ComboCardRef {
+  name: string;
+  scryfall_id: string | null;
+  image_uri: string | null;
+}
+
+export interface ComboPiece {
+  card: ComboCardRef;
+  in_deck: boolean;
+}
+
+export interface Combo {
+  id: string;
+  pieces: ComboPiece[];
+  produces: string[];
+  description: string | null;
+  popularity: number | null;
+  bracket_tag: string | null;
+  missing_count: number;
+}
+
+export interface ComboListResponse {
+  active: Combo[];
+  almost_there: Combo[];
+}
+
 // Import
 export interface DeckImportRequest {
   deck_list: string;

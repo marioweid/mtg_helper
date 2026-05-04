@@ -4,6 +4,7 @@ import type {
   BuildResponse,
   CardResponse,
   CardSuggestion,
+  ComboListResponse,
   CollectionCardAdd,
   CollectionCardItem,
   CollectionCardUpdate,
@@ -139,6 +140,8 @@ export const apiClient = {
     }),
 
   getDeck: (id: string) => request<DeckDetailResponse>(`/decks/${id}`),
+
+  getDeckCombos: (id: string) => request<ComboListResponse>(`/decks/${id}/combos`),
 
   updateDeck: (deckId: string, body: DeckUpdate) =>
     request<DeckResponse>(`/decks/${deckId}`, {
