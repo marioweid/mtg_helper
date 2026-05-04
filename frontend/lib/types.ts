@@ -171,6 +171,7 @@ export interface CardSuggestion {
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
   qualifying_stages: string[];
+  sources: string[];
 }
 
 export interface BuildResponse {

@@ -118,6 +118,8 @@ class RetrievedCard:
     price_eur_cents: int | None
     score: float
     signals: list[str] = field(default_factory=list)
+    edhrec_weight: float = 0.0
+    moxfield_weight: float = 0.0
 
 
 # Maps natural-language terms to tag names
@@ -1519,6 +1521,8 @@ async def retrieve_candidates(
                 price_eur_cents=row["price_eur_cents"],
                 score=scores[uid],
                 signals=signal_map.get(uid, []),
+                edhrec_weight=edhrec_inclusion.get(uid, 0.0),
+                moxfield_weight=moxfield_inclusion.get(uid, 0.0),
             )
         )
     return result

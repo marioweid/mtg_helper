@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
-import type { DeckCardItem } from "@/lib/types";
+import { bucketsFor, type DeckCardItem } from "@/lib/types";
 
 interface Props {
   category: string;
@@ -49,19 +49,16 @@ export function DeckCategoryGroup({
         <ul className="divide-y divide-white/5 border-t border-white/10">
           {cards.map((card) => {
             const isOpen = openCard === card.deck_card_id;
+            const tags = bucketsFor(card).filter((t) => t !== "untagged");
             return (
-              <li key={card.deck_card_id} className="hover:bg-white/5 transition-colors">
+              <li
+                key={card.deck_card_id}
+                className="group relative hover:bg-white/5 transition-colors"
+              >
                 <button
                   onClick={() => setOpenCard(isOpen ? null : card.deck_card_id)}
                   className="flex w-full items-center gap-3 px-4 py-2 text-left"
                 >
-                  {card.image_uri && (
-                    <img
-                      src={card.image_uri}
-                      alt={card.name}
-                      className="h-10 w-7 rounded object-cover flex-shrink-0"
-                    />
-                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
                       {card.name}
@@ -69,7 +66,18 @@ export function DeckCategoryGroup({
                         <span className="text-red-400 flex-shrink-0" title="Pet card">♥</span>
                       )}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">{card.type_line}</p>
+                    {tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {tags.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded bg-indigo-900/40 px-1.5 py-0.5 text-[10px] text-indigo-300 capitalize"
+                          >
+                            {STAGE_LABELS[t] ?? t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {card.mana_cost && (
                     <span className="text-xs text-gray-500 flex-shrink-0">{card.mana_cost}</span>
@@ -77,8 +85,26 @@ export function DeckCategoryGroup({
                   <span className="text-gray-600 text-xs flex-shrink-0">{isOpen ? "▴" : "▾"}</span>
                 </button>
 
+                {/* Hover preview: full card image. Hidden on touch (no real
+                    hover), visible only when ``group:hover`` fires. */}
+                {card.image_uri && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute right-2 top-1/2 z-20 hidden -translate-y-1/2 translate-x-full opacity-0 transition-opacity group-hover:block group-hover:opacity-100"
+                  >
+                    <img
+                      src={card.image_uri}
+                      alt=""
+                      className="w-56 rounded-lg shadow-2xl ring-1 ring-white/20"
+                    />
+                  </div>
+                )}
+
                 {isOpen && (
                   <div className="flex flex-col gap-3 border-t border-white/5 bg-black/20 px-4 py-3">
+                    {card.type_line && (
+                      <p className="text-xs text-gray-500">{card.type_line}</p>
+                    )}
                     {card.oracle_text && (
                       <p className="text-xs text-gray-300 whitespace-pre-line leading-relaxed">
                         {card.oracle_text}

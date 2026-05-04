@@ -397,6 +397,25 @@ export default function BuildPage() {
   const totalTypeFilters = cardTypeFilters.length + subtypeFilters.length;
   const [globalRejectedIds, setGlobalRejectedIds] = useState<Set<string>>(new Set());
   const [globalRejectedNames, setGlobalRejectedNames] = useState<string[]>([]);
+  const [comboCardNames, setComboCardNames] = useState<Set<string>>(new Set());
+
+  // Cards that would complete an "almost-there" combo for this deck. Drives
+  // the combo (⚡) icon on each suggestion. Refreshed alongside the deck —
+  // adding a card may unlock new completions, removing one may close them.
+  const refreshCombos = useCallback(async () => {
+    try {
+      const combos = await apiClient.getDeckCombos(deckId);
+      const names = new Set<string>();
+      for (const c of combos.almost_there) {
+        for (const p of c.pieces) {
+          if (!p.in_deck) names.add(p.card.name.toLowerCase());
+        }
+      }
+      setComboCardNames(names);
+    } catch {
+      /* non-critical: combo discovery is best-effort */
+    }
+  }, [deckId]);
 
   const acceptedScryfallIds = useMemo(
     () => new Set(deckCards.map((c) => c.scryfall_id)),
@@ -427,10 +446,12 @@ export default function BuildPage() {
     } catch {
       /* non-critical */
     }
-  }, [deckId]);
+    void refreshCombos();
+  }, [deckId, refreshCombos]);
 
   // Fetch deck on mount to derive color identity, initial category counts, and stage targets
   useEffect(() => {
+    void refreshCombos();
     apiClient
       .getDeck(deckId)
       .then((deck) => {
@@ -1433,6 +1454,7 @@ export default function BuildPage() {
                           onAddBack={() => void handlePromptAddBack(s)}
                           isPetCard={petCardNames.has(s.name)}
                           isBasicLand={isBasicLand(s)}
+                          inCombo={comboCardNames.has(s.name.toLowerCase())}
                           quantity={promptQuantities[s.scryfall_id] ?? 1}
                           onQuantityChange={(qty) =>
                             setPromptQuantities((prev) => ({ ...prev, [s.scryfall_id]: qty }))
@@ -1475,6 +1497,7 @@ export default function BuildPage() {
                     onAddBack={() => void handleAddRejected(state.activeStage, s)}
                     isPetCard={petCardNames.has(s.name)}
                     isBasicLand={isBasicLand(s)}
+                    inCombo={comboCardNames.has(s.name.toLowerCase())}
                     quantity={activeStageState.quantities[s.scryfall_id] ?? 1}
                     onQuantityChange={(qty) =>
                       dispatch({

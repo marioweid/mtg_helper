@@ -11,6 +11,7 @@ interface Props {
   onAddBack?: () => void;
   isPetCard?: boolean;
   isBasicLand?: boolean;
+  inCombo?: boolean;
   quantity?: number;
   onQuantityChange?: (quantity: number) => void;
 }
@@ -20,18 +21,14 @@ function formatEur(cents: number | null): string {
   return `€${(cents / 100).toFixed(2)}`;
 }
 
-function dedupeChips(primary: string[], secondary: string[], cap: number): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const s of [...primary, ...secondary]) {
-    const key = s.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(s);
-    if (result.length >= cap) break;
-  }
-  return result;
-}
+const SOURCE_CLASSES: Record<string, string> = {
+  Semantic: "bg-indigo-900/40 text-indigo-300",
+  Keywords: "bg-violet-900/40 text-violet-300",
+  Text: "bg-sky-900/40 text-sky-300",
+  EDHREC: "bg-orange-900/40 text-orange-300",
+  Moxfield: "bg-cyan-900/40 text-cyan-300",
+  Type: "bg-fuchsia-900/40 text-fuchsia-300",
+};
 
 export function CardSuggestionCard({
   suggestion,
@@ -42,17 +39,14 @@ export function CardSuggestionCard({
   onAddBack,
   isPetCard,
   isBasicLand,
+  inCombo,
   quantity = 1,
   onQuantityChange,
 }: Props) {
   const isHot =
     suggestion.highlight_reasons != null && suggestion.highlight_reasons.length > 0;
-  const chips = dedupeChips(
-    suggestion.highlight_reasons ?? [],
-    suggestion.synergies,
-    3,
-  );
   const owned = suggestion.owned_in;
+  const sources = suggestion.sources ?? [];
 
   return (
     <div
@@ -64,47 +58,85 @@ export function CardSuggestionCard({
             : "border-white/10 bg-white/5"
       }`}
     >
-      {suggestion.image_uri && (
-        <div className="relative h-40 overflow-hidden">
+      {suggestion.image_uri ? (
+        <div className="relative bg-black/40">
           <img
             src={suggestion.image_uri}
             alt={suggestion.name}
-            className="h-full w-full object-cover object-top"
+            className="block w-full h-auto"
           />
-          <div className="absolute top-1.5 right-1.5 flex gap-1">
-            <span
-              className="rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur"
-              title="Scryfall EUR, nonfoil"
-            >
-              {formatEur(suggestion.price_eur_cents)}
-            </span>
-          </div>
-          {isHot && (
-            <span
-              className="absolute top-1.5 left-1.5 text-base"
-              title={`Top pick: ${suggestion.highlight_reasons?.join(", ") ?? ""}`}
-            >
-              🔥
-            </span>
-          )}
-        </div>
-      )}
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <div>
-          <p className="font-medium text-white leading-tight flex items-center gap-1.5 flex-wrap">
-            <span>{suggestion.name}</span>
+          {/* Top-left icons: hot + combo */}
+          <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
+            {isHot && (
+              <span
+                className="rounded-full bg-black/70 px-1.5 py-0.5 text-base backdrop-blur"
+                title={`Top pick: ${suggestion.highlight_reasons?.join(", ") ?? ""}`}
+              >
+                🔥
+              </span>
+            )}
+            {inCombo && (
+              <span
+                className="rounded-full bg-black/70 px-1.5 py-0.5 text-base backdrop-blur"
+                title="Completes a potential combo for this deck"
+              >
+                ⚡
+              </span>
+            )}
             {isPetCard && (
-              <span className="text-red-400 flex-shrink-0 text-xs" title="Pet card">
+              <span
+                className="rounded-full bg-black/70 px-1.5 py-0.5 text-sm text-red-400 backdrop-blur"
+                title="Pet card"
+              >
                 ♥
               </span>
             )}
-            {!suggestion.image_uri && isHot && <span title="Top pick">🔥</span>}
+          </div>
+          {/* Top-right: price */}
+          <span
+            className="absolute top-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur"
+            title="Scryfall EUR, nonfoil"
+          >
+            {formatEur(suggestion.price_eur_cents)}
+          </span>
+        </div>
+      ) : (
+        // Image fallback: name + mana cost + type line
+        <div className="flex flex-col gap-1 border-b border-white/10 bg-black/30 px-3 py-3">
+          <p className="font-medium text-white leading-tight flex items-center gap-1.5 flex-wrap">
+            <span>{suggestion.name}</span>
+            {isPetCard && <span className="text-red-400 text-xs" title="Pet card">♥</span>}
+            {isHot && <span title="Top pick">🔥</span>}
+            {inCombo && <span title="Completes a potential combo">⚡</span>}
           </p>
           {suggestion.mana_cost && (
             <p className="text-xs text-gray-500">{suggestion.mana_cost}</p>
           )}
-          <p className="text-xs text-gray-400 mt-0.5">{suggestion.type_line}</p>
+          {suggestion.type_line && (
+            <p className="text-xs text-gray-400">{suggestion.type_line}</p>
+          )}
+          <p className="text-xs text-gray-300 mt-1">
+            {formatEur(suggestion.price_eur_cents)}
+          </p>
         </div>
+      )}
+
+      <div className="flex flex-col gap-2 p-2">
+        {/* Source chips */}
+        {sources.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {sources.map((s) => (
+              <span
+                key={s}
+                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  SOURCE_CLASSES[s] ?? "bg-white/10 text-gray-300"
+                }`}
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Ownership chip */}
         <div className="flex flex-wrap gap-1">
@@ -112,57 +144,25 @@ export function CardSuggestionCard({
             owned.slice(0, 2).map((c) => (
               <span
                 key={c.id}
-                className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-xs text-emerald-300"
+                className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-[10px] text-emerald-300"
                 title="Owned in this collection"
               >
                 ✓ {c.name}
               </span>
             ))
           ) : (
-            <span className="rounded bg-gray-800/60 px-1.5 py-0.5 text-xs text-gray-500">
+            <span className="rounded bg-gray-800/60 px-1.5 py-0.5 text-[10px] text-gray-500">
               Unowned
             </span>
           )}
           {owned.length > 2 && (
-            <span className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-xs text-emerald-300">
+            <span className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-[10px] text-emerald-300">
               +{owned.length - 2}
             </span>
           )}
         </div>
-
-        {/* Oracle text */}
-        {suggestion.oracle_text && (
-          <p className="text-xs text-gray-400 italic leading-relaxed">
-            {suggestion.oracle_text}
-          </p>
-        )}
-
-        {/* Reasoning */}
-        <p className="text-xs text-gray-400 leading-relaxed">{suggestion.reasoning}</p>
-
-        {/* Tags row: synergy/highlight chips + price fallback when no image */}
-        {(chips.length > 0 || !suggestion.image_uri) && (
-          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-white/5 pt-2">
-            {chips.map((c) => (
-              <span
-                key={c}
-                className={`rounded px-1.5 py-0.5 text-xs ${
-                  isHot && suggestion.highlight_reasons?.includes(c)
-                    ? "bg-amber-900/30 text-amber-300"
-                    : "bg-indigo-900/40 text-indigo-300"
-                }`}
-              >
-                {c}
-              </span>
-            ))}
-            {!suggestion.image_uri && (
-              <span className="ml-auto text-xs text-gray-300">
-                {formatEur(suggestion.price_eur_cents)}
-              </span>
-            )}
-          </div>
-        )}
       </div>
+
       {status === "pending" && (
         <>
           {isBasicLand && onQuantityChange && (

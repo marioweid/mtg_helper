@@ -108,9 +108,30 @@ _SIGNAL_LABELS: dict[str, str] = {
     "fts": "Strong text match",
 }
 
+# User-facing labels for the *source* badges shown on every suggestion card.
+# Distinct from ``_SIGNAL_LABELS`` (which feed banger highlight reasons): these
+# are the simple "where did this come from?" chips and cover signals beyond the
+# original three (edhrec, moxfield, type filter).
+_SOURCE_LABELS: dict[str, str] = {
+    "semantic": "Semantic",
+    "tag": "Keywords",
+    "fts": "Text",
+    "edhrec": "EDHREC",
+    "moxfield": "Moxfield",
+    "type": "Type",
+}
+
 # Threshold for highlighting top picks (new scoring is [0, 1])
 _BANGER_SCORE_THRESHOLD = 0.6
 _BANGER_MIN_SIGNALS = 2
+
+# Inclusion-weight thresholds that promote a card to the "hot" set even when
+# it doesn't meet the multi-signal banger rule. EDHREC weights are the per-
+# category boost (highsynergycards = 1.00, topcards = 0.85, etc.); 0.7 captures
+# the strongest categories. Moxfield weights are ``count / _TOP_DECKS`` (10),
+# so 0.5 means the card is in 5+ of the top-liked decks for the commander.
+_HOT_EDHREC_THRESHOLD = 0.7
+_HOT_MOXFIELD_THRESHOLD = 0.5
 
 
 class DeckNotFoundError(ValueError):
@@ -122,21 +143,50 @@ class LLMEmptyResponseError(RuntimeError):
 
 
 def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
-    """Return highlight reasons if the card is a multi-signal top hit ('banger').
+    """Return reasons that should fire the "hot" / fire-icon badge on a card.
 
-    A card is highlighted when it scores highly across 2+ retrieval signals.
+    Triggers (any one is enough):
+      * Multi-signal top hit: ≥2 retrieval signals AND composite score ≥ 0.6.
+      * Hot on EDHREC: inclusion weight ≥ ``_HOT_EDHREC_THRESHOLD`` — present
+        in EDHREC's strong categories (highsynergy / topcards / combos).
+      * In majority of top Moxfield decks: weight ≥ ``_HOT_MOXFIELD_THRESHOLD``
+        — appears in at least half of the cached top-liked Moxfield decks.
 
     Args:
-        candidate: Retrieved card with weighted score and signal list.
+        candidate: Retrieved card with score, signals, and inclusion weights.
 
     Returns:
-        List of human-readable reason strings, or None if not a banger.
+        List of human-readable reason strings, or None when nothing fires.
     """
-    if len(candidate.signals) < _BANGER_MIN_SIGNALS:
+    reasons: list[str] = []
+
+    if len(candidate.signals) >= _BANGER_MIN_SIGNALS and candidate.score >= _BANGER_SCORE_THRESHOLD:
+        reasons.extend(_SIGNAL_LABELS[s] for s in candidate.signals if s in _SIGNAL_LABELS)
+
+    if candidate.edhrec_weight >= _HOT_EDHREC_THRESHOLD:
+        reasons.append("Hot on EDHREC")
+    if candidate.moxfield_weight >= _HOT_MOXFIELD_THRESHOLD:
+        reasons.append("In majority of top Moxfield decks")
+
+    if not reasons:
         return None
-    if candidate.score < _BANGER_SCORE_THRESHOLD:
-        return None
-    return [_SIGNAL_LABELS[s] for s in candidate.signals if s in _SIGNAL_LABELS]
+    seen: set[str] = set()
+    out: list[str] = []
+    for r in reasons:
+        if r not in seen:
+            seen.add(r)
+            out.append(r)
+    return out
+
+
+def _sources_for(candidate: RetrievedCard) -> list[str]:
+    """Map a candidate's signals to user-facing source labels.
+
+    Preserves ``_SOURCE_LABELS`` ordering so badges render in a stable visual
+    sequence regardless of the order signals were appended internally.
+    """
+    have = set(candidate.signals)
+    return [_SOURCE_LABELS[s] for s in _SOURCE_LABELS if s in have]
 
 
 def _card_from_retrieved(
@@ -193,6 +243,7 @@ def _card_from_retrieved(
         price_eur_cents=card.price_eur_cents,
         owned_in=owned_in,
         qualifying_stages=qualifying_stages,
+        sources=_sources_for(card),
     )
 
 
