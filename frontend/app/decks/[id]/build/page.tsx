@@ -578,6 +578,7 @@ export default function BuildPage() {
     setSelectedCollectionIds(next);
     try {
       await apiClient.updateDeck(deckId, { suggestion_collection_ids: next });
+      reloadAllSuggestions();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to save collection filter");
     }
