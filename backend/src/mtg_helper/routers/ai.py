@@ -93,6 +93,7 @@ async def build_stage(
             email,
             stage=body.stage,
             target=body.target,
+            offset=body.offset,
             exclude=body.exclude,
             collection_ids=body.collection_ids,
             max_price_cents=body.max_price_cents,

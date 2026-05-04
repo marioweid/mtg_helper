@@ -10,6 +10,7 @@ class BuildRequest(BaseModel):
 
     stage: str | None = None
     target: int | None = Field(default=None, ge=1, le=99)
+    offset: int = Field(default=0, ge=0, le=1000)
     exclude: list[str] | None = Field(default=None, max_length=200)
     collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, gt=0)

@@ -727,6 +727,7 @@ async def build_stage(
     email: str,
     stage: str | None = None,
     target: int | None = None,
+    offset: int = 0,
     exclude: list[str] | None = None,
     collection_ids: list[UUID] | None = None,
     max_price_cents: int | None = None,
@@ -743,7 +744,10 @@ async def build_stage(
         deck_id: The deck's UUID.
         stage: Specific stage to generate for. If None, auto-advances to the next stage.
         target: Override target card count (determines how many candidates to return).
-        exclude: Card names to exclude from suggestions (already shown to the user).
+        offset: Pagination offset into the ranked candidate list. Used by
+            Load More to fetch the next page without re-sending shown names.
+        exclude: Persistent rejections (thumbs-down / per-session rejects). Not
+            used for pagination — that's handled via ``offset``.
         collection_ids: Per-request override. When provided, replaces the deck's
             stored ``suggestion_collection_ids`` for this call only.
 
@@ -799,6 +803,7 @@ async def build_stage(
         commander.color_identity,
         all_excluded,
         limit=limit,
+        offset=offset,
         stage=resolved_stage,
         deck_cmc_counts=deck_cmc_counts,
         feedback_weights=feedback_weights,

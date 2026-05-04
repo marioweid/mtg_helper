@@ -189,6 +189,7 @@ export const apiClient = {
     opts?: {
       stage?: string;
       target?: number;
+      offset?: number;
       exclude?: string[];
       collection_ids?: string[];
       max_price_cents?: number | null;
@@ -202,6 +203,7 @@ export const apiClient = {
       body: JSON.stringify({
         stage: opts?.stage ?? null,
         target: opts?.target ?? null,
+        offset: opts?.offset ?? 0,
         exclude: opts?.exclude ?? null,
         collection_ids: opts?.collection_ids ?? null,
         max_price_cents: opts?.max_price_cents ?? null,

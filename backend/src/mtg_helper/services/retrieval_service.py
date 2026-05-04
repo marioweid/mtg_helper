@@ -1349,6 +1349,7 @@ async def retrieve_candidates(
     deck_card_ids: list[UUID],
     limit: int = 40,
     *,
+    offset: int = 0,
     stage: str | None = None,
     deck_cmc_counts: dict[int, int] | None = None,
     feedback_weights: dict[UUID, float] | None = None,
@@ -1393,10 +1394,11 @@ async def retrieve_candidates(
     owned_ids = collection_filter.owned_card_ids if collection_filter else None
     query_vector = await embed_single(ai_client, query_text)
 
-    # Scale inner-search pool with the requested limit + already-excluded count
-    # so the Load More flow (which keeps growing ``deck_card_ids`` with shown
-    # cards) doesn't drain the candidate set after a few clicks.
-    headroom = limit + len(deck_card_ids)
+    # Build a deep enough ranked list to satisfy ``offset + limit`` (Load More
+    # paginates through positions, not via a growing exclude list). The pool
+    # is also padded for cards already in the deck since those get filtered.
+    page_end = offset + limit
+    headroom = page_end + len(deck_card_ids)
     pool_size = min(_MAX_INNER_POOL, max(headroom, 50))
     fts_pool_size = min(_MAX_INNER_POOL, max(headroom, 30))
 
@@ -1480,9 +1482,10 @@ async def retrieve_candidates(
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
-    top_ids = _apply_trusted_quota(
-        scores, edhrec_inclusion, moxfield_inclusion, cards_by_id, limit, stage=stage
+    full_ranked = _apply_trusted_quota(
+        scores, edhrec_inclusion, moxfield_inclusion, cards_by_id, page_end, stage=stage
     )
+    top_ids = full_ranked[offset:page_end]
     if not top_ids:
         return []
 

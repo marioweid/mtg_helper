@@ -30,6 +30,7 @@ interface StageState {
   target: number;
   unresolved: string[];
   exhausted: boolean;
+  offset: number;
 }
 
 interface WizardState {
@@ -74,6 +75,7 @@ function makeStageState(stage: string): StageState {
     target: STAGE_DEFAULTS[stage] ?? 10,
     unresolved: [],
     exhausted: false,
+    offset: 0,
   };
 }
 
@@ -217,6 +219,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
             quantities: {},
             unresolved: action.unresolved,
             exhausted: false,
+            offset: deduped.length + buffer.length,
           },
         },
       };
@@ -242,6 +245,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       ]);
       const newBuffer = action.buffer.filter((s) => !allIds.has(s.scryfall_id));
       const exhausted = newSuggestions.length === 0 && newBuffer.length === 0;
+      const newOffset =
+        existing.suggestions.length + newSuggestions.length + newBuffer.length;
       return {
         ...state,
         stages: {
@@ -254,6 +259,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
             statuses: newStatuses,
             unresolved: mergedUnresolved,
             exhausted,
+            offset: newOffset,
           },
         },
       };
@@ -478,13 +484,14 @@ export default function BuildPage() {
   }, [searchQuery, searchType, deckColorIdentity]);
 
   const loadStage = useCallback(
-    async (stage: string, extraExclude: string[] = []) => {
+    async (stage: string) => {
       dispatch({ type: "LOAD_START", stage });
       try {
-        const exclude = extraExclude.length > 0 ? extraExclude : undefined;
+        const exclude = globalRejectedNames.length > 0 ? globalRejectedNames : undefined;
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
+          offset: 0,
           ...(exclude ? { exclude } : {}),
           card_types: cardTypeFilters,
           subtypes: subtypeFilters,
@@ -504,22 +511,20 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId, cardTypeFilters, subtypeFilters],
+    [deckId, cardTypeFilters, subtypeFilters, globalRejectedNames],
   );
 
   const loadMore = useCallback(
-    async (
-      stage: string,
-      existingNames: string[],
-      rejectedNames: string[],
-    ) => {
+    async (stage: string, offset: number, rejectedNames: string[]) => {
       dispatch({ type: "LOAD_START", stage });
       try {
-        const exclude = [...existingNames, ...rejectedNames, ...globalRejectedNames];
+        const persistentExclude = [...rejectedNames, ...globalRejectedNames];
+        const exclude = persistentExclude.length > 0 ? persistentExclude : undefined;
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
-          exclude,
+          offset,
+          ...(exclude ? { exclude } : {}),
           card_types: cardTypeFilters,
           subtypes: subtypeFilters,
         });
@@ -1518,7 +1523,7 @@ export default function BuildPage() {
                   onClick={() =>
                     void loadMore(
                       state.activeStage,
-                      activeStageState.suggestions.map((s) => s.name),
+                      activeStageState.offset,
                       activeStageState.rejectedNames,
                     )
                   }
