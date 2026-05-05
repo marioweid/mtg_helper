@@ -152,6 +152,87 @@ def test_lifegain_you_gain() -> None:
 def test_graveyard_return_from() -> None:
     tags = _classify("Return target creature card from your graveyard to your hand.")
     assert "graveyard" in tags
+    assert "graveyard_hate" not in tags
+
+
+def test_graveyard_hate_exile_target_card() -> None:
+    tags = _classify("Exile target card from a graveyard.")
+    assert "graveyard_hate" in tags
+    # Hate-only cards must not double-count as recursion.
+    assert "graveyard" not in tags
+
+
+def test_graveyard_hate_exile_all_in_graveyard() -> None:
+    tags = _classify("Exile all cards from target player's graveyard.")
+    assert "graveyard_hate" in tags
+    assert "graveyard" not in tags
+
+
+# ── cost_reduction ────────────────────────────────────────────────────────────
+
+
+def test_cost_reduction_discount_phrase() -> None:
+    tags = _classify(
+        "The first enchantment spell you cast each turn costs {1} less to cast.",
+        type_line="Legendary Creature — Faerie Cleric",
+    )
+    assert "cost_reduction" in tags
+
+
+def test_cost_reduction_color_specific() -> None:
+    tags = _classify("Creature spells you cast cost {2} less to cast.")
+    assert "cost_reduction" in tags
+
+
+# ── anthem ────────────────────────────────────────────────────────────────────
+
+
+def test_anthem_global_buff() -> None:
+    tags = _classify("Creatures you control get +1/+1.", type_line="Enchantment")
+    assert "anthem" in tags
+
+
+def test_anthem_other_creatures() -> None:
+    tags = _classify("Other creatures you control get +1/+0.")
+    assert "anthem" in tags
+
+
+# ── proliferate ───────────────────────────────────────────────────────────────
+
+
+def test_proliferate_keyword() -> None:
+    tags = _classify("Whenever this creature attacks, proliferate.", keywords=["Proliferate"])
+    assert "proliferate" in tags
+
+
+def test_proliferate_oracle_text_only() -> None:
+    tags = _classify("Proliferate, then proliferate again.")
+    assert "proliferate" in tags
+
+
+# ── card_selection ────────────────────────────────────────────────────────────
+
+
+def test_card_selection_scry() -> None:
+    tags = _classify("When this enters, scry 2.")
+    assert "card_selection" in tags
+
+
+def test_card_selection_keyword_only() -> None:
+    tags = _classify("Whenever you cast a spell, this dies.", keywords=["Surveil"])
+    assert "card_selection" in tags
+
+
+# ── lifegain via lifelink keyword ─────────────────────────────────────────────
+
+
+def test_lifegain_lifelink_keyword() -> None:
+    tags = _classify(
+        "Lifelink. {T}: Add {W}.",
+        type_line="Creature",
+        keywords=["Lifelink"],
+    )
+    assert "lifegain" in tags
 
 
 # ── sacrifice + aristocrats ───────────────────────────────────────────────────

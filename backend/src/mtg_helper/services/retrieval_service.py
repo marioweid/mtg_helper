@@ -157,6 +157,9 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "graveyard": ["graveyard"],
     "reanimator": ["graveyard"],
     "recursion": ["graveyard"],
+    "graveyard hate": ["graveyard_hate"],
+    "exile graveyard": ["graveyard_hate"],
+    "graveyard removal": ["graveyard_hate"],
     "sacrifice": ["sacrifice"],
     "sac": ["sacrifice"],
     "aristocrats": ["aristocrats"],
@@ -178,6 +181,17 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "extra turn": ["extra_turn"],
     "land destruction": ["land_destruction"],
     "tribal": ["tribal"],
+    "cost reduction": ["cost_reduction"],
+    "discount": ["cost_reduction"],
+    "cheaper": ["cost_reduction"],
+    "anthem": ["anthem"],
+    "global buff": ["anthem"],
+    "lord effect": ["anthem"],
+    "proliferate": ["proliferate"],
+    "scry": ["card_selection"],
+    "surveil": ["card_selection"],
+    "card selection": ["card_selection"],
+    "filtering": ["card_selection"],
     "treasure": ["token"],
     "food token": ["token"],
     "clue token": ["token"],
@@ -230,10 +244,14 @@ _TOKEN_TYPE_NAMES: dict[str, str] = {
 # deck-specific (no tag mapping) and bangers is a tag superset that would
 # double-count everything; both are excluded from auto-membership.
 _STAGE_TAG_MEMBERSHIP: dict[str, frozenset[str]] = {
-    "ramp": frozenset({"ramp", "fast_mana"}),
-    "interaction": frozenset({"removal", "counterspell", "board_wipe", "protection"}),
-    "draw": frozenset({"draw"}),
-    "utility": frozenset({"tutor", "graveyard", "blink", "protection"}),
+    "ramp": frozenset({"ramp", "fast_mana", "cost_reduction"}),
+    "interaction": frozenset(
+        {"removal", "counterspell", "board_wipe", "protection", "graveyard_hate"}
+    ),
+    "draw": frozenset({"draw", "card_selection"}),
+    "utility": frozenset(
+        {"tutor", "graveyard", "graveyard_hate", "blink", "protection", "proliferate"}
+    ),
 }
 
 

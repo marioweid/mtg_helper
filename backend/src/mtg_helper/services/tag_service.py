@@ -62,7 +62,30 @@ _PAT_TUTOR = _re(r"search your library for (?!(?:a |an )?(?:basic |snow )?land\b
 _PAT_TOKEN = _re(r"create (?:a |an |\d+ |X )[\w ,/]*token")
 _PAT_PLUS_ONE = _re(r"\+1/\+1 counter")
 _PAT_LIFEGAIN = _re(r"you gain \d+ life|gain \d+ life|gains? \d+ life")
-_PAT_GRAVEYARD = _re(r"from (?:your |a )?graveyard|return [\w ,']+ from (?:your )?graveyard")
+_PAT_GRAVEYARD = _re(
+    r"return [\w ,']+ from (?:your |a )?graveyard"
+    r"|put (?:target )?(?:creature |\w+ )?card from (?:your |a )?graveyard"
+    r"|reanimate"
+)
+_PAT_GRAVEYARD_HATE = _re(
+    r"exile (?:target |all |each )?(?:card|creature|player'?s? graveyard)"
+    r"[\w ,']*?(?:from (?:a |any |target player'?s? |your |each )?graveyard)?"
+    r"|if a card would be put into a graveyard from anywhere, exile it instead"
+    r"|each opponent exiles? (?:their|his or her) graveyard"
+    r"|shuffle [\w ,']+ graveyard into"
+)
+_PAT_COST_REDUCTION = _re(
+    r"costs? \{[0-9XWUBRGC/]+\} less to cast"
+    r"|spells? you cast cost \{[0-9XWUBRGC/]+\} less"
+)
+_PAT_ANTHEM = _re(
+    r"creatures? you control get \+\d+/\+\d+"
+    r"|other creatures? you control get \+\d+/\+\d+"
+)
+_PAT_CARD_SELECTION = _re(
+    r"\bscry \d+|\bsurveil \d+|\bexplore\b|\bdiscover \d+|\binvestigate\b"
+    r"|look at the top \d+ cards? of your library"
+)
 _PAT_SACRIFICE = _re(r"sacrifice (?:a |an |another |this |one |two )")
 _PAT_DEATH_TRIGGER = _re(r"whenever (?:a |another )?(?:creature |[\w]+ )?dies|when [\w ,']+ dies")
 _PAT_BLINK = _re(r"exile [\w ,']+then return [\w ,']+ to the battlefield|flicker")
@@ -216,12 +239,16 @@ def _tag_tutor_token_counter(text: str, tags: list[str]) -> None:
         tags.append("token")
 
 
-def _tag_graveyard_sacrifice(text: str, tags: list[str]) -> None:
+def _tag_graveyard_sacrifice(text: str, kw_set: set[str], tags: list[str]) -> None:
     if _PAT_PLUS_ONE.search(text):
         tags.append("plus_one_counters")
-    if _PAT_LIFEGAIN.search(text):
+    if _PAT_LIFEGAIN.search(text) or "lifelink" in kw_set:
         tags.append("lifegain")
-    if _PAT_GRAVEYARD.search(text):
+    # Hate first so we don't double-tag with the recursion bucket.
+    is_hate = bool(_PAT_GRAVEYARD_HATE.search(text))
+    if is_hate:
+        tags.append("graveyard_hate")
+    if not is_hate and _PAT_GRAVEYARD.search(text):
         tags.append("graveyard")
     has_sacrifice = bool(_PAT_SACRIFICE.search(text))
     has_death = bool(_PAT_DEATH_TRIGGER.search(text))
@@ -229,6 +256,24 @@ def _tag_graveyard_sacrifice(text: str, tags: list[str]) -> None:
         tags.append("sacrifice")
     if has_sacrifice and has_death:
         tags.append("aristocrats")
+
+
+def _tag_extras(text: str, kw_set: set[str], tags: list[str]) -> None:
+    """Misc tags that fire from a single regex/keyword check apiece."""
+    if _PAT_COST_REDUCTION.search(text):
+        tags.append("cost_reduction")
+    if _PAT_ANTHEM.search(text):
+        tags.append("anthem")
+    if "proliferate" in kw_set or re.search(r"\bproliferate\b", text, re.IGNORECASE):
+        tags.append("proliferate")
+    if _PAT_CARD_SELECTION.search(text) or kw_set & {
+        "scry",
+        "surveil",
+        "explore",
+        "discover",
+        "investigate",
+    }:
+        tags.append("card_selection")
 
 
 def _tag_equipment_voltron(tl: str, text: str, tags: list[str]) -> None:
@@ -310,10 +355,11 @@ def classify_card(
     _tag_removal(text, tags)
     _tag_board_wipe(text, tags)
     _tag_tutor_token_counter(text, tags)
-    _tag_graveyard_sacrifice(text, tags)
+    _tag_graveyard_sacrifice(text, kw_set, tags)
     _tag_equipment_voltron(tl, text, tags)
     _tag_stax_hug_mana(name, text, cmc, tags)
     _tag_protection_misc(text, tl, kw_set, tags)
+    _tag_extras(text, kw_set, tags)
 
     return tags
 
