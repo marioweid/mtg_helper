@@ -9,6 +9,7 @@ import { CardSearchResult } from "@/components/card-search-result";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
 import {
   bucketsFor,
+  totalCardCount,
   type CardSuggestion,
   type CardResponse,
   type CollectionResponse,
@@ -1569,7 +1570,7 @@ export default function BuildPage() {
             onClick={() => setDeckListOpen((v) => !v)}
             className="flex w-full items-center justify-between text-sm font-medium text-gray-300 hover:text-white transition-colors"
           >
-            <span>Current Deck ({deckCards.length} cards)</span>
+            <span>Current Deck ({totalCardCount(deckCards)} cards)</span>
             <span className="text-xs text-gray-500">{deckListOpen ? "▲" : "▼"}</span>
           </button>
           {deckListOpen && (

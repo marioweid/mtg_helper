@@ -211,6 +211,14 @@ export interface DescribeResponse {
 }
 
 /**
+ * Total number of physical cards across rows. Sums ``quantity`` so basic-land
+ * rows like "18 Forest" count as 18, not 1. Treats missing quantity as 1.
+ */
+export function totalCardCount(cards: DeckCardItem[]): number {
+  return cards.reduce((sum, c) => sum + (c.quantity ?? 1), 0);
+}
+
+/**
  * Buckets a deck card belongs to: union of user-set categories and the
  * auto-derived qualifying_stages, minus the retrieval-only "bangers" pseudo-
  * stage (it isn't a real classification). Cards left with no buckets fall

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
-import { bucketsFor, type DeckCardItem } from "@/lib/types";
+import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 
 interface Props {
   category: string;
@@ -40,7 +40,7 @@ export function DeckCategoryGroup({
       >
         <h3 className="font-medium text-white capitalize">{category}</h3>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">{cards.length}</span>
+          <span className="text-sm text-gray-400">{totalCardCount(cards)}</span>
           <span className="text-gray-500 text-xs">{expanded ? "▲" : "▼"}</span>
         </div>
       </button>

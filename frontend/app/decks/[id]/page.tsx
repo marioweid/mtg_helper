@@ -11,7 +11,7 @@ import { ManaCurve } from "@/components/mana-curve";
 import { ManaSymbols } from "@/components/mana-symbols";
 import { ExportButton } from "@/components/export-button";
 import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
-import { bucketsFor, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
+import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
 type GroupingMode = "tags" | "types";
@@ -207,7 +207,7 @@ export default function DeckDetailPage() {
                 {bracket}
               </span>
             )}
-            <span className="text-gray-500">{deck.cards.length} cards</span>
+            <span className="text-gray-500">{totalCardCount(deck.cards)} cards</span>
             <ManaSymbols colors={colors} />
           </div>
         </div>
