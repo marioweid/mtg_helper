@@ -285,9 +285,12 @@ def test_trusted_quota_reserves_low_scoring_edhrec_cards() -> None:
     assert set(trusted).issubset(set(top)), "all trusted cards must survive truncation"
 
 
-def test_trusted_quota_caps_at_half_limit() -> None:
+def test_trusted_quota_fills_with_trusted_first_then_composite() -> None:
+    """Every trusted card lands ahead of composite fill, capped only by limit."""
     semantic = _ids("aaaa", 20)
     trusted = _ids("bbbb", 15)
+    # Composite sort puts semantic above trusted, so without the all-trusted-first
+    # rule the slice would prefer semantic.
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
     scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
     cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
@@ -296,8 +299,38 @@ def test_trusted_quota_caps_at_half_limit() -> None:
     top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
 
     assert len(top) == 10
-    reserved_count = sum(1 for uid in top if uid in set(trusted))
-    assert reserved_count == 5, f"quota must cap at limit//2 (5), got {reserved_count}"
+    # All 10 returned slots must come from trusted, since trusted (15) > limit (10).
+    assert set(top).issubset(set(trusted))
+
+
+def test_trusted_quota_overflow_trusted_truncated_at_limit() -> None:
+    """When trusted exceeds limit, return is exactly limit items, all trusted."""
+    trusted = _ids("bbbb", 50)
+    scores = {uid: 0.5 for uid in trusted}
+    cards_by_id = {uid: {"id": uid} for uid in trusted}
+    moxfield = {uid: 0.9 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
+
+    assert len(top) == 10
+    assert set(top).issubset(set(trusted))
+
+
+def test_trusted_quota_composite_fills_remainder() -> None:
+    """When trusted < limit, composite fills the remainder."""
+    trusted = _ids("bbbb", 3)
+    semantic = _ids("aaaa", 10)
+    scores = {uid: 0.5 for uid in trusted}
+    scores.update({uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)})
+    cards_by_id = {uid: {"id": uid} for uid in [*trusted, *semantic]}
+    edhrec = {uid: 0.7 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=8)
+
+    assert len(top) == 8
+    assert set(trusted).issubset(set(top))
+    composite_count = sum(1 for uid in top if uid in set(semantic))
+    assert composite_count == 5
 
 
 def test_trusted_quota_skips_zero_score_cards() -> None:

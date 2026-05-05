@@ -1211,8 +1211,6 @@ def _annotate_moxfield_signals(
             entry.append("moxfield")
 
 
-_TRUSTED_QUOTA_FRACTION: float = 0.5
-
 # Hard cap on the inner candidate pool. Each Load More click bumps the requested
 # limit (frontend sends target=80 with the growing exclude list); inner searches
 # scale with that limit. 1000 leaves plenty of headroom before stages exhaust.
@@ -1287,31 +1285,34 @@ def _apply_trusted_quota(
     limit: int,
     stage: str | None = None,
 ) -> list[UUID]:
-    """Select top-N UIDs reserving a quota for trusted EDHREC/Moxfield cards.
+    """Place every trusted EDHREC/Moxfield card first, then fill with composite.
 
-    Up to ``floor(limit * 0.5)`` slots are reserved for cards with the highest
-    EDHREC or Moxfield inclusion score, sorted by trusted score desc then
-    composite score desc. Remaining slots are filled from the composite ranking,
-    skipping already-reserved UIDs. Trusted cards with zero composite score
-    (e.g., zeroed by a strict type filter) or missing from ``cards_by_id``
-    (filtered out at DB fetch) are excluded from the quota pass.
+    Ordering of the returned list:
 
-    For the ``theme`` stage, trusted cards whose tags match no other build
-    stage (uncategorizable — they cannot land in ramp/draw/interaction/etc.)
-    receive guaranteed reserved slots ahead of the regular trusted quota.
-    Without this, Enchantress-style cost-reducers and other mechanically
-    untagged staples pulled from top decks are squeezed out of every stage.
+    1. ``theme``-stage uncategorizable pins (cards with no qualifying mechanical
+       stage but high trust — see :func:`_theme_pinned_uncategorizable`).
+    2. **All** remaining trusted cards (Moxfield + EDHREC inclusion ≥ 0 with a
+       positive composite score), sorted by trusted score desc then composite
+       score desc. A card present in all 10 top Moxfield decks (trust = 1.0)
+       therefore ranks above one in 5 decks (trust = 0.5).
+    3. Composite-ranked fill (semantic + keyword + FTS scoring) for any
+       remaining slots up to ``limit``.
+
+    The result is then truncated to ``limit`` so over-allocation from large
+    trusted pools is bounded; pagination at the caller (``retrieve_candidates``)
+    walks deeper trusted slices as ``limit = offset + page_size`` grows.
 
     Args:
         scores: Final composite scores per card UUID.
         edhrec_inclusion: EDHREC inclusion scores per card UUID.
         moxfield_inclusion: Moxfield inclusion scores per card UUID.
         cards_by_id: Raw DB rows indexed by card UUID.
-        limit: Maximum number of UIDs to return.
+        limit: Maximum number of UIDs to return (page_end in pagination terms).
         stage: Active build stage; controls the theme uncategorizable-pin pass.
 
     Returns:
-        Ordered list of UUIDs (reserved trusted slots first, then composite fill).
+        Ordered list of UUIDs: pinned + every trusted card + composite fill,
+        truncated to ``limit``.
     """
     if limit <= 0:
         return []
@@ -1332,13 +1333,12 @@ def _apply_trusted_quota(
     pinned = _theme_pinned_uncategorizable(trusted, cards_by_id, limit) if stage == "theme" else []
     pinned_set = set(pinned)
 
-    quota = min(int(limit * _TRUSTED_QUOTA_FRACTION), len(trusted))
-    reserved = [uid for uid, _ in trusted[:quota] if uid not in pinned_set]
+    reserved = [uid for uid, _ in trusted if uid not in pinned_set]
     reserved_set = pinned_set | set(reserved)
 
-    remaining = limit - len(pinned) - len(reserved)
+    remaining = max(0, limit - len(pinned) - len(reserved))
     fill = [uid for uid in composite_ranked if uid not in reserved_set][:remaining]
-    return pinned + reserved + fill
+    return (pinned + reserved + fill)[:limit]
 
 
 async def retrieve_candidates(
