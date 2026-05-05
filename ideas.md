@@ -1,5 +1,5 @@
 # Ideas
-1. Quick view in deckbuilder category that shows total cards and the cards in the current category
+1. Moxfield edhrec comming first, option to toggle order of retrieving
 
 2. Can we improve card parsing so that cards can be more reliable be categorized to one of the specific categories and also the keywords etc. are better matched.
 
