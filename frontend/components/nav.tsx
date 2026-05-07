@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
+import { getAdminEmail } from "@/lib/admin";
 
-export function Nav() {
+export async function Nav() {
+  const adminEmail = await getAdminEmail();
+
   return (
     <nav className="border-b border-white/10 bg-black/40 backdrop-blur-sm">
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3 overflow-x-auto">
@@ -26,6 +29,14 @@ export function Nav() {
         >
           Preferences
         </Link>
+        {adminEmail ? (
+          <Link
+            href="/admin"
+            className="text-sm text-amber-400 hover:text-amber-300 transition-colors flex-shrink-0"
+          >
+            Admin
+          </Link>
+        ) : null}
         <form
           action={async () => {
             "use server";

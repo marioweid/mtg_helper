@@ -52,6 +52,16 @@ gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap --comma
 
 ## Card data sync
 
+Easiest: sign in as an admin user, click **Admin** in the nav (only visible to addresses listed in `ADMIN_EMAILS`), use the buttons. The page calls the same endpoints below.
+
+Required env (frontend, in `.env.local` for dev / `.env.prod` for VM):
+
+```
+ADMIN_EMAILS="you@example.com,other@example.com"
+```
+
+Backend's `admin_emails` (in `backend/.env` / `.env.prod`) must contain the same set — frontend just hides the button, backend enforces.
+
 Three admin endpoints, in order, do a full refresh: pull Scryfall → tag → embed into Qdrant.
 
 ```bash
