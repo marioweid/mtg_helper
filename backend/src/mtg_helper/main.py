@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient
 
-from mtg_helper.auth import get_current_account, get_current_admin
+from mtg_helper.auth import get_current_account, require_admin_or_internal
 from mtg_helper.config import settings
 from mtg_helper.db import apply_schema, close_pool, create_pool
 from mtg_helper.routers import (
@@ -82,7 +82,7 @@ async def generic_exception_handler(_request: Request, exc: Exception) -> JSONRe
 
 
 _authed = [Depends(get_current_account)]
-_admin = [Depends(get_current_admin)]
+_admin = [Depends(require_admin_or_internal)]
 
 app.include_router(health.router)
 app.include_router(me.router, prefix="/api/v1")

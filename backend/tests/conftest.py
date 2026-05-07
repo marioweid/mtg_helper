@@ -195,7 +195,11 @@ async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
     """
     from unittest.mock import AsyncMock, MagicMock
 
-    from mtg_helper.auth import get_current_account, get_current_admin
+    from mtg_helper.auth import (
+        get_current_account,
+        get_current_admin,
+        require_admin_or_internal,
+    )
     from mtg_helper.models.accounts import AccountResponse
 
     app.state.db_pool = db_pool
@@ -219,6 +223,7 @@ async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
 
     app.dependency_overrides[get_current_account] = lambda: default_account
     app.dependency_overrides[get_current_admin] = lambda: default_account
+    app.dependency_overrides[require_admin_or_internal] = lambda: None
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
@@ -232,10 +237,15 @@ def set_current_account(account: object) -> None:
     Use inside tests that need to switch identities (e.g. rate-limit tests
     that exercise per-account buckets).
     """
-    from mtg_helper.auth import get_current_account, get_current_admin
+    from mtg_helper.auth import (
+        get_current_account,
+        get_current_admin,
+        require_admin_or_internal,
+    )
 
     app.dependency_overrides[get_current_account] = lambda: account
     app.dependency_overrides[get_current_admin] = lambda: account
+    app.dependency_overrides[require_admin_or_internal] = lambda: None
 
 
 # Convenience UUIDs for tests

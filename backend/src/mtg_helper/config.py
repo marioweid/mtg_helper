@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ""
     admin_emails: Annotated[list[str], NoDecode] = []
 
+    # Shared secret for internal service-to-service calls (e.g. cron container
+    # hitting admin endpoints). Empty disables internal-token auth.
+    internal_api_token: str = ""
+
     @field_validator("admin_emails", mode="before")
     @classmethod
     def _split_admin_emails(cls, v: object) -> object:

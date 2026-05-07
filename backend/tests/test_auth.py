@@ -7,7 +7,11 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 
 from mtg_helper import auth as auth_mod
-from mtg_helper.auth import get_current_account, get_current_admin
+from mtg_helper.auth import (
+    get_current_account,
+    get_current_admin,
+    require_admin_or_internal,
+)
 from mtg_helper.config import settings
 from mtg_helper.main import app
 
@@ -155,10 +159,51 @@ async def test_admin_router_returns_403_via_http(client: AsyncClient) -> None:
         created_at=row["created_at"],
     )
 
-    async def _real_admin() -> AccountResponse:
-        return await get_current_admin(account=user)
+    async def _real_admin() -> None:
+        await get_current_admin(account=user)
 
-    app.dependency_overrides[get_current_admin] = _real_admin
+    app.dependency_overrides[require_admin_or_internal] = _real_admin
 
     resp = await client.post("/api/v1/admin/sync-cards")
     assert resp.status_code == 403
+
+
+async def test_internal_token_bypasses_admin_gate(client: AsyncClient) -> None:
+    """Valid `X-Internal-Token` header skips Google auth on admin endpoints."""
+    settings.internal_api_token = "secret-token-xyz"
+    app.dependency_overrides.pop(require_admin_or_internal, None)
+
+    req = _fake_request(app.state.db_pool)
+    await auth_mod.require_admin_or_internal(
+        request=req,  # type: ignore[arg-type]
+        x_internal_token="secret-token-xyz",
+        authorization=None,
+    )
+
+
+async def test_internal_token_mismatch_falls_through_to_admin(client: AsyncClient) -> None:
+    """Wrong `X-Internal-Token` falls through and 401s without a Bearer token."""
+    settings.internal_api_token = "secret-token-xyz"
+    app.dependency_overrides.pop(require_admin_or_internal, None)
+
+    with pytest.raises(HTTPException) as exc:
+        await auth_mod.require_admin_or_internal(
+            request=_fake_request(app.state.db_pool),  # type: ignore[arg-type]
+            x_internal_token="wrong",
+            authorization=None,
+        )
+    assert exc.value.status_code == 401
+
+
+async def test_internal_token_disabled_when_unset(client: AsyncClient) -> None:
+    """Empty `internal_api_token` disables internal auth even if header sent."""
+    settings.internal_api_token = ""
+    app.dependency_overrides.pop(require_admin_or_internal, None)
+
+    with pytest.raises(HTTPException) as exc:
+        await auth_mod.require_admin_or_internal(
+            request=_fake_request(app.state.db_pool),  # type: ignore[arg-type]
+            x_internal_token="",
+            authorization=None,
+        )
+    assert exc.value.status_code == 401

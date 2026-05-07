@@ -1,5 +1,6 @@
 """Google Sign-In dependency: verifies the bearer ID token and resolves the account."""
 
+import hmac
 import logging
 from typing import Annotated
 
@@ -79,3 +80,26 @@ async def get_current_admin(
     if email not in {e.lower() for e in settings.admin_emails}:
         raise HTTPException(status_code=403, detail="admin only")
     return account
+
+
+async def require_admin_or_internal(
+    request: Request,
+    x_internal_token: Annotated[str | None, Header()] = None,
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    """Allow either a configured internal-service token or an admin Google ID token.
+
+    Internal callers (e.g. the scryfall-sync cron container) send
+    `X-Internal-Token: <secret>`; the value is compared in constant time against
+    `settings.internal_api_token`. If the header is absent, falls back to the
+    standard admin dependency chain (Google ID token + admin email allowlist).
+
+    Raises:
+        HTTPException: 401 when no credentials are present, or the admin chain
+            rejects the token. 403 when the account is not an admin.
+    """
+    expected = settings.internal_api_token
+    if x_internal_token and expected and hmac.compare_digest(x_internal_token, expected):
+        return
+    account = await get_current_account(request, authorization)
+    await get_current_admin(account)
