@@ -13,6 +13,20 @@ async def test_search_by_name(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_search_short_query_finds_long_named_card(client: AsyncClient) -> None:
+    """Short prefix queries should still find cards with long names.
+
+    Regression: pg_trgm `name % q` returns false when similarity is below
+    0.3 — a "Hazel" query against "Hazel of the Rootbloom" scores ~0.23 and
+    would silently miss. The search uses ILIKE substring matching instead.
+    """
+    resp = await client.get("/api/v1/cards/search?q=Hazel")
+    assert resp.status_code == 200
+    names = [c["name"] for c in resp.json()["data"]]
+    assert "Hazel of the Rootbloom" in names
+
+
+@pytest.mark.asyncio
 async def test_search_by_color_identity_subset(client: AsyncClient) -> None:
     # Green+White commander — should find GW and G and W and colorless cards
     resp = await client.get("/api/v1/cards/search?color_identity=GW")

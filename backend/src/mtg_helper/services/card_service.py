@@ -45,13 +45,20 @@ def _row_to_card(row: asyncpg.Record) -> CardResponse:
 
 
 def _add_text_search(q: str, clauses: list[str], values: list[Any]) -> None:
-    """Append name fuzzy + oracle full-text search clauses for q."""
+    """Append name substring + oracle full-text search clauses for q.
+
+    Uses ILIKE on name (backed by the trigram GIN index) instead of pg_trgm's
+    `%` operator: short user queries like "Abigale" have similarity below the
+    default 0.3 threshold against long card names (e.g. "Abigale, Poet
+    Laureate // Heroic Stanza" scores ~0.22), so `%` would silently miss.
+    """
     n1 = len(values) + 1
     values.append(q)
     n2 = len(values) + 1
     values.append(q)
     clauses.append(
-        f"(name % ${n1} OR to_tsvector('english', COALESCE(oracle_text, '')) "
+        f"(name ILIKE '%' || ${n1} || '%' "
+        f"OR to_tsvector('english', COALESCE(oracle_text, '')) "
         f"@@ plainto_tsquery('english', ${n2}))"
     )
 
