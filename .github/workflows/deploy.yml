@@ -45,7 +45,7 @@ jobs:
           REPO_DIR: /opt/mtg-helper
         run: |
           set -euo pipefail
-          gcloud --verbosity=debug compute ssh "$VM_NAME" \
+          gcloud compute ssh "$VM_NAME" \
             --zone="$VM_ZONE" \
             --project="$VM_PROJECT" \
             --tunnel-through-iap \

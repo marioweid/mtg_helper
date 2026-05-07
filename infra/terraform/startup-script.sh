@@ -3,6 +3,14 @@
 # Idempotent: each step is guarded so re-runs are no-ops.
 set -euo pipefail
 
+# --- google-guest-agent: enable OS Login + metadata key sync ----------------
+# Some debian-12 images ship the unit disabled. Without it, OS Login keys
+# uploaded via `gcloud compute ssh` never appear in the SA's profile and the
+# CI deploy fails with "Permission denied (publickey)".
+if ! systemctl is-enabled --quiet google-guest-agent; then
+  systemctl enable --now google-guest-agent
+fi
+
 # --- Docker (official Debian repo) -------------------------------------------
 if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
