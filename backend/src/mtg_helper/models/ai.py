@@ -116,3 +116,33 @@ class DescribeResponse(BaseModel):
     description: str | None = None
     suggested_name: str | None = None
     stage_targets: dict[str, int] | None = None
+
+
+class KeywordExtractRequest(BaseModel):
+    """Request body for the keyword-extracting deck agent.
+
+    Mirrors ``DescribeRequest`` but the agent is asked to converge on a
+    structured set of archetype keywords (Moxfield-style: ``voltron``,
+    ``aristocrats``, ``squirrel_tribal``) rather than a free-form description.
+    """
+
+    commander_scryfall_id: UUID
+    partner_scryfall_id: UUID | None = None
+    bracket: int = Field(default=3, ge=1, le=4)
+    history: list[DescribeMessage] = Field(default_factory=list, max_length=24)
+    message: str = Field(default="", max_length=2000)
+
+
+class KeywordExtractResponse(BaseModel):
+    """Response from the keyword-extracting deck agent.
+
+    ``archetype_tags`` is the running set of canonical keywords the agent has
+    inferred from the conversation. The frontend mirrors them as live chips so
+    the user can refine selection mid-conversation.
+    """
+
+    reply: str
+    done: bool
+    archetype_tags: list[str] = Field(default_factory=list)
+    suggested_name: str | None = None
+    stage_targets: dict[str, int] | None = None

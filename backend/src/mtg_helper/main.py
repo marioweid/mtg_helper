@@ -22,6 +22,7 @@ from mtg_helper.routers import (
     health,
     me,
     onboarding,
+    tags,
 )
 from mtg_helper.services import scryfall
 from mtg_helper.services.embedding_service import ensure_collection
@@ -92,4 +93,5 @@ app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(ai.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(feedback.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(collections.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(tags.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(admin.router, prefix="/api/v1", dependencies=_admin)

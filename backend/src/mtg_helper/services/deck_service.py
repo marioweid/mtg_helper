@@ -92,6 +92,7 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
         suggestion_collection_ids=list(row["suggestion_collection_ids"] or []),
         max_price_cents=row["max_price_cents"],
         min_price_cents=row["min_price_cents"],
+        archetype_tags=list(row["archetype_tags"] or []),
     )
 
 
@@ -199,8 +200,8 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             """
             INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_email,
                                stage_targets, suggestion_collection_ids, max_price_cents,
-                               min_price_cents)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                               min_price_cents, archetype_tags)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             """,
             data.name,
@@ -213,6 +214,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             list(data.suggestion_collection_ids),
             data.max_price_cents,
             data.min_price_cents,
+            list(data.archetype_tags),
         )
     deck = _row_to_deck(row)
     asyncio.create_task(_safe_edhrec_refresh(pool, deck.commander_id))
@@ -343,6 +345,7 @@ async def get_deck(
         suggestion_collection_ids=list(deck_row["suggestion_collection_ids"] or []),
         max_price_cents=deck_row["max_price_cents"],
         min_price_cents=deck_row["min_price_cents"],
+        archetype_tags=list(deck_row["archetype_tags"] or []),
         cards=[_row_to_deck_card_item(r) for r in card_rows],
     )
 

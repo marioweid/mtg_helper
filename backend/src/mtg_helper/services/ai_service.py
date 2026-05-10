@@ -16,6 +16,7 @@ from mtg_helper.models.ai import (
     ChatResponse,
     CollectionMembership,
     DescribeResponse,
+    KeywordExtractResponse,
     SuggestResponse,
 )
 from mtg_helper.models.cards import CardResponse
@@ -833,7 +834,21 @@ async def build_stage(
     avoid_ids = await preference_service.get_avoid_card_ids(pool, account_id)
     all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
 
-    query_text, query_tags = stage_retrieval_query(resolved_stage, deck.description)
+    query_text, base_tags = stage_retrieval_query(resolved_stage, deck.description)
+    deck_archetype_tags = list(deck.archetype_tags or [])
+    if deck_archetype_tags:
+        # Union the explicit chips with the stage's default tags so e.g. the
+        # ramp stage still pulls ramp cards while the deck's archetype tilts
+        # which ramp pieces win the tiebreaker.
+        seen: set[str] = set()
+        query_tags = [
+            t for t in (*deck_archetype_tags, *base_tags) if not (t in seen or seen.add(t))
+        ]
+        prefer_keywords = True
+    else:
+        query_tags = base_tags
+        prefer_keywords = False
+
     feedback_weights, user_profile = await asyncio.gather(
         _compute_feedback_weights(pool, deck.id, account_id),
         _load_user_profile(pool, deck.id, account_id, email),
@@ -865,6 +880,7 @@ async def build_stage(
         commander_id=deck.commander_id,
         bracket=deck.bracket,
         type_filter=type_filter,
+        prefer_keywords=prefer_keywords,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
@@ -932,7 +948,11 @@ async def suggest_cards(
 
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
     deck_card_ids = list({*(c.card_id for c in deck.cards), *commander_ids})
-    query_tags = parse_query_tags(prompt)
+    parsed_tags = parse_query_tags(prompt)
+    deck_archetype_tags = list(deck.archetype_tags or [])
+    seen: set[str] = set()
+    query_tags = [t for t in (*deck_archetype_tags, *parsed_tags) if not (t in seen or seen.add(t))]
+    prefer_keywords = bool(deck_archetype_tags)
     parsed_filter = parse_query_types(prompt)
     structured_filter = _resolve_structured_type_filter(card_types, subtypes)
     type_filter = _merge_type_filters(structured_filter, parsed_filter)
@@ -961,6 +981,7 @@ async def suggest_cards(
         price_filter=price_filter,
         commander_id=deck.commander_id,
         bracket=deck.bracket,
+        prefer_keywords=prefer_keywords,
     )
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 
@@ -1244,6 +1265,255 @@ async def describe_deck(
         reply=reply,
         done=done,
         description=description,
+        suggested_name=suggested_name,
+        stage_targets=stage_targets,
+    )
+
+
+# Canonical archetype keyword vocabulary the keyword-extraction agent is allowed
+# to emit. Mirrors the rule-based tags emitted by ``tag_service.classify_card``
+# so retrieval finds matching cards by GIN tag overlap.
+_KEYWORD_VOCAB: tuple[str, ...] = (
+    "ramp",
+    "draw",
+    "removal",
+    "board_wipe",
+    "counterspell",
+    "tutor",
+    "token",
+    "plus_one_counters",
+    "lifegain",
+    "graveyard",
+    "graveyard_hate",
+    "sacrifice",
+    "aristocrats",
+    "cost_reduction",
+    "anthem",
+    "proliferate",
+    "card_selection",
+    "equipment",
+    "voltron",
+    "stax",
+    "group_hug",
+    "fast_mana",
+    "blink",
+    "mill",
+    "protection",
+    "extra_turn",
+    "land_destruction",
+    "tribal",
+    "energy",
+    "reanimator",
+    "cascade",
+    "storm",
+    "landfall",
+    "spellslinger",
+    "wheels",
+    "treasure_matters",
+    "food_matters",
+    "clue_matters",
+    "infect_toxic",
+)
+
+
+def _build_extract_system_prompt(
+    commander_name: str,
+    commander_type: str | None,
+    commander_oracle: str | None,
+    commander_colors: list[str],
+    partner_name: str | None,
+    partner_oracle: str | None,
+    bracket: int,
+) -> str:
+    """System prompt for the keyword-extracting deck agent.
+
+    The agent's only job is to map the user's description into a subset of the
+    canonical archetype vocabulary plus any relevant ``<subtype>_tribal`` tags.
+    Free-form prose synthesis is explicitly disallowed — retrieval downstream
+    is keyword-driven.
+    """
+    color_str = ", ".join(commander_colors) if commander_colors else "colorless"
+    bracket_desc = _BRACKET_DESCRIPTIONS.get(bracket, "")
+    vocab_str = ", ".join(_KEYWORD_VOCAB)
+
+    parts = [
+        "You are a Magic: The Gathering Commander deck strategist.",
+        "Your job is to identify a small set of ARCHETYPE KEYWORDS that match",
+        "the player's deck vision. The downstream retrieval system filters cards",
+        "by these keywords — vague descriptions hurt suggestion quality.",
+        "",
+        _SANDBOX_RULES,
+        "",
+        f"Commander: {commander_name}",
+        f"Type: {commander_type or 'unknown'}",
+        f"Color identity: {color_str}",
+    ]
+    if commander_oracle:
+        parts.append(f"Rules text: {commander_oracle}")
+    if partner_name:
+        parts.append(f"Partner: {partner_name}")
+        if partner_oracle:
+            parts.append(f"Partner rules text: {partner_oracle}")
+
+    parts += [
+        f"\nPower level: Bracket {bracket} — {bracket_desc}",
+        "",
+        "ARCHETYPE VOCABULARY (use ONLY these tag names):",
+        vocab_str,
+        "",
+        "TRIBAL: Append `<subtype>_tribal` (lowercase, underscore) when the deck",
+        "cares about a creature subtype — e.g. `squirrel_tribal`, `dragon_tribal`,",
+        "`elf_tribal`. Use only common EDH tribes; do not invent obscure ones.",
+        "",
+        "RULES:",
+        "- Ask 1-3 short, focused questions to narrow the archetype.",
+        "- Each question must be ONE sentence; no preambles.",
+        "- Reference the commander's specific abilities when picking what to ask.",
+        "- After 1-3 exchanges, output the final JSON block on its own line:",
+        '  {"done": true, "name": "Deck Name",',
+        '   "archetype_tags": ["voltron", "equipment", "squirrel_tribal"],',
+        '   "stage_targets": {"ramp": 12, "interaction": 10, "draw": 8,',
+        '                     "theme": 22, "utility": 6, "lands": 37}}',
+        "",
+        "STAGE TARGET GUIDELINES:",
+        "- ramp: 8-14 (default 10-12)",
+        "- interaction: 6-12 (default 8-10)",
+        "- draw: 6-12 (default 8-10)",
+        "- theme: 18-28 (default 20-25)",
+        "- utility: 3-10 (default 5-8)",
+        "- lands: 33-38 (default 35-38)",
+        "",
+        "FORBIDDEN:",
+        "- Do NOT invent tags outside the vocabulary above.",
+        "- Do NOT write a prose `description` field.",
+        "- Do NOT mention semantic match, embeddings, or oracle text.",
+        "- Do NOT wrap the JSON in a code fence.",
+        "- Do NOT output the JSON block until you have enough information.",
+    ]
+    return "\n".join(parts)
+
+
+def _filter_known_keywords(raw: object) -> list[str]:
+    """Drop unknown tags; preserve the agent's ordering.
+
+    Permits any ``<subtype>_tribal`` whose subtype is in the tag_service
+    tribal set so we don't reject the agent's tribal picks.
+    """
+    if not isinstance(raw, list):
+        return []
+    from mtg_helper.services.tag_service import _TRIBAL_SUBTYPES  # local to avoid cycles
+
+    allowed_archetypes = set(_KEYWORD_VOCAB)
+    allowed_tribes = {f"{s.lower()}_tribal" for s in _TRIBAL_SUBTYPES}
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        tag = item.strip().lower()
+        if tag in seen:
+            continue
+        if tag in allowed_archetypes or tag in allowed_tribes:
+            seen.add(tag)
+            out.append(tag)
+    return out
+
+
+def _parse_extract_response(
+    raw: str,
+) -> tuple[str, bool, list[str], str | None, dict[str, int] | None]:
+    """Extract conversation reply and optional completion data from LLM response.
+
+    Returns:
+        (reply, done, archetype_tags, suggested_name, stage_targets)
+    """
+    found = _find_done_json(raw)
+    if found is None:
+        return raw.strip(), False, [], None, None
+
+    start, end, data = found
+    archetype_tags = _filter_known_keywords(data.get("archetype_tags"))
+    raw_name = data.get("name")
+    suggested_name: str | None = raw_name if isinstance(raw_name, str) else None
+    reply: str = (raw[:start] + raw[end:]).strip() or "Got it — picked your keywords."
+    raw_targets = data.get("stage_targets")
+    stage_targets: dict[str, int] | None = None
+    if isinstance(raw_targets, dict):
+        stage_targets = {
+            str(k): int(v) for k, v in raw_targets.items() if isinstance(v, int | float)
+        }
+    return reply, True, archetype_tags, suggested_name, stage_targets
+
+
+async def extract_keywords(
+    pool: asyncpg.Pool,
+    ai_client: LLMClient,
+    commander_scryfall_id: UUID,
+    partner_scryfall_id: UUID | None,
+    bracket: int,
+    history: list[dict[str, str]],
+    message: str,
+) -> KeywordExtractResponse:
+    """Run one turn of the keyword-extracting deck agent.
+
+    Replaces ``describe_deck`` for the new agent flow: the LLM converges on a
+    subset of the canonical archetype vocabulary instead of writing prose. The
+    frontend mirrors the running ``archetype_tags`` as live chips.
+
+    Args:
+        pool: asyncpg connection pool.
+        ai_client: LLM adapter.
+        commander_scryfall_id: Scryfall ID of the commander card.
+        partner_scryfall_id: Scryfall ID of the partner commander, if any.
+        bracket: Power level bracket (1-4).
+        history: Full conversation history from the client.
+        message: Latest user message (empty string for the initial prompt).
+
+    Returns:
+        KeywordExtractResponse with reply, done flag, and the extracted tags.
+
+    Raises:
+        DeckNotFoundError: If the commander card is not found in the database.
+        LLMEmptyResponseError: If the LLM returns empty content.
+    """
+    commander = await card_service.get_card_by_scryfall_id(pool, commander_scryfall_id)
+    if commander is None:
+        raise DeckNotFoundError(f"Commander card {commander_scryfall_id} not found")
+
+    partner_name: str | None = None
+    partner_oracle: str | None = None
+    if partner_scryfall_id is not None:
+        partner = await card_service.get_card_by_scryfall_id(pool, partner_scryfall_id)
+        if partner is not None:
+            partner_name = partner.name
+            partner_oracle = partner.oracle_text
+
+    system = _build_extract_system_prompt(
+        commander_name=commander.name,
+        commander_type=commander.type_line,
+        commander_oracle=commander.oracle_text,
+        commander_colors=commander.color_identity,
+        partner_name=partner_name,
+        partner_oracle=partner_oracle,
+        bracket=bracket,
+    )
+
+    user_message = message if message.strip() else "I want to build a deck with this commander."
+    trimmed_history = history[-_MAX_HISTORY_TURNS:]
+    if len(history) >= _MAX_HISTORY_TURNS:
+        user_message = (
+            f"{user_message}\n\n"
+            "[SYSTEM] You have reached the maximum number of exchanges for this "
+            "agent. Emit the final done-JSON block now with your best archetype_tags "
+            "selection. Do not ask more questions."
+        )
+    raw = await _call_llm(ai_client, system, trimmed_history, user_message)
+    reply, done, archetype_tags, suggested_name, stage_targets = _parse_extract_response(raw)
+
+    return KeywordExtractResponse(
+        reply=reply,
+        done=done,
+        archetype_tags=archetype_tags,
         suggested_name=suggested_name,
         stage_targets=stage_targets,
     )

@@ -2,13 +2,25 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { DeckImportResponse } from "@/lib/types";
 
+/** Cache the import-time suggested archetype tags so the keyword step can read them. */
+function stashSuggestedTags(deckId: string, tags: string[]): void {
+  if (typeof window === "undefined" || tags.length === 0) return;
+  try {
+    sessionStorage.setItem(`import-suggested-tags:${deckId}`, JSON.stringify(tags));
+  } catch {
+    // sessionStorage can throw in private mode; suggestions are optional.
+  }
+}
+
 type Mode = "text" | "url";
 
 export default function ImportDeckPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("text");
 
   // Shared
@@ -124,17 +136,21 @@ export default function ImportDeckPage() {
         )}
 
         <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              stashSuggestedTags(result.deck.id, result.suggested_archetype_tags);
+              router.push(`/decks/${result.deck.id}/keywords?from=import`);
+            }}
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+          >
+            Set keywords
+          </button>
           <Link
             href={`/decks/${result.deck.id}`}
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            className="rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10"
           >
-            View Deck
-          </Link>
-          <Link
-            href={`/decks/${result.deck.id}/chat`}
-            className="rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
-          >
-            Chat About This Deck
+            Skip — view deck
           </Link>
         </div>
       </div>

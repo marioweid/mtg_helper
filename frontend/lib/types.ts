@@ -67,6 +67,7 @@ export interface DeckResponse {
   suggestion_collection_ids: string[];
   max_price_cents: number | null;
   min_price_cents: number | null;
+  archetype_tags: string[];
 }
 
 export interface DeckCardItem {
@@ -105,6 +106,7 @@ export interface DeckDetailResponse {
   suggestion_collection_ids: string[];
   max_price_cents: number | null;
   min_price_cents: number | null;
+  archetype_tags: string[];
   cards: DeckCardItem[];
 }
 
@@ -118,6 +120,7 @@ export interface DeckCreate {
   suggestion_collection_ids?: string[];
   max_price_cents?: number | null;
   min_price_cents?: number | null;
+  archetype_tags?: string[];
 }
 
 export interface DeckUpdate {
@@ -127,6 +130,7 @@ export interface DeckUpdate {
   suggestion_collection_ids?: string[];
   max_price_cents?: number | null;
   min_price_cents?: number | null;
+  archetype_tags?: string[];
 }
 
 export interface DeckCardAdd {
@@ -210,6 +214,30 @@ export interface DescribeResponse {
   stage_targets: Record<string, number> | null;
 }
 
+// Keyword-extracting agent (replaces describe for the new flow)
+export interface KeywordExtractRequest {
+  commander_scryfall_id: string;
+  partner_scryfall_id?: string | null;
+  bracket: number;
+  history: DescribeMessage[];
+  message: string;
+}
+
+export interface KeywordExtractResponse {
+  reply: string;
+  done: boolean;
+  archetype_tags: string[];
+  suggested_name: string | null;
+  stage_targets: Record<string, number> | null;
+}
+
+// Tribal tag enumeration (used by keyword pickers)
+export interface TribalTag {
+  tag: string;
+  subtype: string;
+  card_count: number;
+}
+
 /**
  * Total number of physical cards across rows. Sums ``quantity`` so basic-land
  * rows like "18 Forest" count as 18, not 1. Treats missing quantity as 1.
@@ -283,6 +311,7 @@ export interface DeckImportResponse {
   imported_count: number;
   unresolved: string[];
   color_violations: string[];
+  suggested_archetype_tags: string[];
 }
 
 // Onboarding

@@ -108,6 +108,141 @@ _PAT_LAND_DESTROY = _re(r"destroy target land|destroy all lands?|destroy each la
 _PAT_TRIBAL = _re(r"\btribal\b")
 _PAT_ENERGY = _re(r"\{E\}|energy counter")
 
+# New archetype patterns
+_PAT_REANIMATOR = _re(
+    r"return [\w ,'~\-]+ from (?:your |a |any )?graveyard to the battlefield"
+    r"|put [\w ,'~\-]+ from (?:your |a |any )?graveyard onto the battlefield"
+    r"|\breanimate\b"
+)
+_PAT_CASCADE = _re(r"\bcascade\b")
+_PAT_STORM = _re(r"\bstorm\b")
+_PAT_LANDFALL = _re(
+    r"\blandfall\b"
+    r"|whenever a land (?:you control )?enters"
+    r"|whenever (?:a|one or more) lands? enters? the battlefield under your control"
+)
+_PAT_SPELLSLINGER = _re(
+    r"whenever you cast (?:an?|your) (?:instant|sorcery|noncreature)"
+    r"|whenever you cast a spell\b"
+)
+_PAT_WHEELS = _re(
+    r"each player discards (?:their|his or her) hand"
+    r"|each player draws \w+ cards?"
+    r"|discard your hand, then draw"
+)
+_PAT_TREASURE_CARES = _re(
+    r"sacrifice a treasure"
+    r"|treasures? you control"
+    r"|whenever (?:a|one or more) treasure tokens?"
+    r"|for each treasure"
+)
+_PAT_FOOD_CARES = _re(
+    r"sacrifice a food"
+    r"|foods? you control"
+    r"|whenever (?:a|one or more) food tokens?"
+    r"|for each food"
+)
+_PAT_CLUE_CARES = _re(
+    r"sacrifice a clue"
+    r"|clues? you control"
+    r"|whenever (?:a|one or more) clue tokens?"
+    r"|for each clue"
+)
+_PAT_INFECT_TOXIC = _re(r"\binfect\b|\btoxic \d+|poison counter")
+
+# Tribal subtypes worth surfacing as `<subtype>_tribal` mega-tags. Curated to the
+# popular EDH archetypes; cards merely *being* the subtype don't qualify — the
+# oracle text must scope an effect to the tribe.
+_TRIBAL_SUBTYPES: tuple[str, ...] = (
+    "Angel",
+    "Beast",
+    "Bird",
+    "Cat",
+    "Cleric",
+    "Demon",
+    "Dinosaur",
+    "Dragon",
+    "Druid",
+    "Dwarf",
+    "Elder",
+    "Eldrazi",
+    "Elemental",
+    "Elf",
+    "Faerie",
+    "Giant",
+    "Goblin",
+    "Golem",
+    "Horror",
+    "Human",
+    "Insect",
+    "Knight",
+    "Merfolk",
+    "Minotaur",
+    "Ninja",
+    "Orc",
+    "Phoenix",
+    "Pirate",
+    "Rat",
+    "Rogue",
+    "Samurai",
+    "Shaman",
+    "Slime",
+    "Sliver",
+    "Snake",
+    "Soldier",
+    "Spider",
+    "Spirit",
+    "Squirrel",
+    "Treefolk",
+    "Vampire",
+    "Warrior",
+    "Werewolf",
+    "Wizard",
+    "Wolf",
+    "Wraith",
+    "Wurm",
+    "Zombie",
+)
+
+# Bumped whenever the tag vocabulary changes — used as a manual signal to
+# re-run `/admin/tag-cards` against the corpus. Not auto-enforced.
+TAG_VOCAB_VERSION = 2
+
+
+def _tribal_pattern(subtype: str) -> re.Pattern[str]:
+    """Match oracle text that scopes an effect to a creature subtype."""
+    s = re.escape(subtype)
+    return re.compile(
+        rf"\b(?:each|every|other|another|all|target)\s+{s}s?\b"
+        rf"|\b{s}s?\s+you\s+(?:control|own)\b"
+        rf"|\b{s}\s+spells\s+you\s+cast\b"
+        rf"|\b{s}\s+creatures?\s+you\s+control\b",
+        re.IGNORECASE,
+    )
+
+
+_TRIBAL_PATTERNS: dict[str, re.Pattern[str]] = {s: _tribal_pattern(s) for s in _TRIBAL_SUBTYPES}
+
+
+def classify_tribal(oracle_text: str | None) -> list[str]:
+    """Emit `<subtype>_tribal` tags for any tribe the card's text scopes to.
+
+    Distinct from cards that merely *are* the subtype — only fires when the
+    oracle text explicitly cares about other members of the tribe (e.g.
+    "other Squirrels you control get +1/+1").
+
+    Args:
+        oracle_text: Rules text of the card.
+
+    Returns:
+        List of `<lowercase_subtype>_tribal` tags (may be empty).
+    """
+    text = oracle_text or ""
+    if not text:
+        return []
+    return [f"{name.lower()}_tribal" for name, pat in _TRIBAL_PATTERNS.items() if pat.search(text)]
+
+
 # Token type patterns — specific token names adjacent to "token" in oracle text
 _TOKEN_TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
     "treasure": _re(r"\btreasure token"),
@@ -326,6 +461,38 @@ def _tag_protection_misc(text: str, tl: str, kw_set: set[str], tags: list[str]) 
         tags.append("energy")
 
 
+def _tag_keyword_archetypes(text: str, kw_set: set[str], tags: list[str]) -> None:
+    """Archetype tags that key off Scryfall keyword abilities or simple patterns."""
+    if _PAT_REANIMATOR.search(text):
+        tags.append("reanimator")
+    if "cascade" in kw_set or _PAT_CASCADE.search(text):
+        tags.append("cascade")
+    if "storm" in kw_set or _PAT_STORM.search(text):
+        tags.append("storm")
+    if "landfall" in kw_set or _PAT_LANDFALL.search(text):
+        tags.append("landfall")
+    if "infect" in kw_set or "toxic" in kw_set or _PAT_INFECT_TOXIC.search(text):
+        tags.append("infect_toxic")
+
+
+def _tag_token_economies(text: str, tags: list[str]) -> None:
+    """Cares-about tags for the common token-as-resource archetypes."""
+    if _PAT_TREASURE_CARES.search(text):
+        tags.append("treasure_matters")
+    if _PAT_FOOD_CARES.search(text):
+        tags.append("food_matters")
+    if _PAT_CLUE_CARES.search(text):
+        tags.append("clue_matters")
+
+
+def _tag_spell_archetypes(text: str, tags: list[str]) -> None:
+    """Spellslinger / wheels triggers."""
+    if _PAT_SPELLSLINGER.search(text):
+        tags.append("spellslinger")
+    if _PAT_WHEELS.search(text):
+        tags.append("wheels")
+
+
 def classify_card(
     name: str,
     type_line: str | None,
@@ -360,6 +527,10 @@ def classify_card(
     _tag_stax_hug_mana(name, text, cmc, tags)
     _tag_protection_misc(text, tl, kw_set, tags)
     _tag_extras(text, kw_set, tags)
+    _tag_keyword_archetypes(text, kw_set, tags)
+    _tag_token_economies(text, tags)
+    _tag_spell_archetypes(text, tags)
+    tags.extend(classify_tribal(oracle_text))
 
     return tags
 

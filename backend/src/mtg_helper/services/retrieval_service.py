@@ -198,6 +198,24 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "blood token": ["token"],
     "powerstone": ["token"],
     "treasure token": ["token"],
+    # New archetype synonyms (tag_service v2)
+    "reanimate": ["reanimator"],
+    "reanimation": ["reanimator"],
+    "cascade": ["cascade"],
+    "storm": ["storm"],
+    "landfall": ["landfall"],
+    "lands matter": ["landfall"],
+    "spellslinger": ["spellslinger"],
+    "spells matter": ["spellslinger"],
+    "wheels": ["wheels"],
+    "wheel": ["wheels"],
+    "treasure matters": ["treasure_matters"],
+    "treasures matter": ["treasure_matters"],
+    "food matters": ["food_matters"],
+    "clue matters": ["clue_matters"],
+    "infect": ["infect_toxic"],
+    "toxic": ["infect_toxic"],
+    "poison": ["infect_toxic"],
 }
 
 # Token types that can be detected from a query (maps query word → canonical name)
@@ -1027,6 +1045,11 @@ _MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
 _MULTI_TAG_SYNERGY_THRESHOLD = 3
 _MULTI_TAG_SYNERGY_DAMPEN = 0.7
 
+# When the deck supplies explicit archetype keywords we pivot 0.10 of weight
+# from the semantic signal into tag synergy so chip-driven decks stop being
+# diluted by Qdrant neighbors that share oracle-text vocabulary but not theme.
+_KEYWORD_SHIFT: float = 0.10
+
 
 def _compute_weighted_scores(
     all_ids: list[UUID],
@@ -1043,6 +1066,7 @@ def _compute_weighted_scores(
     ranking_weights: RankingWeights | None = None,
     edhrec_inclusion: dict[UUID, float] | None = None,
     moxfield_inclusion: dict[UUID, float] | None = None,
+    prefer_keywords: bool = False,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
@@ -1078,6 +1102,13 @@ def _compute_weighted_scores(
         Dict mapping card UUID to final weighted score.
     """
     w = ranking_weights if ranking_weights is not None else RankingWeights()
+    if prefer_keywords:
+        w = w.model_copy(
+            update={
+                "semantic": max(0.0, w.semantic - _KEYWORD_SHIFT),
+                "synergy": w.synergy + _KEYWORD_SHIFT,
+            }
+        )
 
     max_overlap = max(tag_overlaps.values(), default=1) or 1
     edhrec_ranks = [
@@ -1380,6 +1411,7 @@ async def retrieve_candidates(
     price_filter: PriceFilter | None = None,
     commander_id: UUID | None = None,
     bracket: int | None = None,
+    prefer_keywords: bool = False,
 ) -> list[RetrievedCard]:
     """Run hybrid retrieval and return top candidate cards with weighted scoring.
 
@@ -1406,6 +1438,10 @@ async def retrieve_candidates(
         commander_id: When set, fetches EDHREC commander recommendations and
             applies the deck_inclusion ranking signal.
         bracket: Deck bracket; gates EDHREC's gamechangers category.
+        prefer_keywords: When True (deck supplies explicit archetype keywords),
+            shifts 0.10 of the semantic weight onto tag synergy so chip-driven
+            decks aren't diluted by Qdrant neighbors that share oracle-text
+            vocabulary but not theme.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1497,6 +1533,7 @@ async def retrieve_candidates(
         ranking_weights=ranking_weights,
         edhrec_inclusion=edhrec_inclusion,
         moxfield_inclusion=moxfield_inclusion,
+        prefer_keywords=prefer_keywords,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)

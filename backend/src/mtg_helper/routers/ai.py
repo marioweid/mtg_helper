@@ -15,6 +15,8 @@ from mtg_helper.models.ai import (
     ChatResponse,
     DescribeRequest,
     DescribeResponse,
+    KeywordExtractRequest,
+    KeywordExtractResponse,
     SuggestRequest,
     SuggestResponse,
 )
@@ -174,6 +176,35 @@ async def describe_deck(
     _enforce_rate_limit(account, "describe", _DESCRIBE_LIMIT)
     try:
         result = await ai_service.describe_deck(
+            request.app.state.db_pool,
+            request.app.state.ai_client,
+            body.commander_scryfall_id,
+            body.partner_scryfall_id,
+            body.bracket,
+            [{"role": m.role, "content": m.content} for m in body.history],
+            body.message,
+        )
+    except DeckNotFoundError as e:
+        raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
+    except LLMEmptyResponseError as e:
+        raise _llm_unavailable(str(e))
+    return DataResponse(data=result)
+
+
+@router.post("/extract-keywords", response_model=DataResponse[KeywordExtractResponse])
+async def extract_keywords(
+    body: KeywordExtractRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[KeywordExtractResponse]:
+    """Run one turn of the keyword-extracting deck agent.
+
+    The agent converges on a structured set of archetype keywords (Moxfield-
+    style) instead of writing prose. Used by the new ``/decks/new/agent`` flow.
+    """
+    _enforce_rate_limit(account, "extract_keywords", _DESCRIBE_LIMIT)
+    try:
+        result = await ai_service.extract_keywords(
             request.app.state.db_pool,
             request.app.state.ai_client,
             body.commander_scryfall_id,

@@ -27,6 +27,8 @@ import type {
   DescribeResponse,
   FeedbackCreate,
   FeedbackResponse,
+  KeywordExtractRequest,
+  KeywordExtractResponse,
   PaginationMeta,
   PreferenceCreate,
   PreferenceResponse,
@@ -35,6 +37,7 @@ import type {
   RankingWeightsResponse,
   RankingWeightsUpdate,
   SuggestResponse,
+  TribalTag,
 } from "@/lib/types";
 
 const CLIENT_BASE =
@@ -246,6 +249,15 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  extractKeywords: (body: KeywordExtractRequest) =>
+    request<KeywordExtractResponse>("/decks/extract-keywords", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  listTribalTags: (minCount = 3) =>
+    request<TribalTag[]>(`/tags/tribal?min_count=${minCount}`),
 
   exportMoxfield: (deckId: string): Promise<string> =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/export/moxfield`).then((res) => {

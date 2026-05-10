@@ -1,6 +1,11 @@
 """Tests for rule-based card tag classification."""
 
-from mtg_helper.services.tag_service import classify_card, classify_token_types, classify_traits
+from mtg_helper.services.tag_service import (
+    classify_card,
+    classify_token_types,
+    classify_traits,
+    classify_tribal,
+)
 
 
 def _classify(
@@ -511,3 +516,98 @@ def test_token_types_creature_and_artifact() -> None:
     )
     assert "treasure" in result
     assert "zombie" in result
+
+
+# ── archetype expansion ───────────────────────────────────────────────────────
+
+
+def test_reanimator_return_to_battlefield() -> None:
+    tags = _classify("Return target creature card from your graveyard to the battlefield.")
+    assert "reanimator" in tags
+
+
+def test_cascade_keyword() -> None:
+    tags = _classify("When you cast this, cascade.", keywords=["Cascade"])
+    assert "cascade" in tags
+
+
+def test_storm_keyword() -> None:
+    tags = _classify("Storm (When you cast this spell, copy it for each spell cast before it.)")
+    assert "storm" in tags
+
+
+def test_landfall_trigger() -> None:
+    tags = _classify(
+        "Landfall — Whenever a land enters under your control, create a 2/2 token.",
+        keywords=["Landfall"],
+    )
+    assert "landfall" in tags
+
+
+def test_spellslinger_trigger() -> None:
+    tags = _classify("Whenever you cast an instant or sorcery spell, draw a card.")
+    assert "spellslinger" in tags
+
+
+def test_wheels_each_player_discards() -> None:
+    tags = _classify("Each player discards their hand, then draws seven cards.")
+    assert "wheels" in tags
+
+
+def test_treasure_matters_sacrifice_a_treasure() -> None:
+    tags = _classify("Sacrifice a Treasure: Add one mana of any color.")
+    assert "treasure_matters" in tags
+
+
+def test_food_matters_for_each_food() -> None:
+    tags = _classify("This creature gets +1/+1 for each Food you control.")
+    assert "food_matters" in tags
+
+
+def test_clue_matters_sacrifice_a_clue() -> None:
+    tags = _classify("Sacrifice a Clue: Draw a card.")
+    assert "clue_matters" in tags
+
+
+def test_infect_keyword() -> None:
+    tags = _classify("", keywords=["Infect"])
+    assert "infect_toxic" in tags
+
+
+def test_toxic_keyword() -> None:
+    tags = _classify("", keywords=["Toxic"])
+    assert "infect_toxic" in tags
+
+
+# ── tribal mega-tags ──────────────────────────────────────────────────────────
+
+
+def test_tribal_squirrel_other_you_control() -> None:
+    tags = classify_tribal("Other Squirrels you control get +1/+1.")
+    assert "squirrel_tribal" in tags
+
+
+def test_tribal_dragon_each() -> None:
+    tags = classify_tribal("Each Dragon you control has haste.")
+    assert "dragon_tribal" in tags
+
+
+def test_tribal_elf_spells_you_cast() -> None:
+    tags = classify_tribal("Elf spells you cast cost {1} less to cast.")
+    assert "elf_tribal" in tags
+
+
+def test_tribal_no_match_when_card_is_subtype_only() -> None:
+    # Card *is* a Goblin but doesn't scope effects to Goblins.
+    tags = classify_tribal("When this creature dies, draw a card.")
+    assert "goblin_tribal" not in tags
+    assert tags == []
+
+
+def test_tribal_emitted_via_classify_card() -> None:
+    tags = _classify(
+        "Other Squirrels you control get +1/+1. Whenever a creature dies, create a 1/1 Squirrel.",
+        type_line="Legendary Creature — Squirrel",
+    )
+    assert "squirrel_tribal" in tags
+    assert "token" in tags

@@ -19,6 +19,7 @@ class DeckCreate(BaseModel):
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
     max_price_cents: int | None = Field(default=None, gt=0)
     min_price_cents: int | None = Field(default=None, ge=0)
+    archetype_tags: list[str] = Field(default_factory=list)
 
 
 class DeckUpdate(BaseModel):
@@ -32,6 +33,7 @@ class DeckUpdate(BaseModel):
     suggestion_collection_ids: list[UUID] | None = None
     max_price_cents: int | None = Field(default=None, ge=0)
     min_price_cents: int | None = Field(default=None, ge=0)
+    archetype_tags: list[str] | None = None
 
 
 class DeckSummary(BaseModel):
@@ -65,6 +67,7 @@ class DeckResponse(BaseModel):
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
     max_price_cents: int | None = None
     min_price_cents: int | None = None
+    archetype_tags: list[str] = Field(default_factory=list)
 
 
 class DeckCardItem(BaseModel):
@@ -107,6 +110,7 @@ class DeckDetailResponse(BaseModel):
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
     max_price_cents: int | None = None
     min_price_cents: int | None = None
+    archetype_tags: list[str] = Field(default_factory=list)
     cards: list[DeckCardItem]
 
 
@@ -158,3 +162,4 @@ class DeckImportResponse(BaseModel):
     imported_count: int
     unresolved: list[str]
     color_violations: list[str]
+    suggested_archetype_tags: list[str] = Field(default_factory=list)

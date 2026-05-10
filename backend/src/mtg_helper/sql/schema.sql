@@ -99,9 +99,13 @@ CREATE TABLE IF NOT EXISTS decks (
     bracket         INTEGER CHECK (bracket BETWEEN 1 AND 4),
     stage           TEXT NOT NULL DEFAULT 'created',
     stage_targets   JSONB NOT NULL DEFAULT '{}',
+    archetype_tags  TEXT[] NOT NULL DEFAULT '{}',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_decks_archetype_tags
+    ON decks USING GIN (archetype_tags);
 
 -- ============================================================
 -- DECK CARDS
@@ -352,6 +356,12 @@ CREATE TABLE IF NOT EXISTS moxfield_commander_recs (
 -- signal mirrors deck_inclusion (EDHREC) out of the box.
 ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS moxfield_inclusion REAL NOT NULL DEFAULT 0.20;
+
+-- Archetype keywords selected by the user (Moxfield-style: voltron, aristocrats,
+-- squirrel_tribal). Drives keyword-first retrieval via tag overlap.
+ALTER TABLE decks ADD COLUMN IF NOT EXISTS archetype_tags TEXT[] NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS idx_decks_archetype_tags
+    ON decks USING GIN (archetype_tags);
 
 -- ============================================================
 -- VIEW: deck detail with full card info
