@@ -10,7 +10,7 @@ import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaSymbols } from "@/components/mana-symbols";
 import { ExportButton } from "@/components/export-button";
-import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
+import { archetypeLabel, BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
@@ -210,6 +210,34 @@ export default function DeckDetailPage() {
             <span className="text-gray-500">{totalCardCount(deck.cards)} cards</span>
             <ManaSymbols colors={colors} />
           </div>
+          {deck.archetype_tags && deck.archetype_tags.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {deck.archetype_tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
+                >
+                  {archetypeLabel(tag)}
+                </span>
+              ))}
+              <Link
+                href={`/decks/${deck.id}/keywords`}
+                className="ml-1 text-xs text-gray-600 hover:text-gray-300 transition-colors"
+                title="Edit keywords"
+              >
+                ✎
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-2">
+              <Link
+                href={`/decks/${deck.id}/keywords`}
+                className="text-xs text-gray-600 hover:text-gray-300 transition-colors"
+              >
+                + Add keywords
+              </Link>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -217,6 +245,12 @@ export default function DeckDetailPage() {
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
           >
             {deck.stage === "complete" ? "View Build" : "Continue Building"}
+          </Link>
+          <Link
+            href={`/decks/${deck.id}/keywords`}
+            className="rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+          >
+            Keywords
           </Link>
           <ExportButton deckId={deck.id} />
           <button
