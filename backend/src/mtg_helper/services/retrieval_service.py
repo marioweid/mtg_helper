@@ -1333,17 +1333,20 @@ def _apply_trusted_quota(
     cards_by_id: dict[UUID, "asyncpg.Record"],
     limit: int,
     stage: str | None = None,
+    quota: float = 1.0,
 ) -> list[UUID]:
-    """Place every trusted EDHREC/Moxfield card first, then fill with composite.
+    """Reserve a fraction of the page for trusted cards, fill the rest with composite.
 
     Ordering of the returned list:
 
     1. ``theme``-stage uncategorizable pins (cards with no qualifying mechanical
        stage but high trust — see :func:`_theme_pinned_uncategorizable`).
-    2. **All** remaining trusted cards (Moxfield + EDHREC inclusion ≥ 0 with a
-       positive composite score), sorted by trusted score desc then composite
-       score desc. A card present in all 10 top Moxfield decks (trust = 1.0)
-       therefore ranks above one in 5 decks (trust = 0.5).
+    2. Trusted cards (Moxfield + EDHREC inclusion ≥ 0 with a positive composite
+       score), sorted by trusted score desc then composite score desc. Capped
+       at ``floor(limit * quota)`` slots so the composite channel always has
+       room to surface keyword/semantic winners when ``quota < 1.0``. A card
+       present in all 10 top Moxfield decks (trust = 1.0) therefore ranks
+       above one in 5 decks (trust = 0.5).
     3. Composite-ranked fill (semantic + keyword + FTS scoring) for any
        remaining slots up to ``limit``.
 
@@ -1358,10 +1361,13 @@ def _apply_trusted_quota(
         cards_by_id: Raw DB rows indexed by card UUID.
         limit: Maximum number of UIDs to return (page_end in pagination terms).
         stage: Active build stage; controls the theme uncategorizable-pin pass.
+        quota: Fraction of ``limit`` reserved for trusted cards. ``1.0`` keeps
+            the historical "all trusted first" behavior; ``0.5`` yields the
+            50/50 mix that lets keyword/semantic winners share the page.
 
     Returns:
-        Ordered list of UUIDs: pinned + every trusted card + composite fill,
-        truncated to ``limit``.
+        Ordered list of UUIDs: pinned + trusted (capped by quota) + composite
+        fill, truncated to ``limit``.
     """
     if limit <= 0:
         return []
@@ -1382,7 +1388,9 @@ def _apply_trusted_quota(
     pinned = _theme_pinned_uncategorizable(trusted, cards_by_id, limit) if stage == "theme" else []
     pinned_set = set(pinned)
 
-    reserved = [uid for uid, _ in trusted if uid not in pinned_set]
+    # Pinned cards count against the trusted budget so the page total stays bounded.
+    trusted_budget = max(0, int(limit * quota) - len(pinned))
+    reserved = [uid for uid, _ in trusted if uid not in pinned_set][:trusted_budget]
     reserved_set = pinned_set | set(reserved)
 
     remaining = max(0, limit - len(pinned) - len(reserved))
@@ -1539,8 +1547,15 @@ async def retrieve_candidates(
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
+    trusted_quota = ranking_weights.trusted_quota if ranking_weights is not None else 1.0
     full_ranked = _apply_trusted_quota(
-        scores, edhrec_inclusion, moxfield_inclusion, cards_by_id, page_end, stage=stage
+        scores,
+        edhrec_inclusion,
+        moxfield_inclusion,
+        cards_by_id,
+        page_end,
+        stage=stage,
+        quota=trusted_quota,
     )
     top_ids = full_ranked[offset:page_end]
     if not top_ids:

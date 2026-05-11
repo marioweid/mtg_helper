@@ -460,6 +460,9 @@ async def _load_ranking_weights(
             synergy=result.synergy,
             popularity=result.popularity,
             personal=result.personal,
+            deck_inclusion=result.deck_inclusion,
+            moxfield_inclusion=result.moxfield_inclusion,
+            trusted_quota=result.trusted_quota,
         )
     except ranking_weight_service.AccountNotFoundError:
         return None

@@ -380,6 +380,43 @@ def test_trusted_quota_limit_zero_returns_empty() -> None:
     assert _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=0) == []
 
 
+def test_trusted_quota_half_split_reserves_half_for_composite() -> None:
+    """quota=0.5 splits page 50/50 between trusted and composite winners."""
+    semantic = _ids("aaaa", 20)
+    trusted = _ids("bbbb", 15)
+    # Composite ordering puts semantic well above trusted, so without the quota
+    # cap the trusted reservation would still eat the whole page (15 > 10).
+    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
+    scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
+    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    moxfield = {uid: 0.8 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10, quota=0.5)
+
+    assert len(top) == 10
+    trusted_in_top = [uid for uid in top if uid in set(trusted)]
+    composite_in_top = [uid for uid in top if uid in set(semantic)]
+    assert len(trusted_in_top) == 5, "half the page should be reserved for trusted"
+    assert len(composite_in_top) == 5, "the other half should fill with composite winners"
+    # Trusted slots come before composite fill in the ordering.
+    assert top[:5] == trusted_in_top
+
+
+def test_trusted_quota_zero_drops_all_trusted_reservations() -> None:
+    """quota=0.0 hands the whole page to the composite ranker."""
+    semantic = _ids("aaaa", 8)
+    trusted = _ids("bbbb", 5)
+    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
+    scores.update({uid: 0.5 for uid in trusted})
+    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    moxfield = {uid: 0.9 for uid in trusted}
+
+    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=6, quota=0.0)
+
+    # Composite ordering is purely score-desc; semantic scores dominate.
+    assert top == sorted(scores, key=lambda u: scores[u], reverse=True)[:6]
+
+
 def test_trusted_quota_skips_cards_missing_from_db() -> None:
     """Trusted card filtered out by _fetch_candidates is also skipped from quota."""
     semantic = _ids("aaaa", 5)

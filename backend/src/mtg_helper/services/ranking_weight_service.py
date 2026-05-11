@@ -45,8 +45,8 @@ async def get_weights(pool: asyncpg.Pool, account_id: UUID) -> RankingWeightsRes
                 """
                 INSERT INTO account_ranking_weights
                     (account_id, semantic, synergy, popularity, personal,
-                     deck_inclusion, moxfield_inclusion)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                     deck_inclusion, moxfield_inclusion, trusted_quota)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT (account_id) DO UPDATE SET account_id = EXCLUDED.account_id
                 RETURNING *
                 """,
@@ -57,6 +57,7 @@ async def get_weights(pool: asyncpg.Pool, account_id: UUID) -> RankingWeightsRes
                 defaults.personal,
                 defaults.deck_inclusion,
                 defaults.moxfield_inclusion,
+                defaults.trusted_quota,
             )
     return _row_to_response(row)
 
@@ -110,8 +111,8 @@ async def update_weights(
             """
             INSERT INTO account_ranking_weights
                 (account_id, semantic, synergy, popularity, personal,
-                 deck_inclusion, moxfield_inclusion, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+                 deck_inclusion, moxfield_inclusion, trusted_quota, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
             ON CONFLICT (account_id) DO UPDATE SET
                 semantic           = EXCLUDED.semantic,
                 synergy            = EXCLUDED.synergy,
@@ -119,6 +120,7 @@ async def update_weights(
                 personal           = EXCLUDED.personal,
                 deck_inclusion     = EXCLUDED.deck_inclusion,
                 moxfield_inclusion = EXCLUDED.moxfield_inclusion,
+                trusted_quota      = EXCLUDED.trusted_quota,
                 updated_at         = now()
             RETURNING *
             """,
@@ -129,6 +131,7 @@ async def update_weights(
             personal,
             deck_inclusion,
             moxfield_inclusion,
+            data.trusted_quota,
         )
     return _row_to_response(row)
 
@@ -142,5 +145,6 @@ def _row_to_response(row: asyncpg.Record) -> RankingWeightsResponse:
         personal=row["personal"],
         deck_inclusion=row["deck_inclusion"],
         moxfield_inclusion=row["moxfield_inclusion"],
+        trusted_quota=row["trusted_quota"],
         updated_at=row["updated_at"],
     )

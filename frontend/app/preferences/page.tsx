@@ -19,6 +19,8 @@ const DEFAULT_WEIGHTS = {
   moxfield_inclusion: 0.20,
 };
 
+const DEFAULT_TRUSTED_QUOTA = 1.0;
+
 const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   semantic: "Semantic Match",
   synergy: "Tag Synergy",
@@ -45,6 +47,7 @@ export default function PreferencesPage() {
   const [profileToggling, setProfileToggling] = useState(false);
   const [rankingWeights, setRankingWeights] = useState<RankingWeightsResponse | null>(null);
   const [draftWeights, setDraftWeights] = useState(DEFAULT_WEIGHTS);
+  const [draftTrustedQuota, setDraftTrustedQuota] = useState(DEFAULT_TRUSTED_QUOTA);
   const [weightsSaving, setWeightsSaving] = useState(false);
   const [weightsDirty, setWeightsDirty] = useState(false);
 
@@ -71,6 +74,7 @@ export default function PreferencesPage() {
           deck_inclusion: w.deck_inclusion,
           moxfield_inclusion: w.moxfield_inclusion,
         });
+        setDraftTrustedQuota(w.trusted_quota);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize account");
       } finally {
@@ -89,7 +93,10 @@ export default function PreferencesPage() {
     if (weightsSaving) return;
     setWeightsSaving(true);
     try {
-      const updated = await apiClient.updateRankingWeights(draftWeights);
+      const updated = await apiClient.updateRankingWeights({
+        ...draftWeights,
+        trusted_quota: draftTrustedQuota,
+      });
       setRankingWeights(updated);
       setDraftWeights({
         semantic: updated.semantic,
@@ -99,6 +106,7 @@ export default function PreferencesPage() {
         deck_inclusion: updated.deck_inclusion,
         moxfield_inclusion: updated.moxfield_inclusion,
       });
+      setDraftTrustedQuota(updated.trusted_quota);
       setWeightsDirty(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save ranking weights");
@@ -109,6 +117,12 @@ export default function PreferencesPage() {
 
   function handleWeightsReset() {
     setDraftWeights(DEFAULT_WEIGHTS);
+    setDraftTrustedQuota(DEFAULT_TRUSTED_QUOTA);
+    setWeightsDirty(true);
+  }
+
+  function handleTrustedQuotaChange(pct: number) {
+    setDraftTrustedQuota(pct / 100);
     setWeightsDirty(true);
   }
 
@@ -265,6 +279,39 @@ export default function PreferencesPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-6">
+        <div className="mb-4">
+          <h2 className="font-semibold text-white">Suggestion Mix</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            How much of each page is reserved for trusted EDHREC/Moxfield cards. Lower it to
+            give your archetype keywords and deck description a real exploration channel.
+          </p>
+        </div>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-white">Trusted Card Quota</span>
+              <p className="text-xs text-gray-500">
+                100% = every trusted card ranks first (legacy). 50% = half popularity-driven,
+                half keyword/semantic. 0% = pure composite ranking.
+              </p>
+            </div>
+            <span className="ml-4 w-10 text-right text-sm tabular-nums text-indigo-300">
+              {Math.round(draftTrustedQuota * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(draftTrustedQuota * 100)}
+            onChange={(e) => handleTrustedQuotaChange(Number(e.target.value))}
+            className="w-full accent-indigo-500"
+          />
         </div>
       </section>
 

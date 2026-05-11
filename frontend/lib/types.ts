@@ -360,6 +360,7 @@ export interface RankingWeights {
   personal: number;
   deck_inclusion: number;
   moxfield_inclusion: number;
+  trusted_quota: number;
 }
 
 export interface RankingWeightsResponse extends RankingWeights {
@@ -374,6 +375,7 @@ export interface RankingWeightsUpdate {
   personal: number;
   deck_inclusion: number;
   moxfield_inclusion: number;
+  trusted_quota: number;
 }
 
 // Collections

@@ -362,6 +362,12 @@ CREATE TABLE IF NOT EXISTS moxfield_commander_recs (
 ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS moxfield_inclusion REAL NOT NULL DEFAULT 0.20;
 
+-- Fraction of each result page reserved for EDHREC/Moxfield trusted cards.
+-- 1.0 = historical "all trusted first"; lower values free slots for the
+-- composite (semantic + keyword + FTS) channel so user-supplied chips matter.
+ALTER TABLE account_ranking_weights
+    ADD COLUMN IF NOT EXISTS trusted_quota REAL NOT NULL DEFAULT 1.0;
+
 -- ============================================================
 -- VIEW: deck detail with full card info
 -- ============================================================
