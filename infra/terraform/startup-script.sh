@@ -46,19 +46,54 @@ for u in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1}'); do
   usermod -aG docker "$u" || true
 done
 
-# --- GitHub Actions self-hosted runner ---------------------------------------
-# Runner files live on the data disk so spot recreates reuse the existing
-# registration. The systemd unit is installed once via `svc.sh install` (see
-# README/runbook); on every boot we just re-enable + start it. If the runner
-# was never registered the unit doesn't exist yet — skip silently.
-if [ -d /srv/mtg-helper/data/runner ] && [ ! -e /opt/actions-runner ]; then
-  ln -s /srv/mtg-helper/data/runner /opt/actions-runner
-fi
+# --- Auto-deploy: poll origin/main, redeploy on new commits ------------------
+# systemd timer fires every minute. The service is a no-op unless the remote
+# HEAD has advanced beyond the local one, so most ticks are cheap.
+cat > /usr/local/sbin/mtg-helper-autodeploy.sh <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+REPO=/opt/mtg-helper
+cd "$REPO"
+LOCAL=$(git rev-parse HEAD)
+git fetch --quiet origin main
+REMOTE=$(git rev-parse origin/main)
+[ "$LOCAL" = "$REMOTE" ] && exit 0
+echo "$(date -Is) deploying $LOCAL -> $REMOTE"
+git reset --hard "$REMOTE"
+COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod"
+$COMPOSE build --pull frontend backend
+$COMPOSE up -d --remove-orphans frontend backend
+docker image prune -f
+EOS
+chmod 0755 /usr/local/sbin/mtg-helper-autodeploy.sh
 
-RUNNER_SVC=$(systemctl list-unit-files 'actions.runner.*.service' --no-legend | awk '{print $1}' | head -1)
-if [ -n "$RUNNER_SVC" ]; then
-  systemctl enable --now "$RUNNER_SVC"
-fi
+cat > /etc/systemd/system/mtg-helper-autodeploy.service <<'EOS'
+[Unit]
+Description=Pull-based deploy for mtg-helper
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mtg-helper-autodeploy.sh
+EOS
+
+cat > /etc/systemd/system/mtg-helper-autodeploy.timer <<'EOS'
+[Unit]
+Description=Run mtg-helper auto-deploy every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=mtg-helper-autodeploy.service
+
+[Install]
+WantedBy=timers.target
+EOS
+
+systemctl daemon-reload
+systemctl enable --now mtg-helper-autodeploy.timer
 
 # --- Atuin (shell history) — system-wide install -----------------------------
 if ! command -v atuin >/dev/null 2>&1; then
