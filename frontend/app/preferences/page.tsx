@@ -39,6 +39,38 @@ const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   moxfield_inclusion: "Cards from the most-liked Moxfield decks for this commander",
 };
 
+interface SaveBarProps {
+  dirty: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onReset: () => void;
+}
+
+function SaveBar({ dirty, saving, onSave, onReset }: SaveBarProps) {
+  return (
+    <div className="mb-4 flex items-center justify-end gap-2">
+      <span className="mr-auto text-xs text-gray-500">
+        {dirty ? "Unsaved changes" : "All changes saved"}
+      </span>
+      <button
+        type="button"
+        onClick={onReset}
+        className="rounded-lg px-3 py-1.5 text-xs text-gray-400 transition-colors hover:text-white"
+      >
+        Reset defaults
+      </button>
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={!dirty || saving}
+        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs text-white transition-colors hover:bg-indigo-500 disabled:opacity-40"
+      >
+        {saving ? "Saving…" : "Save changes"}
+      </button>
+    </div>
+  );
+}
+
 export default function PreferencesPage() {
   const [preferences, setPreferences] = useState<PreferenceResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,26 +261,16 @@ export default function PreferencesPage() {
         </div>
       </section>
 
+      <SaveBar
+        dirty={weightsDirty}
+        saving={weightsSaving}
+        onSave={() => void handleWeightsSave()}
+        onReset={handleWeightsReset}
+      />
+
       <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4">
           <h2 className="font-semibold text-white">Ranking Weights</h2>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleWeightsReset}
-              className="rounded-lg px-3 py-1.5 text-xs text-gray-400 hover:text-white transition-colors"
-            >
-              Reset defaults
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleWeightsSave()}
-              disabled={!weightsDirty || weightsSaving}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs text-white transition-colors disabled:opacity-40 hover:bg-indigo-500"
-            >
-              {weightsSaving ? "Saving…" : "Save"}
-            </button>
-          </div>
         </div>
         <p className="mb-5 text-sm text-gray-400">
           Control how much each signal influences card suggestions. Values are auto-normalized.
@@ -314,6 +336,13 @@ export default function PreferencesPage() {
           />
         </div>
       </section>
+
+      <SaveBar
+        dirty={weightsDirty}
+        saving={weightsSaving}
+        onSave={() => void handleWeightsSave()}
+        onReset={handleWeightsReset}
+      />
 
       <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-6">
         <h2 className="mb-4 font-semibold text-white">Add Preference</h2>
