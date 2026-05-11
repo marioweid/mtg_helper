@@ -15,52 +15,23 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   deploy:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, mtg-helper]
     timeout-minutes: 20
     env:
-      VM_NAME: ${{ vars.GCP_VM_NAME }}
-      VM_ZONE: ${{ vars.GCP_VM_ZONE }}
-      VM_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      REPO_DIR: /opt/mtg-helper
 
     steps:
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOYER_SA }}
-
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-        with:
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-
-      - name: Deploy on VM
-        env:
-          REPO_DIR: /opt/mtg-helper
+      - name: Deploy
         run: |
           set -euo pipefail
-          gcloud compute ssh "$VM_NAME" \
-            --zone="$VM_ZONE" \
-            --project="$VM_PROJECT" \
-            --tunnel-through-iap \
-            --quiet \
-            --command="sudo bash -s" <<'EOF'
-          set -euo pipefail
-          REPO_DIR=/opt/mtg-helper
           cd "$REPO_DIR"
           git fetch --quiet origin main
           git reset --hard origin/main
           COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod"
           $COMPOSE build --pull frontend backend
           $COMPOSE up -d --remove-orphans --force-recreate frontend backend
-          # Verify backend stayed up (catches schema/migration crashes that the
-          # CI would otherwise report as a successful deploy).
           for i in 1 2 3 4 5 6 7 8 9 10; do
               status=$($COMPOSE ps --format '{{.State}}' backend | head -1)
               [ "$status" = "running" ] && break
@@ -72,4 +43,3 @@ jobs:
               exit 1
           fi
           docker image prune -f
-          EOF

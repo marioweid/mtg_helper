@@ -46,6 +46,20 @@ for u in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1}'); do
   usermod -aG docker "$u" || true
 done
 
+# --- GitHub Actions self-hosted runner ---------------------------------------
+# Runner files live on the data disk so spot recreates reuse the existing
+# registration. The systemd unit is installed once via `svc.sh install` (see
+# README/runbook); on every boot we just re-enable + start it. If the runner
+# was never registered the unit doesn't exist yet — skip silently.
+if [ -d /srv/mtg-helper/data/runner ] && [ ! -e /opt/actions-runner ]; then
+  ln -s /srv/mtg-helper/data/runner /opt/actions-runner
+fi
+
+RUNNER_SVC=$(systemctl list-unit-files 'actions.runner.*.service' --no-legend | awk '{print $1}' | head -1)
+if [ -n "$RUNNER_SVC" ]; then
+  systemctl enable --now "$RUNNER_SVC"
+fi
+
 # --- Atuin (shell history) — system-wide install -----------------------------
 if ! command -v atuin >/dev/null 2>&1; then
   ATUIN_VERSION=$(curl -fsSL https://api.github.com/repos/atuinsh/atuin/releases/latest \

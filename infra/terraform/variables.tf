@@ -50,17 +50,6 @@ variable "snapshot_retention_days" {
   default     = 7
 }
 
-variable "github_repository" {
-  description = "GitHub repository allowed to assume the deployer SA via WIF (format: \"owner/repo\")."
-  type        = string
-}
-
-variable "github_branch" {
-  description = "Branch ref allowed to deploy (e.g. \"main\"). Other refs are denied by the WIF condition."
-  type        = string
-  default     = "main"
-}
-
 variable "spot_vm" {
   description = "Run the VM as Spot (~70% cheaper, can be preempted ≤24h). Auto-restart job recovers it."
   type        = bool
