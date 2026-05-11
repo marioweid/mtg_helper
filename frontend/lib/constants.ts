@@ -1,3 +1,5 @@
+import { MECHANIC_LABELS } from "./mechanics";
+
 export const STAGES = [
   "ramp",
   "interaction",
@@ -154,6 +156,9 @@ export const ARCHETYPE_LABELS: Record<string, string> = Object.fromEntries(
 /** Pretty-print a tag chip — handles tribal tags too (e.g. ``squirrel_tribal``). */
 export function archetypeLabel(tag: string): string {
   if (ARCHETYPE_LABELS[tag]) return ARCHETYPE_LABELS[tag];
+  // Fall back to the mechanic catalog so chips from the "All mechanics"
+  // section render with the same pretty label.
+  if (MECHANIC_LABELS[tag]) return MECHANIC_LABELS[tag];
   if (tag.endsWith("_tribal")) {
     const sub = tag.slice(0, -"_tribal".length).replace(/_/g, " ");
     return `${sub.charAt(0).toUpperCase()}${sub.slice(1)} tribal`;

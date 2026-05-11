@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { apiClient } from "@/lib/api";
 import { ARCHETYPE_GROUPS, archetypeLabel } from "@/lib/constants";
+import { MECHANIC_GROUPS } from "@/lib/mechanics";
 import type { TribalTag } from "@/lib/types";
 
 interface Props {
@@ -140,6 +141,45 @@ export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
           </div>
         </section>
       ))}
+
+      <details className="rounded-lg border border-gray-200 bg-gray-50 open:bg-white">
+        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700">
+          All mechanics ({MECHANIC_GROUPS.reduce((n, g) => n + g.chips.length, 0)}) — click to expand
+        </summary>
+        <div className="space-y-5 border-t border-gray-200 px-3 py-3">
+          <p className="text-xs text-gray-500">
+            Every printed keyword and mechanic — flying, dredge, cycling, explore, plot, monarch,
+            and so on. Picking one filters the corpus to cards that mention the mechanic by name,
+            not curated deck archetypes.
+          </p>
+          {MECHANIC_GROUPS.map((group) => (
+            <section key={group.group}>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                {group.group}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {group.chips.map((chip) => {
+                  const active = selected.has(chip.tag);
+                  return (
+                    <button
+                      key={chip.tag}
+                      type="button"
+                      onClick={() => toggle(chip.tag)}
+                      className={`rounded-full border px-3 py-1 text-sm transition ${
+                        active
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      </details>
 
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">

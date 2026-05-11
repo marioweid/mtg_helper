@@ -223,7 +223,150 @@ _TRIBAL_SUBTYPES: tuple[str, ...] = (
 
 # Bumped whenever the tag vocabulary changes — used as a manual signal to
 # re-run `/admin/tag-cards` against the corpus. Not auto-enforced.
-TAG_VOCAB_VERSION = 2
+TAG_VOCAB_VERSION = 3
+
+
+# ─── Full mechanic catalog ────────────────────────────────────────────────────
+# Mirrors the printed keyword vocabulary of Magic so the chip picker's "All
+# mechanics" tab can surface every card that mentions a given mechanic by
+# name. Distinct from the curated archetype taggers below: those infer
+# deck-level archetypes (aristocrats, voltron, mill, etc.); these tags are
+# literal keyword presence. The frontend mirror lives in
+# ``frontend/lib/mechanics.ts`` — both must stay in sync.
+_FULL_MECHANIC_PATTERNS: dict[str, re.Pattern[str]] = {
+    # Evergreen combat keywords
+    "flying": _re(r"\bflying\b"),
+    "first_strike": _re(r"\bfirst strike\b"),
+    "double_strike": _re(r"\bdouble strike\b"),
+    "deathtouch": _re(r"\bdeathtouch\b"),
+    "hexproof": _re(r"\bhexproof\b"),
+    "indestructible": _re(r"\bindestructible\b"),
+    "lifelink": _re(r"\blifelink\b"),
+    "menace": _re(r"\bmenace\b"),
+    "reach": _re(r"\breach\b"),
+    "trample": _re(r"\btrample\b"),
+    "vigilance": _re(r"\bvigilance\b"),
+    "ward": _re(r"\bward\b"),
+    "defender": _re(r"\bdefender\b"),
+    "flash": _re(r"\bflash\b"),
+    "haste": _re(r"\bhaste\b"),
+    "shroud": _re(r"\bshroud\b"),
+    # Combat / pumping
+    "annihilator": _re(r"\bannihilator\b"),
+    "battle_cry": _re(r"\bbattle cry\b"),
+    "exalted": _re(r"\bexalted\b"),
+    "frenzy": _re(r"\bfrenzy\b"),
+    "rampage": _re(r"\brampage\b"),
+    "soulbond": _re(r"\bsoulbond\b"),
+    "undying": _re(r"\bundying\b"),
+    "persist": _re(r"\bpersist\b"),
+    "mentor": _re(r"\bmentor\b"),
+    "renown": _re(r"\brenown\b"),
+    "training_kw": _re(r"\btraining\b"),
+    # Graveyard / recursion
+    "dredge": _re(r"\bdredge\b"),
+    "scavenge": _re(r"\bscavenge\b"),
+    "unearth": _re(r"\bunearth\b"),
+    "embalm": _re(r"\bembalm\b"),
+    "eternalize": _re(r"\beternalize\b"),
+    "encore": _re(r"\bencore\b"),
+    "threshold": _re(r"\bthreshold\b"),
+    "delirium": _re(r"\bdelirium\b"),
+    "morbid": _re(r"\bmorbid\b"),
+    "flashback": _re(r"\bflashback\b"),
+    "escape": _re(r"\bescape\b"),
+    "jump_start": _re(r"\bjump-?start\b"),
+    "disturb": _re(r"\bdisturb\b"),
+    "madness": _re(r"\bmadness\b"),
+    "retrace": _re(r"\bretrace\b"),
+    # Cost / cast mechanics
+    "cycling": _re(r"\bcycling\b"),
+    "buyback": _re(r"\bbuyback\b"),
+    "kicker": _re(r"\bkicker\b|\bmultikicker\b"),
+    "suspend": _re(r"\bsuspend\b"),
+    "convoke": _re(r"\bconvoke\b"),
+    "delve": _re(r"\bdelve\b"),
+    "improvise": _re(r"\bimprovise\b"),
+    "affinity": _re(r"\baffinity for\b"),
+    "rebound": _re(r"\brebound\b"),
+    "miracle": _re(r"\bmiracle\b"),
+    "foretell": _re(r"\bforetell\b"),
+    "overload": _re(r"\boverload\b"),
+    "splice": _re(r"\bsplice\b"),
+    "transmute": _re(r"\btransmute\b"),
+    "prototype": _re(r"\bprototype\b"),
+    "casualty": _re(r"\bcasualty\b"),
+    "mutate": _re(r"\bmutate\b"),
+    "emerge": _re(r"\bemerge\b"),
+    "bestow": _re(r"\bbestow\b"),
+    "awaken": _re(r"\bawaken\b"),
+    "spree": _re(r"\bspree\b"),
+    "disguise": _re(r"\bdisguise\b"),
+    "cloak": _re(r"\bcloak\b"),
+    "bargain": _re(r"\bbargain\b"),
+    "plot": _re(r"\bplot\b"),
+    "saddle": _re(r"\bsaddle\b"),
+    "surge": _re(r"\bsurge\b"),
+    # Counters / power-toughness mechanics
+    "modular": _re(r"\bmodular\b"),
+    "devour": _re(r"\bdevour\b"),
+    "monstrosity": _re(r"\bmonstrosity\b|\bmonstrous\b"),
+    "outlast": _re(r"\boutlast\b"),
+    "fabricate": _re(r"\bfabricate\b"),
+    "adapt": _re(r"\badapt\b"),
+    "evolve": _re(r"\bevolve\b"),
+    "support": _re(r"\bsupport \d"),
+    "level_up": _re(r"\blevel up\b"),
+    "bolster": _re(r"\bbolster\b"),
+    "reinforce": _re(r"\breinforce\b"),
+    "explore": _re(r"\bexplore(?:s|d|ing)?\b"),
+    "discover": _re(r"\bdiscover(?: \d|ed|ing|s)?\b"),
+    "amass": _re(r"\bamass\b"),
+    # Triggers / states / locations
+    "raid": _re(r"\braid\b"),
+    "revolt": _re(r"\brevolt\b"),
+    "metalcraft": _re(r"\bmetalcraft\b"),
+    "ferocious": _re(r"\bferocious\b"),
+    "formidable": _re(r"\bformidable\b"),
+    "hellbent": _re(r"\bhellbent\b"),
+    "spell_mastery": _re(r"\bspell mastery\b"),
+    "constellation": _re(r"\bconstellation\b"),
+    "magecraft": _re(r"\bmagecraft\b"),
+    "undergrowth": _re(r"\bundergrowth\b"),
+    "monarch": _re(r"\bthe monarch\b"),
+    "initiative": _re(r"\bthe initiative\b"),
+    "dungeon": _re(r"\bventure into\b|\bcomplete(?:d|s)? (?:a |the )?dungeon"),
+    "the_ring": _re(r"\bthe ring tempts you\b"),
+    "addendum": _re(r"\baddendum\b"),
+    "coven": _re(r"\bcoven\b"),
+    "inspired": _re(r"\binspired\b"),
+    "heroic": _re(r"\bheroic\b"),
+    "domain": _re(r"\bdomain\b"),
+    "descend": _re(r"\bdescend\b"),
+    "eerie": _re(r"\beerie\b"),
+    "celebration": _re(r"\bcelebration\b"),
+    "party": _re(r"\b(?:full )?party\b"),
+    "manifest": _re(r"\bmanifest\b"),
+    "populate": _re(r"\bpopulate\b"),
+    "changeling": _re(r"\bchangeling\b"),
+}
+
+
+def _tag_full_mechanics(text: str, tags: list[str]) -> None:
+    """Append a tag for every printed mechanic the oracle text mentions.
+
+    Additive over the curated archetype taggers — duplicates are skipped. The
+    catalog is intentionally permissive: a card with `flying` ends up under the
+    Flying chip even though Flying isn't a deck archetype on its own. That's
+    the point of the "All mechanics" tab.
+    """
+    existing = set(tags)
+    for tag, pat in _FULL_MECHANIC_PATTERNS.items():
+        if tag in existing:
+            continue
+        if pat.search(text):
+            tags.append(tag)
+            existing.add(tag)
 
 
 def _tribal_pattern(subtype: str) -> re.Pattern[str]:
@@ -547,6 +690,7 @@ def classify_card(
     _tag_keyword_archetypes(text, kw_set, tags)
     _tag_token_economies(text, tags)
     _tag_spell_archetypes(text, tags)
+    _tag_full_mechanics(text, tags)
     tags.extend(classify_tribal(oracle_text))
 
     return tags
