@@ -130,23 +130,35 @@ _PAT_WHEELS = _re(
     r"|each player draws \w+ cards?"
     r"|discard your hand, then draw"
 )
+# Producer + payoff patterns. Moxfield-style chip search expects a Food deck to
+# surface both food-makers (Witch's Oven, Peregrin Took) and food-payoffs
+# (Trail of Crumbs, sac-food triggers), so we match both sides intentionally.
+# The "sacrifice <qty> foods?" clause accepts any quantifier word (a, an, all,
+# two, three, another, that many, X) instead of only "a", which missed cards
+# like Peregrin Took ("Sacrifice three Foods").
 _PAT_TREASURE_CARES = _re(
-    r"sacrifice a treasure"
-    r"|treasures? you control"
-    r"|whenever (?:a|one or more) treasure tokens?"
-    r"|for each treasure"
+    r"\bsacrifice (?:\w+\s+){0,2}treasures?\b"
+    r"|\btreasures? you control"
+    r"|\bwhenever (?:a|one or more) treasure tokens?"
+    r"|\bfor each treasure"
+    r"|\bcreate (?:\w+\s+){0,3}treasure tokens?"
+    r"|\badditional treasure tokens?"
 )
 _PAT_FOOD_CARES = _re(
-    r"sacrifice a food"
-    r"|foods? you control"
-    r"|whenever (?:a|one or more) food tokens?"
-    r"|for each food"
+    r"\bsacrifice (?:\w+\s+){0,2}foods?\b"
+    r"|\bfoods? you control"
+    r"|\bwhenever (?:a|one or more) food tokens?"
+    r"|\bfor each food"
+    r"|\bcreate (?:\w+\s+){0,3}food tokens?"
+    r"|\badditional food tokens?"
 )
 _PAT_CLUE_CARES = _re(
-    r"sacrifice a clue"
-    r"|clues? you control"
-    r"|whenever (?:a|one or more) clue tokens?"
-    r"|for each clue"
+    r"\bsacrifice (?:\w+\s+){0,2}clues?\b"
+    r"|\bclues? you control"
+    r"|\bwhenever (?:a|one or more) clue tokens?"
+    r"|\bfor each clue"
+    r"|\bcreate (?:\w+\s+){0,3}clue tokens?"
+    r"|\badditional clue tokens?"
 )
 _PAT_INFECT_TOXIC = _re(r"\binfect\b|\btoxic \d+|poison counter")
 
