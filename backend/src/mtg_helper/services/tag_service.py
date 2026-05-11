@@ -151,6 +151,8 @@ _PAT_FOOD_CARES = _re(
     r"|\bfor each food"
     r"|\bcreate (?:\w+\s+){0,3}food tokens?"
     r"|\badditional food tokens?"
+    # Bloomburrow keyword that always involves sacrificing a Food.
+    r"|\bforage\b"
 )
 _PAT_CLUE_CARES = _re(
     r"\bsacrifice (?:\w+\s+){0,2}clues?\b"
@@ -159,6 +161,9 @@ _PAT_CLUE_CARES = _re(
     r"|\bfor each clue"
     r"|\bcreate (?:\w+\s+){0,3}clue tokens?"
     r"|\badditional clue tokens?"
+    # Investigate is the canonical Clue producer keyword; reminder text isn't
+    # printed on every card, so we match the bare verb too.
+    r"|\binvestigate\b"
 )
 _PAT_INFECT_TOXIC = _re(r"\binfect\b|\btoxic \d+|poison counter")
 
