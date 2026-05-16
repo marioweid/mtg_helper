@@ -90,6 +90,16 @@ export interface DeckCardItem {
   price_eur_cents: number | null;
 }
 
+export interface CommanderCardSummary {
+  id: string;
+  name: string;
+  mana_cost: string | null;
+  type_line: string | null;
+  oracle_text: string | null;
+  image_uri: string | null;
+  color_identity: string[];
+}
+
 export interface DeckDetailResponse {
   id: string;
   name: string;
@@ -99,6 +109,8 @@ export interface DeckDetailResponse {
   commander_id: string;
   partner_id: string | null;
   commander_color_identity: string[];
+  commander_card: CommanderCardSummary | null;
+  partner_card: CommanderCardSummary | null;
   owner_email: string | null;
   created_at: string;
   updated_at: string;

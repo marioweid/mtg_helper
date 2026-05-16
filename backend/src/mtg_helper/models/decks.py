@@ -92,6 +92,18 @@ class DeckCardItem(BaseModel):
     price_eur_cents: int | None = None
 
 
+class CommanderCardSummary(BaseModel):
+    """Minimal commander/partner card fields needed for the detail-page preview."""
+
+    id: UUID
+    name: str
+    mana_cost: str | None = None
+    type_line: str | None = None
+    oracle_text: str | None = None
+    image_uri: str | None = None
+    color_identity: list[str] = Field(default_factory=list)
+
+
 class DeckDetailResponse(BaseModel):
     """Deck metadata plus all cards."""
 
@@ -103,6 +115,8 @@ class DeckDetailResponse(BaseModel):
     commander_id: UUID
     partner_id: UUID | None
     commander_color_identity: list[str] = Field(default_factory=list)
+    commander_card: CommanderCardSummary | None = None
+    partner_card: CommanderCardSummary | None = None
     owner_email: str | None
     created_at: datetime
     updated_at: datetime

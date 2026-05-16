@@ -9,6 +9,7 @@ import { DeckCategoryGroup } from "@/components/deck-category-group";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaSymbols } from "@/components/mana-symbols";
+import { CommanderCardPreview } from "@/components/commander-card-preview";
 import { ExportButton } from "@/components/export-button";
 import { archetypeLabel, BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
@@ -154,7 +155,12 @@ export default function DeckDetailPage() {
     <div>
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="flex flex-1 items-start gap-4">
+          <CommanderCardPreview
+            commander={deck.commander_card}
+            partner={deck.partner_card}
+          />
+          <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-white">{deck.name}</h1>
           {editingDescription ? (
             <div className="mt-2 flex flex-col gap-2">
@@ -238,6 +244,7 @@ export default function DeckDetailPage() {
               </Link>
             </div>
           )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link

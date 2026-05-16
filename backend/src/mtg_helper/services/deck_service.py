@@ -8,6 +8,7 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.models.decks import (
+    CommanderCardSummary,
     DeckCardAdd,
     DeckCardItem,
     DeckCardResponse,
@@ -325,9 +326,12 @@ async def get_deck(
                 return None
         card_rows = await conn.fetch("SELECT * FROM deck_detail_view WHERE deck_id = $1", deck_id)
         commander_identity = await _get_color_identity(conn, deck_row["commander_id"])
+        commander_card = await _fetch_commander_summary(conn, deck_row["commander_id"])
+        partner_card: CommanderCardSummary | None = None
         if deck_row["partner_id"]:
             partner_identity = await _get_color_identity(conn, deck_row["partner_id"])
             commander_identity = sorted(set(commander_identity) | set(partner_identity))
+            partner_card = await _fetch_commander_summary(conn, deck_row["partner_id"])
 
     return DeckDetailResponse(
         id=deck_row["id"],
@@ -338,6 +342,8 @@ async def get_deck(
         commander_id=deck_row["commander_id"],
         partner_id=deck_row["partner_id"],
         commander_color_identity=commander_identity,
+        commander_card=commander_card,
+        partner_card=partner_card,
         owner_email=deck_row["owner_email"],
         created_at=deck_row["created_at"],
         updated_at=deck_row["updated_at"],
@@ -347,6 +353,28 @@ async def get_deck(
         min_price_cents=deck_row["min_price_cents"],
         archetype_tags=list(deck_row["archetype_tags"] or []),
         cards=[_row_to_deck_card_item(r) for r in card_rows],
+    )
+
+
+async def _fetch_commander_summary(
+    conn: asyncpg.Connection, card_id: UUID
+) -> CommanderCardSummary | None:
+    """Load minimal card fields for the deck detail commander preview."""
+    row = await conn.fetchrow(
+        "SELECT id, name, mana_cost, type_line, oracle_text, image_uri, color_identity "
+        "FROM cards WHERE id = $1",
+        card_id,
+    )
+    if row is None:
+        return None
+    return CommanderCardSummary(
+        id=row["id"],
+        name=row["name"],
+        mana_cost=row["mana_cost"],
+        type_line=row["type_line"],
+        oracle_text=row["oracle_text"],
+        image_uri=row["image_uri"],
+        color_identity=list(row["color_identity"] or []),
     )
 
 
