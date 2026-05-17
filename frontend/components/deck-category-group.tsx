@@ -12,6 +12,7 @@ interface Props {
   onRemove?: (scryfallId: string) => void;
   onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
   petCardNames?: Set<string>;
+  comboCardIds?: Set<string>;
 }
 
 export function DeckCategoryGroup({
@@ -20,6 +21,7 @@ export function DeckCategoryGroup({
   onRemove,
   onSetCategories,
   petCardNames,
+  comboCardIds,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [openCard, setOpenCard] = useState<string | null>(null);
@@ -58,6 +60,14 @@ export function DeckCategoryGroup({
                       </CardHover>
                       {petCardNames?.has(card.name) && (
                         <span className="text-red-400 flex-shrink-0" title="Pet card">♥</span>
+                      )}
+                      {comboCardIds?.has(card.scryfall_id) && (
+                        <span
+                          className="flex-shrink-0 text-yellow-300"
+                          title="Part of an active or near-complete combo in this deck"
+                        >
+                          ⚡
+                        </span>
                       )}
                     </p>
                     {tags.length > 0 && (

@@ -205,6 +205,21 @@ export interface SuggestResponse {
   unresolved: string[];
 }
 
+// Deck Chat
+export interface ChatTurn {
+  role: string;
+  content: string;
+}
+
+export interface ChatHistoryResponse {
+  turns: ChatTurn[];
+}
+
+export interface ChatResponse {
+  reply: string;
+  suggestions: CardSuggestion[];
+}
+
 // Deck Description Agent
 export interface DescribeMessage {
   role: string;

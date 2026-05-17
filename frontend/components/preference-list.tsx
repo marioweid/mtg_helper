@@ -1,6 +1,7 @@
 "use client";
 
 import { CardHover } from "@/components/card-hover";
+import { useToast } from "@/components/toast";
 import { apiClient } from "@/lib/api";
 import type { PreferenceResponse } from "@/lib/types";
 
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export function PreferenceList({ preferences, onDeleted }: Props) {
+  const toast = useToast();
   const displayPreferences = preferences.filter(
     (p) => p.preference_type !== "feedback_boosting",
   );
@@ -41,7 +43,7 @@ export function PreferenceList({ preferences, onDeleted }: Props) {
       await apiClient.deletePreference(id);
       onDeleted();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete preference");
+      toast.push(err instanceof Error ? err.message : "Failed to delete preference", "error");
     }
   }
 

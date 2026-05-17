@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/toast";
 import { apiClient } from "@/lib/api";
 
 interface DeleteCollectionButtonProps {
@@ -14,6 +15,7 @@ export function DeleteCollectionButton({
   collectionName,
   onDeleted,
 }: DeleteCollectionButtonProps) {
+  const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete(e: React.MouseEvent) {
@@ -30,7 +32,7 @@ export function DeleteCollectionButton({
       await apiClient.deleteCollection(collectionId);
       onDeleted();
     } catch {
-      alert("Failed to delete collection");
+      toast.push("Failed to delete collection", "error");
       setDeleting(false);
     }
   }

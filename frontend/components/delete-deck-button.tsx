@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/toast";
 import { apiClient } from "@/lib/api";
 
 interface DeleteDeckButtonProps {
@@ -11,6 +12,7 @@ interface DeleteDeckButtonProps {
 
 export function DeleteDeckButton({ deckId, deckName }: DeleteDeckButtonProps) {
   const router = useRouter();
+  const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete(e: React.MouseEvent) {
@@ -22,7 +24,7 @@ export function DeleteDeckButton({ deckId, deckName }: DeleteDeckButtonProps) {
       await apiClient.deleteDeck(deckId);
       router.refresh();
     } catch {
-      alert("Failed to delete deck");
+      toast.push("Failed to delete deck", "error");
       setDeleting(false);
     }
   }

@@ -5,10 +5,18 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { CardDetailModal } from "@/components/card-detail-modal";
+import { DeckDetailSkeleton } from "@/components/skeleton";
+import { useToast } from "@/components/toast";
 import { ComboTab } from "@/components/combo-tab";
+import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
+import {
+  applyDeckFilter,
+  DeckFilterBar,
+  type DeckFilter,
+} from "@/components/deck-filter-bar";
 import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
 import { DeckStats } from "@/components/deck-stats";
@@ -52,6 +60,7 @@ function colorIdentityFromCards(cards: DeckCardItem[]): string[] {
 export default function DeckDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
   const deckId = params["id"] as string;
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +73,12 @@ export default function DeckDetailPage() {
   const [tab, setTab] = useState<DeckTab>("cards");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [filter, setFilter] = useState<DeckFilter>({
+    query: "",
+    colors: [],
+    sort: "default",
+  });
+  const [combos, setCombos] = useState<ComboListResponse | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +92,21 @@ export default function DeckDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getDeckCombos(deckId)
+      .then((data) => {
+        if (!cancelled) setCombos(data);
+      })
+      .catch(() => {
+        /* non-critical */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deckId]);
 
   useEffect(() => {
     apiClient.listPreferences().then((prefs) => {
@@ -97,7 +127,7 @@ export default function DeckDetailPage() {
       setDeck({ ...deck, description: draftDescription || null });
       setEditingDescription(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update description");
+      toast.push(err instanceof Error ? err.message : "Failed to update description", "error");
     } finally {
       setSavingDescription(false);
     }
@@ -111,7 +141,7 @@ export default function DeckDetailPage() {
       await apiClient.deleteDeck(deck.id);
       router.push("/decks");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete deck");
+      toast.push(err instanceof Error ? err.message : "Failed to delete deck", "error");
       setDeleting(false);
     }
   }
@@ -122,7 +152,7 @@ export default function DeckDetailPage() {
       await apiClient.removeCard(deck.id, scryfallId);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to remove card");
+      toast.push(err instanceof Error ? err.message : "Failed to remove card", "error");
     }
   }
 
@@ -132,7 +162,7 @@ export default function DeckDetailPage() {
       await apiClient.updateCardCategories(deck.id, scryfallId, categories);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update categories");
+      toast.push(err instanceof Error ? err.message : "Failed to update categories", "error");
     }
   }
 
@@ -145,17 +175,16 @@ export default function DeckDetailPage() {
   }
 
   if (!deck) {
-    return (
-      <div className="flex items-center justify-center py-20 text-gray-500">Loading...</div>
-    );
+    return <DeckDetailSkeleton />;
   }
 
   const isGrid = viewMode === "grid";
+  const visibleCards = applyDeckFilter(deck.cards, filter);
   const groups = isGrid
     ? {}
     : viewMode === "types"
-      ? groupByPrimaryType(deck.cards)
-      : groupByCategory(deck.cards);
+      ? groupByPrimaryType(visibleCards)
+      : groupByCategory(visibleCards);
   const categories = isGrid
     ? []
     : viewMode === "types"
@@ -165,6 +194,14 @@ export default function DeckDetailPage() {
   const selectedCard = selectedCardId
     ? deck.cards.find((c) => c.deck_card_id === selectedCardId) ?? null
     : null;
+  const comboCardIds = new Set<string>();
+  if (combos) {
+    for (const c of [...combos.active, ...combos.almost_there]) {
+      for (const p of c.pieces) {
+        if (p.in_deck && p.card.scryfall_id) comboCardIds.add(p.card.scryfall_id);
+      }
+    }
+  }
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
   const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] ?? null : null;
 
@@ -252,12 +289,24 @@ export default function DeckDetailPage() {
                   })}
                 </div>
               )}
+              {deck.cards.length > 0 && (
+                <DeckFilterBar
+                  value={filter}
+                  onChange={setFilter}
+                  resultCount={visibleCards.length}
+                  totalCount={deck.cards.length}
+                />
+              )}
               <CommanderSection
                 commander={deck.commander_card}
                 partner={deck.partner_card}
               />
               {isGrid ? (
-                <DeckGrid cards={deck.cards} onCardClick={setSelectedCardId} />
+                <DeckGrid
+                  cards={visibleCards}
+                  onCardClick={setSelectedCardId}
+                  comboCardIds={comboCardIds}
+                />
               ) : (
                 categories.map((cat) => (
                   <DeckCategoryGroup
@@ -267,6 +316,7 @@ export default function DeckDetailPage() {
                     onRemove={handleRemoveCard}
                     onSetCategories={handleSetCategories}
                     petCardNames={petCardNames}
+                    comboCardIds={comboCardIds}
                   />
                 ))
               )}

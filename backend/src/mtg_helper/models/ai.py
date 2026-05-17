@@ -91,6 +91,19 @@ class ChatResponse(BaseModel):
     suggestions: list[CardSuggestion]
 
 
+class ChatTurn(BaseModel):
+    """A persisted conversation turn between the user and the assistant."""
+
+    role: str
+    content: str
+
+
+class ChatHistoryResponse(BaseModel):
+    """Full conversation history for a deck."""
+
+    turns: list[ChatTurn]
+
+
 class DescribeMessage(BaseModel):
     """A single turn in the description agent conversation."""
 

@@ -7,6 +7,7 @@ import { totalCardCount, type DeckCardItem } from "@/lib/types";
 interface Props {
   cards: DeckCardItem[];
   onCardClick: (deckCardId: string) => void;
+  comboCardIds?: Set<string>;
 }
 
 /**
@@ -15,7 +16,7 @@ interface Props {
  * of every card behind the top one is visible. Hover keeps the existing
  * floating popover; click opens a detail modal at the page level.
  */
-export function DeckGrid({ cards, onCardClick }: Props) {
+export function DeckGrid({ cards, onCardClick, comboCardIds }: Props) {
   const groups = groupByPrimaryType(cards);
   const types = sortedPrimaryTypes(groups);
 
@@ -29,6 +30,7 @@ export function DeckGrid({ cards, onCardClick }: Props) {
           type={type}
           cards={groups[type] ?? []}
           onCardClick={onCardClick}
+          comboCardIds={comboCardIds}
         />
       ))}
     </div>
@@ -39,9 +41,10 @@ interface ColumnProps {
   type: string;
   cards: DeckCardItem[];
   onCardClick: (deckCardId: string) => void;
+  comboCardIds?: Set<string> | undefined;
 }
 
-function DeckGridColumn({ type, cards, onCardClick }: ColumnProps) {
+function DeckGridColumn({ type, cards, onCardClick, comboCardIds }: ColumnProps) {
   return (
     <section className="flex flex-col">
       <header className="mb-2 flex items-baseline justify-between px-1">
@@ -76,6 +79,14 @@ function DeckGridColumn({ type, cards, onCardClick }: ColumnProps) {
                 {card.quantity > 1 ? (
                   <span className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur">
                     ×{card.quantity}
+                  </span>
+                ) : null}
+                {comboCardIds?.has(card.scryfall_id) ? (
+                  <span
+                    className="absolute left-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-sm text-yellow-300 backdrop-blur"
+                    title="Part of an active or near-complete combo"
+                  >
+                    ⚡
                   </span>
                 ) : null}
               </button>

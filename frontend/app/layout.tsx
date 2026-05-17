@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/nav";
+import { ToastProvider } from "@/components/toast";
 
 export const metadata: Metadata = {
   title: "MTG Helper",
@@ -20,8 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen" suppressHydrationWarning>
-        <Nav />
-        <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+        <ToastProvider>
+          <Nav />
+          <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+        </ToastProvider>
       </body>
     </html>
   );

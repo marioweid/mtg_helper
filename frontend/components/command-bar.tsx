@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
+import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
  * actions so they stay reachable while the user scrolls a long card list.
  */
 export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
+  const toast = useToast();
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
@@ -29,8 +31,9 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
       a.download = "deck.txt";
       a.click();
       URL.revokeObjectURL(url);
+      toast.push("Exported to deck.txt", "success");
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Export failed");
+      toast.push(err instanceof ApiError ? err.message : "Export failed", "error");
     } finally {
       setExporting(false);
     }
@@ -47,6 +50,12 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
           className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-indigo-500 sm:flex-none"
         >
           {buildLabel}
+        </Link>
+        <Link
+          href={`/decks/${deckId}/chat`}
+          className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-center text-sm text-gray-200 transition-colors hover:border-white/40 hover:text-white sm:flex-none"
+        >
+          Chat
         </Link>
         <button
           type="button"

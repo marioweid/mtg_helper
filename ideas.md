@@ -19,18 +19,52 @@
   8. Buy list — deck minus collection → Cardmarket/TCG cart links.
   9. Paste-to-import — paste raw decklist text, auto-resolve. Currently only URL import + manual add.
 
-  UI redesign ideas (pick one big move)
-
-  - Visual card-grid deck view (Moxfield style) — stacked image columns by type. Current list works but enthusiasts shop visually.
-  - Bottom command bar — sticky Build · Chat · Stats · Export · Cuts instead of buttons scattered through header.
-  - Drag-and-drop categories — move card between categories by drag; cut by drag-off.
-
   My recommendation if you want one to start:
   - Goldfish playtest + health scorecard combo. Both rank highest on "thing enthusiasts actually use during deck tuning", reuse data you already have, no new backend integrations.
 
-Mobile/responsive pass + in-app feedback button. Game store users will pull this up on phones at the table. The build wizard's grid + filter dropdown work on desktop; haven't seen them on a 390px
-viewport. Bundle this with a small "Send feedback" button that writes to a feedback table — you'll get more honest signal than asking after the session. Tradeoff: low-glamour work, but cuts the
-highest-probability "this is broken" first impressions.
+Honest audit. Three buckets.
+
+  Half-shipped / inconsistent
+
+  - Chat page is dead — app/decks/[id]/chat/page.tsx is a 6-line redirect to deck detail. AI chat
+  (/api/v1/decks/{id}/chat) exists on the backend. UI surface never built. (Can be remove no ai chat needed)
+  - "Cuts" suggestion — not implemented. Would need backend endpoint + UI. (Nice to have feature implement this)
+  - Drag-and-drop categories — original big-move list, never built. (implement this)
+  - Per-card actions in grid view — only via modal click. No quick remove or quick categorize without opening
+   modal.
+  - No browser verification of hero / popover / grid / command bar / commander section / new deck list tile.
+  All passes type-check, none confirmed visually. (Checks passed i tested it)
+  - 8 pre-existing ty check warnings in backend — config.py / main.py / cards.py / ai_service.py /
+  deck_service.py. Not mine but they've been ignored.
+  - handleSetCategories / handleRemoveCard reload the entire deck after every action. Visible flash on the
+  new visual grid. ( fix this, can be nicer and smoother)
+
+  Product gaps
+
+  - No within-deck search / filter / sort (CMC, color, price, name). Once decks exceed ~50 cards, list
+  scanning gets rough.
+  - No version history / snapshots. No way to compare "before/after" a build session.
+  - No deck sharing — public URLs, share links, embed.
+  - No playtest / sample hand — visualize a 7-card opener.
+  - No deck comparison — diff two builds, see overlap.
+  - No mana-base auto-fix — suggest fixing color requirements / missing fetches.
+  - No combo highlight in deck view — combos exist as a tab but the cards in the regular list don't flag
+  "this card completes a combo."
+  - No "owned in collection" badge on the deck card list (it's on suggestions, not on existing deck cards).
+  - No keyboard shortcuts anywhere.
+  - No CSV deck import — text only. Most Moxfield exports include set/quantity.
+
+  Quality / debt
+
+  - No frontend tests at all.
+  - Backend tests blocked by env — pytest needs local postgres. Recent backend change (color_identity column)
+   not test-covered.
+  - Visual identity stops at deck pages — /collections, /preferences, /admin, /onboarding, /signin still use
+  the old flat style.
+  - No empty-state polish on collections, preferences (deck page has one).
+
+
+  Which thread?
 
 ## Optional nice to have
 
