@@ -15,6 +15,17 @@ const COLOR_HEX: Record<string, string> = {
   C: "#6b6b6b",
 };
 
+// Brighter / more saturated tones for glow shadows — the gradient-grade hexes
+// (especially the near-black B) wash out as shadows.
+const SHADOW_HEX: Record<string, string> = {
+  W: "#f3e3a1",
+  U: "#3b7be0",
+  B: "#6e4ea0",
+  R: "#e4493c",
+  G: "#34b85a",
+  C: "#aab0bc",
+};
+
 const WUBRG: readonly string[] = ["W", "U", "B", "R", "G"];
 
 function sortWUBRG(colors: string[]): string[] {
@@ -42,4 +53,36 @@ export function colorIdentityGradient(colors: string[]): string {
     return `${COLOR_HEX[c]} ${pct}%`;
   });
   return `linear-gradient(135deg, ${stops.join(", ")})`;
+}
+
+/**
+ * Build a CSS ``box-shadow`` string that glows around an element with the
+ * deck's color identity. Each color contributes a tinted glow at a different
+ * radial offset so multicolor decks read as a rim of stacked hues rather than
+ * one muddy blend.
+ *
+ * Always layers a black drop shadow underneath for vertical lift.
+ */
+export function colorIdentityShadow(colors: string[]): string {
+  const baseDrop = "0 12px 32px rgba(0, 0, 0, 0.55)";
+  const sorted = sortWUBRG(colors.filter((c) => c in SHADOW_HEX));
+  if (sorted.length === 0) return baseDrop;
+
+  const radius = 14;
+  const blur = 42;
+  const alpha = sorted.length === 1 ? "cc" : "bb";
+
+  const glows = sorted.map((c, i) => {
+    // Spread the glows around the element. Single color sits behind centred;
+    // multi-color positions follow the unit circle so each hue gets an edge.
+    if (sorted.length === 1) {
+      return `0 0 ${blur}px ${SHADOW_HEX[c]}${alpha}`;
+    }
+    const angle = (i / sorted.length) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.round(Math.cos(angle) * radius);
+    const y = Math.round(Math.sin(angle) * radius);
+    return `${x}px ${y}px ${blur}px ${SHADOW_HEX[c]}${alpha}`;
+  });
+
+  return [...glows, baseDrop].join(", ");
 }

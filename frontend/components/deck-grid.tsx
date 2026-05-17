@@ -1,6 +1,5 @@
 "use client";
 
-import { CardHover } from "@/components/card-hover";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 import { totalCardCount, type DeckCardItem } from "@/lib/types";
 
@@ -56,41 +55,40 @@ function DeckGridColumn({ type, cards, onCardClick, comboCardIds }: ColumnProps)
           <li
             key={card.deck_card_id}
             style={idx === 0 ? undefined : { marginTop: "-78%" }}
-            className="relative transition-transform hover:z-10 hover:-translate-y-1"
+            className="relative"
           >
-            <CardHover name={card.name} imageUri={card.image_uri}>
-              <button
-                type="button"
-                onClick={() => onCardClick(card.deck_card_id)}
-                className="block w-full overflow-hidden rounded-[4.5%] focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                aria-label={`Open ${card.name}`}
-              >
-                {card.image_uri ? (
-                  <img
-                    src={card.image_uri}
-                    alt={card.name}
-                    className="block w-full rounded-[4.5%] shadow-md"
-                  />
-                ) : (
-                  <span className="flex aspect-[5/7] w-full items-center justify-center rounded-[4.5%] border border-white/10 bg-white/5 px-2 text-center text-xs text-gray-400">
-                    {card.name}
-                  </span>
-                )}
-                {card.quantity > 1 ? (
-                  <span className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur">
-                    ×{card.quantity}
-                  </span>
-                ) : null}
-                {comboCardIds?.has(card.scryfall_id) ? (
-                  <span
-                    className="absolute left-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-sm text-yellow-300 backdrop-blur"
-                    title="Part of an active or near-complete combo"
-                  >
-                    ⚡
-                  </span>
-                ) : null}
-              </button>
-            </CardHover>
+            <button
+              type="button"
+              onClick={() => onCardClick(card.deck_card_id)}
+              title={card.name}
+              className="block w-full overflow-hidden rounded-[4.5%] focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              aria-label={`Open ${card.name}`}
+            >
+              {card.image_uri ? (
+                <img
+                  src={card.image_uri}
+                  alt={card.name}
+                  className="block w-full rounded-[4.5%] shadow-md"
+                />
+              ) : (
+                <span className="flex aspect-[5/7] w-full items-center justify-center rounded-[4.5%] border border-white/10 bg-white/5 px-2 text-center text-xs text-gray-400">
+                  {card.name}
+                </span>
+              )}
+              {card.quantity > 1 ? (
+                <span className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur">
+                  ×{card.quantity}
+                </span>
+              ) : null}
+              {comboCardIds?.has(card.scryfall_id) ? (
+                <span
+                  className="absolute left-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-sm text-yellow-300 backdrop-blur"
+                  title="Part of an active or near-complete combo"
+                >
+                  ⚡
+                </span>
+              ) : null}
+            </button>
           </li>
         ))}
       </ul>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { DeleteDeckButton } from "@/components/delete-deck-button";
 import { ManaSymbols } from "@/components/mana-symbols";
-import { colorIdentityGradient } from "@/lib/color-gradients";
+import { colorIdentityGradient, colorIdentityShadow } from "@/lib/color-gradients";
 import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
 import type { DeckSummary } from "@/lib/types";
 
@@ -18,33 +18,31 @@ function DeckCard({ deck }: { deck: DeckSummary }) {
   const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] : null;
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
   const gradient = colorIdentityGradient(deck.commander_color_identity);
+  const shadow = colorIdentityShadow(deck.commander_color_identity);
 
   return (
     <div className="group relative">
       <Link
         href={`/decks/${deck.id}`}
         aria-label={`Open deck ${deck.name}`}
-        className="relative flex aspect-[4/5] flex-col overflow-hidden rounded-xl border border-white/10 transition-all hover:border-white/30 hover:shadow-lg hover:shadow-black/40"
-        style={{ background: gradient }}
+        className="relative flex aspect-[4/5] flex-col overflow-hidden rounded-xl border border-white/10 transition-all duration-200 hover:border-white/30 hover:-translate-y-0.5"
+        style={{
+          background: deck.commander_image ? "#0b0d12" : gradient,
+          boxShadow: shadow,
+        }}
       >
         {deck.commander_image ? (
           <img
             src={deck.commander_image}
             alt=""
             aria-hidden
-            className="absolute inset-0 h-full w-full object-cover object-top opacity-55 mix-blend-luminosity transition-opacity duration-200 group-hover:opacity-75"
+            className="absolute inset-0 h-full w-full object-cover object-top opacity-80 transition-opacity duration-200 group-hover:opacity-95"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-5xl text-white/30">
             🎴
           </div>
         )}
-
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: gradient, mixBlendMode: "multiply", opacity: 0.45 }}
-        />
 
         <div
           aria-hidden

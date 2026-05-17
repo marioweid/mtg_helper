@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { ManaSymbols } from "@/components/mana-symbols";
 import { archetypeLabel } from "@/lib/constants";
-import { colorIdentityGradient } from "@/lib/color-gradients";
+import { colorIdentityGradient, colorIdentityShadow } from "@/lib/color-gradients";
 import type { CommanderCardSummary } from "@/lib/types";
 
 interface DeckHeroProps {
@@ -51,31 +51,26 @@ export function DeckHero({
   onDelete,
 }: DeckHeroProps) {
   const gradient = colorIdentityGradient(colors);
+  const shadow = colorIdentityShadow(colors);
 
   return (
     <section
       aria-label="Deck hero"
-      className="relative mb-6 overflow-hidden rounded-2xl border border-white/10 min-h-[260px] sm:min-h-[320px]"
-      style={{ background: gradient }}
+      className="relative mb-8 overflow-hidden rounded-2xl border border-white/10 min-h-[260px] sm:min-h-[320px]"
+      style={{ background: commander?.image_uri ? "#0b0d12" : gradient, boxShadow: shadow }}
     >
       {commander?.image_uri ? (
         <img
           src={commander.image_uri}
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full object-cover object-top opacity-40 mix-blend-luminosity"
+          className="absolute inset-0 h-full w-full object-cover object-top opacity-80"
         />
       ) : null}
 
       <div
         aria-hidden
-        className="absolute inset-0"
-        style={{ background: gradient, mixBlendMode: "multiply", opacity: 0.55 }}
-      />
-
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10"
+        className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent"
       />
 
       {partner?.image_uri ? (

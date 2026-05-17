@@ -1,5 +1,6 @@
 "use client";
 
+import { COLOR_SYMBOLS } from "@/lib/constants";
 import type { DeckCardItem } from "@/lib/types";
 
 export type SortMode = "default" | "name" | "cmc" | "price";
@@ -56,16 +57,18 @@ export function DeckFilterBar({ value, onChange, resultCount, totalCount }: Prop
       <div className="flex items-center gap-1">
         {COLOR_TOGGLES.map((c) => {
           const active = value.colors.includes(c.key);
+          const sym = COLOR_SYMBOLS[c.key];
+          if (!sym) return null;
           return (
             <button
               key={c.key}
               type="button"
               onClick={() => toggleColor(c.key)}
               aria-pressed={active}
-              className={`h-7 w-7 rounded-full text-xs font-semibold transition-colors ${
+              className={`h-7 w-7 rounded-full text-xs font-bold transition-all ${sym.bg} ${sym.text} ${
                 active
-                  ? "bg-indigo-600 text-white"
-                  : "border border-white/15 bg-black/30 text-gray-300 hover:border-white/40"
+                  ? "scale-110 ring-2 ring-white/90 shadow-md"
+                  : "opacity-45 hover:opacity-90"
               }`}
               title={`Show only ${c.label} cards`}
             >
@@ -130,9 +133,12 @@ export function applyDeckFilter(cards: DeckCardItem[], filter: DeckFilter): Deck
   } else if (filter.sort === "cmc") {
     sorted.sort((a, b) => (a.cmc ?? 0) - (b.cmc ?? 0) || a.name.localeCompare(b.name));
   } else if (filter.sort === "price") {
+    // Ascending: cheapest first, most valuable last. Unknown prices sort to
+    // the end so they don't pretend to be cheap.
     sorted.sort(
       (a, b) =>
-        (b.price_eur_cents ?? -1) - (a.price_eur_cents ?? -1) ||
+        (a.price_eur_cents ?? Number.POSITIVE_INFINITY) -
+          (b.price_eur_cents ?? Number.POSITIVE_INFINITY) ||
         a.name.localeCompare(b.name),
     );
   }
