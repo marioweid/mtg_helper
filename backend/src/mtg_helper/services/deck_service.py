@@ -268,6 +268,7 @@ async def list_decks(
             SELECT
                 d.id, d.name, d.bracket, d.stage, d.created_at, d.updated_at,
                 c.name AS commander_name, c.image_uri AS commander_image,
+                c.color_identity AS commander_color_identity,
                 (SELECT COALESCE(SUM(quantity), 0)
                    FROM deck_cards
                   WHERE deck_id = d.id)::int AS card_count
@@ -291,6 +292,7 @@ async def list_decks(
             name=r["name"],
             commander_name=r["commander_name"],
             commander_image=r["commander_image"],
+            commander_color_identity=list(r["commander_color_identity"] or []),
             bracket=r["bracket"],
             stage=r["stage"],
             card_count=r["card_count"],

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { DeleteDeckButton } from "@/components/delete-deck-button";
+import { ManaSymbols } from "@/components/mana-symbols";
+import { colorIdentityGradient } from "@/lib/color-gradients";
 import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
 import type { DeckSummary } from "@/lib/types";
 
@@ -15,37 +17,58 @@ async function loadDecks(): Promise<DeckSummary[]> {
 function DeckCard({ deck }: { deck: DeckSummary }) {
   const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] : null;
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
+  const gradient = colorIdentityGradient(deck.commander_color_identity);
 
   return (
     <div className="group relative">
       <Link
         href={`/decks/${deck.id}`}
-        className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 transition-all"
+        aria-label={`Open deck ${deck.name}`}
+        className="relative flex aspect-[4/5] flex-col overflow-hidden rounded-xl border border-white/10 transition-all hover:border-white/30 hover:shadow-lg hover:shadow-black/40"
+        style={{ background: gradient }}
       >
-      <div className="relative h-40 overflow-hidden bg-gray-900">
         {deck.commander_image ? (
           <img
             src={deck.commander_image}
-            alt={deck.commander_name}
-            className="h-full w-full object-cover object-top opacity-80 group-hover:opacity-100 transition-opacity"
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover object-top opacity-55 mix-blend-luminosity transition-opacity duration-200 group-hover:opacity-75"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-gray-600">
-            <span className="text-4xl">🎴</span>
+          <div className="absolute inset-0 flex items-center justify-center text-5xl text-white/30">
+            🎴
           </div>
         )}
-      </div>
-      <div className="flex flex-1 flex-col gap-1 p-4">
-        <h2 className="font-semibold text-white leading-tight">{deck.name}</h2>
-        <p className="text-sm text-gray-400">{deck.commander_name}</p>
-        <div className="mt-auto flex items-center justify-between pt-2 text-xs text-gray-500">
-          <span>{deck.card_count} cards</span>
-          <span className="rounded bg-white/10 px-2 py-0.5">{stage}</span>
-          {bracket && (
-            <span className="text-indigo-400">{bracket.split("—")[0]?.trim()}</span>
-          )}
+
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: gradient, mixBlendMode: "multiply", opacity: 0.45 }}
+        />
+
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"
+        />
+
+        <div className="relative mt-auto flex flex-col gap-1.5 p-4">
+          <h2 className="pr-8 font-semibold leading-tight text-white drop-shadow">
+            {deck.name}
+          </h2>
+          <p className="text-xs text-gray-200/90 drop-shadow">{deck.commander_name}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-200">
+            <span className="rounded bg-black/55 px-1.5 py-0.5 backdrop-blur">
+              {deck.card_count} cards
+            </span>
+            <span className="rounded bg-black/55 px-1.5 py-0.5 backdrop-blur">{stage}</span>
+            {bracket ? (
+              <span className="rounded bg-indigo-900/70 px-1.5 py-0.5 text-indigo-100 backdrop-blur">
+                {bracket.split("—")[0]?.trim()}
+              </span>
+            ) : null}
+            <ManaSymbols colors={deck.commander_color_identity} />
+          </div>
         </div>
-      </div>
       </Link>
       <DeleteDeckButton deckId={deck.id} deckName={deck.name} />
     </div>

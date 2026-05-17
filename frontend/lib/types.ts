@@ -45,6 +45,7 @@ export interface DeckSummary {
   name: string;
   commander_name: string;
   commander_image: string | null;
+  commander_color_identity: string[];
   bracket: number | null;
   stage: string;
   card_count: number;

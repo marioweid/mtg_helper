@@ -43,6 +43,7 @@ class DeckSummary(BaseModel):
     name: str
     commander_name: str
     commander_image: str | None
+    commander_color_identity: list[str] = Field(default_factory=list)
     bracket: int | None
     stage: str
     card_count: int
