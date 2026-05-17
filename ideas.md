@@ -1,5 +1,7 @@
 # Ideas
 
+- Make It work locally again, refactor docker compose for local setup and remote only ingests the cloudflare
+
 ⏺ Repo recon done. App has: deck CRUD, staged AI build wizard, collections, AI suggest/chat (chat now redirects to deck page), combos, tags, EDHREC, Moxfield import/export, bracket, price, preferences,
   onboarding. Last commit: commander card preview modal + mechanic chips.
 
@@ -20,14 +22,11 @@
   UI redesign ideas (pick one big move)
 
   - Visual card-grid deck view (Moxfield style) — stacked image columns by type. Current list works but enthusiasts shop visually.
-  - Hero banner deck detail — full-bleed commander art as header, color-identity accent (Boros = red/white gradient, Dimir = blue/black). Right now it's a small preview tile + dense panels.
-  - Universal card hover popover — anywhere a card name appears (suggestions, chat, combos), hover shows full image. Big QoL win.
   - Bottom command bar — sticky Build · Chat · Stats · Export · Cuts instead of buttons scattered through header.
   - Drag-and-drop categories — move card between categories by drag; cut by drag-off.
 
   My recommendation if you want one to start:
   - Goldfish playtest + health scorecard combo. Both rank highest on "thing enthusiasts actually use during deck tuning", reuse data you already have, no new backend integrations.
-  - For UI: hero banner + card hover popover. Cheap, makes the app feel like a deck builder instead of a dashboard.
 
 Mobile/responsive pass + in-app feedback button. Game store users will pull this up on phones at the table. The build wizard's grid + filter dropdown work on desktop; haven't seen them on a 390px
 viewport. Bundle this with a small "Send feedback" button that writes to a feedback table — you'll get more honest signal than asking after the session. Tradeoff: low-glamour work, but cuts the

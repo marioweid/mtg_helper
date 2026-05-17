@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { ComboTab } from "@/components/combo-tab";
+import { CommanderSection } from "@/components/commander-section";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
 import { DeckHero } from "@/components/deck-hero";
 import { DeckStats } from "@/components/deck-stats";
@@ -256,6 +257,10 @@ export default function DeckDetailPage() {
                   })}
                 </div>
               )}
+              <CommanderSection
+                commander={deck.commander_card}
+                partner={deck.partner_card}
+              />
               {categories.map((cat) => (
                 <DeckCategoryGroup
                   key={cat}
