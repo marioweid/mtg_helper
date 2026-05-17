@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiClient, ApiError } from "@/lib/api";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardSearchResult } from "@/components/card-search-result";
+import { CardHover } from "@/components/card-hover";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
 import {
   bucketsFor,
@@ -1516,7 +1517,12 @@ export default function BuildPage() {
                 <div className="mt-4 rounded-lg border border-yellow-500/20 bg-yellow-900/10 px-4 py-3">
                   <p className="text-xs text-yellow-400">
                     Unresolved cards (not found in database):{" "}
-                    {activeStageState.unresolved.join(", ")}
+                    {activeStageState.unresolved.map((u, i) => (
+                      <span key={u}>
+                        {i > 0 ? ", " : ""}
+                        <CardHover name={u}>{u}</CardHover>
+                      </span>
+                    ))}
                   </p>
                 </div>
               )}

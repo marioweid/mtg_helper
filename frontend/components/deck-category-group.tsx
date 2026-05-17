@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CardHover } from "@/components/card-hover";
 import { CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 
@@ -53,7 +54,7 @@ export function DeckCategoryGroup({
             return (
               <li
                 key={card.deck_card_id}
-                className="group relative hover:bg-white/5 transition-colors"
+                className="relative hover:bg-white/5 transition-colors"
               >
                 <button
                   onClick={() => setOpenCard(isOpen ? null : card.deck_card_id)}
@@ -61,7 +62,9 @@ export function DeckCategoryGroup({
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
-                      {card.name}
+                      <CardHover name={card.name} imageUri={card.image_uri}>
+                        {card.name}
+                      </CardHover>
                       {petCardNames?.has(card.name) && (
                         <span className="text-red-400 flex-shrink-0" title="Pet card">♥</span>
                       )}
@@ -89,21 +92,6 @@ export function DeckCategoryGroup({
                   </span>
                   <span className="text-gray-600 text-xs flex-shrink-0">{isOpen ? "▴" : "▾"}</span>
                 </button>
-
-                {/* Hover preview: full card image. Hidden on touch (no real
-                    hover), visible only when ``group:hover`` fires. */}
-                {card.image_uri && (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute right-2 top-1/2 z-20 hidden -translate-y-1/2 translate-x-full opacity-0 transition-opacity group-hover:block group-hover:opacity-100"
-                  >
-                    <img
-                      src={card.image_uri}
-                      alt=""
-                      className="w-56 rounded-[4.5%] shadow-2xl"
-                    />
-                  </div>
-                )}
 
                 {isOpen && (
                   <div className="flex flex-col gap-3 border-t border-white/5 bg-black/20 px-4 py-3">

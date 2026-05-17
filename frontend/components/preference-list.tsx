@@ -1,5 +1,6 @@
 "use client";
 
+import { CardHover } from "@/components/card-hover";
 import { apiClient } from "@/lib/api";
 import type { PreferenceResponse } from "@/lib/types";
 
@@ -59,7 +60,11 @@ export function PreferenceList({ preferences, onDeleted }: Props) {
             {TYPE_LABELS[pref.preference_type] ?? pref.preference_type}
           </span>
           <span className="flex-1 text-sm text-white">
-            {pref.card_name ?? pref.description}
+            {pref.card_name ? (
+              <CardHover name={pref.card_name}>{pref.card_name}</CardHover>
+            ) : (
+              pref.description
+            )}
           </span>
           <button
             onClick={() => void handleDelete(pref.id)}

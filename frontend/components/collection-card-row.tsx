@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CardHover } from "@/components/card-hover";
 import { apiClient, ApiError } from "@/lib/api";
 import type { CollectionCardItem } from "@/lib/types";
 
@@ -55,7 +56,9 @@ export function CollectionCardRow({ collectionId, card, onChanged }: Props) {
         <div className="h-14 w-10 rounded bg-gray-800 flex-shrink-0" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-white truncate">{card.name}</p>
+        <p className="text-sm font-medium text-white truncate">
+          <CardHover name={card.name} imageUri={card.image_uri}>{card.name}</CardHover>
+        </p>
         <p className="text-xs text-gray-500 truncate">
           {card.type_line ?? ""}
           {card.set_code && (

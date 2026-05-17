@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CardHover } from "@/components/card-hover";
 import { ApiError, apiClient } from "@/lib/api";
 import type { Combo, ComboListResponse } from "@/lib/types";
 
@@ -150,9 +151,10 @@ function ComboRow({ combo }: { combo: Combo }) {
 function PieceCard({ piece }: { piece: { card: { name: string; image_uri: string | null }; in_deck: boolean } }) {
   const { card, in_deck } = piece;
   return (
-    <div
+    <CardHover
+      name={card.name}
+      imageUri={card.image_uri}
       className={`flex flex-col items-center gap-1 ${in_deck ? "" : "opacity-70"}`}
-      title={in_deck ? `${card.name} (in deck)` : `${card.name} (missing)`}
     >
       {card.image_uri ? (
         <img
@@ -163,9 +165,9 @@ function PieceCard({ piece }: { piece: { card: { name: string; image_uri: string
           }`}
         />
       ) : (
-        <div className="flex h-24 w-[60px] items-center justify-center rounded border border-white/10 bg-white/5 px-1 text-center text-[10px] text-gray-400">
+        <span className="flex h-24 w-[60px] items-center justify-center rounded border border-white/10 bg-white/5 px-1 text-center text-[10px] text-gray-400">
           {card.name}
-        </div>
+        </span>
       )}
       <span
         className={`rounded px-1.5 py-0.5 text-[10px] ${
@@ -176,6 +178,6 @@ function PieceCard({ piece }: { piece: { card: { name: string; image_uri: string
       >
         {in_deck ? "in deck" : "needs"}
       </span>
-    </div>
+    </CardHover>
   );
 }

@@ -6,12 +6,11 @@ import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { ComboTab } from "@/components/combo-tab";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
+import { DeckHero } from "@/components/deck-hero";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
-import { ManaSymbols } from "@/components/mana-symbols";
-import { CommanderCardPreview } from "@/components/commander-card-preview";
 import { ExportButton } from "@/components/export-button";
-import { archetypeLabel, BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
+import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
@@ -149,126 +148,58 @@ export default function DeckDetailPage() {
     groupingMode === "types" ? sortedPrimaryTypes(groups) : sortedCategories(groups);
   const colors = colorIdentityFromCards(deck.cards);
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
-  const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] : null;
+  const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] ?? null : null;
+
+  const actions = (
+    <>
+      <Link
+        href={`/decks/${deck.id}/build`}
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+      >
+        {deck.stage === "complete" ? "View Build" : "Continue Building"}
+      </Link>
+      <Link
+        href={`/decks/${deck.id}/keywords`}
+        className="rounded-lg border border-white/30 bg-black/30 px-4 py-2 text-sm text-gray-100 backdrop-blur transition-colors hover:bg-white/10 hover:text-white"
+      >
+        Keywords
+      </Link>
+      <ExportButton deckId={deck.id} />
+      <button
+        onClick={() => void handleDeleteDeck()}
+        disabled={deleting}
+        className="rounded-lg border border-red-500/50 bg-black/30 px-4 py-2 text-sm text-red-300 backdrop-blur transition-colors hover:border-red-400 hover:text-red-200 disabled:opacity-50"
+      >
+        {deleting ? "Deleting…" : "Delete"}
+      </button>
+    </>
+  );
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-1 items-start gap-4">
-          <CommanderCardPreview
-            commander={deck.commander_card}
-            partner={deck.partner_card}
-          />
-          <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold text-white">{deck.name}</h1>
-          {editingDescription ? (
-            <div className="mt-2 flex flex-col gap-2">
-              <textarea
-                value={draftDescription}
-                onChange={(e) => setDraftDescription(e.target.value)}
-                rows={3}
-                className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:border-indigo-500 focus:outline-none resize-none"
-                placeholder="Describe the deck strategy..."
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => void handleSaveDescription()}
-                  disabled={savingDescription}
-                  className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                >
-                  {savingDescription ? "Saving…" : "Save"}
-                </button>
-                <button
-                  onClick={() => setEditingDescription(false)}
-                  className="rounded-md border border-white/20 px-3 py-1 text-xs text-gray-400 hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-1 flex items-start gap-1.5">
-              {deck.description ? (
-                <p className="text-sm text-gray-400">{deck.description}</p>
-              ) : (
-                <span className="text-sm text-gray-600 italic">No description</span>
-              )}
-              <button
-                onClick={() => {
-                  setDraftDescription(deck.description ?? "");
-                  setEditingDescription(true);
-                }}
-                className="ml-1 text-xs text-gray-600 hover:text-gray-300 transition-colors flex-shrink-0"
-                title="Edit description"
-              >
-                ✎
-              </button>
-            </div>
-          )}
-          <div className="mt-2 flex flex-wrap gap-3 text-sm">
-            <span className="rounded bg-white/10 px-2 py-0.5 text-gray-300">{stage}</span>
-            {bracket && (
-              <span className="rounded bg-indigo-900/40 px-2 py-0.5 text-indigo-300">
-                {bracket}
-              </span>
-            )}
-            <span className="text-gray-500">{totalCardCount(deck.cards)} cards</span>
-            <ManaSymbols colors={colors} />
-          </div>
-          {deck.archetype_tags && deck.archetype_tags.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {deck.archetype_tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
-                >
-                  {archetypeLabel(tag)}
-                </span>
-              ))}
-              <Link
-                href={`/decks/${deck.id}/keywords`}
-                className="ml-1 text-xs text-gray-600 hover:text-gray-300 transition-colors"
-                title="Edit keywords"
-              >
-                ✎
-              </Link>
-            </div>
-          ) : (
-            <div className="mt-2">
-              <Link
-                href={`/decks/${deck.id}/keywords`}
-                className="text-xs text-gray-600 hover:text-gray-300 transition-colors"
-              >
-                + Add keywords
-              </Link>
-            </div>
-          )}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/decks/${deck.id}/build`}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
-          >
-            {deck.stage === "complete" ? "View Build" : "Continue Building"}
-          </Link>
-          <Link
-            href={`/decks/${deck.id}/keywords`}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            Keywords
-          </Link>
-          <ExportButton deckId={deck.id} />
-          <button
-            onClick={() => void handleDeleteDeck()}
-            disabled={deleting}
-            className="rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-400 hover:border-red-500/70 hover:text-red-300 disabled:opacity-50 transition-colors"
-          >
-            {deleting ? "Deleting…" : "Delete"}
-          </button>
-        </div>
-      </div>
+      <DeckHero
+        name={deck.name}
+        deckId={deck.id}
+        description={deck.description}
+        commander={deck.commander_card}
+        partner={deck.partner_card}
+        colors={colors}
+        cardCount={totalCardCount(deck.cards)}
+        stage={stage}
+        bracket={bracket}
+        archetypeTags={deck.archetype_tags ?? []}
+        editingDescription={editingDescription}
+        draftDescription={draftDescription}
+        savingDescription={savingDescription}
+        onDraftChange={setDraftDescription}
+        onStartEditDescription={() => {
+          setDraftDescription(deck.description ?? "");
+          setEditingDescription(true);
+        }}
+        onSaveDescription={() => void handleSaveDescription()}
+        onCancelEditDescription={() => setEditingDescription(false)}
+        actions={actions}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* Card list / combos */}

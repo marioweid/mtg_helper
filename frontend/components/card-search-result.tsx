@@ -1,5 +1,6 @@
 "use client";
 
+import { CardHover } from "@/components/card-hover";
 import type { CardResponse } from "@/lib/types";
 
 interface Props {
@@ -19,7 +20,9 @@ export function CardSearchResult({ card, onAdd, added }: Props) {
         />
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="truncate text-sm font-medium text-white">{card.name}</p>
+        <p className="truncate text-sm font-medium text-white">
+          <CardHover name={card.name} imageUri={card.image_uri}>{card.name}</CardHover>
+        </p>
         {card.mana_cost && <p className="text-xs text-gray-500">{card.mana_cost}</p>}
         {card.type_line && <p className="truncate text-xs text-gray-400">{card.type_line}</p>}
       </div>

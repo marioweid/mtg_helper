@@ -1,5 +1,6 @@
 "use client";
 
+import { CardHover } from "@/components/card-hover";
 import type { CardSuggestion } from "@/lib/types";
 
 interface Props {
@@ -104,7 +105,9 @@ export function CardSuggestionCard({
         // Image fallback: name + mana cost + type line
         <div className="flex flex-col gap-1 border-b border-white/10 bg-black/30 px-3 py-3">
           <p className="font-medium text-white leading-tight flex items-center gap-1.5 flex-wrap">
-            <span>{suggestion.name}</span>
+            <CardHover name={suggestion.name} imageUri={suggestion.image_uri}>
+              {suggestion.name}
+            </CardHover>
             {isPetCard && <span className="text-red-400 text-xs" title="Pet card">♥</span>}
             {isHot && <span title="Top pick">🔥</span>}
             {inCombo && <span title="Completes a potential combo">⚡</span>}
