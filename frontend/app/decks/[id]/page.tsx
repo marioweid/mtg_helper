@@ -4,19 +4,24 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
+import { CardDetailModal } from "@/components/card-detail-modal";
 import { ComboTab } from "@/components/combo-tab";
+import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
+import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
-import { ExportButton } from "@/components/export-button";
+import { StatsModal } from "@/components/stats-modal";
 import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
-type GroupingMode = "tags" | "types";
+type ViewMode = "tags" | "types" | "grid";
 type DeckTab = "cards" | "combos";
+
+const VIEW_MODES: readonly ViewMode[] = ["tags", "types", "grid"];
 
 function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
@@ -55,8 +60,10 @@ export default function DeckDetailPage() {
   const [draftDescription, setDraftDescription] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [groupingMode, setGroupingMode] = useState<GroupingMode>("tags");
+  const [viewMode, setViewMode] = useState<ViewMode>("tags");
   const [tab, setTab] = useState<DeckTab>("cards");
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -143,41 +150,28 @@ export default function DeckDetailPage() {
     );
   }
 
-  const groups =
-    groupingMode === "types" ? groupByPrimaryType(deck.cards) : groupByCategory(deck.cards);
-  const categories =
-    groupingMode === "types" ? sortedPrimaryTypes(groups) : sortedCategories(groups);
+  const isGrid = viewMode === "grid";
+  const groups = isGrid
+    ? {}
+    : viewMode === "types"
+      ? groupByPrimaryType(deck.cards)
+      : groupByCategory(deck.cards);
+  const categories = isGrid
+    ? []
+    : viewMode === "types"
+      ? sortedPrimaryTypes(groups)
+      : sortedCategories(groups);
   const colors = colorIdentityFromCards(deck.cards);
+  const selectedCard = selectedCardId
+    ? deck.cards.find((c) => c.deck_card_id === selectedCardId) ?? null
+    : null;
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
   const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] ?? null : null;
 
-  const actions = (
-    <>
-      <Link
-        href={`/decks/${deck.id}/build`}
-        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
-      >
-        {deck.stage === "complete" ? "View Build" : "Continue Building"}
-      </Link>
-      <Link
-        href={`/decks/${deck.id}/keywords`}
-        className="rounded-lg border border-white/30 bg-black/30 px-4 py-2 text-sm text-gray-100 backdrop-blur transition-colors hover:bg-white/10 hover:text-white"
-      >
-        Keywords
-      </Link>
-      <ExportButton deckId={deck.id} />
-      <button
-        onClick={() => void handleDeleteDeck()}
-        disabled={deleting}
-        className="rounded-lg border border-red-500/50 bg-black/30 px-4 py-2 text-sm text-red-300 backdrop-blur transition-colors hover:border-red-400 hover:text-red-200 disabled:opacity-50"
-      >
-        {deleting ? "Deleting…" : "Delete"}
-      </button>
-    </>
-  );
+  const buildLabel = deck.stage === "complete" ? "View Build" : "Continue Building";
 
   return (
-    <div>
+    <div className="pb-28">
       <DeckHero
         name={deck.name}
         deckId={deck.id}
@@ -192,6 +186,7 @@ export default function DeckDetailPage() {
         editingDescription={editingDescription}
         draftDescription={draftDescription}
         savingDescription={savingDescription}
+        deleting={deleting}
         onDraftChange={setDraftDescription}
         onStartEditDescription={() => {
           setDraftDescription(deck.description ?? "");
@@ -199,7 +194,7 @@ export default function DeckDetailPage() {
         }}
         onSaveDescription={() => void handleSaveDescription()}
         onCancelEditDescription={() => setEditingDescription(false)}
-        actions={actions}
+        onDelete={() => void handleDeleteDeck()}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
@@ -235,15 +230,15 @@ export default function DeckDetailPage() {
               {deck.cards.length > 0 && (
                 <div
                   role="group"
-                  aria-label="Group cards by"
+                  aria-label="Deck view mode"
                   className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-xs"
                 >
-                  {(["tags", "types"] as const).map((mode) => {
-                    const active = groupingMode === mode;
+                  {VIEW_MODES.map((mode) => {
+                    const active = viewMode === mode;
                     return (
                       <button
                         key={mode}
-                        onClick={() => setGroupingMode(mode)}
+                        onClick={() => setViewMode(mode)}
                         aria-pressed={active}
                         className={`px-3 py-1.5 capitalize transition-colors ${
                           active
@@ -261,16 +256,20 @@ export default function DeckDetailPage() {
                 commander={deck.commander_card}
                 partner={deck.partner_card}
               />
-              {categories.map((cat) => (
-                <DeckCategoryGroup
-                  key={cat}
-                  category={cat}
-                  cards={groups[cat] ?? []}
-                  onRemove={handleRemoveCard}
-                  onSetCategories={handleSetCategories}
-                  petCardNames={petCardNames}
-                />
-              ))}
+              {isGrid ? (
+                <DeckGrid cards={deck.cards} onCardClick={setSelectedCardId} />
+              ) : (
+                categories.map((cat) => (
+                  <DeckCategoryGroup
+                    key={cat}
+                    category={cat}
+                    cards={groups[cat] ?? []}
+                    onRemove={handleRemoveCard}
+                    onSetCategories={handleSetCategories}
+                    petCardNames={petCardNames}
+                  />
+                ))
+              )}
               {deck.cards.length === 0 && (
                 <div className="rounded-xl border border-dashed border-white/20 py-12 text-center text-gray-500">
                   No cards yet.{" "}
@@ -318,6 +317,30 @@ export default function DeckDetailPage() {
           </div>
         </div>
       </div>
+
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCardId(null)}
+        onRemove={async (id) => {
+          await handleRemoveCard(id);
+          setSelectedCardId(null);
+        }}
+        onSetCategories={handleSetCategories}
+      />
+
+      <StatsModal
+        open={statsOpen}
+        onClose={() => setStatsOpen(false)}
+        cards={deck.cards}
+        minPriceCents={deck.min_price_cents}
+        maxPriceCents={deck.max_price_cents}
+      />
+
+      <CommandBar
+        deckId={deck.id}
+        buildLabel={buildLabel}
+        onOpenStats={() => setStatsOpen(true)}
+      />
     </div>
   );
 }

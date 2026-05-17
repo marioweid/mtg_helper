@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { ManaSymbols } from "@/components/mana-symbols";
@@ -22,11 +21,12 @@ interface DeckHeroProps {
   editingDescription: boolean;
   draftDescription: string;
   savingDescription: boolean;
+  deleting: boolean;
   onDraftChange: (value: string) => void;
   onStartEditDescription: () => void;
   onSaveDescription: () => void;
   onCancelEditDescription: () => void;
-  actions: ReactNode;
+  onDelete: () => void;
 }
 
 export function DeckHero({
@@ -43,11 +43,12 @@ export function DeckHero({
   editingDescription,
   draftDescription,
   savingDescription,
+  deleting,
   onDraftChange,
   onStartEditDescription,
   onSaveDescription,
   onCancelEditDescription,
-  actions,
+  onDelete,
 }: DeckHeroProps) {
   const gradient = colorIdentityGradient(colors);
 
@@ -85,9 +86,18 @@ export function DeckHero({
         />
       ) : null}
 
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={deleting}
+        className="absolute right-3 top-3 z-10 rounded-md border border-red-500/40 bg-black/40 px-2.5 py-1 text-xs text-red-300 backdrop-blur transition-colors hover:border-red-400 hover:text-red-200 disabled:opacity-50"
+      >
+        {deleting ? "Deleting…" : "Delete deck"}
+      </button>
+
       <div className="relative flex h-full flex-col justify-end gap-3 p-5 sm:p-6">
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-bold leading-tight text-white drop-shadow sm:text-3xl">
+          <h1 className="pr-28 text-2xl font-bold leading-tight text-white drop-shadow sm:text-3xl">
             {name}
           </h1>
 
@@ -175,8 +185,6 @@ export function DeckHero({
             </div>
           )}
         </div>
-
-        <div className="flex flex-wrap gap-2">{actions}</div>
       </div>
     </section>
   );
