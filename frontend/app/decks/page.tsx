@@ -19,7 +19,7 @@ function DeckCard({ deck }: { deck: DeckSummary }) {
   const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] : null;
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
   const gradient = colorIdentityGradient(deck.commander_color_identity);
-  const shadow = colorIdentityShadow(deck.commander_color_identity);
+  const shadow = colorIdentityShadow(deck.commander_color_identity, "subtle");
 
   return (
     <div className="group relative">

@@ -167,25 +167,23 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-3">
-        <Link
-          href="/collections"
-          className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
-        >
-          ← Collections
-        </Link>
-      </div>
+      <Link
+        href="/collections"
+        className="mb-4 inline-block text-sm text-gray-500 transition-colors hover:text-gray-300"
+      >
+        ← Collections
+      </Link>
 
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
+      <header className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
           {renaming ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 autoFocus
-                className="rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-xl font-bold text-white focus:border-indigo-500 focus:outline-none"
+                className="rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-2xl font-bold text-white focus:border-indigo-500 focus:outline-none sm:text-3xl"
               />
               <button
                 onClick={() => void handleRename()}
@@ -202,8 +200,8 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white truncate">
-                {collection?.name ?? "..."}
+              <h1 className="truncate text-2xl font-bold leading-tight text-white sm:text-3xl">
+                {collection?.name ?? "…"}
               </h1>
               {collection && (
                 <button
@@ -211,7 +209,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
                     setRenameValue(collection.name);
                     setRenaming(true);
                   }}
-                  className="text-gray-500 hover:text-white text-sm"
+                  className="text-sm text-gray-500 transition-colors hover:text-white"
                   aria-label="Rename collection"
                 >
                   ✎
@@ -223,22 +221,22 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             {total} card{total !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex flex-shrink-0 gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/collections/${id}/import`}
-            className="rounded-lg border border-indigo-500/60 px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-600/10 transition-colors"
+            className="rounded-lg border border-indigo-500/60 px-4 py-2 text-sm font-medium text-indigo-400 transition-colors hover:bg-indigo-600/10"
           >
             Import CSV
           </Link>
           <button
             onClick={() => void handleExport()}
             disabled={exporting || total === 0}
-            className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors disabled:opacity-50"
+            className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10 disabled:opacity-50"
           >
-            {exporting ? "Exporting..." : "Export CSV"}
+            {exporting ? "Exporting…" : "Export CSV"}
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <p className="mb-4 rounded-lg border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">

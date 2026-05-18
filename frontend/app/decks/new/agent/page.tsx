@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { ArchetypeChipPicker } from "@/components/archetype-chip-picker";
 import { CardSearch } from "@/components/card-search";
+import { PageHeader } from "@/components/page-header";
 import { apiClient } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse, DescribeMessage } from "@/lib/types";
@@ -135,20 +136,17 @@ export default function AgentDeckPage() {
   if (phase === "select") {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="mb-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/decks/new")}
-            className="text-sm text-gray-400 transition-colors hover:text-white"
-          >
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-white">Chat with the agent</h1>
-        </div>
-        <p className="mb-6 text-sm text-gray-400">
-          The agent asks 1–3 short questions, then converges on archetype keywords. You can fine-
-          tune the chips before creating the deck.
-        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/decks/new")}
+          className="mb-4 inline-block text-sm text-gray-500 transition-colors hover:text-gray-300"
+        >
+          ← Back
+        </button>
+        <PageHeader
+          title="Chat with the agent"
+          subtitle="The agent asks 1–3 short questions, then converges on archetype keywords. You can fine-tune the chips before creating the deck."
+        />
 
         <div className="flex flex-col gap-6">
           <section className="rounded-xl border border-white/10 bg-white/5 p-6">

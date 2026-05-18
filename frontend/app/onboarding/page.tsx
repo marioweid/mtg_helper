@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { CardSearch } from "@/components/card-search";
+import { PageHeader } from "@/components/page-header";
 import { apiClient, ApiError } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse } from "@/lib/types";
@@ -82,17 +82,10 @@ export default function OnboardingPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-8 flex items-center gap-3">
-        <Link href="/decks" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
-          ← Decks
-        </Link>
-        <h1 className="text-2xl font-bold text-white">Quickstart</h1>
-      </div>
-
-      <p className="mb-6 text-sm text-gray-400">
-        Pick a commander and we&apos;ll generate a complete draft deck in about a minute.
-        You can then review and swap any card in the build wizard.
-      </p>
+      <PageHeader
+        title="Quickstart"
+        subtitle="Pick a commander and we'll generate a complete draft deck in about a minute. You can swap any card in the build wizard."
+      />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">

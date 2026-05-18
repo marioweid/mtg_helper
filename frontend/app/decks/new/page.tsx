@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { PageHeader } from "@/components/page-header";
+
 export const metadata = {
   title: "New Deck",
 };
@@ -31,11 +33,11 @@ const OPTIONS: { href: string; title: string; subtitle: string; description: str
 export default function NewDeckChooser() {
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-2 text-2xl font-bold text-white">Start a new deck</h1>
-      <p className="mb-2 text-sm text-gray-400">
-        Three paths. Pick whichever fits your mood — they all converge on the same keyword-driven
-        suggestion engine.
-      </p>
+      <PageHeader
+        title="Start a new deck"
+        subtitle="Three paths. Pick whichever fits your mood — they all converge on the same keyword-driven suggestion engine."
+      />
+
       <p className="mb-6 text-xs text-gray-500">
         New here? Try the{" "}
         <Link
@@ -52,7 +54,7 @@ export default function NewDeckChooser() {
           <Link
             key={opt.href}
             href={opt.href}
-            className="rounded-xl border border-white/10 bg-white/5 p-6 transition-colors hover:border-indigo-500 hover:bg-indigo-900/20"
+            className="group rounded-xl border border-white/10 bg-white/5 p-6 transition-all hover:-translate-y-0.5 hover:border-indigo-500/70 hover:bg-indigo-900/20 hover:shadow-lg hover:shadow-indigo-900/30"
           >
             <div className="mb-1 flex items-baseline justify-between">
               <h2 className="text-lg font-semibold text-white">{opt.title}</h2>

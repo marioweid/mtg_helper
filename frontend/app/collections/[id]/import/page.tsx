@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
+
+import { PageHeader } from "@/components/page-header";
 import { apiClient, ApiError } from "@/lib/api";
 import type { CollectionImportResponse } from "@/lib/types";
 
@@ -49,7 +51,8 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
   if (result) {
     return (
       <div className="mx-auto max-w-2xl">
-        <h1 className="mb-8 text-2xl font-bold text-white">Import Complete</h1>
+        <PageHeader title="Import complete" />
+
 
         <div className="rounded-xl border border-green-500/30 bg-green-900/10 p-6 mb-4">
           <p className="text-green-400 font-medium text-lg mb-2">
@@ -100,15 +103,16 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-8 flex items-center gap-3">
-        <Link
-          href={`/collections/${id}`}
-          className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
-        >
-          ← Collection
-        </Link>
-        <h1 className="text-2xl font-bold text-white">Import CSV</h1>
-      </div>
+      <Link
+        href={`/collections/${id}`}
+        className="mb-4 inline-block text-sm text-gray-500 transition-colors hover:text-gray-300"
+      >
+        ← Collection
+      </Link>
+      <PageHeader
+        title="Import CSV"
+        subtitle="Paste your collection export or upload a file. Merge adds to what's already here; replace wipes first."
+      />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">

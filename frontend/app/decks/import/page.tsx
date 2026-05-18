@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
+import { useToast } from "@/components/toast";
 import { apiClient } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { DeckImportResponse } from "@/lib/types";
@@ -21,6 +23,7 @@ type Mode = "text" | "url";
 
 export default function ImportDeckPage() {
   const router = useRouter();
+  const toast = useToast();
   const [mode, setMode] = useState<Mode>("text");
 
   // Shared
@@ -91,7 +94,10 @@ export default function ImportDeckPage() {
     const hasWarnings = result.unresolved.length > 0 || result.color_violations.length > 0;
     return (
       <div className="mx-auto max-w-2xl">
-        <h1 className="mb-8 text-2xl font-bold text-white">Import Complete</h1>
+        <PageHeader
+          title="Import complete"
+          subtitle={`${result.imported_count} card${result.imported_count !== 1 ? "s" : ""} added to ${result.deck.name}.`}
+        />
 
         <div className="rounded-xl border border-green-500/30 bg-green-900/10 p-6 mb-4">
           <p className="text-green-400 font-medium text-lg mb-1">
@@ -159,12 +165,10 @@ export default function ImportDeckPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-8 flex items-center gap-3">
-        <Link href="/decks" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
-          ← Decks
-        </Link>
-        <h1 className="text-2xl font-bold text-white">Import Deck</h1>
-      </div>
+      <PageHeader
+        title="Import deck"
+        subtitle="Paste a Moxfield / Archidekt URL or a deck list — we'll pull in cards, the commander, and a suggested archetype keyword set."
+      />
 
       <div className="mb-6 inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
         {(["url", "text"] as const).map((m) => (

@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+import { PageHeader } from "@/components/page-header";
 import { apiClient, ApiError } from "@/lib/api";
 
 export default function NewCollectionPage() {
@@ -34,15 +35,10 @@ export default function NewCollectionPage() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <div className="mb-8 flex items-center gap-3">
-        <Link
-          href="/collections"
-          className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
-        >
-          ← Collections
-        </Link>
-        <h1 className="text-2xl font-bold text-white">New Collection</h1>
-      </div>
+      <PageHeader
+        title="New collection"
+        subtitle="Use one collection per binder, box, or online inventory."
+      />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">

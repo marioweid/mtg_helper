@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { ArchetypeChipPicker } from "@/components/archetype-chip-picker";
+import { PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/skeleton";
 import { apiClient } from "@/lib/api";
 import type { DeckDetailResponse } from "@/lib/types";
 
@@ -80,7 +82,14 @@ export default function DeckKeywordsPage() {
   }
 
   if (loading) {
-    return <div className="mx-auto max-w-3xl p-6 text-gray-400">Loading deck…</div>;
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-6 w-full max-w-xl" />
+        <Skeleton className="h-72 w-full rounded-xl" />
+      </div>
+    );
   }
   if (!deck) {
     return (
@@ -94,22 +103,20 @@ export default function DeckKeywordsPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-4 flex items-center gap-3">
-        <Link
-          href={`/decks/${deck.id}`}
-          className="text-sm text-gray-400 transition-colors hover:text-white"
-        >
-          ← {deck.name}
-        </Link>
-      </div>
-      <h1 className="mb-2 text-2xl font-bold text-white">
-        {fromImport ? "Set keywords for your imported deck" : "Edit deck keywords"}
-      </h1>
-      <p className="mb-6 text-sm text-gray-400">
-        {fromImport
-          ? "We pre-selected the most common archetype tags from your imported cards. Adjust the chips so future suggestions stay on-theme."
-          : "Adjust the archetype tags that drive AI card suggestions for this deck."}
-      </p>
+      <Link
+        href={`/decks/${deck.id}`}
+        className="mb-4 inline-block text-sm text-gray-500 transition-colors hover:text-gray-300"
+      >
+        ← {deck.name}
+      </Link>
+      <PageHeader
+        title={fromImport ? "Set keywords for your imported deck" : "Edit deck keywords"}
+        subtitle={
+          fromImport
+            ? "We pre-selected the most common archetype tags from your imported cards. Adjust the chips so future suggestions stay on-theme."
+            : "Adjust the archetype tags that drive AI card suggestions for this deck."
+        }
+      />
 
       {fromImport && (
         <div className="mb-6 rounded-lg border border-indigo-500/30 bg-indigo-900/10 p-4 text-sm text-indigo-200">

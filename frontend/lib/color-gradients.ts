@@ -61,16 +61,25 @@ export function colorIdentityGradient(colors: string[]): string {
  * radial offset so multicolor decks read as a rim of stacked hues rather than
  * one muddy blend.
  *
- * Always layers a black drop shadow underneath for vertical lift.
+ * Always layers a black drop shadow underneath for vertical lift. Set
+ * ``intensity`` to "subtle" for small tiles where the default reads as too
+ * heavy.
  */
-export function colorIdentityShadow(colors: string[]): string {
-  const baseDrop = "0 12px 32px rgba(0, 0, 0, 0.55)";
+export function colorIdentityShadow(
+  colors: string[],
+  intensity: "subtle" | "normal" = "normal",
+): string {
+  const subtle = intensity === "subtle";
+  const baseDrop = subtle
+    ? "0 6px 18px rgba(0, 0, 0, 0.5)"
+    : "0 12px 32px rgba(0, 0, 0, 0.55)";
   const sorted = sortWUBRG(colors.filter((c) => c in SHADOW_HEX));
   if (sorted.length === 0) return baseDrop;
 
-  const radius = 14;
-  const blur = 42;
-  const alpha = sorted.length === 1 ? "cc" : "bb";
+  const radius = subtle ? 8 : 14;
+  const blur = subtle ? 22 : 42;
+  const alpha =
+    sorted.length === 1 ? (subtle ? "80" : "cc") : subtle ? "66" : "bb";
 
   const glows = sorted.map((c, i) => {
     // Spread the glows around the element. Single color sits behind centred;

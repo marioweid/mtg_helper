@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { ArchetypeChipPicker } from "@/components/archetype-chip-picker";
 import { CardSearch } from "@/components/card-search";
+import { PageHeader } from "@/components/page-header";
 import { apiClient } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse } from "@/lib/types";
@@ -44,20 +45,17 @@ export default function KeywordMenuPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.push("/decks/new")}
-          className="text-sm text-gray-400 transition-colors hover:text-white"
-        >
-          ← Back
-        </button>
-        <h1 className="text-2xl font-bold text-white">Pick keywords</h1>
-      </div>
-      <p className="mb-6 text-sm text-gray-400">
-        Pick the archetype keywords your deck cares about. Suggestions in the build wizard will
-        favour cards that share these tags.
-      </p>
+      <button
+        type="button"
+        onClick={() => router.push("/decks/new")}
+        className="mb-4 inline-block text-sm text-gray-500 transition-colors hover:text-gray-300"
+      >
+        ← Back
+      </button>
+      <PageHeader
+        title="Pick keywords"
+        subtitle="Pick the archetype keywords your deck cares about. Suggestions in the build wizard will favour cards that share these tags."
+      />
 
       <div className="flex flex-col gap-6">
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
