@@ -70,7 +70,10 @@ def _build_system_prompt() -> str:
         "(combo pieces, the commander, basic lands), recommend which non-protected "
         "cards to cut from the deck. Prefer cutting the weakest cards for the "
         "deck's strategy: low-impact filler, redundant effects, cards that don't "
-        "advance the commander's plan. Never recommend cutting a protected card."
+        "advance the commander's plan. Never recommend cutting a protected card. "
+        "Quality over quantity: return only cards that genuinely deserve cutting. "
+        "It is correct to return fewer cuts — or none at all — when the deck is "
+        "already tight. Never pad the list to hit a target count."
     )
 
 
@@ -96,10 +99,14 @@ def _build_user_prompt(
         "Candidates (eligible to cut):",
         *cand_lines,
         "",
-        f"Pick the {count} weakest cards to cut. Return ONLY a JSON object on a "
-        "single line with this exact shape (no code fences, no prose):",
+        f"Recommend up to {count} cards worth cutting — fewer (or zero) if the "
+        "deck is already lean. Do NOT pad the list. Each card you list must be "
+        "clearly weaker than typical staples for this archetype. Return ONLY a "
+        "JSON object on a single line with this exact shape (no code fences, "
+        "no prose):",
         '{"cuts": [{"name": "Card Name", "reasoning": "why it should be cut"}]}',
-        "Use card names exactly as written in the candidates list.",
+        "Use card names exactly as written in the candidates list. Return "
+        '{"cuts": []} when nothing deserves cutting.',
     ]
     return "\n".join(parts)
 
@@ -174,7 +181,8 @@ async def suggest_cuts(
         ai_client: LLM adapter (chat only).
         deck_id: Target deck.
         email: Owner email used for ACL.
-        count: Maximum number of cuts to return.
+        count: Maximum number of cuts to return. The LLM may return fewer
+            (or zero) when the deck has nothing genuinely worth cutting.
 
     Returns:
         CutsResponse with up to ``count`` suggestions and the size of the

@@ -17,11 +17,18 @@ from mtg_helper.models.ai import (
     DescribeResponse,
     KeywordExtractRequest,
     KeywordExtractResponse,
+    ManaFixResponse,
     SuggestRequest,
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import ai_service, cuts_service, deck_service, rate_limit_service
+from mtg_helper.services import (
+    ai_service,
+    cuts_service,
+    deck_service,
+    mana_base_service,
+    rate_limit_service,
+)
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
 from mtg_helper.services.cuts_service import DeckNotFoundError as CutsDeckNotFoundError
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
@@ -137,6 +144,27 @@ async def suggest_cards(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    return DataResponse(data=result)
+
+
+@router.post("/{deck_id}/mana-fix", response_model=DataResponse[ManaFixResponse])
+async def mana_fix(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[ManaFixResponse]:
+    """Analyze the deck's mana base and suggest lands fixing deficient colors."""
+    email = _require_email(account)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    result = await mana_base_service.suggest_mana_fix(
+        request.app.state.db_pool,
+        request.app.state.ai_client,
+        request.app.state.qdrant_client,
+        deck,
+        account.id,
+    )
     return DataResponse(data=result)
 
 

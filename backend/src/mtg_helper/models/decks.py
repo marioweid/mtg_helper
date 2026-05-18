@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import AnyHttpUrl, BaseModel, Field
 
+from mtg_helper.models.ai import CollectionMembership
+
 
 class DeckCreate(BaseModel):
     """Request body for creating a new deck."""
@@ -91,6 +93,7 @@ class DeckCardItem(BaseModel):
     ai_reasoning: str | None
     qualifying_stages: list[str] = Field(default_factory=list)
     price_eur_cents: int | None = None
+    owned_in: list[CollectionMembership] = Field(default_factory=list)
 
 
 class CommanderCardSummary(BaseModel):

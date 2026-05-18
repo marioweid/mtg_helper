@@ -144,6 +144,32 @@ class CutsResponse(BaseModel):
     protected_count: int
 
 
+class ColorStatus(BaseModel):
+    """Per-color mana-base health for a deck."""
+
+    color: str = Field(pattern="^[WUBRG]$")
+    pip_count: float = Field(ge=0.0)
+    source_count: int = Field(ge=0)
+    target: int = Field(ge=0)
+    deficit: int = Field(ge=0)
+
+
+class ManaBaseReport(BaseModel):
+    """Mana-base analysis for a deck — per-color requirements vs sources."""
+
+    total_lands: int = Field(ge=0)
+    total_colored_pips: float = Field(ge=0.0)
+    colors: list[ColorStatus] = Field(default_factory=list)
+
+
+class ManaFixResponse(BaseModel):
+    """Mana-base report plus suggested lands to fix deficient colors."""
+
+    report: ManaBaseReport
+    suggestions: list[CardSuggestion] = Field(default_factory=list)
+    unresolved: list[str] = Field(default_factory=list)
+
+
 class KeywordExtractResponse(BaseModel):
     """Response from the keyword-extracting deck agent.
 

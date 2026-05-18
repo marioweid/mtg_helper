@@ -2,6 +2,7 @@
 
 import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
+import { OwnedBadge } from "@/components/owned-badge";
 import type { CardSuggestion } from "@/lib/types";
 
 interface Props {
@@ -146,26 +147,7 @@ export function CardSuggestionCard({
 
         {/* Ownership chip */}
         <div className="flex flex-wrap gap-1">
-          {owned.length > 0 ? (
-            owned.slice(0, 2).map((c) => (
-              <span
-                key={c.id}
-                className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-[10px] text-emerald-300"
-                title="Owned in this collection"
-              >
-                ✓ {c.name}
-              </span>
-            ))
-          ) : (
-            <span className="rounded bg-gray-800/60 px-1.5 py-0.5 text-[10px] text-gray-500">
-              Unowned
-            </span>
-          )}
-          {owned.length > 2 && (
-            <span className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-[10px] text-emerald-300">
-              +{owned.length - 2}
-            </span>
-          )}
+          <OwnedBadge owned={owned} />
         </div>
       </div>
 

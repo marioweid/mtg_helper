@@ -32,6 +32,7 @@ import type {
   FeedbackResponse,
   KeywordExtractRequest,
   KeywordExtractResponse,
+  ManaFixResponse,
   PaginationMeta,
   PreferenceCreate,
   PreferenceResponse,
@@ -156,6 +157,12 @@ export const apiClient = {
     request<CutsResponse>(`/decks/${deckId}/suggest-cuts`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+
+  manaFix: (deckId: string) =>
+    request<ManaFixResponse>(`/decks/${deckId}/mana-fix`, {
+      method: "POST",
+      body: JSON.stringify({}),
     }),
 
   updateDeck: (deckId: string, body: DeckUpdate) =>

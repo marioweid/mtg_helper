@@ -188,7 +188,7 @@ def _sources_for(candidate: RetrievedCard) -> list[str]:
     return [_SOURCE_LABELS[s] for s in _SOURCE_LABELS if s in have]
 
 
-def _card_from_retrieved(
+def card_from_retrieved(
     card: RetrievedCard,
     stage: str,
     query_tags: list[str],
@@ -564,40 +564,6 @@ def _resolve_price_filter(
     )
 
 
-async def _build_ownership_map(
-    pool: asyncpg.Pool,
-    account_id: UUID | None,
-    scryfall_ids: list[UUID],
-) -> dict[UUID, list[CollectionMembership]]:
-    """Map scryfall_id -> list of account collections containing that card.
-
-    Deduplicates across multiple printings of the same oracle card in a collection.
-    """
-    if account_id is None or not scryfall_ids:
-        return {}
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT DISTINCT cards.scryfall_id AS scryfall_id,
-                   c.id AS collection_id,
-                   c.name AS collection_name
-            FROM collection_cards cc
-            JOIN collections c ON c.id = cc.collection_id
-            JOIN cards ON cards.id = cc.card_id
-            WHERE c.account_id = $1
-              AND cards.scryfall_id = ANY($2::uuid[])
-            """,
-            account_id,
-            scryfall_ids,
-        )
-    result: dict[UUID, list[CollectionMembership]] = {}
-    for row in rows:
-        result.setdefault(row["scryfall_id"], []).append(
-            CollectionMembership(id=row["collection_id"], name=row["collection_name"])
-        )
-    return result
-
-
 async def build_stage(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
@@ -714,11 +680,11 @@ async def build_stage(
 
     if resolved_stage == "lands":
         candidates = [c for c in candidates if "Land" in (c.type_line or "")]
-    ownership_map = await _build_ownership_map(
+    ownership_map = await collection_service.build_ownership_map(
         pool, account_id, [c.scryfall_id for c in candidates]
     )
     suggestions = [
-        _card_from_retrieved(c, resolved_stage, query_tags, ownership_map) for c in candidates
+        card_from_retrieved(c, resolved_stage, query_tags, ownership_map) for c in candidates
     ]
 
     if advance_deck_stage:
@@ -813,10 +779,10 @@ async def suggest_cards(
     )
     _log.debug("Suggest: retrieved %d candidates for prompt %r", len(candidates), prompt[:60])
 
-    ownership_map = await _build_ownership_map(
+    ownership_map = await collection_service.build_ownership_map(
         pool, account_id, [c.scryfall_id for c in candidates]
     )
-    suggestions = [_card_from_retrieved(c, "theme", query_tags, ownership_map) for c in candidates]
+    suggestions = [card_from_retrieved(c, "theme", query_tags, ownership_map) for c in candidates]
     return SuggestResponse(suggestions=suggestions, unresolved=[])
 
 

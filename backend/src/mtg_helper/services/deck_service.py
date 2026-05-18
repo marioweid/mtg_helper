@@ -18,6 +18,7 @@ from mtg_helper.models.decks import (
     DeckSummary,
     DeckUpdate,
 )
+from mtg_helper.services import collection_service
 from mtg_helper.services.retrieval_service import card_qualifying_stages
 
 _log = logging.getLogger(__name__)
@@ -305,7 +306,10 @@ async def list_decks(
 
 
 async def get_deck(
-    pool: asyncpg.Pool, deck_id: UUID, email: str | None = None
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    email: str | None = None,
+    account_id: UUID | None = None,
 ) -> DeckDetailResponse | None:
     """Fetch a deck with all its cards.
 
@@ -314,6 +318,9 @@ async def get_deck(
         deck_id: The deck's UUID.
         email: When provided, the deck must be owned by this email or the
             call returns None (treated as 404 by callers).
+        account_id: When provided, each card's ``owned_in`` is populated with
+            the caller's collections containing that card. Omit when ownership
+            info isn't needed (internal callers, exports).
 
     Returns:
         DeckDetailResponse or None if not found / not owned.
@@ -335,6 +342,14 @@ async def get_deck(
             commander_identity = sorted(set(commander_identity) | set(partner_identity))
             partner_card = await _fetch_commander_summary(conn, deck_row["partner_id"])
 
+    cards = [_row_to_deck_card_item(r) for r in card_rows]
+    if account_id is not None and cards:
+        ownership_map = await collection_service.build_ownership_map(
+            pool, account_id, [c.scryfall_id for c in cards]
+        )
+        for card in cards:
+            card.owned_in = ownership_map.get(card.scryfall_id, [])
+
     return DeckDetailResponse(
         id=deck_row["id"],
         name=deck_row["name"],
@@ -354,7 +369,7 @@ async def get_deck(
         max_price_cents=deck_row["max_price_cents"],
         min_price_cents=deck_row["min_price_cents"],
         archetype_tags=list(deck_row["archetype_tags"] or []),
-        cards=[_row_to_deck_card_item(r) for r in card_rows],
+        cards=cards,
     )
 
 

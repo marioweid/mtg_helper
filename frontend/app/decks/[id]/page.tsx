@@ -23,6 +23,7 @@ import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
+import { ManaFixPanel } from "@/components/mana-fix-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
@@ -165,6 +166,16 @@ export default function DeckDetailPage() {
       await load();
     } catch (err) {
       toast.push(err instanceof Error ? err.message : "Failed to remove card", "error");
+    }
+  }
+
+  async function handleAddCard(scryfallId: string) {
+    if (!deck) return;
+    try {
+      await apiClient.addCard(deck.id, { card_scryfall_id: scryfallId, added_by: "ai" });
+      await load();
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : "Failed to add card", "error");
     }
   }
 
@@ -382,6 +393,7 @@ export default function DeckDetailPage() {
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <ManaCurve cards={deck.cards} />
           </div>
+          <ManaFixPanel deckId={deck.id} onAddCard={handleAddCard} />
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <DeckStats cards={deck.cards} />
           </div>

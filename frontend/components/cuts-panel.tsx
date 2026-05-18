@@ -47,7 +47,8 @@ export function CutsPanel({ deckId, onRemoveCard }: Props) {
         <div>
           <div className="font-medium text-gray-200">Suggest cuts</div>
           <div className="text-xs text-gray-500">
-            Combo pieces, commander, and basic lands are never suggested.
+            Up to 10 cards worth cutting. Combo pieces, commander, and basic lands
+            are never suggested.
           </div>
         </div>
         <button
@@ -56,7 +57,7 @@ export function CutsPanel({ deckId, onRemoveCard }: Props) {
           disabled={loading}
           className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
         >
-          {loading ? "Thinking…" : cuts ? "Refresh" : "Suggest 10 cuts"}
+          {loading ? "Thinking…" : cuts ? "Refresh" : "Suggest cuts"}
         </button>
       </div>
 

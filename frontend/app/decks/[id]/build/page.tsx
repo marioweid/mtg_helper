@@ -386,7 +386,6 @@ export default function BuildPage() {
   const [basicLandAdding, setBasicLandAdding] = useState<Record<string, boolean>>({});
   const [collections, setCollections] = useState<CollectionResponse[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
-  const [collectionPanelOpen, setCollectionPanelOpen] = useState(false);
   const [maxPriceCents, setMaxPriceCents] = useState<number | null>(null);
   const [minPriceCents, setMinPriceCents] = useState<number | null>(null);
   const [pricePanelOpen, setPricePanelOpen] = useState(false);
@@ -617,6 +616,27 @@ export default function BuildPage() {
   function clearAllCollections() {
     if (selectedCollectionIds.length === 0) return;
     void persistSelectedCollections([]);
+  }
+
+  function selectAllCollections() {
+    const allIds = collections.map((c) => c.id);
+    if (
+      allIds.length === selectedCollectionIds.length &&
+      allIds.every((id) => selectedCollectionIds.includes(id))
+    ) {
+      return;
+    }
+    void persistSelectedCollections(allIds);
+  }
+
+  function toggleOwnedOnly() {
+    if (selectedCollectionIds.length > 0) {
+      clearAllCollections();
+    } else if (collections.length > 0) {
+      // Master toggle on with nothing selected: pick all collections by default
+      // so the filter is active immediately. Users can deselect individual chips.
+      selectAllCollections();
+    }
   }
 
   function reloadAllSuggestions() {
@@ -927,71 +947,79 @@ export default function BuildPage() {
         </Link>
       </div>
 
-      {/* Collection filter panel */}
+      {/* Collection filter panel — always visible so the build-from-owned toggle is discoverable. */}
       {collections.length > 0 && (
-        <details
-          open={collectionPanelOpen}
-          onToggle={(e) => setCollectionPanelOpen((e.target as HTMLDetailsElement).open)}
-          className="mb-4 rounded-xl border border-white/10 bg-white/5"
-        >
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-white hover:bg-white/5 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span>Build using collection only</span>
-              {selectedCollectionIds.length > 0 && (
-                <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
-                  {selectedCollectionIds.length} active
-                </span>
-              )}
-            </span>
-            <span className="text-xs text-gray-400">{collectionPanelOpen ? "▲" : "▼"}</span>
-          </summary>
-          <div className="border-t border-white/10 px-4 py-3">
-            <p className="mb-3 text-xs text-gray-400">
-              When any collections are checked, suggestions are restricted to cards you own in those
-              collections. Uncheck all to disable filtering.
-            </p>
-            <ul className="flex flex-col gap-1">
-              {collections.map((c) => {
-                const checked = selectedCollectionIds.includes(c.id);
-                return (
-                  <li key={c.id}>
-                    <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-200 hover:bg-white/5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCollection(c.id)}
-                        className="h-4 w-4 rounded border-white/20 bg-white/10 accent-indigo-500"
-                      />
-                      <span className="flex-1">{c.name}</span>
-                      <span className="text-xs text-gray-500">{c.card_count} cards</span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="mt-3 flex items-center gap-3">
+        <div className="mb-4 rounded-xl border border-white/10 bg-white/5">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <label className="flex items-center gap-3 cursor-pointer">
               <button
                 type="button"
-                onClick={reloadAllSuggestions}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition-colors"
+                role="switch"
+                aria-checked={selectedCollectionIds.length > 0}
+                onClick={toggleOwnedOnly}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                  selectedCollectionIds.length > 0 ? "bg-indigo-600" : "bg-white/10"
+                }`}
               >
-                Reload suggestions
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                    selectedCollectionIds.length > 0 ? "translate-x-5" : "translate-x-0.5"
+                  }`}
+                />
               </button>
-              {selectedCollectionIds.length > 0 && (
+              <span className="text-sm font-medium text-white">Build from owned cards only</span>
+            </label>
+            {selectedCollectionIds.length > 0 && (
+              <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
+                {selectedCollectionIds.length}/{collections.length} collections
+              </span>
+            )}
+          </div>
+          {selectedCollectionIds.length > 0 && (
+            <div className="border-t border-white/10 px-4 py-3">
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {collections.map((c) => {
+                  const checked = selectedCollectionIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleCollection(c.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        checked
+                          ? "bg-indigo-600 text-white hover:bg-indigo-500"
+                          : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                      }`}
+                      title={`${c.card_count} cards`}
+                    >
+                      {checked ? "✓ " : ""}
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={selectAllCollections}
+                  className="text-xs text-gray-400 hover:text-white transition-colors"
+                >
+                  Select all
+                </button>
                 <button
                   type="button"
                   onClick={clearAllCollections}
                   className="text-xs text-gray-400 hover:text-white transition-colors"
                 >
-                  Clear all
+                  Clear
                 </button>
-              )}
-              <span className="text-xs text-gray-500">
-                Refetches the active stage and clears cached suggestions for other stages.
-              </span>
+                <span className="text-xs text-gray-500">
+                  Suggestions are restricted to cards you own in the selected collections.
+                </span>
+              </div>
             </div>
-          </div>
-        </details>
+          )}
+        </div>
       )}
 
       {/* Price cap panel */}

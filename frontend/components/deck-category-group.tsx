@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CardDetailPanel } from "@/components/card-detail-panel";
 import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
+import { OwnedBadge } from "@/components/owned-badge";
 import { STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 
@@ -71,7 +72,7 @@ export function DeckCategoryGroup({
                         </span>
                       )}
                     </p>
-                    {tags.length > 0 && (
+                    {(tags.length > 0 || card.owned_in.length > 0) && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {tags.map((t) => (
                           <span
@@ -81,6 +82,7 @@ export function DeckCategoryGroup({
                             {STAGE_LABELS[t] ?? t}
                           </span>
                         ))}
+                        <OwnedBadge owned={card.owned_in} showUnowned={false} />
                       </div>
                     )}
                   </div>

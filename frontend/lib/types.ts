@@ -89,6 +89,7 @@ export interface DeckCardItem {
   ai_reasoning: string | null;
   qualifying_stages: string[];
   price_eur_cents: number | null;
+  owned_in: CollectionMembership[];
 }
 
 export interface CommanderCardSummary {
@@ -340,6 +341,26 @@ export interface CutSuggestion {
 export interface CutsResponse {
   cuts: CutSuggestion[];
   protected_count: number;
+}
+
+export interface ColorStatus {
+  color: string;
+  pip_count: number;
+  source_count: number;
+  target: number;
+  deficit: number;
+}
+
+export interface ManaBaseReport {
+  total_lands: number;
+  total_colored_pips: number;
+  colors: ColorStatus[];
+}
+
+export interface ManaFixResponse {
+  report: ManaBaseReport;
+  suggestions: CardSuggestion[];
+  unresolved: string[];
 }
 
 // Import

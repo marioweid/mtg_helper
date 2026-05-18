@@ -174,7 +174,9 @@ async def get_deck(
 ) -> DataResponse[DeckDetailResponse]:
     """Get a deck with all its cards."""
     email = _require_email(account)
-    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    deck = await deck_service.get_deck(
+        request.app.state.db_pool, deck_id, email, account_id=account.id
+    )
     if deck is None:
         raise _not_found(deck_id)
     return DataResponse(data=deck)

@@ -10,6 +10,7 @@ from uuid import UUID
 
 import asyncpg
 
+from mtg_helper.models.ai import CollectionMembership
 from mtg_helper.models.collections import (
     CollectionCardAdd,
     CollectionCardItem,
@@ -561,6 +562,41 @@ async def get_owned_card_ids(pool: asyncpg.Pool, collection_id: UUID) -> frozens
             collection_id,
         )
     return frozenset(r["card_id"] for r in rows)
+
+
+async def build_ownership_map(
+    pool: asyncpg.Pool,
+    account_id: UUID | None,
+    scryfall_ids: list[UUID],
+) -> dict[UUID, list[CollectionMembership]]:
+    """Map scryfall_id -> list of account collections containing that card.
+
+    Deduplicates across multiple printings of the same oracle card in a collection.
+    Returns an empty mapping when ``account_id`` is None or ``scryfall_ids`` is empty.
+    """
+    if account_id is None or not scryfall_ids:
+        return {}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT DISTINCT cards.scryfall_id AS scryfall_id,
+                   c.id AS collection_id,
+                   c.name AS collection_name
+            FROM collection_cards cc
+            JOIN collections c ON c.id = cc.collection_id
+            JOIN cards ON cards.id = cc.card_id
+            WHERE c.account_id = $1
+              AND cards.scryfall_id = ANY($2::uuid[])
+            """,
+            account_id,
+            scryfall_ids,
+        )
+    result: dict[UUID, list[CollectionMembership]] = {}
+    for row in rows:
+        result.setdefault(row["scryfall_id"], []).append(
+            CollectionMembership(id=row["collection_id"], name=row["collection_name"])
+        )
+    return result
 
 
 async def get_owned_card_ids_for_collections(
