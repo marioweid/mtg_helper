@@ -14,7 +14,6 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.17
     restart: always
-    container_name: qdrant
     ports:
       - 6333:6333
       - 6334:6334
