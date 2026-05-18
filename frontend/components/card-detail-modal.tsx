@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { CardDetailPanel } from "@/components/card-detail-panel";
+import { ManaCost } from "@/components/mana-cost";
 import type { DeckCardItem } from "@/lib/types";
 
 interface Props {
@@ -43,7 +44,9 @@ export function CardDetailModal({ card, onClose, onRemove, onSetCategories }: Pr
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <h2 className="text-xl font-semibold text-white">{card.name}</h2>
           {card.mana_cost ? (
-            <span className="text-sm tracking-wider text-gray-400">{card.mana_cost}</span>
+            <span className="text-sm text-gray-300">
+              <ManaCost cost={card.mana_cost} />
+            </span>
           ) : null}
         </div>
         <CardDetailPanel

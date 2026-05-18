@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/lib/api";
+import { PageHeader } from "@/components/page-header";
 import { PreferenceForm } from "@/components/preference-form";
 import { PreferenceList } from "@/components/preference-list";
+import { Skeleton } from "@/components/skeleton";
 import { ToggleSwitch } from "@/components/toggle-switch";
 import type {
   PreferenceResponse,
@@ -160,7 +162,12 @@ export default function PreferencesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-500">Loading...</div>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-80 w-full rounded-xl" />
+      </div>
     );
   }
 
@@ -222,10 +229,10 @@ export default function PreferencesPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-8 text-2xl font-bold text-white">Preferences</h1>
-      <p className="mb-6 text-sm text-gray-400">
-        Preferences are injected into every AI prompt to customize deck suggestions.
-      </p>
+      <PageHeader
+        title="Preferences"
+        subtitle="Preferences are injected into every AI prompt to customize deck suggestions."
+      />
 
       <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-6">
         <div className="flex items-center justify-between">

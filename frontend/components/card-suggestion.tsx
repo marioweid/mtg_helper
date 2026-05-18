@@ -1,6 +1,7 @@
 "use client";
 
 import { CardHover } from "@/components/card-hover";
+import { ManaCost } from "@/components/mana-cost";
 import type { CardSuggestion } from "@/lib/types";
 
 interface Props {
@@ -113,7 +114,9 @@ export function CardSuggestionCard({
             {inCombo && <span title="Completes a potential combo">⚡</span>}
           </p>
           {suggestion.mana_cost && (
-            <p className="text-xs text-gray-500">{suggestion.mana_cost}</p>
+            <p className="text-xs text-gray-500">
+              <ManaCost cost={suggestion.mana_cost} />
+            </p>
           )}
           {suggestion.type_line && (
             <p className="text-xs text-gray-400">{suggestion.type_line}</p>

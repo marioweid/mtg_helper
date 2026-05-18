@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { CardHover } from "@/components/card-hover";
+import { ManaCost, OracleText } from "@/components/mana-cost";
 import type { CommanderCardSummary } from "@/lib/types";
 
 interface Props {
@@ -65,7 +66,9 @@ function CommanderRow({ card }: { card: CommanderCardSummary }) {
           ) : null}
         </div>
         {card.mana_cost ? (
-          <span className="flex-shrink-0 text-xs text-gray-500">{card.mana_cost}</span>
+          <span className="flex-shrink-0 text-xs text-gray-500">
+            <ManaCost cost={card.mana_cost} />
+          </span>
         ) : null}
         <span className="flex-shrink-0 text-xs text-gray-600">{open ? "▴" : "▾"}</span>
       </button>
@@ -82,7 +85,7 @@ function CommanderRow({ card }: { card: CommanderCardSummary }) {
           <div className="flex flex-col gap-2">
             {card.oracle_text ? (
               <p className="whitespace-pre-line text-xs leading-relaxed text-gray-200">
-                {card.oracle_text}
+                <OracleText text={card.oracle_text} />
               </p>
             ) : (
               <p className="text-xs italic text-gray-500">No oracle text.</p>

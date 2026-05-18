@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CardDetailPanel } from "@/components/card-detail-panel";
 import { CardHover } from "@/components/card-hover";
+import { ManaCost } from "@/components/mana-cost";
 import { STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 
@@ -84,7 +85,9 @@ export function DeckCategoryGroup({
                     )}
                   </div>
                   {card.mana_cost && (
-                    <span className="text-xs text-gray-500 flex-shrink-0">{card.mana_cost}</span>
+                    <span className="flex-shrink-0 text-xs text-gray-500">
+                      <ManaCost cost={card.mana_cost} />
+                    </span>
                   )}
                   <span className="w-16 text-right text-xs text-gray-300 flex-shrink-0 tabular-nums">
                     {card.price_eur_cents != null

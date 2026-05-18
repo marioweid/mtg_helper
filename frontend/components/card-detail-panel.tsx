@@ -1,5 +1,6 @@
 "use client";
 
+import { OracleText } from "@/components/mana-cost";
 import { CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import type { DeckCardItem } from "@/lib/types";
 
@@ -48,7 +49,7 @@ export function CardDetailPanel({ card, onRemove, onSetCategories, showImage }: 
         ) : null}
         {card.oracle_text ? (
           <p className="whitespace-pre-line text-xs leading-relaxed text-gray-300">
-            {card.oracle_text}
+            <OracleText text={card.oracle_text} />
           </p>
         ) : (
           <p className="text-xs italic text-gray-600">No oracle text.</p>

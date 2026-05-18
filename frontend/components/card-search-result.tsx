@@ -1,6 +1,7 @@
 "use client";
 
 import { CardHover } from "@/components/card-hover";
+import { ManaCost } from "@/components/mana-cost";
 import type { CardResponse } from "@/lib/types";
 
 interface Props {
@@ -23,7 +24,11 @@ export function CardSearchResult({ card, onAdd, added }: Props) {
         <p className="truncate text-sm font-medium text-white">
           <CardHover name={card.name} imageUri={card.image_uri}>{card.name}</CardHover>
         </p>
-        {card.mana_cost && <p className="text-xs text-gray-500">{card.mana_cost}</p>}
+        {card.mana_cost && (
+          <p className="text-xs text-gray-500">
+            <ManaCost cost={card.mana_cost} />
+          </p>
+        )}
         {card.type_line && <p className="truncate text-xs text-gray-400">{card.type_line}</p>}
       </div>
       <button

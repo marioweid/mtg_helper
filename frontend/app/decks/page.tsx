@@ -2,6 +2,7 @@ import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { DeleteDeckButton } from "@/components/delete-deck-button";
 import { ManaSymbols } from "@/components/mana-symbols";
+import { PageHeader } from "@/components/page-header";
 import { colorIdentityGradient, colorIdentityShadow } from "@/lib/color-gradients";
 import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
 import type { DeckSummary } from "@/lib/types";
@@ -78,23 +79,26 @@ export default async function DecksPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Your Decks</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/decks/import"
-            className="rounded-lg border border-indigo-500/60 px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-600/10 transition-colors"
-          >
-            Import Deck
-          </Link>
-          <Link
-            href="/decks/new"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
-          >
-            New Deck
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Your Decks"
+        subtitle="Browse, build, and tune your Commander decks."
+        actions={
+          <>
+            <Link
+              href="/decks/import"
+              className="rounded-lg border border-indigo-500/60 px-4 py-2 text-sm font-medium text-indigo-400 transition-colors hover:bg-indigo-600/10"
+            >
+              Import Deck
+            </Link>
+            <Link
+              href="/decks/new"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+            >
+              New Deck
+            </Link>
+          </>
+        }
+      />
 
       {decks.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-white/20 py-20 text-center">

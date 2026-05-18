@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { ManaCost } from "@/components/mana-cost";
 import { apiClient } from "@/lib/api";
 import type { CardResponse } from "@/lib/types";
 
@@ -130,8 +131,8 @@ export function CardSearch({
                   <p className="text-xs text-gray-400 truncate">{card.type_line}</p>
                 </div>
                 {card.mana_cost && (
-                  <span className="ml-auto text-xs text-gray-500 flex-shrink-0">
-                    {card.mana_cost}
+                  <span className="ml-auto flex-shrink-0 text-xs text-gray-500">
+                    <ManaCost cost={card.mana_cost} />
                   </span>
                 )}
               </button>
