@@ -1,11 +1,10 @@
-# Ideas
-
-  My recommendation if you want one to start:
-  - Make It work locally again, refactor docker compose for local setup and remote only ingests the cloudflare
+# Next Features
   - Chat page is dead — app/decks/[id]/chat/page.tsx is a 6-line redirect to deck detail. AI chat
-  (/api/v1/decks/{id}/chat) exists on the backend. UI surface never built. (Can be remove no ai chat needed)
+  (/api/v1/decks/{id}/chat) exists on the backend. UI surface never built. (Can be remove no ai chat needed) Rmoev the chat page and all features also the backend for it all dependencies etc. is dont like the feature and want dead code from it gone
+  - "Cuts" suggestion — not implemented. Would need backend endpoint + UI. (Nice to have feature implement this), important to not suggest a cut  of combo pieces
+
+# Ideas
   - Goldfish playtest + health scorecard combo. Both rank highest on "thing enthusiasts actually use during deck tuning", reuse data you already have, no new backend integrations.
-  - "Cuts" suggestion — not implemented. Would need backend endpoint + UI. (Nice to have feature implement this)
   - No mana-base auto-fix — suggest fixing color requirements / missing fetches.
   - No "owned in collection" badge on the deck card list (it's on suggestions, not on existing deck cards).
   - Bracket validator — flag Game Changers, MLD, mass LD, fast mana, infinite combos vs declared bracket. You have brackets + combos data but no enforcement.

@@ -1,18 +1,24 @@
-# docker-compose.prod.yml — override; do not run standalone.
-# Use: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Production overlay — applied on top of docker-compose.yml. Never run alone.
+#
+#   sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file .env.prod up -d
+#
+# What this overlay does:
+#   - Redirects the pgdata / qdrantdata named volumes to host bind paths under
+#     /srv/mtg-helper/data/* so the data disk survives container recreation
+#     and Terraform daily snapshots can capture it.
+#   - Strips host port mappings — Cloudflare Tunnel is the only ingress.
+#   - Swaps env_file to ./.env.prod (real secrets on the VM).
+#   - Removes source bind-mounts and the backend --reload flag.
+#   - Adds the cloudflared sidecar and the weekly Scryfall sync cron.
+
 services:
   qdrant:
     ports: !reset []
-    volumes:
-      - ./qdrant/production.yaml:/qdrant/config/production.yaml:ro
-      - /srv/mtg-helper/data/qdrant:/qdrant/storage
     restart: unless-stopped
 
   postgres:
     ports: !reset []
-    volumes:
-      - /srv/mtg-helper/data/postgres:/var/lib/postgresql/data
-      - ./backend/src/mtg_helper/sql/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     restart: unless-stopped
 
   backend:
@@ -40,9 +46,6 @@ services:
       - ./.env.prod
     restart: unless-stopped
 
-  scryfall-sync:
-    restart: unless-stopped
-
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
@@ -50,3 +53,38 @@ services:
     depends_on:
       - frontend
       - backend
+
+  # Weekly Scryfall refresh. Prod-only — locally you trigger sync manually
+  # from the Admin page when you want fresh card data.
+  scryfall-sync:
+    image: alpine/curl:latest
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set in .env.prod}
+    entrypoint: >
+      sh -c "
+        echo 'Scryfall weekly sync cron started';
+        while true; do
+          sleep 604800;
+          echo 'Running weekly Scryfall sync...';
+          curl -sf -X POST -H \"X-Internal-Token: $$INTERNAL_API_TOKEN\" http://backend:8000/api/v1/admin/sync-cards && echo 'Sync complete' || echo 'Sync failed';
+        done
+      "
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+# Point the named volumes from the base file at the host data disk so prod
+# data survives container recreation and is reachable by Terraform snapshots.
+volumes:
+  pgdata:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/mtg-helper/data/postgres
+      o: bind
+  qdrantdata:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/mtg-helper/data/qdrant
+      o: bind

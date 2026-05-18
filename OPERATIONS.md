@@ -2,10 +2,25 @@
 
 Copy-paste commands for the things you do more than once a year. For project conventions see `CLAUDE.md`.
 
-## Local development
+## Compose layout
+
+Two files. The base one is the local-dev stack; the prod overlay layers on top.
+
+| File | Purpose |
+|---|---|
+| `docker-compose.yml` | Local dev. Postgres + Qdrant + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in Docker-managed named volumes. |
+| `docker-compose.prod.yml` | Additive overlay for the GCP VM. Binds `pgdata` / `qdrantdata` to `/srv/mtg-helper/data/*`, strips host ports, swaps to `.env.prod`, adds `cloudflared` and the weekly `scryfall-sync` cron. Never run standalone. |
+
+The `scryfall-sync` cron and Cloudflare Tunnel are prod-only; locally you trigger card sync from the Admin page when you want fresh data.
+
+## Local boot
 
 ```bash
-# bring everything up (postgres, qdrant, backend, frontend, scryfall-sync cron)
+# Required once: copy env template and fill in keys
+cp backend/.env.example backend/.env
+$EDITOR backend/.env   # set GEMINI_API_KEY; INTERNAL_API_TOKEN if you'll hit admin endpoints
+
+# bring everything up (postgres, qdrant, backend, frontend)
 docker compose up -d --build
 
 # tail logs
@@ -17,11 +32,22 @@ docker compose down
 
 Ports: backend `:8000`, frontend `:3000`, postgres `:5432`, qdrant `:6333`.
 
-Required env: `backend/.env` (copy from `backend/.env.example`) and an `INTERNAL_API_TOKEN` in the project-root `.env` (used for compose interpolation):
+> No root `.env` is needed locally — `INTERNAL_API_TOKEN` only matters if you call `/api/v1/admin/*` endpoints, and the backend reads it from `backend/.env`.
+
+## Prod boot (on the VM)
 
 ```bash
-echo "INTERNAL_API_TOKEN=$(openssl rand -hex 32)" >> .env
+gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap
+
+# from inside the VM
+cd /opt/mtg-helper
+sudo docker compose \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  --env-file .env.prod \
+  up -d --build
 ```
+
+`.env.prod` lives at `/opt/mtg-helper/.env.prod` and supplies both the env vars consumed inside containers (Gemini key, NextAuth secrets, etc.) and the values interpolated into the compose file itself (`INTERNAL_API_TOKEN` for the sync cron, `CF_TUNNEL_TOKEN` for cloudflared).
 
 ## Database
 
@@ -73,7 +99,7 @@ curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/tag-cards"
 curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/embed-cards"
 ```
 
-Weekly auto-sync runs in the `scryfall-sync` compose service (uses the same token via env). Initial sync also runs on backend startup if `cards` table is empty.
+Weekly auto-sync runs **only in prod** via the `scryfall-sync` service defined in `docker-compose.prod.yml`. Locally, trigger it manually from the Admin page (or with the curl commands above) when you want fresh card data. Initial sync also runs on backend startup if `cards` table is empty.
 
 ## Deploy pipeline
 

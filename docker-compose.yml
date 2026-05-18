@@ -1,3 +1,15 @@
+# Local development stack: Postgres + Qdrant + backend (--reload) + frontend
+# (pnpm dev). Source dirs are mounted for hot-reload; data lives in
+# Docker-managed named volumes (pgdata, qdrantdata).
+#
+# Boot:        docker compose up -d --build
+# Tail logs:   docker compose logs -f backend frontend
+# Stop:        docker compose down
+#
+# Production layers an overlay on top to bind data to /srv/mtg-helper/data,
+# strip host ports, swap env files, and add the Cloudflare Tunnel + weekly
+# Scryfall sync. See docker-compose.prod.yml.
+
 services:
   qdrant:
     image: qdrant/qdrant:v1.17
@@ -33,9 +45,6 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
-    environment:
-      DATABASE_URL: postgresql://mtg:mtg_dev@postgres:5432/mtg_helper
-      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,23 +65,6 @@ services:
       - ./frontend/app:/app/app
       - ./frontend/lib:/app/lib
       - ./frontend/components:/app/components
-
-  scryfall-sync:
-    image: alpine/curl:latest
-    environment:
-      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
-    entrypoint: >
-      sh -c "
-        echo 'Scryfall weekly sync cron started';
-        while true; do
-          sleep 604800;
-          echo 'Running weekly Scryfall sync...';
-          curl -sf -X POST -H \"X-Internal-Token: $$INTERNAL_API_TOKEN\" http://backend:8000/api/v1/admin/sync-cards && echo 'Sync complete' || echo 'Sync failed';
-        done
-      "
-    depends_on:
-      - backend
-    restart: unless-stopped
 
 volumes:
   pgdata:
