@@ -44,6 +44,10 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      # Override the localhost DATABASE_URL from backend/.env — inside the
+      # container, the database lives at the ``postgres`` service hostname.
+      DATABASE_URL: postgresql://mtg:mtg_dev@postgres:5432/mtg_helper
     depends_on:
       postgres:
         condition: service_healthy
