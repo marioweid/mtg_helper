@@ -1,7 +1,10 @@
 import type {
   AccountResponse,
   AccountUpdate,
+  BracketValidationResponse,
   BuildResponse,
+  CutsRequest,
+  CutsResponse,
   CardResponse,
   CardSuggestion,
   ComboListResponse,
@@ -145,6 +148,15 @@ export const apiClient = {
   getDeck: (id: string) => request<DeckDetailResponse>(`/decks/${id}`),
 
   getDeckCombos: (id: string) => request<ComboListResponse>(`/decks/${id}/combos`),
+
+  getBracketValidation: (id: string) =>
+    request<BracketValidationResponse>(`/decks/${id}/bracket-validation`),
+
+  suggestCuts: (deckId: string, body: CutsRequest = {}) =>
+    request<CutsResponse>(`/decks/${deckId}/suggest-cuts`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   updateDeck: (deckId: string, body: DeckUpdate) =>
     request<DeckResponse>(`/decks/${deckId}`, {

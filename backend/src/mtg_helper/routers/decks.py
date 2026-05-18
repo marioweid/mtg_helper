@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse
+from mtg_helper.models.brackets import BracketValidationResponse
 from mtg_helper.models.combos import ComboListResponse
 from mtg_helper.models.common import DataResponse, PaginationMeta
 from mtg_helper.models.decks import (
@@ -24,6 +25,7 @@ from mtg_helper.models.decks import (
     DeckUrlImportRequest,
 )
 from mtg_helper.services import (
+    bracket_service,
     combo_service,
     deck_service,
     deck_url_import_service,
@@ -176,6 +178,32 @@ async def get_deck(
     if deck is None:
         raise _not_found(deck_id)
     return DataResponse(data=deck)
+
+
+@router.get(
+    "/{deck_id}/bracket-validation",
+    response_model=DataResponse[BracketValidationResponse],
+)
+async def validate_deck_bracket(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[BracketValidationResponse]:
+    """Validate a deck against the rules for its declared bracket.
+
+    Pulls active combos from Commander Spellbook on a best-effort basis;
+    a Spellbook failure degrades to combo-blind validation rather than 502.
+    """
+    email = _require_email(account)
+    pool = request.app.state.db_pool
+    deck = await deck_service.get_deck(pool, deck_id, email)
+    if deck is None:
+        raise _not_found(deck_id)
+    try:
+        combos = await combo_service.fetch_combos(pool, deck)
+    except ComboFetchError:
+        combos = None
+    return DataResponse(data=bracket_service.validate_bracket(deck, combos))
 
 
 @router.get("/{deck_id}/combos", response_model=DataResponse[ComboListResponse])

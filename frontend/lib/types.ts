@@ -304,6 +304,44 @@ export interface ComboListResponse {
   almost_there: Combo[];
 }
 
+export type BracketViolationRule =
+  | "game_changer"
+  | "mass_land_destruction"
+  | "fast_mana"
+  | "infinite_combo"
+  | "extra_turn_chain";
+
+export interface BracketViolation {
+  rule: BracketViolationRule;
+  severity: "block" | "warn";
+  message: string;
+  cards: string[];
+}
+
+export interface BracketValidationResponse {
+  declared_bracket: number;
+  legal: boolean;
+  violations: BracketViolation[];
+}
+
+export interface CutsRequest {
+  count?: number;
+}
+
+export interface CutSuggestion {
+  scryfall_id: string;
+  name: string;
+  type_line: string | null;
+  image_uri: string | null;
+  cmc: number | null;
+  reasoning: string;
+}
+
+export interface CutsResponse {
+  cuts: CutSuggestion[];
+  protected_count: number;
+}
+
 // Import
 export interface DeckImportRequest {
   deck_list: string;

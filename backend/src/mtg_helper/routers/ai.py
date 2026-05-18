@@ -11,6 +11,8 @@ from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
     BuildResponse,
+    CutsRequest,
+    CutsResponse,
     DescribeRequest,
     DescribeResponse,
     KeywordExtractRequest,
@@ -19,8 +21,9 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import ai_service, deck_service, rate_limit_service
+from mtg_helper.services import ai_service, cuts_service, deck_service, rate_limit_service
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
+from mtg_helper.services.cuts_service import DeckNotFoundError as CutsDeckNotFoundError
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
 
 CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
@@ -133,6 +136,28 @@ async def suggest_cards(
             subtypes=body.subtypes,
         )
     except DeckNotFoundError as e:
+        raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    return DataResponse(data=result)
+
+
+@router.post("/{deck_id}/suggest-cuts", response_model=DataResponse[CutsResponse])
+async def suggest_cuts(
+    deck_id: UUID,
+    body: CutsRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CutsResponse]:
+    """Suggest cards to cut from a deck, protecting combo pieces."""
+    email = _require_email(account)
+    try:
+        result = await cuts_service.suggest_cuts(
+            request.app.state.db_pool,
+            request.app.state.ai_client,
+            deck_id,
+            email,
+            body.count,
+        )
+    except CutsDeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
     return DataResponse(data=result)
 

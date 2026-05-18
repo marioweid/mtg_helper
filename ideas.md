@@ -1,6 +1,7 @@
 # Next Features
   - "Cuts" suggestion — not implemented. Would need backend endpoint + UI. (Nice to have feature implement this), important to not suggest a cut of combo pieces
   - Bracket validator — flag Game Changers, MLD, mass LD, fast mana, infinite combos vs declared bracket. You have brackets + combos data but no enforcement.
+  - in deck view only show color filters for colors we have f.e. dont show black for blue/red commander
 
 # Ideas
   - Goldfish playtest + health scorecard combo. Both rank highest on "thing enthusiasts actually use during deck tuning", reuse data you already have, no new backend integrations.

@@ -16,6 +16,7 @@ interface Props {
   onChange: (next: DeckFilter) => void;
   resultCount: number;
   totalCount: number;
+  availableColors?: string[];
 }
 
 const COLOR_TOGGLES: readonly { key: string; label: string }[] = [
@@ -34,7 +35,13 @@ const SORT_OPTIONS: readonly { key: SortMode; label: string }[] = [
   { key: "price", label: "Price" },
 ];
 
-export function DeckFilterBar({ value, onChange, resultCount, totalCount }: Props) {
+export function DeckFilterBar({
+  value,
+  onChange,
+  resultCount,
+  totalCount,
+  availableColors,
+}: Props) {
   function toggleColor(c: string) {
     const has = value.colors.includes(c);
     onChange({
@@ -44,6 +51,9 @@ export function DeckFilterBar({ value, onChange, resultCount, totalCount }: Prop
   }
 
   const filtered = resultCount !== totalCount;
+  const visibleToggles = availableColors
+    ? COLOR_TOGGLES.filter((c) => c.key === "C" || availableColors.includes(c.key))
+    : COLOR_TOGGLES;
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
@@ -55,7 +65,7 @@ export function DeckFilterBar({ value, onChange, resultCount, totalCount }: Prop
         className="min-w-[160px] flex-1 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-indigo-400 focus:outline-none"
       />
       <div className="flex items-center gap-1">
-        {COLOR_TOGGLES.map((c) => {
+        {visibleToggles.map((c) => {
           const active = value.colors.includes(c.key);
           const sym = COLOR_SYMBOLS[c.key];
           if (!sym) return null;
