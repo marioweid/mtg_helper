@@ -13,19 +13,16 @@ from qdrant_client import AsyncQdrantClient
 from mtg_helper.models.ai import (
     BuildResponse,
     CardSuggestion,
-    ChatResponse,
     CollectionMembership,
     DescribeResponse,
     KeywordExtractResponse,
     SuggestResponse,
 )
-from mtg_helper.models.cards import CardResponse
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
     card_service,
     collection_service,
-    conversation_service,
     deck_service,
     preference_service,
     profile_service,
@@ -51,8 +48,9 @@ _FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3}
 _REJECT_BASE: float = 0.3  # weight = _REJECT_BASE ** reject_count
 _REJECT_FLOOR: float = 0.02
 
-# Cap conversation history replayed into the LLM. Bounds token spend and blunts
-# multi-turn jailbreak attempts that rely on accumulating context.
+# Cap conversation history replayed into the LLM for the describe / keyword-
+# extract agents. Bounds token spend and blunts multi-turn jailbreak attempts
+# that rely on accumulating context.
 _MAX_HISTORY_TURNS = 20
 _LLM_TEMPERATURE = 0.3
 _LLM_MAX_COMPLETION_TOKENS = 2048
@@ -248,125 +246,6 @@ def _card_from_retrieved(
     )
 
 
-def _build_system_prompt(
-    deck: DeckDetailResponse,
-    commander: CardResponse,
-    partner: CardResponse | None,
-    preferences: dict[str, list[str]] | None = None,
-    downvoted_cards: list[str] | None = None,
-) -> str:
-    """Build the system prompt with full deck context (used for chat).
-
-    Args:
-        deck: Full deck detail including cards and metadata.
-        commander: Commander card data.
-        partner: Partner commander card data, if any.
-        preferences: Account preferences grouped by type for injection.
-        downvoted_cards: Card names the user has thumbed-down for this deck.
-    """
-    color_identity = ", ".join(commander.color_identity) or "colorless"
-    bracket = deck.bracket or 3
-    bracket_desc = _BRACKET_DESCRIPTIONS.get(bracket, "")
-
-    parts = [
-        "You are an expert Magic: The Gathering Commander deck builder.",
-        "",
-        _SANDBOX_RULES,
-        "",
-        f"Commander: {commander.name}",
-        f"Type: {commander.type_line or 'unknown'}",
-        f"Color identity: {color_identity}",
-    ]
-    if commander.oracle_text:
-        parts.append(f"Rules text: {commander.oracle_text}")
-    if partner:
-        parts.append(f"Partner: {partner.name} ({partner.type_line or ''})")
-        if partner.oracle_text:
-            parts.append(f"Partner rules text: {partner.oracle_text}")
-
-    if deck.description:
-        parts.append(f"\nDeck strategy: {deck.description}")
-
-    parts += [
-        f"\nPower level: Bracket {bracket} — {bracket_desc}",
-        "",
-        "CONSTRAINTS:",
-        f"- Only suggest cards with color identity within: [{color_identity}]",
-        "- Only suggest Commander-legal cards (no banned cards)",
-        "- Every card must be a real, existing Magic card",
-    ]
-
-    pref_lines = _build_preference_lines(preferences, downvoted_cards)
-    if pref_lines:
-        parts += ["", *pref_lines]
-
-    parts += [
-        "",
-        "OUTPUT FORMAT:",
-        "Return ONLY a JSON array. Each element must have these exact keys:",
-        '  {"name": "exact card name", "category": "category label",'
-        ' "reasoning": "why this fits", "synergies": ["card or mechanic it synergizes with"]}',
-        "Do not include any text outside the JSON array.",
-    ]
-    return "\n".join(parts)
-
-
-def _build_preference_lines(
-    preferences: dict[str, list[str]] | None,
-    downvoted_cards: list[str] | None,
-) -> list[str]:
-    """Build the PLAYER PREFERENCES and FEEDBACK sections for the system prompt."""
-    lines: list[str] = []
-
-    if preferences is not None and any(preferences.values()):
-        lines.append("PLAYER PREFERENCES:")
-        if preferences.get("pet_cards"):
-            cards = ", ".join(preferences["pet_cards"])
-            lines.append(f"- Try to include these cards when possible: {cards}")
-        if preferences.get("avoid_cards"):
-            cards = ", ".join(preferences["avoid_cards"])
-            lines.append(f"- Never suggest these cards: {cards}")
-        if preferences.get("avoid_archetypes"):
-            archetypes = ", ".join(preferences["avoid_archetypes"])
-            lines.append(f"- Avoid strategies involving: {archetypes}")
-        if preferences.get("general"):
-            for note in preferences["general"]:
-                lines.append(f"- {note}")
-
-    if downvoted_cards:
-        lines.append("FEEDBACK:")
-        cards = ", ".join(downvoted_cards)
-        lines.append(f"- Do not suggest these previously rejected cards: {cards}")
-
-    return lines
-
-
-def _parse_suggestions(raw: str) -> list[dict]:
-    """Extract a JSON array from the LLM response text."""
-    match = re.search(r"\[.*\]", raw, re.DOTALL)
-    if not match:
-        return []
-    try:
-        data = json.loads(match.group())
-        return data if isinstance(data, list) else []
-    except json.JSONDecodeError:
-        return []
-
-
-def _suggestion_from_card(card: CardResponse, raw: dict) -> CardSuggestion:
-    """Build a CardSuggestion from a validated card + raw AI output (used for chat)."""
-    return CardSuggestion(
-        scryfall_id=card.scryfall_id,
-        name=card.name,
-        mana_cost=card.mana_cost,
-        type_line=card.type_line,
-        image_uri=card.image_uri,
-        category=raw.get("category", ""),
-        reasoning=raw.get("reasoning", ""),
-        synergies=raw.get("synergies") or [],
-    )
-
-
 async def _compute_feedback_weights(
     pool: asyncpg.Pool,
     deck_id: UUID,
@@ -468,39 +347,6 @@ async def _load_ranking_weights(
         return None
 
 
-async def _load_prompt_context(
-    pool: asyncpg.Pool,
-    deck: DeckDetailResponse,
-    account_id: UUID | None,
-) -> tuple[dict[str, list[str]] | None, list[str]]:
-    """Load account preferences and downvoted cards for prompt injection (used for chat).
-
-    Args:
-        pool: asyncpg connection pool.
-        deck: Deck detail.
-        account_id: Authenticated account UUID for preference lookup.
-
-    Returns:
-        Tuple of (preferences dict or None, list of downvoted card names).
-    """
-    prefs: dict[str, list[str]] | None = None
-    if account_id is not None:
-        prefs = await preference_service.get_preferences_for_prompt(pool, account_id)
-
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT c.name
-            FROM deck_feedback df
-            JOIN cards c ON df.card_id = c.id
-            WHERE df.deck_id = $1 AND df.feedback = 'down'
-            """,
-            deck.id,
-        )
-    downvoted = [r["name"] for r in rows]
-    return prefs, downvoted
-
-
 async def _call_llm(
     ai_client: LLMClient,
     system: str,
@@ -521,27 +367,6 @@ async def _call_llm(
     if not content:
         raise LLMEmptyResponseError("LLM returned empty content")
     return content
-
-
-async def _validate_suggestions(
-    pool: asyncpg.Pool,
-    raw_items: list[dict],
-    commander: CardResponse,
-) -> tuple[list[CardSuggestion], list[str]]:
-    """Validate AI suggestions against the local DB and color identity (used for chat)."""
-    names = [item.get("name", "") for item in raw_items if item.get("name")]
-    matched, unresolved = await card_service.resolve_card_names(pool, names)
-
-    suggestions: list[CardSuggestion] = []
-    for card in matched:
-        violations = set(card.color_identity) - set(commander.color_identity)
-        if violations:
-            unresolved.append(card.name)
-            continue
-        raw = next((r for r in raw_items if r.get("name", "").lower() == card.name.lower()), {})
-        suggestions.append(_suggestion_from_card(card, raw))
-
-    return suggestions, unresolved
 
 
 def _resolve_stage(
@@ -993,60 +818,6 @@ async def suggest_cards(
     )
     suggestions = [_card_from_retrieved(c, "theme", query_tags, ownership_map) for c in candidates]
     return SuggestResponse(suggestions=suggestions, unresolved=[])
-
-
-async def chat_about_deck(
-    pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    deck_id: UUID,
-    account_id: UUID,
-    email: str,
-    message: str,
-) -> ChatResponse:
-    """Handle a free-form chat message about the deck.
-
-    If the assistant response contains a JSON array of card suggestions, they are
-    validated and returned alongside the reply text.
-
-    Args:
-        pool: asyncpg connection pool.
-        ai_client: LLM adapter.
-        deck_id: The deck's UUID.
-        message: User's chat message.
-
-    Returns:
-        ChatResponse with reply text and any parsed card suggestions.
-
-    Raises:
-        DeckNotFoundError: If the deck does not exist.
-    """
-    deck = await deck_service.get_deck(pool, deck_id, email)
-    if deck is None:
-        raise DeckNotFoundError(f"Deck {deck_id} not found")
-
-    commander = await card_service.get_card_by_id(pool, deck.commander_id)
-    if commander is None:
-        raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
-
-    partner = None
-    if deck.partner_id:
-        partner = await card_service.get_card_by_id(pool, deck.partner_id)
-
-    prefs, downvoted = await _load_prompt_context(pool, deck, account_id)
-    system = _build_system_prompt(deck, commander, partner, prefs, downvoted)
-    history = await conversation_service.get_recent_turns(pool, deck_id, _MAX_HISTORY_TURNS)
-    raw_response = await _call_llm(ai_client, system, history, message)
-
-    raw_items = _parse_suggestions(raw_response)
-    suggestions: list[CardSuggestion] = []
-    if raw_items:
-        suggestions, _ = await _validate_suggestions(pool, raw_items, commander)
-
-    await conversation_service.append_turn(pool, deck_id, "user", message)
-    if raw_response:
-        await conversation_service.append_turn(pool, deck_id, "assistant", raw_response)
-
-    return ChatResponse(reply=raw_response, suggestions=suggestions)
 
 
 # Known strategy tags the retrieval system recognizes — injected into the agent prompt

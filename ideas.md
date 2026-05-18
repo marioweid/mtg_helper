@@ -1,6 +1,4 @@
 # Next Features
-  - Chat page is dead — app/decks/[id]/chat/page.tsx is a 6-line redirect to deck detail. AI chat
-  (/api/v1/decks/{id}/chat) exists on the backend. UI surface never built. (Can be remove no ai chat needed) Rmoev the chat page and all features also the backend for it all dependencies etc. is dont like the feature and want dead code from it gone
   - "Cuts" suggestion — not implemented. Would need backend endpoint + UI. (Nice to have feature implement this), important to not suggest a cut of combo pieces
   - Bracket validator — flag Game Changers, MLD, mass LD, fast mana, infinite combos vs declared bracket. You have brackets + combos data but no enforcement.
 

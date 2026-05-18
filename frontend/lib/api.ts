@@ -4,8 +4,6 @@ import type {
   BuildResponse,
   CardResponse,
   CardSuggestion,
-  ChatHistoryResponse,
-  ChatResponse,
   ComboListResponse,
   CollectionCardAdd,
   CollectionCardItem,
@@ -244,15 +242,6 @@ export const apiClient = {
         card_types: opts?.card_types && opts.card_types.length > 0 ? opts.card_types : null,
         subtypes: opts?.subtypes && opts.subtypes.length > 0 ? opts.subtypes : null,
       }),
-    }),
-
-  getChatHistory: (deckId: string) =>
-    request<ChatHistoryResponse>(`/decks/${deckId}/chat/history`),
-
-  chatWithDeck: (deckId: string, message: string) =>
-    request<ChatResponse>(`/decks/${deckId}/chat`, {
-      method: "POST",
-      body: JSON.stringify({ message }),
     }),
 
   describeDeck: (body: DescribeRequest) =>

@@ -38,27 +38,6 @@ async def test_describe_rate_limit_trips_after_threshold(client: AsyncClient) ->
 
 
 @pytest.mark.asyncio
-async def test_chat_rate_limit_trips_after_threshold(client: AsyncClient) -> None:
-    """21st chat call within the window returns 429."""
-    app.state.ai_client = _stub_ai_client()
-    await create_test_account(client, "Rate Chat")
-
-    deck_resp = await client.post(
-        "/api/v1/decks",
-        json={"commander_scryfall_id": str(HAZEL_SCRYFALL_ID), "name": "Rate Test Deck"},
-    )
-    deck_id = deck_resp.json()["data"]["id"]
-
-    for _ in range(20):
-        resp = await client.post(f"/api/v1/decks/{deck_id}/chat", json={"message": "hi"})
-        assert resp.status_code == 200
-
-    resp = await client.post(f"/api/v1/decks/{deck_id}/chat", json={"message": "hi"})
-    assert resp.status_code == 429
-    assert resp.json()["detail"]["code"] == "RATE_LIMITED"
-
-
-@pytest.mark.asyncio
 async def test_rate_limit_keys_are_per_account(client: AsyncClient) -> None:
     """Different authenticated accounts get independent rate-limit buckets."""
     app.state.ai_client = _stub_ai_client()

@@ -206,45 +206,6 @@ async def test_suggest_cards_returns_200(client: AsyncClient) -> None:
     assert isinstance(data["unresolved"], list)
 
 
-# ── chat_about_deck ───────────────────────────────────────────────────────────
-
-
-async def test_chat_about_deck_returns_reply(client: AsyncClient) -> None:
-    deck_id = await _create_deck(client)
-    app.state.ai_client = _make_ai_client("This is a great commander for a token strategy!")
-
-    resp = await client.post(
-        f"/api/v1/decks/{deck_id}/chat",
-        json={"message": "What do you think?"},
-    )
-
-    assert resp.status_code == 200
-    data = resp.json()["data"]
-    assert "token" in data["reply"].lower()
-    assert data["suggestions"] == []
-
-
-async def test_chat_returns_suggestions_when_llm_outputs_card_json(client: AsyncClient) -> None:
-    """Chat endpoint still uses LLM and returns parsed card suggestions."""
-    import json
-
-    deck_id = await _create_deck(client)
-    card_json = json.dumps(
-        [{"name": "Sol Ring", "category": "ramp", "reasoning": "fast mana", "synergies": []}]
-    )
-    app.state.ai_client = _make_ai_client(card_json)
-
-    resp = await client.post(
-        f"/api/v1/decks/{deck_id}/chat",
-        json={"message": "Give me ramp"},
-    )
-
-    assert resp.status_code == 200
-    data = resp.json()["data"]
-    names = [s["name"] for s in data["suggestions"]]
-    assert "Sol Ring" in names
-
-
 # ── feedback boosting ─────────────────────────────────────────────────────────
 
 

@@ -135,7 +135,7 @@ export default function DeckDetailPage() {
 
   async function handleDeleteDeck() {
     if (!deck) return;
-    if (!confirm(`Delete "${deck.name}"? All cards, feedback, and chat history will be permanently removed.`)) return;
+    if (!confirm(`Delete "${deck.name}"? All cards and feedback will be permanently removed.`)) return;
     setDeleting(true);
     try {
       await apiClient.deleteDeck(deck.id);

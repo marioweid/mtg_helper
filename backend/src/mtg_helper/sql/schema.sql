@@ -165,17 +165,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_feedback_deck_card
 
 CREATE INDEX IF NOT EXISTS idx_deck_feedback_deck_id ON deck_feedback (deck_id);
 
--- ============================================================
--- CONVERSATION TURNS (AI chat history per deck)
--- ============================================================
-CREATE TABLE IF NOT EXISTS conversation_turns (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    deck_id         UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
-    role            TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-    content         TEXT NOT NULL,
-    turn_order      INTEGER NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- Deck chat feature was removed; drop the legacy conversation_turns table on
+-- existing databases. Safe no-op if the table was never created.
+DROP TABLE IF EXISTS conversation_turns;
 
 -- ============================================================
 -- ACCOUNT RANKING WEIGHTS (per-user signal weight overrides)

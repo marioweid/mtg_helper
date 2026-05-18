@@ -11,10 +11,6 @@ from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
     BuildResponse,
-    ChatHistoryResponse,
-    ChatRequest,
-    ChatResponse,
-    ChatTurn,
     DescribeRequest,
     DescribeResponse,
     KeywordExtractRequest,
@@ -23,7 +19,7 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import ai_service, conversation_service, deck_service, rate_limit_service
+from mtg_helper.services import ai_service, deck_service, rate_limit_service
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
 
@@ -32,7 +28,6 @@ CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
 # Per-key rate limits for LLM-backed endpoints. Both window and count are tuned
 # for interactive use; drop the limit when deploying to a multi-replica setup.
 _DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
-_CHAT_LIMIT = (20, 60)  # 20 calls / 60 seconds
 
 
 def _llm_unavailable(detail: str) -> HTTPException:
@@ -139,53 +134,6 @@ async def suggest_cards(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
-    return DataResponse(data=result)
-
-
-@router.get("/{deck_id}/chat/history", response_model=DataResponse[ChatHistoryResponse])
-async def get_chat_history(
-    deck_id: UUID,
-    request: Request,
-    account: CurrentAccount,
-) -> DataResponse[ChatHistoryResponse]:
-    """Return the full conversation history for a deck.
-
-    Raises 404 if the deck does not exist or is not owned by the caller.
-    """
-    email = _require_email(account)
-    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
-    if deck is None:
-        raise HTTPException(
-            status_code=404, detail={"code": "DECK_NOT_FOUND", "message": "Deck not found"}
-        )
-    raw = await conversation_service.get_turns(request.app.state.db_pool, deck_id)
-    turns = [ChatTurn(role=t["role"], content=t["content"]) for t in raw]
-    return DataResponse(data=ChatHistoryResponse(turns=turns))
-
-
-@router.post("/{deck_id}/chat", response_model=DataResponse[ChatResponse])
-async def chat_about_deck(
-    deck_id: UUID,
-    body: ChatRequest,
-    request: Request,
-    account: CurrentAccount,
-) -> DataResponse[ChatResponse]:
-    """Send a free-form chat message about the deck."""
-    email = _require_email(account)
-    _enforce_rate_limit(account, "chat", _CHAT_LIMIT)
-    try:
-        result = await ai_service.chat_about_deck(
-            request.app.state.db_pool,
-            request.app.state.ai_client,
-            deck_id,
-            account.id,
-            email,
-            body.message,
-        )
-    except DeckNotFoundError as e:
-        raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
-    except LLMEmptyResponseError as e:
-        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 

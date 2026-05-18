@@ -51,12 +51,6 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
         >
           {buildLabel}
         </Link>
-        <Link
-          href={`/decks/${deckId}/chat`}
-          className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-center text-sm text-gray-200 transition-colors hover:border-white/40 hover:text-white sm:flex-none"
-        >
-          Chat
-        </Link>
         <button
           type="button"
           onClick={onOpenStats}

@@ -18,7 +18,7 @@ export function DeleteDeckButton({ deckId, deckName }: DeleteDeckButtonProps) {
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(`Delete "${deckName}"? All cards, feedback, and chat history will be permanently removed.`)) return;
+    if (!confirm(`Delete "${deckName}"? All cards and feedback will be permanently removed.`)) return;
     setDeleting(true);
     try {
       await apiClient.deleteDeck(deckId);
