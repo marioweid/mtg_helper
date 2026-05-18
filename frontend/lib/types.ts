@@ -325,24 +325,6 @@ export interface BracketValidationResponse {
   violations: BracketViolation[];
 }
 
-export interface CutsRequest {
-  count?: number;
-}
-
-export interface CutSuggestion {
-  scryfall_id: string;
-  name: string;
-  type_line: string | null;
-  image_uri: string | null;
-  cmc: number | null;
-  reasoning: string;
-}
-
-export interface CutsResponse {
-  cuts: CutSuggestion[];
-  protected_count: number;
-}
-
 export interface ColorStatus {
   color: string;
   pip_count: number;

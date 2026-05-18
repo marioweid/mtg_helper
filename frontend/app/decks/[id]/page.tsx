@@ -7,10 +7,9 @@ import { apiClient } from "@/lib/api";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { DeckDetailSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
-import { BracketValidationPanel } from "@/components/bracket-validation-panel";
+import { BracketSelector } from "@/components/bracket-selector";
 import { ComboTab } from "@/components/combo-tab";
-import { CutsPanel } from "@/components/cuts-panel";
-import type { BracketValidationResponse, ComboListResponse } from "@/lib/types";
+import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
@@ -82,8 +81,6 @@ export default function DeckDetailPage() {
     sort: "default",
   });
   const [combos, setCombos] = useState<ComboListResponse | null>(null);
-  const [bracketValidation, setBracketValidation] =
-    useState<BracketValidationResponse | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -104,14 +101,6 @@ export default function DeckDetailPage() {
       .getDeckCombos(deckId)
       .then((data) => {
         if (!cancelled) setCombos(data);
-      })
-      .catch(() => {
-        /* non-critical */
-      });
-    apiClient
-      .getBracketValidation(deckId)
-      .then((data) => {
-        if (!cancelled) setBracketValidation(data);
       })
       .catch(() => {
         /* non-critical */
@@ -312,13 +301,11 @@ export default function DeckDetailPage() {
                   })}
                 </div>
               )}
-              <BracketValidationPanel validation={bracketValidation} />
-              {deck.cards.length > 0 && (
-                <CutsPanel
-                  deckId={deck.id}
-                  onRemoveCard={(scryfallId) => handleRemoveCard(scryfallId)}
-                />
-              )}
+              <BracketSelector
+                deckId={deck.id}
+                bracket={deck.bracket}
+                onBracketChange={(b) => setDeck({ ...deck, bracket: b })}
+              />
               {deck.cards.length > 0 && (
                 <DeckFilterBar
                   value={filter}

@@ -120,30 +120,6 @@ class KeywordExtractRequest(BaseModel):
     message: str = Field(default="", max_length=2000)
 
 
-class CutsRequest(BaseModel):
-    """Request body for AI-suggested cuts from a deck."""
-
-    count: int = Field(default=10, ge=1, le=25)
-
-
-class CutSuggestion(BaseModel):
-    """A single card recommended for removal, with reasoning."""
-
-    scryfall_id: UUID
-    name: str
-    type_line: str | None = None
-    image_uri: str | None = None
-    cmc: float | None = None
-    reasoning: str
-
-
-class CutsResponse(BaseModel):
-    """Response from a cuts suggestion request."""
-
-    cuts: list[CutSuggestion]
-    protected_count: int
-
-
 class ColorStatus(BaseModel):
     """Per-color mana-base health for a deck."""
 

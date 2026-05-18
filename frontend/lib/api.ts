@@ -3,8 +3,6 @@ import type {
   AccountUpdate,
   BracketValidationResponse,
   BuildResponse,
-  CutsRequest,
-  CutsResponse,
   CardResponse,
   CardSuggestion,
   ComboListResponse,
@@ -152,12 +150,6 @@ export const apiClient = {
 
   getBracketValidation: (id: string) =>
     request<BracketValidationResponse>(`/decks/${id}/bracket-validation`),
-
-  suggestCuts: (deckId: string, body: CutsRequest = {}) =>
-    request<CutsResponse>(`/decks/${deckId}/suggest-cuts`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
 
   manaFix: (deckId: string) =>
     request<ManaFixResponse>(`/decks/${deckId}/mana-fix`, {
