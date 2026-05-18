@@ -68,12 +68,21 @@ def _build_system_prompt() -> str:
         "You are a Magic: The Gathering Commander (EDH) deck-tuning assistant. "
         "Given a deck list, a commander, and an explicit set of protected cards "
         "(combo pieces, the commander, basic lands), recommend which non-protected "
-        "cards to cut from the deck. Prefer cutting the weakest cards for the "
-        "deck's strategy: low-impact filler, redundant effects, cards that don't "
-        "advance the commander's plan. Never recommend cutting a protected card. "
-        "Quality over quantity: return only cards that genuinely deserve cutting. "
-        "It is correct to return fewer cuts — or none at all — when the deck is "
-        "already tight. Never pad the list to hit a target count."
+        "cards to cut from the deck. Never recommend cutting a protected card.\n\n"
+        "First infer the deck's archetype from the commander and the candidate "
+        "list (e.g. Enchantress, Voltron, Aristocrats, Spellslinger, Tokens, "
+        "Stax). Then ALWAYS cut cards that meet any of these criteria:\n"
+        "  • Off-archetype cards that don't advance the commander's plan (e.g. "
+        "    Equipment in an Enchantress deck, creatures in a deep Spellslinger "
+        "    deck, ramp pieces in a Stax shell that hates artifacts).\n"
+        "  • Strict upgrades exist among the deck's other cards.\n"
+        "  • Redundant low-impact effects with no synergy payoff.\n"
+        "  • High-CMC vanilla cards with no relevant text in this deck.\n\n"
+        "Off-archetype misfits are the highest-priority cuts and must appear "
+        "first in the result. Quality over quantity: do not pad with marginal "
+        "cards — but if any misfits exist, you MUST recommend cutting them. "
+        "Returning zero cuts is only correct when every non-protected card "
+        "genuinely supports the deck's plan."
     )
 
 
@@ -99,14 +108,16 @@ def _build_user_prompt(
         "Candidates (eligible to cut):",
         *cand_lines,
         "",
-        f"Recommend up to {count} cards worth cutting — fewer (or zero) if the "
-        "deck is already lean. Do NOT pad the list. Each card you list must be "
-        "clearly weaker than typical staples for this archetype. Return ONLY a "
-        "JSON object on a single line with this exact shape (no code fences, "
-        "no prose):",
+        f"Recommend up to {count} cards worth cutting. Off-archetype misfits "
+        "go first and must be included — Equipment in an Enchantress deck, "
+        "creatures in a Spellslinger deck, etc. are obvious examples. After "
+        "the misfits, only add cuts that are clearly weaker than this deck's "
+        "staples; do not pad with marginal cards. Return ONLY a JSON object "
+        "on a single line with this exact shape (no code fences, no prose):",
         '{"cuts": [{"name": "Card Name", "reasoning": "why it should be cut"}]}',
         "Use card names exactly as written in the candidates list. Return "
-        '{"cuts": []} when nothing deserves cutting.',
+        '{"cuts": []} only when every non-protected card genuinely supports '
+        "the commander's strategy.",
     ]
     return "\n".join(parts)
 

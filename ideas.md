@@ -1,14 +1,8 @@
 # Next Features
-  - "Cuts" suggestion — not implemented. Would need backend endpoint + UI. (Nice to have feature implement this), important to not suggest a cut of combo pieces
-  - Bracket validator — flag Game Changers, MLD, mass LD, fast mana, infinite combos vs declared bracket. You have brackets + combos data but no enforcement.
-  - in deck view only show color filters for colors we have f.e. dont show black for blue/red commander
 
 # Ideas
   - Goldfish playtest + health scorecard combo. Both rank highest on "thing enthusiasts actually use during deck tuning", reuse data you already have, no new backend integrations.
-  - No mana-base auto-fix — suggest fixing color requirements / missing fetches.
-  - No "owned in collection" badge on the deck card list (it's on suggestions, not on existing deck cards).
   - Budget swap suggestions — "deck €120 → here 8 swaps saving €60 with <10% function loss". You have prices + retrieval; missing the swap-finder.
-  - Collection-aware build — "build from owned cards only" toggle in wizard. Collections exist but build doesn't filter.
   - Playtest / goldfish opening hand — shuffle, draw 7, mulligan to London, sim turns 1–4. Huge for tuning land count + curve. Nothing in app does this.
   - Mana base auditor — pip count per color, recommended land count by avg CMC, "you need 2 more white sources for double-pip turn 3". Curve chart shows shape but not color reqs.
   - Drag-and-drop categories — original big-move list, never built. (implement this)
