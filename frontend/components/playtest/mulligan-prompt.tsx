@@ -5,6 +5,7 @@ interface Props {
   mulliganCount: number;
   bottoming: Set<string>;
   bottomNeeded: number;
+  canMulligan: boolean;
   onKeep: () => void;
   onMulligan: () => void;
   onToggleBottom: (uid: string) => void;
@@ -17,6 +18,7 @@ export function MulliganPrompt({
   mulliganCount,
   bottoming,
   bottomNeeded,
+  canMulligan,
   onKeep,
   onMulligan,
   onToggleBottom,
@@ -78,9 +80,10 @@ export function MulliganPrompt({
           <button
             type="button"
             onClick={onMulligan}
-            className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-200 hover:border-white/40 hover:text-white"
+            disabled={!canMulligan}
+            className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-200 hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Mulligan
+            {canMulligan ? "Mulligan" : "Max mulligans"}
           </button>
         </div>
       ) : (

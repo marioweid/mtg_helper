@@ -311,8 +311,8 @@ export default function DeckDetailPage() {
                 <DeckFilterBar
                   value={filter}
                   onChange={setFilter}
-                  resultCount={visibleCards.length}
-                  totalCount={deck.cards.length}
+                  resultCount={totalCardCount(visibleCards)}
+                  totalCount={totalCardCount(deck.cards)}
                   availableColors={deck.commander_color_identity}
                 />
               )}

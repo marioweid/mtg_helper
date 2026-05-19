@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -12,6 +12,11 @@ import {
   shuffle,
   type PlaytestCard,
 } from "@/lib/playtest";
+import type { DeckCardItem } from "@/lib/types";
+import { CardDetailModal } from "@/components/card-detail-modal";
+import { CommanderSection } from "@/components/commander-section";
+import type { CommanderCardSummary } from "@/lib/types";
+import { DeckGrid } from "@/components/deck-grid";
 import { Battlefield } from "@/components/playtest/battlefield";
 import { HandRow } from "@/components/playtest/hand-row";
 import { ManaReadout } from "@/components/playtest/mana-readout";
@@ -19,6 +24,7 @@ import { MulliganPrompt } from "@/components/playtest/mulligan-prompt";
 import { PlaytestStatsPanel } from "@/components/playtest/stats-panel";
 
 const MAX_TURNS = 4;
+const MAX_MULLIGANS = 7;
 
 type Phase = "loading" | "mulligan" | "bottoming" | "playing" | "done";
 
@@ -126,6 +132,7 @@ function handleConfirmBottom(state: GameState): GameState {
 }
 
 function handleMulligan(state: GameState): GameState {
+  if (state.mulliganCount >= MAX_MULLIGANS) return state;
   const fullLibrary = [...state.library, ...state.hand];
   const { hand, rest } = freshDeal(fullLibrary);
   return {
@@ -280,10 +287,17 @@ export default function PlaytestPage() {
   const params = useParams();
   const deckId = params["id"] as string;
   const [state, dispatch] = useReducer(reducer, deckId, initialState);
+  const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
+  const [commander, setCommander] = useState<CommanderCardSummary | null>(null);
+  const [partner, setPartner] = useState<CommanderCardSummary | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const loadDeck = useCallback(async () => {
     try {
       const deck = await apiClient.getDeck(deckId);
+      setDeckCards(deck.cards);
+      setCommander(deck.commander_card);
+      setPartner(deck.partner_card);
       const expanded = expandDeck(deck.cards);
       const { hand, rest } = freshDeal(expanded);
       dispatch({ type: "DECK_LOADED", deckName: deck.name, library: rest, hand });
@@ -365,6 +379,7 @@ export default function PlaytestPage() {
           mulliganCount={state.mulliganCount}
           bottoming={state.bottoming}
           bottomNeeded={bottomNeeded}
+          canMulligan={state.mulliganCount < MAX_MULLIGANS}
           onKeep={() => dispatch({ type: "KEEP_HAND" })}
           onMulligan={() => dispatch({ type: "TAKE_MULLIGAN" })}
           onToggleBottom={(uid) => dispatch({ type: "TOGGLE_BOTTOM", uid })}
@@ -457,6 +472,23 @@ export default function PlaytestPage() {
           </div>
         </>
       )}
+
+      {deckCards.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-medium text-gray-400">Deck overview</h2>
+          <CommanderSection commander={commander} partner={partner} />
+          <DeckGrid cards={deckCards} onCardClick={setSelectedCardId} />
+        </section>
+      )}
+
+      <CardDetailModal
+        card={
+          selectedCardId
+            ? deckCards.find((c) => c.deck_card_id === selectedCardId) ?? null
+            : null
+        }
+        onClose={() => setSelectedCardId(null)}
+      />
     </div>
   );
 }
