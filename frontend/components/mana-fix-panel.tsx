@@ -25,29 +25,33 @@ function ColorRow({ color }: { color: ColorStatus }) {
   const turnRisk = color.turn_deficit > 0;
   return (
     <tr className={deficit || turnRisk ? "bg-red-900/10" : ""}>
-      <td className="px-2 py-1">
-        <span className="inline-flex items-center gap-1.5">
+      <td className="px-1 py-1">
+        <span className="inline-flex items-center gap-1">
           <span className={`h-3 w-3 rounded-full ${COLOR_DOT[color.color] ?? "bg-gray-400"}`} />
           <span className="font-medium text-white">{color.color}</span>
         </span>
       </td>
-      <td className="px-2 py-1 tabular-nums text-gray-300">{color.pip_count.toFixed(1)}</td>
-      <td className="px-2 py-1 tabular-nums text-gray-300">{color.source_count}</td>
-      <td className="px-2 py-1 tabular-nums text-gray-300">{color.target}</td>
-      <td className="px-2 py-1 tabular-nums">
+      <td className="px-1 py-1 tabular-nums text-gray-300">{color.pip_count.toFixed(1)}</td>
+      <td
+        className="px-1 py-1 tabular-nums text-gray-300"
+        title={`Sources / target = ${color.source_count}/${color.target}`}
+      >
+        {color.source_count}
+        <span className="text-gray-600">/{color.target}</span>
+      </td>
+      <td className="px-1 py-1 tabular-nums">
         {deficit ? (
           <span className="font-medium text-red-300">−{color.deficit}</span>
         ) : (
           <span className="text-emerald-400">ok</span>
         )}
       </td>
-      <td className="px-2 py-1 tabular-nums text-gray-300">
+      <td
+        className="px-1 py-1 tabular-nums text-gray-300"
+        title={turnRisk ? `Need ${color.turn_demand} sources by turn` : undefined}
+      >
         {color.turn_demand > 0 ? color.turn_demand : "—"}
-        {turnRisk && (
-          <span className="ml-1 text-red-400" title={`Need ${color.turn_demand} sources`}>
-            ⚠
-          </span>
-        )}
+        {turnRisk && <span className="ml-0.5 text-red-400">⚠</span>}
       </td>
     </tr>
   );
@@ -208,23 +212,35 @@ export function ManaFixPanel({ deckId, onAddCard }: Props) {
               <span className="text-gray-300">{report.ramp_count}</span> ramp
             </span>
           </div>
-          <table className="w-full text-xs">
-            <thead className="text-left text-gray-500">
-              <tr>
-                <th className="px-2 py-1 font-normal">Color</th>
-                <th className="px-2 py-1 font-normal">Pips</th>
-                <th className="px-2 py-1 font-normal">Sources</th>
-                <th className="px-2 py-1 font-normal">Target</th>
-                <th className="px-2 py-1 font-normal">Deficit</th>
-                <th className="px-2 py-1 font-normal">Turn need</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {report.colors.map((c) => (
-                <ColorRow key={c.color} color={c} />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead className="text-left text-gray-500">
+                <tr>
+                  <th className="px-1 py-1 font-normal">Col</th>
+                  <th className="px-1 py-1 font-normal" title="Colored pips on non-land cards">
+                    Pips
+                  </th>
+                  <th className="px-1 py-1 font-normal" title="Sources you have / target">
+                    Src/Tgt
+                  </th>
+                  <th className="px-1 py-1 font-normal" title="Shortfall vs target">
+                    Def
+                  </th>
+                  <th
+                    className="px-1 py-1 font-normal"
+                    title="Sources needed for the hardest pip requirement on curve"
+                  >
+                    Turn
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {report.colors.map((c) => (
+                  <ColorRow key={c.color} color={c} />
+                ))}
+              </tbody>
+            </table>
+          </div>
           <div className="mt-1 text-[11px] text-gray-500">
             {report.total_colored_pips.toFixed(1)} colored pips
           </div>
