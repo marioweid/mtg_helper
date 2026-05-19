@@ -292,6 +292,12 @@ export const apiClient = {
       return res.text();
     }),
 
+  exportBuylist: (deckId: string): Promise<string> =>
+    fetch(`${CLIENT_BASE}/decks/${deckId}/export/buylist`).then((res) => {
+      if (!res.ok) throw new ApiError("EXPORT_FAILED", "Buy list export failed");
+      return res.text();
+    }),
+
   // Feedback
   addFeedback: (deckId: string, body: FeedbackCreate) =>
     request<FeedbackResponse>(`/decks/${deckId}/feedback`, {

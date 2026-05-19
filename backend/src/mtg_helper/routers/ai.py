@@ -272,6 +272,23 @@ async def extract_keywords(
     return DataResponse(data=result)
 
 
+@router.get("/{deck_id}/export/buylist")
+async def export_buylist(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> Response:
+    """Export Cardmarket-compatible wants list: deck cards the user doesn't own yet."""
+    email = _require_email(account)
+    result = await deck_service.export_buylist(
+        request.app.state.db_pool, deck_id, email, account_id=account.id
+    )
+    if result is None:
+        raise _deck_not_found(deck_id)
+    _deck_name, export_text = result
+    return Response(content=export_text, media_type="text/plain")
+
+
 @router.get("/{deck_id}/export/moxfield")
 async def export_moxfield(
     deck_id: UUID,

@@ -19,6 +19,7 @@ interface Props {
 export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
   const toast = useToast();
   const [exporting, setExporting] = useState(false);
+  const [copyingBuylist, setCopyingBuylist] = useState(false);
 
   async function handleExport() {
     setExporting(true);
@@ -36,6 +37,23 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
       toast.push(err instanceof ApiError ? err.message : "Export failed", "error");
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleBuylist() {
+    setCopyingBuylist(true);
+    try {
+      const text = await apiClient.exportBuylist(deckId);
+      if (!text.trim()) {
+        toast.push("Nothing to buy — you own everything", "success");
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast.push("Buy list copied to clipboard", "success");
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Buy list failed", "error");
+    } finally {
+      setCopyingBuylist(false);
     }
   }
 
@@ -63,6 +81,15 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
           className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-200 transition-colors hover:border-white/40 hover:text-white sm:flex-none"
         >
           Stats
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleBuylist()}
+          disabled={copyingBuylist}
+          className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-200 transition-colors hover:border-white/40 hover:text-white disabled:opacity-50 sm:flex-none"
+          title="Copy missing cards to clipboard (Cardmarket wants format)"
+        >
+          {copyingBuylist ? "Copying…" : "Buy list"}
         </button>
         <button
           type="button"

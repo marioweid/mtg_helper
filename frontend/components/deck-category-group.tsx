@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { DraggableAttributes } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CardDetailPanel } from "@/components/card-detail-panel";
 import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
@@ -12,6 +14,7 @@ interface Props {
   category: string;
   cards: DeckCardItem[];
   deckId?: string;
+  draggable?: boolean;
   onRemove?: (scryfallId: string) => void;
   onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
   onSwapped?: () => void | Promise<void>;
@@ -19,10 +22,29 @@ interface Props {
   comboCardIds?: Set<string>;
 }
 
+function DraggableCardRow({
+  card,
+  children,
+}: {
+  card: DeckCardItem;
+  children: (handle: {
+    setNodeRef: (el: HTMLElement | null) => void;
+    listeners: Record<string, unknown> | undefined;
+    attributes: DraggableAttributes;
+    isDragging: boolean;
+  }) => React.ReactNode;
+}) {
+  const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
+    id: card.scryfall_id,
+  });
+  return <>{children({ setNodeRef, listeners, attributes, isDragging })}</>;
+}
+
 export function DeckCategoryGroup({
   category,
   cards,
   deckId,
+  draggable = false,
   onRemove,
   onSetCategories,
   onSwapped,
@@ -31,9 +53,17 @@ export function DeckCategoryGroup({
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [openCard, setOpenCard] = useState<string | null>(null);
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: category });
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5">
+    <div
+      ref={draggable ? setDropRef : undefined}
+      className={`rounded-xl border bg-white/5 transition-colors ${
+        isOver && draggable
+          ? "border-indigo-400 ring-2 ring-indigo-500/40"
+          : "border-white/10"
+      }`}
+    >
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
@@ -50,10 +80,20 @@ export function DeckCategoryGroup({
           {cards.map((card) => {
             const isOpen = openCard === card.deck_card_id;
             const tags = bucketsFor(card).filter((t) => t !== "untagged");
-            return (
+            const inner = (handle?: {
+              setNodeRef: (el: HTMLElement | null) => void;
+              listeners: Record<string, unknown> | undefined;
+              attributes: DraggableAttributes;
+              isDragging: boolean;
+            }) => (
               <li
                 key={card.deck_card_id}
-                className="relative hover:bg-white/5 transition-colors"
+                ref={handle?.setNodeRef}
+                {...(handle?.attributes ?? {})}
+                {...(handle?.listeners ?? {})}
+                className={`relative hover:bg-white/5 transition-colors ${
+                  handle?.isDragging ? "opacity-50" : ""
+                } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
                 <button
                   onClick={() => setOpenCard(isOpen ? null : card.deck_card_id)}
@@ -116,6 +156,14 @@ export function DeckCategoryGroup({
                 )}
               </li>
             );
+            if (draggable) {
+              return (
+                <DraggableCardRow key={card.deck_card_id} card={card}>
+                  {(handle) => inner(handle)}
+                </DraggableCardRow>
+              );
+            }
+            return inner();
           })}
         </ul>
       )}

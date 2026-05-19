@@ -15,7 +15,8 @@ export type Stage = (typeof STAGES)[number];
 export const STAGE_LABELS: Record<string, string> = {
   bangers: "Bangers",
   ramp: "Ramp",
-  interaction: "Interaction",
+  interaction: "Removal",
+  wipes: "Wipes",
   draw: "Card Draw",
   theme: "Theme",
   utility: "Utility",
@@ -43,7 +44,8 @@ export const CATEGORY_TARGETS: Record<string, [number, number]> = {
 export const STAGE_DEFAULTS: Record<string, number> = {
   bangers: 10,
   ramp: 10,
-  interaction: 9,
+  interaction: 8,
+  wipes: 2,
   draw: 9,
   theme: 22,
   utility: 6,

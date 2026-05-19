@@ -88,6 +88,7 @@ export interface DeckCardItem {
   added_by: string;
   ai_reasoning: string | null;
   qualifying_stages: string[];
+  tags: string[];
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
 }

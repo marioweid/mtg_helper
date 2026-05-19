@@ -599,6 +599,37 @@ async def build_ownership_map(
     return result
 
 
+async def owned_quantities(
+    pool: asyncpg.Pool,
+    account_id: UUID | None,
+    scryfall_ids: list[UUID],
+) -> dict[UUID, int]:
+    """Sum owned quantity per ``scryfall_id`` across all of the account's collections.
+
+    Quantities are summed across every collection owned by ``account_id`` and
+    every printing of the same oracle card. Returns an empty mapping when the
+    account is anonymous or the input list is empty.
+    """
+    if account_id is None or not scryfall_ids:
+        return {}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT cards.scryfall_id AS scryfall_id,
+                   SUM(cc.quantity)::int AS total
+            FROM collection_cards cc
+            JOIN collections c ON c.id = cc.collection_id
+            JOIN cards ON cards.id = cc.card_id
+            WHERE c.account_id = $1
+              AND cards.scryfall_id = ANY($2::uuid[])
+            GROUP BY cards.scryfall_id
+            """,
+            account_id,
+            scryfall_ids,
+        )
+    return {row["scryfall_id"]: row["total"] for row in rows}
+
+
 async def get_owned_card_ids_for_collections(
     pool: asyncpg.Pool, collection_ids: list[UUID]
 ) -> frozenset[UUID]:

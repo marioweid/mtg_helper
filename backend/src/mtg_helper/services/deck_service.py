@@ -122,6 +122,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         added_by=row["added_by"],
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
+        tags=tags,
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
     )
 
@@ -592,6 +593,45 @@ async def export_moxfield(
         lines.extend(by_category[category])
 
     return deck.name, "\n".join(lines)
+
+
+async def export_buylist(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    email: str | None,
+    *,
+    account_id: UUID | None,
+) -> tuple[str, str] | None:
+    """Export the cards the user still needs to buy in Cardmarket wants format.
+
+    Diff: ``deck quantity - owned quantity`` per card (summed across all the
+    user's collections). Plain text, one ``<missing_qty> <name>`` per line,
+    sorted alphabetically. Cards fully owned are omitted.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck's UUID.
+        email: When provided, the deck must be owned by this email or None
+            is returned.
+        account_id: Account whose collections are diffed against the deck.
+
+    Returns:
+        Tuple of ``(deck_name, text)`` or None if the deck isn't found/owned.
+        ``text`` is empty when nothing is missing.
+    """
+    deck = await get_deck(pool, deck_id, email)
+    if deck is None:
+        return None
+    scryfall_ids = [c.scryfall_id for c in deck.cards]
+    owned = await collection_service.owned_quantities(pool, account_id, scryfall_ids)
+    missing: list[tuple[str, int]] = []
+    for card in deck.cards:
+        deficit = max(0, card.quantity - owned.get(card.scryfall_id, 0))
+        if deficit > 0:
+            missing.append((card.name, deficit))
+    missing.sort(key=lambda x: x[0].lower())
+    text = "\n".join(f"{qty} {name}" for name, qty in missing)
+    return deck.name, text
 
 
 async def update_deck_card_categories(

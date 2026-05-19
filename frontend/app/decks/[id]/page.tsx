@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { apiClient } from "@/lib/api";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { DeckDetailSkeleton } from "@/components/skeleton";
@@ -179,6 +187,21 @@ export default function DeckDetailPage() {
     }
   }
 
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+    const scryfallId = String(active.id);
+    const target = String(over.id);
+    if (target === "bangers") return;
+    const next = target === "untagged" ? [] : [target];
+    void handleSetCategories(scryfallId, next);
+  }
+
   if (error) {
     return (
       <p className="rounded-lg border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
@@ -326,6 +349,23 @@ export default function DeckDetailPage() {
                   onCardClick={setSelectedCardId}
                   comboCardIds={comboCardIds}
                 />
+              ) : viewMode === "tags" ? (
+                <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
+                  {categories.map((cat) => (
+                    <DeckCategoryGroup
+                      key={cat}
+                      category={cat}
+                      cards={groups[cat] ?? []}
+                      deckId={deck.id}
+                      draggable
+                      onRemove={handleRemoveCard}
+                      onSetCategories={handleSetCategories}
+                      onSwapped={load}
+                      petCardNames={petCardNames}
+                      comboCardIds={comboCardIds}
+                    />
+                  ))}
+                </DndContext>
               ) : (
                 categories.map((cat) => (
                   <DeckCategoryGroup

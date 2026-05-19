@@ -1,7 +1,14 @@
 import type { DeckCardItem } from "@/lib/types";
 import { STAGE_DEFAULTS, STAGE_LABELS } from "@/lib/constants";
 
-const SCORECARD_STAGES = ["ramp", "interaction", "draw", "utility", "lands"] as const;
+const SCORECARD_STAGES = [
+  "ramp",
+  "interaction",
+  "wipes",
+  "draw",
+  "utility",
+  "lands",
+] as const;
 type ScorecardStage = (typeof SCORECARD_STAGES)[number];
 
 type Status = "low" | "ok" | "high";
@@ -14,6 +21,8 @@ interface Row {
   status: Status;
 }
 
+const WIPE_TAGS = new Set(["destroy_all", "exile_all"]);
+
 function qty(card: DeckCardItem): number {
   return card.quantity ?? 1;
 }
@@ -25,6 +34,12 @@ function isLand(card: DeckCardItem): boolean {
 function countStage(cards: DeckCardItem[], stage: ScorecardStage): number {
   if (stage === "lands") {
     return cards.reduce((sum, c) => (isLand(c) ? sum + qty(c) : sum), 0);
+  }
+  if (stage === "wipes") {
+    return cards.reduce(
+      (sum, c) => (!isLand(c) && c.tags.some((t) => WIPE_TAGS.has(t)) ? sum + qty(c) : sum),
+      0,
+    );
   }
   return cards.reduce(
     (sum, c) => (c.qualifying_stages.includes(stage) && !isLand(c) ? sum + qty(c) : sum),
@@ -41,9 +56,9 @@ function statusFor(actual: number, target: number): Status {
 }
 
 const STATUS_PIP: Record<Status, { glyph: string; text: string; tone: string }> = {
-  low: { glyph: "⚠", text: "low", tone: "text-yellow-400" },
-  ok: { glyph: "●", text: "ok", tone: "text-green-400" },
-  high: { glyph: "⚠", text: "high", tone: "text-yellow-400" },
+  low: { glyph: "🔴", text: "low", tone: "text-red-300" },
+  ok: { glyph: "🟢", text: "ok", tone: "text-emerald-300" },
+  high: { glyph: "🟡", text: "high", tone: "text-yellow-300" },
 };
 
 interface Props {
@@ -64,9 +79,18 @@ export function DeckScorecard({ cards, stageTargets }: Props) {
     };
   });
 
+  const okCount = rows.filter((r) => r.status === "ok").length;
+  const overallGlyph =
+    okCount === rows.length ? "🟢" : okCount >= rows.length - 1 ? "🟡" : "🔴";
+
   return (
     <div>
-      <h3 className="mb-3 text-sm font-medium text-gray-400">Health</h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-400">Health</h3>
+        <span className="text-xs text-gray-300">
+          {overallGlyph} {okCount}/{rows.length} on target
+        </span>
+      </div>
       <div className="flex flex-col gap-1.5">
         {rows.map((row) => {
           const pip = STATUS_PIP[row.status];
@@ -78,9 +102,7 @@ export function DeckScorecard({ cards, stageTargets }: Props) {
                   {row.actual}
                   <span className="text-gray-600"> / {row.target}</span>
                 </span>
-                <span className={`${pip.tone} w-10 text-right`}>
-                  {pip.glyph} {pip.text}
-                </span>
+                <span className={`${pip.tone} w-10 text-right`}>{pip.glyph}</span>
               </span>
             </div>
           );
