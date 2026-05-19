@@ -120,6 +120,23 @@ class KeywordExtractRequest(BaseModel):
     message: str = Field(default="", max_length=2000)
 
 
+class RiskyCard(BaseModel):
+    """A non-land card whose colored pip requirement exceeds available sources.
+
+    ``sources_required`` is the Karsten heuristic for the card's CMC turn and
+    solid pip count in the given color.
+    """
+
+    card_id: UUID
+    name: str
+    mana_cost: str | None
+    cmc: int = Field(ge=0)
+    color: str = Field(pattern="^[WUBRG]$")
+    pips_required: int = Field(ge=1)
+    sources_available: int = Field(ge=0)
+    sources_required: int = Field(ge=0)
+
+
 class ColorStatus(BaseModel):
     """Per-color mana-base health for a deck."""
 
@@ -128,6 +145,9 @@ class ColorStatus(BaseModel):
     source_count: int = Field(ge=0)
     target: int = Field(ge=0)
     deficit: int = Field(ge=0)
+    turn_demand: int = Field(default=0, ge=0)
+    turn_deficit: int = Field(default=0, ge=0)
+    risky_cards: list[RiskyCard] = Field(default_factory=list)
 
 
 class ManaBaseReport(BaseModel):
@@ -136,6 +156,10 @@ class ManaBaseReport(BaseModel):
     total_lands: int = Field(ge=0)
     total_colored_pips: float = Field(ge=0.0)
     colors: list[ColorStatus] = Field(default_factory=list)
+    avg_cmc: float = Field(default=0.0, ge=0.0)
+    ramp_count: int = Field(default=0, ge=0)
+    recommended_lands: int = Field(default=0, ge=0)
+    land_delta: int = Field(default=0)
 
 
 class ManaFixResponse(BaseModel):

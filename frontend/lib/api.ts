@@ -41,6 +41,8 @@ import type {
   RankingWeightsResponse,
   RankingWeightsUpdate,
   SuggestResponse,
+  SwapRequest,
+  SwapResponse,
   TribalTag,
 } from "@/lib/types";
 
@@ -161,6 +163,12 @@ export const apiClient = {
 
   playtestSimulate: (deckId: string, body: PlaytestSimulateRequest = {}) =>
     request<PlaytestStats>(`/decks/${deckId}/playtest/simulate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  findSwaps: (deckId: string, cardId: string, body: SwapRequest = {}) =>
+    request<SwapResponse>(`/decks/${deckId}/cards/${cardId}/swap`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

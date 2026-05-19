@@ -21,15 +21,18 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.common import DataResponse
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
+from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
     ai_service,
     deck_service,
     mana_base_service,
     playtest_service,
     rate_limit_service,
+    swap_service,
 )
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
+from mtg_helper.services.swap_service import SwapError
 
 CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
 
@@ -181,6 +184,37 @@ async def mana_fix(
         deck,
         account.id,
     )
+    return DataResponse(data=result)
+
+
+@router.post("/{deck_id}/cards/{card_id}/swap", response_model=DataResponse[SwapResponse])
+async def find_swaps(
+    deck_id: UUID,
+    card_id: UUID,
+    body: SwapRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[SwapResponse]:
+    """Return cheaper alternatives to a deck card, ranked by function similarity."""
+    email = _require_email(account)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    try:
+        result = await swap_service.find_budget_swaps(
+            request.app.state.db_pool,
+            request.app.state.ai_client,
+            request.app.state.qdrant_client,
+            deck,
+            card_id,
+            max_price_cents=body.max_price_cents,
+            account_id=account.id,
+            limit=body.limit,
+        )
+    except SwapError as e:
+        raise HTTPException(
+            status_code=400, detail={"code": "SWAP_UNAVAILABLE", "message": str(e)}
+        ) from e
     return DataResponse(data=result)
 
 

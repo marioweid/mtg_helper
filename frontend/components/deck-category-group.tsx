@@ -11,8 +11,10 @@ import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 interface Props {
   category: string;
   cards: DeckCardItem[];
+  deckId?: string;
   onRemove?: (scryfallId: string) => void;
   onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
+  onSwapped?: () => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
 }
@@ -20,8 +22,10 @@ interface Props {
 export function DeckCategoryGroup({
   category,
   cards,
+  deckId,
   onRemove,
   onSetCategories,
+  onSwapped,
   petCardNames,
   comboCardIds,
 }: Props) {
@@ -103,8 +107,10 @@ export function DeckCategoryGroup({
                   <div className="border-t border-white/5 bg-black/20 px-4 py-3">
                     <CardDetailPanel
                       card={card}
+                      {...(deckId ? { deckId } : {})}
                       onRemove={onRemove}
                       onSetCategories={onSetCategories}
+                      {...(onSwapped ? { onSwapped } : {})}
                     />
                   </div>
                 )}

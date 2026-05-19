@@ -5,7 +5,7 @@ import { ApiError, apiClient } from "@/lib/api";
 import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
 import { OwnedBadge } from "@/components/owned-badge";
-import type { CardSuggestion, ColorStatus, ManaBaseReport } from "@/lib/types";
+import type { CardSuggestion, ColorStatus, ManaBaseReport, RiskyCard } from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -22,8 +22,9 @@ const COLOR_DOT: Record<string, string> = {
 
 function ColorRow({ color }: { color: ColorStatus }) {
   const deficit = color.deficit > 0;
+  const turnRisk = color.turn_deficit > 0;
   return (
-    <tr className={deficit ? "bg-red-900/10" : ""}>
+    <tr className={deficit || turnRisk ? "bg-red-900/10" : ""}>
       <td className="px-2 py-1">
         <span className="inline-flex items-center gap-1.5">
           <span className={`h-3 w-3 rounded-full ${COLOR_DOT[color.color] ?? "bg-gray-400"}`} />
@@ -40,7 +41,29 @@ function ColorRow({ color }: { color: ColorStatus }) {
           <span className="text-emerald-400">ok</span>
         )}
       </td>
+      <td className="px-2 py-1 tabular-nums text-gray-300">
+        {color.turn_demand > 0 ? color.turn_demand : "—"}
+        {turnRisk && (
+          <span className="ml-1 text-red-400" title={`Need ${color.turn_demand} sources`}>
+            ⚠
+          </span>
+        )}
+      </td>
     </tr>
+  );
+}
+
+function RiskyCardItem({ card }: { card: RiskyCard }) {
+  const cost = card.mana_cost ? <ManaCost cost={card.mana_cost} /> : null;
+  return (
+    <li className="text-xs text-gray-300">
+      <span className="text-white">{card.name}</span>
+      {cost && <span className="ml-1 text-gray-400">({cost})</span>}
+      <span className="ml-1 text-gray-500">
+        — turn {card.cmc} needs {card.sources_required} {card.color} sources, you have{" "}
+        {card.sources_available}
+      </span>
+    </li>
   );
 }
 
@@ -118,6 +141,7 @@ export function ManaFixPanel({ deckId, onAddCard }: Props) {
   }
 
   const hasDeficit = (report?.colors ?? []).some((c) => c.deficit > 0);
+  const allRisky: RiskyCard[] = (report?.colors ?? []).flatMap((c) => c.risky_cards);
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
@@ -146,6 +170,34 @@ export function ManaFixPanel({ deckId, onAddCard }: Props) {
 
       {report && (
         <div className="mt-3">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+            <span>
+              <span className="text-gray-300">{report.total_lands}</span> lands
+            </span>
+            <span className="text-gray-600">·</span>
+            <span>
+              recommended <span className="text-gray-300">{report.recommended_lands}</span>
+            </span>
+            {report.land_delta !== 0 && (
+              <span
+                className={
+                  report.land_delta > 0
+                    ? "rounded bg-amber-900/30 px-1.5 py-0.5 text-amber-300"
+                    : "rounded bg-amber-900/30 px-1.5 py-0.5 text-amber-300"
+                }
+              >
+                {report.land_delta > 0 ? `+${report.land_delta} lands` : `${report.land_delta} lands`}
+              </span>
+            )}
+            <span className="text-gray-600">·</span>
+            <span>
+              avg CMC <span className="text-gray-300">{report.avg_cmc.toFixed(2)}</span>
+            </span>
+            <span className="text-gray-600">·</span>
+            <span>
+              <span className="text-gray-300">{report.ramp_count}</span> ramp
+            </span>
+          </div>
           <table className="w-full text-xs">
             <thead className="text-left text-gray-500">
               <tr>
@@ -154,6 +206,7 @@ export function ManaFixPanel({ deckId, onAddCard }: Props) {
                 <th className="px-2 py-1 font-normal">Sources</th>
                 <th className="px-2 py-1 font-normal">Target</th>
                 <th className="px-2 py-1 font-normal">Deficit</th>
+                <th className="px-2 py-1 font-normal">Turn need</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -163,9 +216,22 @@ export function ManaFixPanel({ deckId, onAddCard }: Props) {
             </tbody>
           </table>
           <div className="mt-1 text-[11px] text-gray-500">
-            {report.total_lands} lands · {report.total_colored_pips.toFixed(1)} colored pips
+            {report.total_colored_pips.toFixed(1)} colored pips
           </div>
         </div>
+      )}
+
+      {report && allRisky.length > 0 && (
+        <details className="mt-3 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+          <summary className="cursor-pointer text-xs text-gray-400">
+            Risky cards ({allRisky.length})
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {allRisky.map((r) => (
+              <RiskyCardItem key={`${r.card_id}-${r.color}`} card={r} />
+            ))}
+          </ul>
+        </details>
       )}
 
       {report && !hasDeficit && (

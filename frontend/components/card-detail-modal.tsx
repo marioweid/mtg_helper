@@ -9,8 +9,10 @@ import type { DeckCardItem } from "@/lib/types";
 interface Props {
   card: DeckCardItem | null;
   onClose: () => void;
+  deckId?: string;
   onRemove?: (scryfallId: string) => void;
   onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
+  onSwapped?: () => void | Promise<void>;
 }
 
 /**
@@ -18,7 +20,14 @@ interface Props {
  * Closes on Esc or clicking the scrim. Used by the grid view; the list view
  * keeps its inline expansion.
  */
-export function CardDetailModal({ card, onClose, onRemove, onSetCategories }: Props) {
+export function CardDetailModal({
+  card,
+  onClose,
+  deckId,
+  onRemove,
+  onSetCategories,
+  onSwapped,
+}: Props) {
   useEffect(() => {
     if (!card) return;
     const onKey = (e: KeyboardEvent) => {
@@ -51,8 +60,10 @@ export function CardDetailModal({ card, onClose, onRemove, onSetCategories }: Pr
         </div>
         <CardDetailPanel
           card={card}
+          {...(deckId ? { deckId } : {})}
           onRemove={onRemove}
           onSetCategories={onSetCategories}
+          {...(onSwapped ? { onSwapped } : {})}
           showImage
         />
       </div>

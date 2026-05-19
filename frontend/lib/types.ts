@@ -325,24 +325,59 @@ export interface BracketValidationResponse {
   violations: BracketViolation[];
 }
 
+export interface RiskyCard {
+  card_id: string;
+  name: string;
+  mana_cost: string | null;
+  cmc: number;
+  color: string;
+  pips_required: number;
+  sources_available: number;
+  sources_required: number;
+}
+
 export interface ColorStatus {
   color: string;
   pip_count: number;
   source_count: number;
   target: number;
   deficit: number;
+  turn_demand: number;
+  turn_deficit: number;
+  risky_cards: RiskyCard[];
 }
 
 export interface ManaBaseReport {
   total_lands: number;
   total_colored_pips: number;
   colors: ColorStatus[];
+  avg_cmc: number;
+  ramp_count: number;
+  recommended_lands: number;
+  land_delta: number;
 }
 
 export interface ManaFixResponse {
   report: ManaBaseReport;
   suggestions: CardSuggestion[];
   unresolved: string[];
+}
+
+export interface SwapCandidate extends CardSuggestion {
+  price_delta_cents: number;
+  function_loss_pct: number;
+  similarity_breakdown: Record<string, number>;
+}
+
+export interface SwapResponse {
+  source_card_id: string;
+  source_price_cents: number | null;
+  candidates: SwapCandidate[];
+}
+
+export interface SwapRequest {
+  max_price_cents?: number;
+  limit?: number;
 }
 
 // Playtest

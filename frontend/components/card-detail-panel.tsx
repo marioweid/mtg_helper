@@ -1,15 +1,18 @@
 "use client";
 
 import { OracleText } from "@/components/mana-cost";
+import { SwapPanel } from "@/components/swap-panel";
 import { CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import type { DeckCardItem } from "@/lib/types";
 
 interface Props {
   card: DeckCardItem;
+  deckId?: string | undefined;
   onRemove?: ((scryfallId: string) => void | Promise<void>) | undefined;
   onSetCategories?:
     | ((scryfallId: string, categories: string[]) => void | Promise<void>)
     | undefined;
+  onSwapped?: (() => void | Promise<void>) | undefined;
   showImage?: boolean | undefined;
 }
 
@@ -24,7 +27,14 @@ const CATEGORY_OPTIONS = CATEGORY_ORDER.filter((c) => c !== "bangers");
  * ``CardDetailModal`` (grid view). The ``showImage`` flag controls whether
  * the card art appears; the list view sets it to false to keep rows compact.
  */
-export function CardDetailPanel({ card, onRemove, onSetCategories, showImage }: Props) {
+export function CardDetailPanel({
+  card,
+  deckId,
+  onRemove,
+  onSetCategories,
+  onSwapped,
+  showImage,
+}: Props) {
   function toggleCategory(cat: string) {
     if (!onSetCategories) return;
     const has = card.categories.includes(cat);
@@ -90,6 +100,16 @@ export function CardDetailPanel({ card, onRemove, onSetCategories, showImage }: 
               })}
             </div>
           </div>
+        ) : null}
+
+        {deckId ? (
+          <SwapPanel
+            deckId={deckId}
+            sourceCardId={card.card_id}
+            sourceScryfallId={card.scryfall_id}
+            sourceName={card.name}
+            {...(onSwapped ? { onSwapped } : {})}
+          />
         ) : null}
 
         {onRemove ? (

@@ -12,15 +12,26 @@ interface Props {
 
 const TRIAL_OPTIONS = [100, 500, 1000, 5000] as const;
 
+const TURNS_MIN = 1;
+const TURNS_MAX = 10;
+
+function clampTurns(raw: string, fallback: number): number {
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(TURNS_MAX, Math.max(TURNS_MIN, n));
+}
+
 export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
   const [trials, setTrials] = useState<number>(1000);
-  const [turns, setTurns] = useState<number>(defaultTurns);
+  const [turnsText, setTurnsText] = useState<string>(String(defaultTurns));
   const [onThePlay, setOnThePlay] = useState<boolean>(true);
   const [stats, setStats] = useState<PlaytestStats | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleRun() {
+    const turns = clampTurns(turnsText, defaultTurns);
+    setTurnsText(String(turns));
     setRunning(true);
     setError(null);
     try {
@@ -66,10 +77,12 @@ export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
           Turns
           <input
             type="number"
-            min={1}
-            max={10}
-            value={turns}
-            onChange={(e) => setTurns(Number.parseInt(e.target.value, 10) || 1)}
+            inputMode="numeric"
+            min={TURNS_MIN}
+            max={TURNS_MAX}
+            value={turnsText}
+            onChange={(e) => setTurnsText(e.target.value)}
+            onBlur={() => setTurnsText(String(clampTurns(turnsText, defaultTurns)))}
             disabled={running}
             className="w-16 rounded border border-white/15 bg-zinc-900 px-2 py-1 text-gray-100"
           />

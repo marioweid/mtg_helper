@@ -332,8 +332,10 @@ export default function DeckDetailPage() {
                     key={cat}
                     category={cat}
                     cards={groups[cat] ?? []}
+                    deckId={deck.id}
                     onRemove={handleRemoveCard}
                     onSetCategories={handleSetCategories}
+                    onSwapped={load}
                     petCardNames={petCardNames}
                     comboCardIds={comboCardIds}
                   />
@@ -394,11 +396,16 @@ export default function DeckDetailPage() {
       <CardDetailModal
         card={selectedCard}
         onClose={() => setSelectedCardId(null)}
+        deckId={deck.id}
         onRemove={async (id) => {
           await handleRemoveCard(id);
           setSelectedCardId(null);
         }}
         onSetCategories={handleSetCategories}
+        onSwapped={async () => {
+          await load();
+          setSelectedCardId(null);
+        }}
       />
 
       <StatsModal
