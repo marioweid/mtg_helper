@@ -20,6 +20,7 @@ import {
 } from "@/components/deck-filter-bar";
 import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
+import { DeckScorecard } from "@/components/deck-scorecard";
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
@@ -383,6 +384,9 @@ export default function DeckDetailPage() {
           <ManaFixPanel deckId={deck.id} onAddCard={handleAddCard} />
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <DeckStats cards={deck.cards} />
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <DeckScorecard cards={deck.cards} stageTargets={deck.stage_targets} />
           </div>
         </div>
       </div>

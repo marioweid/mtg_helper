@@ -20,10 +20,12 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
+from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
 from mtg_helper.services import (
     ai_service,
     deck_service,
     mana_base_service,
+    playtest_service,
     rate_limit_service,
 )
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
@@ -34,6 +36,7 @@ CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
 # Per-key rate limits for LLM-backed endpoints. Both window and count are tuned
 # for interactive use; drop the limit when deploying to a multi-replica setup.
 _DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
+_PLAYTEST_LIMIT = (20, 60)  # 20 sim runs / 60 seconds — CPU-bound, cap abuse
 
 
 def _llm_unavailable(detail: str) -> HTTPException:
@@ -141,6 +144,23 @@ async def suggest_cards(
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
     return DataResponse(data=result)
+
+
+@router.post("/{deck_id}/playtest/simulate", response_model=DataResponse[PlaytestStats])
+async def playtest_simulate(
+    deck_id: UUID,
+    body: PlaytestSimulateRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[PlaytestStats]:
+    """Run N goldfish trials and return per-turn aggregate stats."""
+    email = _require_email(account)
+    _enforce_rate_limit(account, "playtest_simulate", _PLAYTEST_LIMIT)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    stats = playtest_service.simulate(deck, body)
+    return DataResponse(data=stats)
 
 
 @router.post("/{deck_id}/mana-fix", response_model=DataResponse[ManaFixResponse])

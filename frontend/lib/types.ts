@@ -345,6 +345,33 @@ export interface ManaFixResponse {
   unresolved: string[];
 }
 
+// Playtest
+export interface PlaytestSimulateRequest {
+  trials?: number;
+  turns?: number;
+  on_the_play?: boolean;
+  max_mulligans?: number;
+  seed?: number | null;
+}
+
+export interface PlaytestTurnStat {
+  turn: number;
+  avg_lands_in_play: number;
+  avg_spells_cast_cumulative: number;
+  pct_land_drop: number;
+  pct_cast_any: number;
+}
+
+export interface PlaytestStats {
+  trials: number;
+  turns: number;
+  on_the_play: boolean;
+  avg_mulligans: number;
+  mulligan_distribution: number[];
+  avg_total_spells_cast: number;
+  per_turn: PlaytestTurnStat[];
+}
+
 // Import
 export interface DeckImportRequest {
   deck_list: string;

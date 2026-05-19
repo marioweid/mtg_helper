@@ -32,6 +32,8 @@ import type {
   KeywordExtractResponse,
   ManaFixResponse,
   PaginationMeta,
+  PlaytestSimulateRequest,
+  PlaytestStats,
   PreferenceCreate,
   PreferenceResponse,
   QuickstartRequest,
@@ -155,6 +157,12 @@ export const apiClient = {
     request<ManaFixResponse>(`/decks/${deckId}/mana-fix`, {
       method: "POST",
       body: JSON.stringify({}),
+    }),
+
+  playtestSimulate: (deckId: string, body: PlaytestSimulateRequest = {}) =>
+    request<PlaytestStats>(`/decks/${deckId}/playtest/simulate`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   updateDeck: (deckId: string, body: DeckUpdate) =>
