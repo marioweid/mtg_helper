@@ -8,8 +8,11 @@ import { apiClient } from "@/lib/api";
 import {
   canCast,
   expandDeck,
+  landToSource,
   parseManaCost,
+  rampToSource,
   shuffle,
+  type ManaSource,
   type PlaytestCard,
 } from "@/lib/playtest";
 import type { DeckCardItem } from "@/lib/types";
@@ -45,8 +48,9 @@ interface GameState {
   hand: PlaytestCard[];
   bottoming: Set<string>;
   battlefieldLands: PlaytestCard[];
-  tappedLands: Set<string>;
   battlefieldOther: PlaytestCard[];
+  manaSources: ManaSource[];
+  tappedSources: Set<string>;
   graveyard: PlaytestCard[];
   turn: number;
   mulliganCount: number;
@@ -79,8 +83,9 @@ function initialState(deckId: string): GameState {
     hand: [],
     bottoming: new Set(),
     battlefieldLands: [],
-    tappedLands: new Set(),
     battlefieldOther: [],
+    manaSources: [],
+    tappedSources: new Set(),
     graveyard: [],
     turn: 0,
     mulliganCount: 0,
@@ -151,29 +156,57 @@ function handlePlayLand(state: GameState, uid: string): GameState {
   if (!card || !card.isLand) return state;
   const hand = state.hand.filter((c) => c.uid !== uid);
   const battlefieldLands = [...state.battlefieldLands, card];
+  const manaSources = [...state.manaSources, landToSource(card, state.turn)];
   const log = updateLog(state.log, (entry) => ({ ...entry, played: [...entry.played, card.name] }));
-  return { ...state, hand, battlefieldLands, landPlayedThisTurn: true, log };
+  return { ...state, hand, battlefieldLands, manaSources, landPlayedThisTurn: true, log };
+}
+
+function activeSources(state: GameState): ManaSource[] {
+  return state.manaSources.filter(
+    (s) => s.availableFromTurn <= state.turn && !state.tappedSources.has(s.uid),
+  );
 }
 
 function handleCast(state: GameState, uid: string): GameState {
   const card = state.hand.find((c) => c.uid === uid);
   if (!card || card.isLand) return state;
   const cost = parseManaCost(card.mana_cost);
-  const untapped = state.battlefieldLands.filter((l) => !state.tappedLands.has(l.uid));
-  if (!canCast(cost, untapped)) return state;
+  const available = activeSources(state);
+  if (!canCast(cost, available)) return state;
   const needed = cost.generic + sumColored(cost.colored);
-  const toTap = pickLandsForCost(untapped, cost, needed);
-  const tapped = new Set(state.tappedLands);
-  for (const land of toTap) tapped.add(land.uid);
-  const hand = state.hand.filter((c) => c.uid !== uid);
-  const battlefieldOther = card.type_line && /Instant|Sorcery/.test(card.type_line)
+  const toTap = pickSourcesForCost(available, cost, needed);
+  const tappedSources = new Set(state.tappedSources);
+  for (const src of toTap) tappedSources.add(src.uid);
+
+  let hand = state.hand.filter((c) => c.uid !== uid);
+  let library = state.library;
+  let manaSources = state.manaSources;
+
+  if (card.isDraw && card.drawCount > 0) {
+    const { drawn, rest } = drawN(library, card.drawCount);
+    library = rest;
+    hand = [...hand, ...drawn];
+  }
+  if (card.isRamp) {
+    manaSources = [...manaSources, rampToSource(card, state.turn)];
+  }
+
+  const isInstantSorcery = !!card.type_line && /Instant|Sorcery/.test(card.type_line);
+  const battlefieldOther = isInstantSorcery
     ? state.battlefieldOther
     : [...state.battlefieldOther, card];
-  const graveyard = card.type_line && /Instant|Sorcery/.test(card.type_line)
-    ? [...state.graveyard, card]
-    : state.graveyard;
+  const graveyard = isInstantSorcery ? [...state.graveyard, card] : state.graveyard;
   const log = updateLog(state.log, (entry) => ({ ...entry, cast: [...entry.cast, card.name] }));
-  return { ...state, hand, battlefieldOther, graveyard, tappedLands: tapped, log };
+  return {
+    ...state,
+    hand,
+    library,
+    manaSources,
+    battlefieldOther,
+    graveyard,
+    tappedSources,
+    log,
+  };
 }
 
 function handleEndTurn(state: GameState): GameState {
@@ -187,7 +220,7 @@ function handleEndTurn(state: GameState): GameState {
     turn: nextTurn,
     library: rest,
     hand: [...state.hand, ...drawn],
-    tappedLands: new Set(),
+    tappedSources: new Set(),
     landPlayedThisTurn: false,
     log: [...state.log, { turn: nextTurn, drew: drawn.length, played: [], cast: [] }],
   };
@@ -203,29 +236,29 @@ function sumColored(colored: Record<string, number>): number {
   return Object.values(colored).reduce((a, b) => a + b, 0);
 }
 
-function pickLandsForCost(
-  untapped: PlaytestCard[],
+function pickSourcesForCost(
+  sources: ManaSource[],
   cost: { generic: number; colored: Record<string, number> },
   needed: number,
-): PlaytestCard[] {
+): ManaSource[] {
   // Mirror canCast assignment: colored first, then any. Greedy is fine here
   // because canCast already proved the cost is payable.
   const used = new Set<string>();
-  const picked: PlaytestCard[] = [];
+  const picked: ManaSource[] = [];
   for (const [color, count] of Object.entries(cost.colored)) {
     for (let i = 0; i < count; i += 1) {
-      const land = untapped.find((l) => !used.has(l.uid) && l.produces.includes(color as never));
-      if (land) {
-        used.add(land.uid);
-        picked.push(land);
+      const src = sources.find((s) => !used.has(s.uid) && s.produces.includes(color as never));
+      if (src) {
+        used.add(src.uid);
+        picked.push(src);
       }
     }
   }
-  for (const land of untapped) {
+  for (const src of sources) {
     if (picked.length >= needed) break;
-    if (!used.has(land.uid)) {
-      used.add(land.uid);
-      picked.push(land);
+    if (!used.has(src.uid)) {
+      used.add(src.uid);
+      picked.push(src);
     }
   }
   return picked;
@@ -260,10 +293,10 @@ function reducer(state: GameState, action: Action): GameState {
     case "PLAY_LAND":
       return handlePlayLand(state, action.uid);
     case "TAP_LAND": {
-      const tapped = new Set(state.tappedLands);
+      const tapped = new Set(state.tappedSources);
       if (tapped.has(action.uid)) tapped.delete(action.uid);
       else tapped.add(action.uid);
-      return { ...state, tappedLands: tapped };
+      return { ...state, tappedSources: tapped };
     }
     case "CAST":
       return handleCast(state, action.uid);
@@ -313,9 +346,20 @@ export default function PlaytestPage() {
     void loadDeck();
   }, [loadDeck]);
 
-  const untappedLands = useMemo(
-    () => state.battlefieldLands.filter((l) => !state.tappedLands.has(l.uid)),
-    [state.battlefieldLands, state.tappedLands],
+  const untappedSources = useMemo(
+    () =>
+      state.manaSources.filter(
+        (s) => s.availableFromTurn <= state.turn && !state.tappedSources.has(s.uid),
+      ),
+    [state.manaSources, state.tappedSources, state.turn],
+  );
+  const activeSourceCount = useMemo(
+    () => state.manaSources.filter((s) => s.availableFromTurn <= state.turn).length,
+    [state.manaSources, state.turn],
+  );
+  const rampSources = useMemo(
+    () => state.manaSources.filter((s) => s.uid.startsWith("ramp:")),
+    [state.manaSources],
   );
 
   const castable = useMemo(() => {
@@ -323,10 +367,10 @@ export default function PlaytestPage() {
     for (const card of state.hand) {
       if (card.isLand) continue;
       const cost = parseManaCost(card.mana_cost);
-      if (canCast(cost, untappedLands)) set.add(card.uid);
+      if (canCast(cost, untappedSources)) set.add(card.uid);
     }
     return set;
-  }, [state.hand, untappedLands]);
+  }, [state.hand, untappedSources]);
 
   if (state.error) {
     return (
@@ -395,8 +439,8 @@ export default function PlaytestPage() {
                 Turn {state.turn}
               </span>
               <ManaReadout
-                untappedLands={untappedLands}
-                tappedCount={state.battlefieldLands.length - untappedLands.length}
+                untappedSources={untappedSources}
+                tappedCount={activeSourceCount - untappedSources.length}
               />
             </div>
             <div className="flex gap-2">
@@ -437,8 +481,10 @@ export default function PlaytestPage() {
                 <h2 className="mb-3 text-sm font-medium text-gray-400">Battlefield</h2>
                 <Battlefield
                   lands={state.battlefieldLands}
-                  tapped={state.tappedLands}
+                  tapped={state.tappedSources}
                   permanents={state.battlefieldOther}
+                  rampSources={rampSources}
+                  currentTurn={state.turn}
                   onTapLand={(uid) => dispatch({ type: "TAP_LAND", uid })}
                 />
               </div>

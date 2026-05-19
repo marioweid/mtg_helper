@@ -357,6 +357,7 @@ export interface PlaytestSimulateRequest {
 export interface PlaytestTurnStat {
   turn: number;
   avg_lands_in_play: number;
+  avg_mana_available: number;
   avg_spells_cast_cumulative: number;
   pct_land_drop: number;
   pct_cast_any: number;

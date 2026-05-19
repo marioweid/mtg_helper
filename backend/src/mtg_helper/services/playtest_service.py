@@ -16,6 +16,16 @@ from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats, T
 
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G", "C")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
+_DRAW_RE = re.compile(r"draw (a|one|two|three|four|five|\d+) cards?", re.IGNORECASE)
+_DRAW_MAX = 5
+_WORD_TO_INT: dict[str, int] = {
+    "a": 1,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+}
 
 _BASIC_LAND_PRODUCES: dict[str, str] = {
     "Plains": "W",
@@ -44,12 +54,27 @@ class SimCard:
     is_land: bool
     produces: tuple[str, ...]
     cost: ParsedCost | None
+    is_ramp: bool = False
+    is_draw: bool = False
+    draw_count: int = 0
+    ramp_produces: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ManaSource:
+    """A mana source on the battlefield. Lands enter immediately; ramp spells
+    create sources usable from the following turn (no same-turn fast mana).
+    """
+
+    produces: tuple[str, ...]
+    available_from_turn: int
 
 
 @dataclass
 class TrialResult:
     mulligans: int
     lands_in_play_by_turn: list[int]
+    mana_available_by_turn: list[int]
     spells_cast_by_turn: list[int]
     cumulative_spells_by_turn: list[int]
 
@@ -97,12 +122,44 @@ def parse_cost(mana_cost: str | None) -> ParsedCost:
     return ParsedCost(generic=generic, colored=tuple(sorted(colored.items())))
 
 
+def _parse_draw_count(oracle_text: str | None) -> int:
+    if not oracle_text:
+        return 1
+    match = _DRAW_RE.search(oracle_text)
+    if not match:
+        return 1
+    token = match.group(1).lower()
+    if token.isdigit():
+        return min(int(token), _DRAW_MAX)
+    return _WORD_TO_INT.get(token, 1)
+
+
+def _ramp_produces_for(card: DeckCardItem) -> tuple[str, ...]:
+    identity = tuple(c for c in (card.color_identity or []) if c in _COLORS)
+    return identity if identity else ("C",)
+
+
 def _to_sim_card(card: DeckCardItem) -> SimCard:
     is_land = "Land" in (card.type_line or "")
     produces = _land_produces(card) if is_land else ()
     cost = None if is_land else parse_cost(card.mana_cost)
     cmc = int(card.cmc) if card.cmc is not None else 0
-    return SimCard(name=card.name, cmc=cmc, is_land=is_land, produces=produces, cost=cost)
+    stages = card.qualifying_stages or []
+    is_ramp = not is_land and "ramp" in stages
+    is_draw = not is_land and "draw" in stages
+    draw_count = _parse_draw_count(card.oracle_text) if is_draw else 0
+    ramp_produces = _ramp_produces_for(card) if is_ramp else ()
+    return SimCard(
+        name=card.name,
+        cmc=cmc,
+        is_land=is_land,
+        produces=produces,
+        cost=cost,
+        is_ramp=is_ramp,
+        is_draw=is_draw,
+        draw_count=draw_count,
+        ramp_produces=ramp_produces,
+    )
 
 
 def _expand_deck(cards: list[DeckCardItem]) -> list[SimCard]:
@@ -114,56 +171,58 @@ def _expand_deck(cards: list[DeckCardItem]) -> list[SimCard]:
     return out
 
 
-def _can_cast(cost: ParsedCost, lands: list[SimCard]) -> bool:
-    """Return True iff ``lands`` can collectively pay ``cost``.
+def _can_cast(cost: ParsedCost, sources: list[ManaSource]) -> bool:
+    """Return True iff ``sources`` can collectively pay ``cost``.
 
     Solves the colored-requirement assignment with backtracking, then pays
-    generic from any remaining land. Lands.length must be at least the cost's
-    total mana value for any chance of success.
+    generic from any remaining source. ``sources.length`` must be at least the
+    cost's total mana value for any chance of success.
     """
     required: list[str] = []
     for color, count in cost.colored:
         required.extend([color] * count)
     needed = len(required) + cost.generic
-    if len(lands) < needed:
+    if len(sources) < needed:
         return False
-    used = [False] * len(lands)
-    if not _assign_colored(required, 0, lands, used):
+    used = [False] * len(sources)
+    if not _assign_colored(required, 0, sources, used):
         return False
     remaining = sum(1 for u in used if not u)
     return remaining >= cost.generic
 
 
-def _assign_colored(required: list[str], idx: int, lands: list[SimCard], used: list[bool]) -> bool:
+def _assign_colored(
+    required: list[str], idx: int, sources: list[ManaSource], used: list[bool]
+) -> bool:
     if idx >= len(required):
         return True
     color = required[idx]
-    for i, land in enumerate(lands):
-        if used[i] or color not in land.produces:
+    for i, source in enumerate(sources):
+        if used[i] or color not in source.produces:
             continue
         used[i] = True
-        if _assign_colored(required, idx + 1, lands, used):
+        if _assign_colored(required, idx + 1, sources, used):
             return True
         used[i] = False
     return False
 
 
-def _pay_cost(cost: ParsedCost, lands: list[SimCard]) -> list[SimCard]:
-    """Return the subset of lands consumed to pay ``cost``. Caller must have
+def _pay_cost(cost: ParsedCost, sources: list[ManaSource]) -> list[ManaSource]:
+    """Return the subset of sources consumed to pay ``cost``. Caller must have
     verified ``_can_cast`` first; mirrors that function's assignment order.
     """
     required: list[str] = []
     for color, count in cost.colored:
         required.extend([color] * count)
-    used = [False] * len(lands)
-    _assign_colored(required, 0, lands, used)
-    for i in range(len(lands)):
+    used = [False] * len(sources)
+    _assign_colored(required, 0, sources, used)
+    for i in range(len(sources)):
         if cost.generic <= 0:
             break
         if not used[i]:
             used[i] = True
             cost = ParsedCost(generic=cost.generic - 1, colored=cost.colored)
-    return [lands[i] for i in range(len(lands)) if used[i]]
+    return [sources[i] for i in range(len(sources)) if used[i]]
 
 
 def _count_lands(hand: list[SimCard]) -> int:
@@ -218,32 +277,49 @@ def _draw_opening(
         mulligans += 1
 
 
-def _play_land(hand: list[SimCard], battlefield: list[SimCard]) -> bool:
+def _play_land(
+    hand: list[SimCard], battlefield_lands: list[SimCard], mana_sources: list[ManaSource], turn: int
+) -> bool:
     for i, card in enumerate(hand):
         if card.is_land:
-            battlefield.append(card)
+            battlefield_lands.append(card)
+            mana_sources.append(ManaSource(produces=card.produces, available_from_turn=turn))
             hand.pop(i)
             return True
     return False
 
 
-def _cast_greedy(hand: list[SimCard], available_lands: list[SimCard]) -> int:
-    """Repeatedly cast the highest-CMC castable spell until none remain."""
+def _cast_turn(
+    hand: list[SimCard],
+    library: list[SimCard],
+    mana_sources: list[ManaSource],
+    turn: int,
+) -> int:
+    """Repeatedly cast the highest-CMC castable spell until none remain. Applies
+    ramp + draw effects as each spell resolves. Returns the spell count cast.
+    """
     cast_count = 0
+    available = [s for s in mana_sources if s.available_from_turn <= turn]
     while True:
         nonlands = [c for c in hand if not c.is_land]
-        castable = [
-            c for c in nonlands if c.cost is not None and _can_cast(c.cost, available_lands)
-        ]
+        castable = [c for c in nonlands if c.cost is not None and _can_cast(c.cost, available)]
         if not castable:
             return cast_count
         spell = max(castable, key=lambda c: c.cmc)
         assert spell.cost is not None
-        consumed = _pay_cost(spell.cost, available_lands)
-        for land in consumed:
-            available_lands.remove(land)
+        consumed = _pay_cost(spell.cost, available)
+        for src in consumed:
+            available.remove(src)
         hand.remove(spell)
         cast_count += 1
+        if spell.is_draw and spell.draw_count > 0:
+            drawn = library[: spell.draw_count]
+            del library[: spell.draw_count]
+            hand.extend(drawn)
+        if spell.is_ramp:
+            mana_sources.append(
+                ManaSource(produces=spell.ramp_produces, available_from_turn=turn + 1)
+            )
 
 
 def _run_trial(
@@ -255,7 +331,9 @@ def _run_trial(
 ) -> TrialResult:
     hand, library, mulligans = _draw_opening(library_template, rng, max_mulligans)
     battlefield_lands: list[SimCard] = []
+    mana_sources: list[ManaSource] = []
     lands_by_turn: list[int] = []
+    mana_by_turn: list[int] = []
     cast_by_turn: list[int] = []
     cumulative_by_turn: list[int] = []
     total_cast = 0
@@ -263,15 +341,18 @@ def _run_trial(
         if turn > 1 or not on_the_play:
             if library:
                 hand.append(library.pop(0))
-        _play_land(hand, battlefield_lands)
-        cast = _cast_greedy(hand, battlefield_lands.copy())
+        _play_land(hand, battlefield_lands, mana_sources, turn)
+        active = sum(1 for s in mana_sources if s.available_from_turn <= turn)
+        cast = _cast_turn(hand, library, mana_sources, turn)
         total_cast += cast
         lands_by_turn.append(len(battlefield_lands))
+        mana_by_turn.append(active)
         cast_by_turn.append(cast)
         cumulative_by_turn.append(total_cast)
     return TrialResult(
         mulligans=mulligans,
         lands_in_play_by_turn=lands_by_turn,
+        mana_available_by_turn=mana_by_turn,
         spells_cast_by_turn=cast_by_turn,
         cumulative_spells_by_turn=cumulative_by_turn,
     )
@@ -288,6 +369,7 @@ def _aggregate(
     per_turn: list[TurnStat] = []
     for turn_idx in range(turns):
         lands = [t.lands_in_play_by_turn[turn_idx] for t in trials]
+        mana = [t.mana_available_by_turn[turn_idx] for t in trials]
         cast_cum = [t.cumulative_spells_by_turn[turn_idx] for t in trials]
         cast_this = [t.spells_cast_by_turn[turn_idx] for t in trials]
         played_land = sum(1 for t in trials if _played_land(t, turn_idx))
@@ -296,6 +378,7 @@ def _aggregate(
             TurnStat(
                 turn=turn_idx + 1,
                 avg_lands_in_play=sum(lands) / n,
+                avg_mana_available=sum(mana) / n,
                 avg_spells_cast_cumulative=sum(cast_cum) / n,
                 pct_land_drop=played_land / n,
                 pct_cast_any=cast_any / n,

@@ -10,9 +10,12 @@ from httpx import AsyncClient
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestSimulateRequest
 from mtg_helper.services.playtest_service import (
+    ManaSource,
     _can_cast,
     _expand_deck,
     _land_produces,
+    _parse_draw_count,
+    _to_sim_card,
     parse_cost,
     simulate,
 )
@@ -27,6 +30,8 @@ def _make_card(
     type_line: str = "Creature — Human",
     color_identity: list[str] | None = None,
     quantity: int = 1,
+    qualifying_stages: list[str] | None = None,
+    oracle_text: str | None = None,
 ) -> DeckCardItem:
     return DeckCardItem(
         deck_card_id=uuid4(),
@@ -36,7 +41,7 @@ def _make_card(
         mana_cost=mana_cost,
         cmc=Decimal(str(cmc)),
         type_line=type_line,
-        oracle_text=None,
+        oracle_text=oracle_text,
         color_identity=color_identity or [],
         image_uri=None,
         rarity=None,
@@ -44,7 +49,7 @@ def _make_card(
         categories=[],
         added_by="ai",
         ai_reasoning=None,
-        qualifying_stages=[],
+        qualifying_stages=qualifying_stages or [],
         price_eur_cents=None,
     )
 
@@ -129,10 +134,8 @@ class TestLandProduces:
 
 
 class TestCanCast:
-    def _land(self, *colors: str):
-        from mtg_helper.services.playtest_service import SimCard
-
-        return SimCard(name="L", cmc=0, is_land=True, produces=tuple(colors), cost=None)
+    def _land(self, *colors: str) -> ManaSource:
+        return ManaSource(produces=tuple(colors), available_from_turn=0)
 
     def test_can_cast_single_colored_with_matching_land(self):
         assert _can_cast(parse_cost("{G}"), [self._land("G")]) is True
@@ -164,6 +167,162 @@ class TestExpandDeck:
         expanded = _expand_deck(cards)
         assert len(expanded) == 10
         assert all(c.is_land for c in expanded)
+
+
+class TestParseDrawCount:
+    def test_default_when_no_oracle(self):
+        assert _parse_draw_count(None) == 1
+        assert _parse_draw_count("") == 1
+
+    def test_default_when_no_match(self):
+        assert _parse_draw_count("Counter target spell.") == 1
+
+    def test_word_count(self):
+        assert _parse_draw_count("Target player draws two cards.") == 2
+        assert _parse_draw_count("Draw three cards.") == 3
+
+    def test_digit_count(self):
+        assert _parse_draw_count("Draw 4 cards.") == 4
+
+    def test_caps_at_max(self):
+        assert _parse_draw_count("Each player draws seven cards.") == 5
+        assert _parse_draw_count("Draw 99 cards.") == 5
+
+    def test_singular_card(self):
+        assert _parse_draw_count("Draw a card.") == 1
+
+
+class TestToSimCardEffects:
+    def test_ramp_creature(self):
+        card = _make_card(
+            "Llanowar Elves",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            qualifying_stages=["ramp"],
+        )
+        sim = _to_sim_card(card)
+        assert sim.is_ramp is True
+        assert sim.is_draw is False
+        assert sim.ramp_produces == ("G",)
+
+    def test_ramp_artifact_colorless(self):
+        card = _make_card(
+            "Sol Ring",
+            mana_cost="{1}",
+            cmc=1,
+            type_line="Artifact",
+            color_identity=[],
+            qualifying_stages=["ramp"],
+        )
+        sim = _to_sim_card(card)
+        assert sim.is_ramp is True
+        assert sim.ramp_produces == ("C",)
+
+    def test_draw_spell(self):
+        card = _make_card(
+            "Sign in Blood",
+            mana_cost="{B}{B}",
+            cmc=2,
+            type_line="Sorcery",
+            color_identity=["B"],
+            qualifying_stages=["draw"],
+            oracle_text="Target player draws two cards and loses 2 life.",
+        )
+        sim = _to_sim_card(card)
+        assert sim.is_draw is True
+        assert sim.draw_count == 2
+
+    def test_lands_never_get_effects(self):
+        card = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            qualifying_stages=["ramp"],  # bogus, but lands should ignore it
+        )
+        sim = _to_sim_card(card)
+        assert sim.is_ramp is False
+        assert sim.is_draw is False
+
+
+class TestRampEffect:
+    def test_ramp_adds_mana_next_turn(self):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            qualifying_stages=["lands"],
+            quantity=40,
+        )
+        elves = _make_card(
+            "Llanowar Elves",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            qualifying_stages=["ramp"],
+            quantity=59,
+        )
+        deck = _make_deck([forest, elves], ["G"])
+        stats = simulate(
+            deck, PlaytestSimulateRequest(trials=200, turns=4, on_the_play=True, seed=11)
+        )
+        # By T4 the ramp deck should have meaningfully more mana available than
+        # lands in play — every Llanowar cast on T1+ contributes +1 mana from
+        # the following turn onwards.
+        t4 = stats.per_turn[3]
+        assert t4.avg_mana_available > t4.avg_lands_in_play + 0.3
+
+    def test_lands_only_deck_mana_equals_lands(self):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            qualifying_stages=["lands"],
+            quantity=99,
+        )
+        deck = _make_deck([forest], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=50, turns=4, seed=3))
+        for turn in stats.per_turn:
+            assert turn.avg_mana_available == pytest.approx(turn.avg_lands_in_play)
+
+
+class TestDrawEffect:
+    def test_cantrip_fills_hand(self):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            qualifying_stages=["lands"],
+            quantity=40,
+        )
+        ponder = _make_card(
+            "Ponder-like",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            qualifying_stages=["draw"],
+            oracle_text="Draw a card.",
+            quantity=59,
+        )
+        deck = _make_deck([forest, ponder], ["G"])
+        # Compare against the same deck with the same shapes minus the draw tag.
+        plain = _make_card(
+            "Grizzly Bear",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            qualifying_stages=[],
+            quantity=59,
+        )
+        plain_deck = _make_deck([forest, plain], ["G"])
+        with_draw = simulate(deck, PlaytestSimulateRequest(trials=200, turns=4, seed=7))
+        without_draw = simulate(plain_deck, PlaytestSimulateRequest(trials=200, turns=4, seed=7))
+        # Both can cast their 1-drops on curve; the draw deck should also have
+        # cast strictly more spells by T4 because each cantrip refills the hand.
+        assert (
+            with_draw.per_turn[3].avg_spells_cast_cumulative
+            > without_draw.per_turn[3].avg_spells_cast_cumulative
+        )
 
 
 class TestSimulate:

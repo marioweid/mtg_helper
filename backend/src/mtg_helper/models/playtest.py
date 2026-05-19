@@ -22,6 +22,7 @@ class TurnStat(BaseModel):
 
     turn: int
     avg_lands_in_play: float
+    avg_mana_available: float
     avg_spells_cast_cumulative: float
     pct_land_drop: float
     pct_cast_any: float

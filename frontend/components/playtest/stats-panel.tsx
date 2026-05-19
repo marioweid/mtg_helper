@@ -130,6 +130,7 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
           <tr className="border-b border-white/10 text-gray-500">
             <th className="py-1 font-medium">Turn</th>
             <th className="py-1 font-medium">Avg lands</th>
+            <th className="py-1 font-medium">Avg mana</th>
             <th className="py-1 font-medium">Land drop</th>
             <th className="py-1 font-medium">Cast any</th>
             <th className="py-1 font-medium">Spells (cum)</th>
@@ -141,6 +142,9 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
               <td className="py-1.5 font-semibold text-white">{row.turn}</td>
               <td className="py-1.5 tabular-nums text-gray-200">
                 {row.avg_lands_in_play.toFixed(2)}
+              </td>
+              <td className="py-1.5 tabular-nums text-gray-200">
+                {row.avg_mana_available.toFixed(2)}
               </td>
               <td className="py-1.5 tabular-nums text-gray-200">{pct(row.pct_land_drop)}</td>
               <td className="py-1.5 tabular-nums text-gray-200">{pct(row.pct_cast_any)}</td>
