@@ -68,23 +68,10 @@ function RiskyCardItem({ card }: { card: RiskyCard }) {
 }
 
 function ProducesPips({ colors }: { colors: string[] }) {
-  if (!colors.length) {
-    return (
-      <span
-        className="inline-block h-3 w-3 rounded-full border border-white/20 bg-gray-500"
-        title="Colorless"
-      />
-    );
-  }
+  const tokens = colors.length ? colors.map((c) => `{${c}}`).join("") : "{C}";
   return (
-    <span className="inline-flex items-center gap-0.5">
-      {colors.map((c) => (
-        <span
-          key={c}
-          className={`h-3 w-3 rounded-full ${COLOR_DOT[c] ?? "bg-gray-400"}`}
-          title={`Produces ${c}`}
-        />
-      ))}
+    <span title={colors.length ? `Produces ${colors.join("")}` : "Colorless"}>
+      <ManaCost cost={tokens} />
     </span>
   );
 }
