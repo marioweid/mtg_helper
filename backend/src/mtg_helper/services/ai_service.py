@@ -235,6 +235,7 @@ def card_from_retrieved(
         toughness=card.toughness,
         rarity=card.rarity,
         cmc=cmc_float,
+        color_identity=list(card.color_identity or []),
         category=category,
         reasoning=reasoning,
         synergies=synergies,

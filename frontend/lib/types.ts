@@ -184,6 +184,7 @@ export interface CardSuggestion {
   toughness: string | null;
   rarity: string | null;
   cmc: number | null;
+  color_identity: string[];
   category: string;
   reasoning: string;
   synergies: string[];

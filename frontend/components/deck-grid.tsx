@@ -7,6 +7,11 @@ interface Props {
   cards: DeckCardItem[];
   onCardClick: (deckCardId: string) => void;
   comboCardIds?: Set<string>;
+  onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
+}
+
+function isBasicLand(card: DeckCardItem): boolean {
+  return !!card.type_line?.includes("Basic Land");
 }
 
 /**
@@ -15,7 +20,7 @@ interface Props {
  * of every card behind the top one is visible. Hover keeps the existing
  * floating popover; click opens a detail modal at the page level.
  */
-export function DeckGrid({ cards, onCardClick, comboCardIds }: Props) {
+export function DeckGrid({ cards, onCardClick, comboCardIds, onSetQuantity }: Props) {
   const groups = groupByPrimaryType(cards);
   const types = sortedPrimaryTypes(groups);
 
@@ -30,6 +35,7 @@ export function DeckGrid({ cards, onCardClick, comboCardIds }: Props) {
           cards={groups[type] ?? []}
           onCardClick={onCardClick}
           comboCardIds={comboCardIds}
+          onSetQuantity={onSetQuantity}
         />
       ))}
     </div>
@@ -41,9 +47,10 @@ interface ColumnProps {
   cards: DeckCardItem[];
   onCardClick: (deckCardId: string) => void;
   comboCardIds?: Set<string> | undefined;
+  onSetQuantity?: ((scryfallId: string, quantity: number) => void | Promise<void>) | undefined;
 }
 
-function DeckGridColumn({ type, cards, onCardClick, comboCardIds }: ColumnProps) {
+function DeckGridColumn({ type, cards, onCardClick, comboCardIds, onSetQuantity }: ColumnProps) {
   return (
     <section className="flex flex-col">
       <header className="mb-2 flex items-baseline justify-between px-1">
@@ -89,6 +96,32 @@ function DeckGridColumn({ type, cards, onCardClick, comboCardIds }: ColumnProps)
                 </span>
               ) : null}
             </button>
+            {isBasicLand(card) && onSetQuantity ? (
+              <div
+                className="absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/80 px-1.5 py-0.5 backdrop-blur"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => void onSetQuantity(card.scryfall_id, card.quantity - 1)}
+                  aria-label="Decrease quantity"
+                  className="h-5 w-5 rounded text-sm text-gray-200 hover:text-white"
+                >
+                  −
+                </button>
+                <span className="min-w-[1.5rem] text-center text-xs tabular-nums text-white">
+                  {card.quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void onSetQuantity(card.scryfall_id, card.quantity + 1)}
+                  aria-label="Increase quantity"
+                  className="h-5 w-5 rounded text-sm text-gray-200 hover:text-white"
+                >
+                  +
+                </button>
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>

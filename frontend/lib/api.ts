@@ -202,6 +202,16 @@ export const apiClient = {
         throw new ApiError("UPDATE_FAILED", "Failed to update card categories");
     }),
 
+  updateCardQuantity: (deckId: string, scryfallId: string, quantity: number) =>
+    fetch(`${CLIENT_BASE}/decks/${deckId}/cards/${scryfallId}/quantity`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity }),
+    }).then((res) => {
+      if (!res.ok && res.status !== 204)
+        throw new ApiError("UPDATE_FAILED", "Failed to update card quantity");
+    }),
+
   removeCard: (deckId: string, scryfallId: string) =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/cards/${scryfallId}`, {
       method: "DELETE",

@@ -67,6 +67,28 @@ function RiskyCardItem({ card }: { card: RiskyCard }) {
   );
 }
 
+function ProducesPips({ colors }: { colors: string[] }) {
+  if (!colors.length) {
+    return (
+      <span
+        className="inline-block h-3 w-3 rounded-full border border-white/20 bg-gray-500"
+        title="Colorless"
+      />
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {colors.map((c) => (
+        <span
+          key={c}
+          className={`h-3 w-3 rounded-full ${COLOR_DOT[c] ?? "bg-gray-400"}`}
+          title={`Produces ${c}`}
+        />
+      ))}
+    </span>
+  );
+}
+
 function SuggestionRow({
   card,
   onAdd,
@@ -79,7 +101,8 @@ function SuggestionRow({
   return (
     <li className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm text-gray-100">
+        <div className="flex items-center gap-2 truncate text-sm text-gray-100">
+          <ProducesPips colors={card.color_identity} />
           <CardHover name={card.name} imageUri={card.image_uri}>
             {card.name}
           </CardHover>

@@ -236,6 +236,7 @@ def _to_swap_candidate(
         toughness=base.toughness,
         rarity=base.rarity,
         cmc=base.cmc,
+        color_identity=base.color_identity,
         category=base.category,
         reasoning=base.reasoning,
         synergies=base.synergies,

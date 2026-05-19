@@ -187,6 +187,20 @@ export default function DeckDetailPage() {
     }
   }
 
+  async function handleSetQuantity(scryfallId: string, quantity: number) {
+    if (!deck) return;
+    if (quantity < 1) {
+      await handleRemoveCard(scryfallId);
+      return;
+    }
+    try {
+      await apiClient.updateCardQuantity(deck.id, scryfallId, quantity);
+      await load();
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : "Failed to update quantity", "error");
+    }
+  }
+
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
@@ -348,6 +362,7 @@ export default function DeckDetailPage() {
                   cards={visibleCards}
                   onCardClick={setSelectedCardId}
                   comboCardIds={comboCardIds}
+                  onSetQuantity={handleSetQuantity}
                 />
               ) : viewMode === "tags" ? (
                 <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
@@ -360,6 +375,7 @@ export default function DeckDetailPage() {
                       draggable
                       onRemove={handleRemoveCard}
                       onSetCategories={handleSetCategories}
+                      onSetQuantity={handleSetQuantity}
                       onSwapped={load}
                       petCardNames={petCardNames}
                       comboCardIds={comboCardIds}
@@ -375,6 +391,7 @@ export default function DeckDetailPage() {
                     deckId={deck.id}
                     onRemove={handleRemoveCard}
                     onSetCategories={handleSetCategories}
+                    onSetQuantity={handleSetQuantity}
                     onSwapped={load}
                     petCardNames={petCardNames}
                     comboCardIds={comboCardIds}

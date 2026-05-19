@@ -287,6 +287,37 @@ class DeckCardCategoryUpdate(BaseModel):
     categories: list[str] = Field(default_factory=list, max_length=10)
 
 
+class DeckCardQuantityUpdate(BaseModel):
+    """Request body for changing a card's quantity within a deck."""
+
+    quantity: int = Field(ge=1, le=99)
+
+
+@router.patch("/{deck_id}/cards/{scryfall_id}/quantity", status_code=204)
+async def update_card_quantity(
+    deck_id: UUID,
+    scryfall_id: UUID,
+    body: DeckCardQuantityUpdate,
+    request: Request,
+    account: CurrentAccount,
+) -> Response:
+    """Set the quantity of a card in the deck.
+
+    Primary use case is basic-land tuning where the same card legitimately
+    appears many times. Returns 404 when the card isn't in the deck.
+    """
+    email = _require_email(account)
+    updated = await deck_service.update_deck_card_quantity(
+        request.app.state.db_pool, deck_id, scryfall_id, body.quantity, email
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "CARD_NOT_IN_DECK", "message": f"Card {scryfall_id} not in deck"},
+        )
+    return Response(status_code=204)
+
+
 @router.patch("/{deck_id}/cards/{scryfall_id}", status_code=204)
 async def update_card_categories(
     deck_id: UUID,

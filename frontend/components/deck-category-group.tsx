@@ -17,9 +17,49 @@ interface Props {
   draggable?: boolean;
   onRemove?: (scryfallId: string) => void;
   onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
+  onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   onSwapped?: () => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
+}
+
+function isBasicLand(card: DeckCardItem): boolean {
+  return !!card.type_line?.includes("Basic Land");
+}
+
+function QuantityStepper({
+  quantity,
+  onSet,
+}: {
+  quantity: number;
+  onSet: (next: number) => void | Promise<void>;
+}) {
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1 text-xs"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => void onSet(quantity - 1)}
+        aria-label="Decrease quantity"
+        className="h-5 w-5 rounded border border-white/15 text-gray-300 hover:border-white/40 hover:text-white"
+      >
+        −
+      </button>
+      <span className="w-5 text-center tabular-nums text-gray-100">{quantity}</span>
+      <button
+        type="button"
+        onClick={() => void onSet(quantity + 1)}
+        aria-label="Increase quantity"
+        className="h-5 w-5 rounded border border-white/15 text-gray-300 hover:border-white/40 hover:text-white"
+      >
+        +
+      </button>
+    </span>
+  );
 }
 
 function DraggableCardRow({
@@ -47,6 +87,7 @@ export function DeckCategoryGroup({
   draggable = false,
   onRemove,
   onSetCategories,
+  onSetQuantity,
   onSwapped,
   petCardNames,
   comboCardIds,
@@ -95,9 +136,17 @@ export function DeckCategoryGroup({
                   handle?.isDragging ? "opacity-50" : ""
                 } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setOpenCard(isOpen ? null : card.deck_card_id)}
-                  className="flex w-full items-center gap-3 px-4 py-2 text-left"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setOpenCard(isOpen ? null : card.deck_card_id);
+                    }
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
@@ -135,13 +184,23 @@ export function DeckCategoryGroup({
                       <ManaCost cost={card.mana_cost} />
                     </span>
                   )}
+                  {isBasicLand(card) && onSetQuantity ? (
+                    <QuantityStepper
+                      quantity={card.quantity}
+                      onSet={(next) => onSetQuantity(card.scryfall_id, next)}
+                    />
+                  ) : card.quantity > 1 ? (
+                    <span className="shrink-0 text-xs tabular-nums text-gray-400">
+                      ×{card.quantity}
+                    </span>
+                  ) : null}
                   <span className="w-16 text-right text-xs text-gray-300 flex-shrink-0 tabular-nums">
                     {card.price_eur_cents != null
                       ? `€${(card.price_eur_cents / 100).toFixed(2)}`
                       : "—"}
                   </span>
                   <span className="text-gray-600 text-xs flex-shrink-0">{isOpen ? "▴" : "▾"}</span>
-                </button>
+                </div>
 
                 {isOpen && (
                   <div className="border-t border-white/5 bg-black/20 px-4 py-3">

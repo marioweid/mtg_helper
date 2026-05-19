@@ -676,6 +676,47 @@ async def update_deck_card_categories(
     return result == "UPDATE 1"
 
 
+async def update_deck_card_quantity(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    scryfall_id: UUID,
+    quantity: int,
+    email: str | None = None,
+) -> bool:
+    """Set the quantity for a card already in the deck.
+
+    Quantity must be >= 1. To remove the card use ``remove_card_from_deck``.
+
+    Args:
+        pool: asyncpg connection pool.
+        deck_id: The deck's UUID.
+        scryfall_id: Scryfall ID of the card.
+        quantity: New quantity (>= 1).
+        email: When provided, only succeeds if the deck is owned by this email.
+
+    Returns:
+        True when a row was updated, False if the card isn't in the deck.
+    """
+    if quantity < 1:
+        return False
+    async with pool.acquire() as conn:
+        if email is not None:
+            try:
+                await _assert_owner(conn, deck_id, email)
+            except DeckNotFoundError:
+                return False
+        card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
+        if card_row is None:
+            return False
+        result = await conn.execute(
+            "UPDATE deck_cards SET quantity = $3 WHERE deck_id = $1 AND card_id = $2",
+            deck_id,
+            card_row["id"],
+            quantity,
+        )
+    return result == "UPDATE 1"
+
+
 async def remove_card_from_deck(
     pool: asyncpg.Pool,
     deck_id: UUID,

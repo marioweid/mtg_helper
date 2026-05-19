@@ -39,6 +39,7 @@ class CardSuggestion(BaseModel):
     toughness: str | None = None
     rarity: str | None = None
     cmc: float | None = None
+    color_identity: list[str] = Field(default_factory=list)
     category: str
     reasoning: str
     synergies: list[str]
