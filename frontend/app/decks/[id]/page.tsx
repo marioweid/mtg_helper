@@ -22,6 +22,7 @@ import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
 import { DeckCategoryGroup } from "@/components/deck-category-group";
+import { DeckCompactColumns } from "@/components/deck-compact-columns";
 import {
   applyDeckFilter,
   DeckFilterBar,
@@ -36,7 +37,6 @@ import { ManaFixPanel } from "@/components/mana-fix-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
-import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
 type ViewMode = "tags" | "types" | "grid";
 type DeckTab = "cards" | "combos" | "history";
@@ -231,16 +231,8 @@ export default function DeckDetailPage() {
 
   const isGrid = viewMode === "grid";
   const visibleCards = applyDeckFilter(deck.cards, filter);
-  const groups = isGrid
-    ? {}
-    : viewMode === "types"
-      ? groupByPrimaryType(visibleCards)
-      : groupByCategory(visibleCards);
-  const categories = isGrid
-    ? []
-    : viewMode === "types"
-      ? sortedPrimaryTypes(groups)
-      : sortedCategories(groups);
+  const groups = viewMode === "tags" ? groupByCategory(visibleCards) : {};
+  const categories = viewMode === "tags" ? sortedCategories(groups) : [];
   const colors = colorIdentityFromCards(deck.cards);
   const selectedCard = selectedCardId
     ? deck.cards.find((c) => c.deck_card_id === selectedCardId) ?? null
@@ -384,20 +376,14 @@ export default function DeckDetailPage() {
                   ))}
                 </DndContext>
               ) : (
-                categories.map((cat) => (
-                  <DeckCategoryGroup
-                    key={cat}
-                    category={cat}
-                    cards={groups[cat] ?? []}
-                    deckId={deck.id}
-                    onRemove={handleRemoveCard}
-                    onSetCategories={handleSetCategories}
-                    onSetQuantity={handleSetQuantity}
-                    onSwapped={load}
-                    petCardNames={petCardNames}
-                    comboCardIds={comboCardIds}
-                  />
-                ))
+                <DeckCompactColumns
+                  cards={visibleCards}
+                  groupBy="type"
+                  onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
+                  onRemove={handleRemoveCard}
+                  petCardNames={petCardNames}
+                  comboCardIds={comboCardIds}
+                />
               )}
               {deck.cards.length === 0 && (
                 <div className="rounded-xl border border-dashed border-white/20 py-12 text-center text-gray-500">

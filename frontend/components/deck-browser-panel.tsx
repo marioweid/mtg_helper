@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CardHover } from "@/components/card-hover";
+import { DeckCompactColumns } from "@/components/deck-compact-columns";
 import {
   applyDeckFilter,
   DeckFilterBar,
   type DeckFilter,
 } from "@/components/deck-filter-bar";
-import { primaryType } from "@/lib/card-types";
 import { STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, type DeckCardItem, totalCardCount } from "@/lib/types";
 
@@ -28,39 +28,6 @@ interface Props {
   onUndoCut?: (card: DeckCardItem) => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
-}
-
-function groupCards(
-  cards: DeckCardItem[],
-  mode: GroupMode,
-): { key: string; label: string; items: DeckCardItem[] }[] {
-  if (mode === "flat") {
-    return [{ key: "all", label: "All", items: cards }];
-  }
-  const groups = new Map<string, DeckCardItem[]>();
-  if (mode === "type") {
-    for (const card of cards) {
-      const key = primaryType(card);
-      const arr = groups.get(key) ?? [];
-      arr.push(card);
-      groups.set(key, arr);
-    }
-  } else {
-    for (const card of cards) {
-      for (const tag of bucketsFor(card)) {
-        const arr = groups.get(tag) ?? [];
-        arr.push(card);
-        groups.set(tag, arr);
-      }
-    }
-  }
-  return [...groups.entries()]
-    .map(([key, items]) => ({
-      key,
-      label: STAGE_LABELS[key] ?? key,
-      items,
-    }))
-    .sort((a, b) => b.items.length - a.items.length);
 }
 
 function CardRow({
@@ -163,7 +130,6 @@ export function DeckBrowserPanel({
   }
 
   const filtered = useMemo(() => applyDeckFilter(cards, filter), [cards, filter]);
-  const groups = useMemo(() => groupCards(filtered, group), [filtered, group]);
   const total = totalCardCount(cards);
 
   return (
@@ -219,28 +185,29 @@ export function DeckBrowserPanel({
       <div className="-mr-1 flex-1 overflow-y-auto pr-1">
         {filtered.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-gray-500">No cards match.</p>
+        ) : group === "flat" ? (
+          <ul>
+            {filtered.map((card) => (
+              <CardRow
+                key={card.deck_card_id}
+                card={card}
+                onCut={() => handleCut(card)}
+                isPet={petCardNames?.has(card.name) ?? false}
+                inCombo={comboCardIds?.has(card.scryfall_id) ?? false}
+              />
+            ))}
+          </ul>
         ) : (
-          groups.map((g) => (
-            <div key={g.key} className="mb-3">
-              {group !== "flat" && (
-                <div className="sticky top-0 z-[1] flex items-center justify-between bg-zinc-950/95 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 backdrop-blur">
-                  <span>{g.label}</span>
-                  <span className="text-gray-600">{totalCardCount(g.items)}</span>
-                </div>
-              )}
-              <ul>
-                {g.items.map((card) => (
-                  <CardRow
-                    key={card.deck_card_id}
-                    card={card}
-                    onCut={() => handleCut(card)}
-                    isPet={petCardNames?.has(card.name) ?? false}
-                    inCombo={comboCardIds?.has(card.scryfall_id) ?? false}
-                  />
-                ))}
-              </ul>
-            </div>
-          ))
+          <DeckCompactColumns
+            cards={filtered}
+            groupBy={group}
+            onRemove={(scryfallId) => {
+              const card = filtered.find((c) => c.scryfall_id === scryfallId);
+              if (card) handleCut(card);
+            }}
+            {...(petCardNames ? { petCardNames } : {})}
+            {...(comboCardIds ? { comboCardIds } : {})}
+          />
         )}
       </div>
     </div>
