@@ -78,9 +78,11 @@ function CompactRow({
         {card.quantity > 1 ? `${card.quantity}` : ""}
       </span>
       <div className="flex min-w-0 flex-1 items-center gap-1">
-        <CardHover name={card.name} imageUri={card.image_uri}>
-          <span className="truncate text-gray-100">{card.name}</span>
-        </CardHover>
+        <div className="min-w-0 flex-1 truncate text-gray-100">
+          <CardHover name={card.name} imageUri={card.image_uri}>
+            {card.name}
+          </CardHover>
+        </div>
         {isPet && <span className="shrink-0 text-red-400" title="Pet card">♥</span>}
         {inCombo && (
           <span className="shrink-0 text-yellow-300" title="In a combo">⚡</span>
@@ -139,7 +141,7 @@ export function DeckCompactColumns({
   const groups = buildGroups(cards, groupBy);
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
       {groups.map((g) => (
         <section key={g.key} className="min-w-0 break-inside-avoid">
           <header className="mb-1 flex items-baseline justify-between border-b border-white/10 px-1 pb-1">

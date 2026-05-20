@@ -7,6 +7,7 @@ import { apiClient, ApiError } from "@/lib/api";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardSearchResult } from "@/components/card-search-result";
 import { CardHover } from "@/components/card-hover";
+import { CardDetailModal } from "@/components/card-detail-modal";
 import { DeckBrowserPanel } from "@/components/deck-browser-panel";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import {
@@ -350,6 +351,7 @@ export default function BuildPage() {
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
   const [commandBarOpen, setCommandBarOpen] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<string | null>(null);
@@ -861,6 +863,15 @@ export default function BuildPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to remove card");
       setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "accepted" }));
+    }
+  }
+
+  async function handleSetCategories(scryfallId: string, categories: string[]) {
+    try {
+      await apiClient.updateCardCategories(deckId, scryfallId, categories);
+      void refreshDeck();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update categories");
     }
   }
 
@@ -1594,6 +1605,17 @@ export default function BuildPage() {
         </div>
       )}
 
+      <CardDetailModal
+        card={selectedCardId ? deckCards.find((c) => c.deck_card_id === selectedCardId) ?? null : null}
+        onClose={() => setSelectedCardId(null)}
+        deckId={deckId}
+        onRemove={async (id) => {
+          await handleRemoveCard(id);
+          setSelectedCardId(null);
+        }}
+        onSetCategories={handleSetCategories}
+      />
+
       {/* Expandable command bar (sticky). Click to expand the deck browser. */}
       <div
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/90 backdrop-blur"
@@ -1606,6 +1628,7 @@ export default function BuildPage() {
                 cards={deckCards}
                 onRemove={handleRemoveCard}
                 onUndoCut={handleUndoCut}
+                onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
                 petCardNames={petCardNames}
               />
             </div>
