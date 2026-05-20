@@ -565,6 +565,107 @@ export interface CollectionImportResponse {
   unresolved: string[];
 }
 
+// Deck Snapshots + Comparison
+export type SnapshotSource = "manual" | "auto_stage";
+
+export interface SnapshotSummary {
+  id: string;
+  deck_id: string;
+  label: string | null;
+  source: SnapshotSource;
+  stage: string;
+  deck_name: string;
+  bracket: number | null;
+  card_count: number;
+  created_at: string;
+}
+
+export interface SnapshotCardItem {
+  card_id: string;
+  scryfall_id: string;
+  name: string;
+  mana_cost: string | null;
+  cmc: number | null;
+  type_line: string | null;
+  color_identity: string[];
+  image_uri: string | null;
+  quantity: number;
+  categories: string[];
+  added_by: string;
+  ai_reasoning: string | null;
+}
+
+export interface SnapshotDetailResponse {
+  id: string;
+  deck_id: string;
+  label: string | null;
+  source: SnapshotSource;
+  stage: string;
+  deck_name: string;
+  bracket: number | null;
+  stage_targets: Record<string, number>;
+  archetype_tags: string[];
+  created_at: string;
+  cards: SnapshotCardItem[];
+}
+
+export interface SnapshotResponse {
+  id: string;
+  deck_id: string;
+  label: string | null;
+  source: SnapshotSource;
+  stage: string;
+  deck_name: string;
+  bracket: number | null;
+  stage_targets: Record<string, number>;
+  archetype_tags: string[];
+  created_at: string;
+}
+
+export interface DiffCardInfo {
+  card_id: string;
+  scryfall_id: string;
+  name: string;
+  mana_cost: string | null;
+  type_line: string | null;
+  image_uri: string | null;
+  color_identity: string[];
+}
+
+export interface DiffEntry {
+  card: DiffCardInfo;
+  left_quantity: number;
+  right_quantity: number;
+  left_categories: string[];
+  right_categories: string[];
+}
+
+export interface DeckDiff {
+  added: DiffEntry[];
+  removed: DiffEntry[];
+  quantity_changed: DiffEntry[];
+  common: DiffEntry[];
+}
+
+export type ComparisonKind = "deck" | "snapshot";
+
+export interface ComparisonSideMeta {
+  kind: ComparisonKind;
+  id: string;
+  deck_id: string;
+  deck_name: string;
+  label: string | null;
+  stage: string;
+  bracket: number | null;
+  card_count: number;
+}
+
+export interface DeckCompareResponse {
+  left: ComparisonSideMeta;
+  right: ComparisonSideMeta;
+  diff: DeckDiff;
+}
+
 // Preferences
 export type PreferenceType =
   | "pet_card"

@@ -14,7 +14,9 @@ import type {
   CollectionImportResponse,
   CollectionResponse,
   CollectionUpdate,
+  ComparisonKind,
   DeckCardAdd,
+  DeckCompareResponse,
   DeckCardResponse,
   DeckCreate,
   DeckDetailResponse,
@@ -40,6 +42,9 @@ import type {
   QuickstartResponse,
   RankingWeightsResponse,
   RankingWeightsUpdate,
+  SnapshotDetailResponse,
+  SnapshotResponse,
+  SnapshotSummary,
   SuggestResponse,
   SwapRequest,
   SwapResponse,
@@ -218,6 +223,37 @@ export const apiClient = {
     }).then((res) => {
       if (!res.ok && res.status !== 204) throw new ApiError("DELETE_FAILED", "Failed to remove card");
     }),
+
+  // Snapshots + Comparison
+  listSnapshots: (deckId: string) =>
+    request<SnapshotSummary[]>(`/decks/${deckId}/snapshots`),
+
+  createSnapshot: (deckId: string, label?: string | null) =>
+    request<SnapshotResponse>(`/decks/${deckId}/snapshots`, {
+      method: "POST",
+      body: JSON.stringify({ label: label ?? null }),
+    }),
+
+  getSnapshot: (snapshotId: string) =>
+    request<SnapshotDetailResponse>(`/snapshots/${snapshotId}`),
+
+  deleteSnapshot: (snapshotId: string) =>
+    fetch(`${CLIENT_BASE}/snapshots/${snapshotId}`, {
+      method: "DELETE",
+    }).then((res) => {
+      if (!res.ok && res.status !== 204)
+        throw new ApiError("DELETE_FAILED", "Failed to delete snapshot");
+    }),
+
+  compareDecks: (left: { kind: ComparisonKind; id: string }, right: { kind: ComparisonKind; id: string }) => {
+    const qs = new URLSearchParams({
+      left: left.id,
+      left_kind: left.kind,
+      right: right.id,
+      right_kind: right.kind,
+    });
+    return request<DeckCompareResponse>(`/decks/compare?${qs.toString()}`);
+  },
 
   // Onboarding
   quickstart: (body: QuickstartRequest) =>

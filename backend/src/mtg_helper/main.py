@@ -22,6 +22,7 @@ from mtg_helper.routers import (
     health,
     me,
     onboarding,
+    snapshots,
     tags,
 )
 from mtg_helper.services import scryfall
@@ -88,6 +89,7 @@ _admin = [Depends(require_admin_or_internal)]
 app.include_router(health.router)
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(cards.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(ai.router, prefix="/api/v1", dependencies=_authed)

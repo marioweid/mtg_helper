@@ -170,6 +170,35 @@ CREATE INDEX IF NOT EXISTS idx_deck_feedback_deck_id ON deck_feedback (deck_id);
 DROP TABLE IF EXISTS conversation_turns;
 
 -- ============================================================
+-- DECK SNAPSHOTS (point-in-time copies of a deck for history + diffing)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS deck_snapshots (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    deck_id         UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    label           TEXT,
+    source          TEXT NOT NULL CHECK (source IN ('manual', 'auto_stage')),
+    stage           TEXT NOT NULL,
+    deck_name       TEXT NOT NULL,
+    bracket         INTEGER,
+    stage_targets   JSONB NOT NULL DEFAULT '{}',
+    archetype_tags  TEXT[] NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_deck_snapshots_deck_id
+    ON deck_snapshots (deck_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS deck_snapshot_cards (
+    snapshot_id     UUID NOT NULL REFERENCES deck_snapshots(id) ON DELETE CASCADE,
+    card_id         UUID NOT NULL REFERENCES cards(id),
+    quantity        INTEGER NOT NULL,
+    categories      TEXT[] NOT NULL DEFAULT '{}',
+    added_by        TEXT NOT NULL DEFAULT 'user' CHECK (added_by IN ('user', 'ai')),
+    ai_reasoning    TEXT,
+    PRIMARY KEY (snapshot_id, card_id)
+);
+
+-- ============================================================
 -- ACCOUNT RANKING WEIGHTS (per-user signal weight overrides)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS account_ranking_weights (

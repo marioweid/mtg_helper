@@ -24,6 +24,12 @@ export async function Nav() {
           Collections
         </Link>
         <Link
+          href="/decks/compare"
+          className="text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0"
+        >
+          Compare
+        </Link>
+        <Link
           href="/preferences"
           className="text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0"
         >

@@ -433,6 +433,8 @@ async def update_deck(
     values = list(updates.values())
 
     async with pool.acquire() as conn:
+        prev_stage_row = await conn.fetchrow("SELECT stage FROM decks WHERE id = $1", deck_id)
+        prev_stage = prev_stage_row["stage"] if prev_stage_row else None
         if email is not None:
             owner_clause = f" AND lower(owner_email) = ${len(updates) + 2}"
             args: list[object] = [deck_id, *values, _normalize_email(email)]
@@ -444,7 +446,15 @@ async def update_deck(
             f"WHERE id = $1{owner_clause} RETURNING *",
             *args,
         )
-    return _row_to_deck(row) if row else None
+    if row is None:
+        return None
+    new_stage = row["stage"]
+    if prev_stage != new_stage and new_stage in STAGES:
+        # Auto-snapshot on stage advance. Best-effort; failures are logged inside the helper.
+        from mtg_helper.services import snapshot_service
+
+        await snapshot_service.create_auto_snapshot(pool, deck_id, new_stage=new_stage)
+    return _row_to_deck(row)
 
 
 async def _fetch_deck(pool: asyncpg.Pool, deck_id: UUID) -> DeckResponse | None:

@@ -87,6 +87,11 @@ function DeckGridColumn({ type, cards, onCardClick, comboCardIds, onSetQuantity 
                   ×{card.quantity}
                 </span>
               ) : null}
+              {card.price_eur_cents != null ? (
+                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-emerald-300 backdrop-blur tabular-nums">
+                  €{(card.price_eur_cents / 100).toFixed(2)}
+                </span>
+              ) : null}
               {comboCardIds?.has(card.scryfall_id) ? (
                 <span
                   className="absolute left-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-sm text-yellow-300 backdrop-blur"

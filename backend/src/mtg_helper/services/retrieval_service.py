@@ -1507,10 +1507,17 @@ async def retrieve_candidates(
 
     # Include EDHREC- and Moxfield-only matches as candidates so a high-synergy
     # card not surfaced by semantic/tag/FTS still has a path into the result set.
+    # Must respect ``deck_card_ids`` — the search channels filter against it,
+    # but this fallback path bypasses them and would otherwise resurface cards
+    # already in the deck.
+    deck_exclude = set(deck_card_ids)
     extra_ids = [
         uid
         for uid in {*edhrec_inclusion, *moxfield_inclusion}
-        if uid not in qdrant_scores and uid not in tag_overlaps and uid not in fts_set
+        if uid not in qdrant_scores
+        and uid not in tag_overlaps
+        and uid not in fts_set
+        and uid not in deck_exclude
     ]
     all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set, *extra_ids})
     if not all_ids:

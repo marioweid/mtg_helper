@@ -17,6 +17,7 @@ import { DeckDetailSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { BracketSelector } from "@/components/bracket-selector";
 import { ComboTab } from "@/components/combo-tab";
+import { DeckHistoryPanel } from "@/components/deck-history-panel";
 import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
@@ -38,7 +39,7 @@ import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse 
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 
 type ViewMode = "tags" | "types" | "grid";
-type DeckTab = "cards" | "combos";
+type DeckTab = "cards" | "combos" | "history";
 
 const VIEW_MODES: readonly ViewMode[] = ["tags", "types", "grid"];
 
@@ -87,7 +88,7 @@ export default function DeckDetailPage() {
   const [filter, setFilter] = useState<DeckFilter>({
     query: "",
     colors: [],
-    sort: "default",
+    sort: "price",
   });
   const [combos, setCombos] = useState<ComboListResponse | null>(null);
 
@@ -292,7 +293,7 @@ export default function DeckDetailPage() {
             aria-label="Deck view"
             className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-sm"
           >
-            {(["cards", "combos"] as const).map((t) => {
+            {(["cards", "combos", "history"] as const).map((t) => {
               const active = tab === t;
               return (
                 <button
@@ -410,6 +411,8 @@ export default function DeckDetailPage() {
           )}
 
           {tab === "combos" && <ComboTab deckId={deck.id} />}
+
+          {tab === "history" && <DeckHistoryPanel deckId={deck.id} />}
         </div>
 
         {/* Sidebar */}
