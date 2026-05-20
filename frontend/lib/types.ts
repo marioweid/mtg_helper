@@ -627,6 +627,7 @@ export interface DiffCardInfo {
   scryfall_id: string;
   name: string;
   mana_cost: string | null;
+  cmc: number | null;
   type_line: string | null;
   image_uri: string | null;
   color_identity: string[];

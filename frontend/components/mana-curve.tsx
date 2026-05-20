@@ -1,9 +1,12 @@
-import type { DeckCardItem } from "@/lib/types";
-
 const MAX_CMC = 7;
 const BAR_H = 80;
 
-export function ManaCurve({ cards }: { cards: DeckCardItem[] }) {
+export interface ManaCurveCard {
+  type_line: string | null;
+  cmc: number | null;
+}
+
+export function ManaCurve({ cards }: { cards: ManaCurveCard[] }) {
   // Count cards per CMC bucket (0-6, then 7+)
   const counts = Array.from<number>({ length: MAX_CMC + 1 }).fill(0);
   for (const card of cards) {

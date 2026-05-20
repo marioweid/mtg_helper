@@ -4,15 +4,42 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { ManaCost } from "@/components/mana-cost";
+import { ManaCurve } from "@/components/mana-curve";
+import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import { apiClient, ApiError } from "@/lib/api";
 import type {
   ComparisonKind,
   ComparisonSideMeta,
   DeckCompareResponse,
+  DeckDiff,
   DeckSummary,
   DiffEntry,
   SnapshotSummary,
 } from "@/lib/types";
+
+interface SideCard {
+  type_line: string | null;
+  cmc: number | null;
+  quantity: number;
+}
+
+function reconstructSide(diff: DeckDiff, side: "left" | "right"): SideCard[] {
+  const qtyKey = side === "left" ? "left_quantity" : "right_quantity";
+  const exclusive = side === "left" ? diff.removed : diff.added;
+  const out: SideCard[] = [];
+  const push = (entries: DiffEntry[]) => {
+    for (const e of entries) {
+      const q = e[qtyKey];
+      if (q > 0) {
+        out.push({ type_line: e.card.type_line, cmc: e.card.cmc, quantity: q });
+      }
+    }
+  };
+  push(diff.common);
+  push(diff.quantity_changed);
+  push(exclusive);
+  return out;
+}
 
 interface SideState {
   deckId: string | null;
@@ -279,6 +306,27 @@ export default function ComparePage() {
             <SideHeader side="Left" meta={result.left} />
             <SideHeader side="Right" meta={result.right} />
           </section>
+
+          {(() => {
+            const leftCards = reconstructSide(result.diff, "left");
+            const rightCards = reconstructSide(result.diff, "right");
+            return (
+              <section className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <DeckTypeBreakdown cards={leftCards} />
+                  <div className="mt-3">
+                    <ManaCurve cards={leftCards} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <DeckTypeBreakdown cards={rightCards} />
+                  <div className="mt-3">
+                    <ManaCurve cards={rightCards} />
+                  </div>
+                </div>
+              </section>
+            );
+          })()}
 
           <section className="grid gap-6 md:grid-cols-2">
             <div>

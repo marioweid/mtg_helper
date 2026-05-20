@@ -83,6 +83,7 @@ class DiffCardInfo(BaseModel):
     scryfall_id: UUID
     name: str
     mana_cost: str | None = None
+    cmc: float | None = None
     type_line: str | None = None
     image_uri: str | None = None
     color_identity: list[str] = Field(default_factory=list)

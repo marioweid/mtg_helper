@@ -342,7 +342,8 @@ async def _load_deck_composition(
     card_rows = await conn.fetch(
         """
         SELECT dc.card_id, dc.quantity, dc.categories,
-               c.scryfall_id, c.name, c.mana_cost, c.type_line, c.image_uri, c.color_identity
+               c.scryfall_id, c.name, c.mana_cost, c.cmc, c.type_line,
+               c.image_uri, c.color_identity
         FROM deck_cards dc
         JOIN cards c ON c.id = dc.card_id
         WHERE dc.deck_id = $1
@@ -380,7 +381,8 @@ async def _load_snapshot_composition(
     card_rows = await conn.fetch(
         """
         SELECT sc.card_id, sc.quantity, sc.categories,
-               c.scryfall_id, c.name, c.mana_cost, c.type_line, c.image_uri, c.color_identity
+               c.scryfall_id, c.name, c.mana_cost, c.cmc, c.type_line,
+               c.image_uri, c.color_identity
         FROM deck_snapshot_cards sc
         JOIN cards c ON c.id = sc.card_id
         WHERE sc.snapshot_id = $1
@@ -406,6 +408,7 @@ def _card_info(row: dict[str, Any]) -> DiffCardInfo:
         scryfall_id=row["scryfall_id"],
         name=row["name"],
         mana_cost=row.get("mana_cost"),
+        cmc=row.get("cmc"),
         type_line=row.get("type_line"),
         image_uri=row.get("image_uri"),
         color_identity=list(row.get("color_identity") or []),

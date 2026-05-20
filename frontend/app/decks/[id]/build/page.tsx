@@ -7,10 +7,9 @@ import { apiClient, ApiError } from "@/lib/api";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardSearchResult } from "@/components/card-search-result";
 import { CardHover } from "@/components/card-hover";
-import { DeckCategoryGroup } from "@/components/deck-category-group";
+import { DeckBrowserPanel } from "@/components/deck-browser-panel";
+import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import {
-  bucketsFor,
-  totalCardCount,
   type CardSuggestion,
   type CardResponse,
   type CollectionResponse,
@@ -151,22 +150,6 @@ function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
     }
   }
   return counts;
-}
-
-function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
-  const groups: Record<string, DeckCardItem[]> = {};
-  for (const card of cards) {
-    for (const cat of bucketsFor(card)) {
-      (groups[cat] ??= []).push(card);
-    }
-  }
-  return groups;
-}
-
-function sortedCategories(groups: Record<string, DeckCardItem[]>): string[] {
-  const ordered = CATEGORY_ORDER.filter((c) => groups[c]?.length);
-  const extra = Object.keys(groups).filter((c) => !CATEGORY_ORDER.includes(c));
-  return [...ordered, ...extra];
 }
 
 function getAcceptedCount(stageState: StageState): number {
@@ -366,7 +349,6 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
-  const [deckListOpen, setDeckListOpen] = useState(false);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<string | null>(null);
@@ -881,6 +863,20 @@ export default function BuildPage() {
     }
   }
 
+  async function handleUndoCut(card: DeckCardItem) {
+    try {
+      await apiClient.addCard(deckId, {
+        card_scryfall_id: card.scryfall_id,
+        quantity: card.quantity,
+        categories: card.categories,
+        added_by: card.added_by === "ai" ? "ai" : "user",
+      });
+      void refreshDeck();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to undo cut");
+    }
+  }
+
   async function handleRemoveCard(scryfallId: string) {
     try {
       await apiClient.removeCard(deckId, scryfallId);
@@ -938,7 +934,7 @@ export default function BuildPage() {
   });
 
   return (
-    <div>
+    <div className="pb-24">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Build Deck</h1>
@@ -946,6 +942,9 @@ export default function BuildPage() {
           View deck
         </Link>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0">
 
       {/* Collection filter panel — always visible so the build-from-owned toggle is discoverable. */}
       {collections.length > 0 && (
@@ -1597,31 +1596,26 @@ export default function BuildPage() {
         </div>
       )}
 
-      {/* Current Deck — collapsible card list with remove */}
-      {deckCards.length > 0 && (
-        <div className="mt-8 border-t border-white/10 pt-6">
-          <button
-            onClick={() => setDeckListOpen((v) => !v)}
-            className="flex w-full items-center justify-between text-sm font-medium text-gray-300 hover:text-white transition-colors"
-          >
-            <span>Current Deck ({totalCardCount(deckCards)} cards)</span>
-            <span className="text-xs text-gray-500">{deckListOpen ? "▲" : "▼"}</span>
-          </button>
-          {deckListOpen && (
-            <div className="mt-3 flex flex-col gap-3">
-              {sortedCategories(groupByCategory(deckCards)).map((cat) => (
-                <DeckCategoryGroup
-                  key={cat}
-                  category={cat}
-                  cards={groupByCategory(deckCards)[cat] ?? []}
-                  onRemove={handleRemoveCard}
-                  petCardNames={petCardNames}
-                />
-              ))}
-            </div>
-          )}
         </div>
-      )}
+
+        <DeckBrowserPanel
+          cards={deckCards}
+          onRemove={handleRemoveCard}
+          onUndoCut={handleUndoCut}
+          petCardNames={petCardNames}
+          target={100}
+        />
+      </div>
+
+      {/* Sticky stats bar (mirrors CommandBar styling on the detail page). */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/85 backdrop-blur"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="mx-auto max-w-5xl px-4 py-3">
+          <DeckTypeBreakdown cards={deckCards} target={100} />
+        </div>
+      </div>
     </div>
   );
 }
