@@ -349,6 +349,7 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
+  const [commandBarOpen, setCommandBarOpen] = useState(false);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<string | null>(null);
@@ -942,9 +943,6 @@ export default function BuildPage() {
           View deck
         </Link>
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0">
 
       {/* Collection filter panel — always visible so the build-from-owned toggle is discoverable. */}
       {collections.length > 0 && (
@@ -1596,25 +1594,39 @@ export default function BuildPage() {
         </div>
       )}
 
-        </div>
-
-        <DeckBrowserPanel
-          cards={deckCards}
-          onRemove={handleRemoveCard}
-          onUndoCut={handleUndoCut}
-          petCardNames={petCardNames}
-          target={100}
-        />
-      </div>
-
-      {/* Sticky stats bar (mirrors CommandBar styling on the detail page). */}
+      {/* Expandable command bar (sticky). Click to expand the deck browser. */}
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/85 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/90 backdrop-blur"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        {commandBarOpen && (
+          <div className="mx-auto max-w-5xl border-b border-white/10 px-4 pt-3">
+            <div className="h-[70vh] max-h-[640px]">
+              <DeckBrowserPanel
+                cards={deckCards}
+                onRemove={handleRemoveCard}
+                onUndoCut={handleUndoCut}
+                petCardNames={petCardNames}
+              />
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setCommandBarOpen((v) => !v)}
+          aria-expanded={commandBarOpen}
+          aria-label={commandBarOpen ? "Collapse deck browser" : "Expand deck browser"}
+          className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+        >
           <DeckTypeBreakdown cards={deckCards} target={100} />
-        </div>
+          <span
+            className="shrink-0 text-gray-400 transition-transform"
+            style={{ transform: commandBarOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+            aria-hidden
+          >
+            ▲
+          </span>
+        </button>
       </div>
     </div>
   );

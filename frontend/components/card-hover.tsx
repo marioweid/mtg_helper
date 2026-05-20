@@ -40,6 +40,7 @@ export function CardHover({ name, imageUri, children, className }: CardHoverProp
   const wrapRef = useRef<HTMLSpanElement | null>(null);
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | null>(imageUri ?? null);
   const [position, setPosition] = useState<Position | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
@@ -96,32 +97,37 @@ export function CardHover({ name, imageUri, children, className }: CardHoverProp
       clearTimeout(showTimer.current);
       showTimer.current = null;
     }
+    // Don't auto-close a preview the user pinned by clicking.
+    if (pinned) return;
     setOpen(false);
-  }, [isTouch]);
+  }, [isTouch, pinned]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLSpanElement>) => {
-      if (!isTouch) return;
-      // Prevent the parent (often a clickable row) from also handling the tap
-      // — the user explicitly targeted a card name to preview it.
       e.stopPropagation();
-      if (open) {
+      e.preventDefault();
+      if (open && pinned) {
         setOpen(false);
+        setPinned(false);
         return;
       }
+      setPinned(true);
       void reveal();
     },
-    [isTouch, open, reveal],
+    [open, pinned, reveal],
   );
 
   useEffect(() => {
-    if (!open || !isTouch) return;
+    if (!open || !pinned) return;
     const onDocClick = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!wrapRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setPinned(false);
+      }
     };
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, [open, isTouch]);
+  }, [open, pinned]);
 
   useEffect(() => {
     return () => {
@@ -135,7 +141,10 @@ export function CardHover({ name, imageUri, children, className }: CardHoverProp
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onClick={handleClick}
-      className={className}
+      role="button"
+      tabIndex={0}
+      aria-pressed={pinned}
+      className={`cursor-pointer ${className ?? ""}`}
     >
       {children}
       {open && position ? (
