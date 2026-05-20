@@ -3,14 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
 import { apiClient } from "@/lib/api";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { DeckDetailSkeleton } from "@/components/skeleton";
@@ -21,7 +13,6 @@ import { DeckHistoryPanel } from "@/components/deck-history-panel";
 import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
-import { DeckCategoryGroup } from "@/components/deck-category-group";
 import { DeckCompactColumns } from "@/components/deck-compact-columns";
 import {
   applyDeckFilter,
@@ -35,29 +26,13 @@ import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
 import { StatsModal } from "@/components/stats-modal";
-import { BRACKET_LABELS, CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
-import { bucketsFor, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
+import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
+import { totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 
 type ViewMode = "tags" | "types" | "grid";
 type DeckTab = "cards" | "combos" | "history";
 
 const VIEW_MODES: readonly ViewMode[] = ["tags", "types", "grid"];
-
-function groupByCategory(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
-  const groups: Record<string, DeckCardItem[]> = {};
-  for (const card of cards) {
-    for (const cat of bucketsFor(card)) {
-      (groups[cat] ??= []).push(card);
-    }
-  }
-  return groups;
-}
-
-function sortedCategories(groups: Record<string, DeckCardItem[]>): string[] {
-  const ordered = CATEGORY_ORDER.filter((c) => groups[c]?.length);
-  const extra = Object.keys(groups).filter((c) => !CATEGORY_ORDER.includes(c));
-  return [...ordered, ...extra];
-}
 
 function colorIdentityFromCards(cards: DeckCardItem[]): string[] {
   const colors: string[] = [];
@@ -202,21 +177,6 @@ export default function DeckDetailPage() {
     }
   }
 
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor),
-  );
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over) return;
-    const scryfallId = String(active.id);
-    const target = String(over.id);
-    if (target === "bangers") return;
-    const next = target === "untagged" ? [] : [target];
-    void handleSetCategories(scryfallId, next);
-  }
-
   if (error) {
     return (
       <p className="rounded-lg border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
@@ -231,8 +191,6 @@ export default function DeckDetailPage() {
 
   const isGrid = viewMode === "grid";
   const visibleCards = applyDeckFilter(deck.cards, filter);
-  const groups = viewMode === "tags" ? groupByCategory(visibleCards) : {};
-  const categories = viewMode === "tags" ? sortedCategories(groups) : [];
   const colors = colorIdentityFromCards(deck.cards);
   const selectedCard = selectedCardId
     ? deck.cards.find((c) => c.deck_card_id === selectedCardId) ?? null
@@ -357,28 +315,10 @@ export default function DeckDetailPage() {
                   comboCardIds={comboCardIds}
                   onSetQuantity={handleSetQuantity}
                 />
-              ) : viewMode === "tags" ? (
-                <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
-                  {categories.map((cat) => (
-                    <DeckCategoryGroup
-                      key={cat}
-                      category={cat}
-                      cards={groups[cat] ?? []}
-                      deckId={deck.id}
-                      draggable
-                      onRemove={handleRemoveCard}
-                      onSetCategories={handleSetCategories}
-                      onSetQuantity={handleSetQuantity}
-                      onSwapped={load}
-                      petCardNames={petCardNames}
-                      comboCardIds={comboCardIds}
-                    />
-                  ))}
-                </DndContext>
               ) : (
                 <DeckCompactColumns
                   cards={visibleCards}
-                  groupBy="type"
+                  groupBy={viewMode === "tags" ? "tag" : "type"}
                   onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
                   onRemove={handleRemoveCard}
                   petCardNames={petCardNames}
