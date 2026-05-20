@@ -321,6 +321,7 @@ export default function DeckDetailPage() {
                   groupBy={viewMode === "tags" ? "tag" : "type"}
                   onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
                   onRemove={handleRemoveCard}
+                  onSetQuantity={handleSetQuantity}
                   petCardNames={petCardNames}
                   comboCardIds={comboCardIds}
                 />

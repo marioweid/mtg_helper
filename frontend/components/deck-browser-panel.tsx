@@ -27,6 +27,7 @@ interface Props {
   onRemove: (scryfallId: string) => void | Promise<void>;
   onUndoCut?: (card: DeckCardItem) => void | Promise<void>;
   onCardClick?: (card: DeckCardItem) => void;
+  onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
 }
@@ -98,6 +99,7 @@ export function DeckBrowserPanel({
   onRemove,
   onUndoCut,
   onCardClick,
+  onSetQuantity,
   petCardNames,
   comboCardIds,
 }: Props) {
@@ -208,6 +210,7 @@ export function DeckBrowserPanel({
               if (card) handleCut(card);
             }}
             {...(onCardClick ? { onCardClick } : {})}
+            {...(onSetQuantity ? { onSetQuantity } : {})}
             {...(petCardNames ? { petCardNames } : {})}
             {...(comboCardIds ? { comboCardIds } : {})}
           />

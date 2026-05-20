@@ -13,8 +13,13 @@ interface Props {
   groupBy: GroupBy;
   onCardClick?: (card: DeckCardItem) => void;
   onRemove?: (scryfallId: string) => void;
+  onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
+}
+
+function isBasicLand(card: DeckCardItem): boolean {
+  return !!card.type_line?.includes("Basic Land");
 }
 
 interface Group {
@@ -56,17 +61,20 @@ function CompactRow({
   card,
   onCardClick,
   onRemove,
+  onSetQuantity,
   isPet,
   inCombo,
 }: {
   card: DeckCardItem;
   onCardClick?: (card: DeckCardItem) => void;
   onRemove?: (scryfallId: string) => void;
+  onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   isPet: boolean;
   inCombo: boolean;
 }) {
   const clickable = !!onCardClick;
   const handleRowClick = clickable ? () => onCardClick?.(card) : undefined;
+  const showStepper = isBasicLand(card) && !!onSetQuantity;
   return (
     <li
       onClick={handleRowClick}
@@ -74,9 +82,36 @@ function CompactRow({
         clickable ? "cursor-pointer" : ""
       }`}
     >
-      <span className="w-5 shrink-0 text-right tabular-nums text-gray-500">
-        {card.quantity > 1 ? `${card.quantity}` : ""}
-      </span>
+      {showStepper ? (
+        <span
+          className="flex shrink-0 items-center gap-0.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => void onSetQuantity?.(card.scryfall_id, card.quantity - 1)}
+            aria-label={`Decrease ${card.name}`}
+            className="flex h-5 w-5 items-center justify-center rounded border border-white/15 text-xs text-gray-300 hover:border-white/40 hover:text-white"
+          >
+            −
+          </button>
+          <span className="w-6 text-center text-xs tabular-nums text-gray-100">
+            {card.quantity}
+          </span>
+          <button
+            type="button"
+            onClick={() => void onSetQuantity?.(card.scryfall_id, card.quantity + 1)}
+            aria-label={`Increase ${card.name}`}
+            className="flex h-5 w-5 items-center justify-center rounded border border-white/15 text-xs text-gray-300 hover:border-white/40 hover:text-white"
+          >
+            +
+          </button>
+        </span>
+      ) : (
+        <span className="w-5 shrink-0 text-right tabular-nums text-gray-500">
+          {card.quantity > 1 ? `${card.quantity}` : ""}
+        </span>
+      )}
       <div className="flex min-w-0 flex-1 items-center gap-1">
         <div className="min-w-0 flex-1 truncate text-gray-100">
           <CardHover name={card.name} imageUri={card.image_uri}>
@@ -130,6 +165,7 @@ export function DeckCompactColumns({
   groupBy,
   onCardClick,
   onRemove,
+  onSetQuantity,
   petCardNames,
   comboCardIds,
 }: Props) {
@@ -159,6 +195,7 @@ export function DeckCompactColumns({
                 card={card}
                 {...(onCardClick ? { onCardClick } : {})}
                 {...(onRemove ? { onRemove } : {})}
+                {...(onSetQuantity ? { onSetQuantity } : {})}
                 isPet={petCardNames?.has(card.name) ?? false}
                 inCombo={comboCardIds?.has(card.scryfall_id) ?? false}
               />

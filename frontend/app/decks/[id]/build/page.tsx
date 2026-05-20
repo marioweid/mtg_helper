@@ -350,8 +350,31 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
-  const [commandBarOpen, setCommandBarOpen] = useState(false);
+  const [commandBarOpen, setCommandBarOpenState] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+
+  // Open/close the command bar through the browser history so the system
+  // back button (mobile + browser) collapses it instead of leaving the page.
+  const setCommandBarOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setCommandBarOpenState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      if (typeof window !== "undefined") {
+        if (resolved && !prev) {
+          window.history.pushState({ deckBar: true }, "");
+        } else if (!resolved && prev && window.history.state?.deckBar) {
+          window.history.back();
+        }
+      }
+      return resolved;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPop = () => setCommandBarOpenState(false);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<string | null>(null);
@@ -863,6 +886,19 @@ export default function BuildPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to remove card");
       setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "accepted" }));
+    }
+  }
+
+  async function handleSetQuantity(scryfallId: string, quantity: number) {
+    try {
+      if (quantity < 1) {
+        await apiClient.removeCard(deckId, scryfallId);
+      } else {
+        await apiClient.updateCardQuantity(deckId, scryfallId, quantity);
+      }
+      void refreshDeck();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update quantity");
     }
   }
 
@@ -1629,6 +1665,7 @@ export default function BuildPage() {
                 onRemove={handleRemoveCard}
                 onUndoCut={handleUndoCut}
                 onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
+                onSetQuantity={handleSetQuantity}
                 petCardNames={petCardNames}
               />
             </div>
