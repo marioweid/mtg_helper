@@ -66,23 +66,20 @@ function CompactRow({
   inCombo: boolean;
 }) {
   const clickable = !!onCardClick;
+  const handleRowClick = clickable ? () => onCardClick?.(card) : undefined;
   return (
-    <li className="group flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs leading-tight hover:bg-white/5">
-      <span className="w-4 shrink-0 text-right tabular-nums text-gray-500">
+    <li
+      onClick={handleRowClick}
+      className={`group flex items-center gap-2 rounded px-1.5 py-1 text-sm leading-snug hover:bg-white/5 ${
+        clickable ? "cursor-pointer" : ""
+      }`}
+    >
+      <span className="w-5 shrink-0 text-right tabular-nums text-gray-500">
         {card.quantity > 1 ? `${card.quantity}` : ""}
       </span>
       <div className="flex min-w-0 flex-1 items-center gap-1">
         <CardHover name={card.name} imageUri={card.image_uri}>
-          <span
-            className="truncate text-gray-100"
-            onClick={clickable ? (e) => {
-              // CardHover stops propagation, so this only fires on the outer
-              // span when the click is on the row outside the name itself.
-              e.stopPropagation();
-            } : undefined}
-          >
-            {card.name}
-          </span>
+          <span className="truncate text-gray-100">{card.name}</span>
         </CardHover>
         {isPet && <span className="shrink-0 text-red-400" title="Pet card">♥</span>}
         {inCombo && (
@@ -90,9 +87,23 @@ function CompactRow({
         )}
       </div>
       {card.mana_cost && (
-        <span className="shrink-0 text-[10px] text-gray-500">
+        <span className="shrink-0 text-xs text-gray-500">
           <ManaCost cost={card.mana_cost} />
         </span>
+      )}
+      {clickable && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCardClick?.(card);
+          }}
+          title={`Edit tags / details for ${card.name}`}
+          aria-label={`Edit ${card.name}`}
+          className="shrink-0 rounded px-1 text-xs text-gray-500 opacity-0 hover:text-white group-hover:opacity-100 focus:opacity-100"
+        >
+          ⓘ
+        </button>
       )}
       {onRemove && (
         <button
@@ -103,20 +114,9 @@ function CompactRow({
           }}
           title={`Cut ${card.name}`}
           aria-label={`Cut ${card.name}`}
-          className="shrink-0 rounded px-1 text-[11px] text-red-400/70 opacity-0 hover:text-red-300 group-hover:opacity-100 focus:opacity-100"
+          className="shrink-0 rounded px-1 text-xs text-red-400/70 opacity-0 hover:text-red-300 group-hover:opacity-100 focus:opacity-100"
         >
           ✗
-        </button>
-      )}
-      {clickable && !onRemove && (
-        <button
-          type="button"
-          onClick={() => onCardClick?.(card)}
-          title={`Open ${card.name}`}
-          aria-label={`Open ${card.name}`}
-          className="shrink-0 rounded px-1 text-[11px] text-gray-500 opacity-0 hover:text-white group-hover:opacity-100 focus:opacity-100"
-        >
-          ⓘ
         </button>
       )}
     </li>
@@ -143,10 +143,10 @@ export function DeckCompactColumns({
       {groups.map((g) => (
         <section key={g.key} className="min-w-0 break-inside-avoid">
           <header className="mb-1 flex items-baseline justify-between border-b border-white/10 px-1 pb-1">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-300">
               {g.label}
             </h3>
-            <span className="text-[11px] tabular-nums text-gray-500">
+            <span className="text-xs tabular-nums text-gray-500">
               {totalCardCount(g.items)}
             </span>
           </header>
