@@ -26,6 +26,7 @@ from mtg_helper.routers import (
     tags,
 )
 from mtg_helper.services import scryfall
+from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.embedding_service import ensure_collection
 from mtg_helper.services.llm_client import LLMClient
 
@@ -45,16 +46,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     )
     app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url)
     await ensure_collection(app.state.qdrant_client)
+    app.state.admin_jobs = JobRegistry()
 
     card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
     if card_count == 0:
         _log.info("Cards table is empty — running initial Scryfall sync")
         try:
-            result = await scryfall.run_sync(
-                app.state.db_pool,
-                app.state.ai_client,
-                app.state.qdrant_client,
-            )
+            result = await scryfall.run_sync(app.state.db_pool)
             _log.info("Scryfall sync complete: %s", result)
         except Exception:
             _log.exception("Scryfall sync failed on startup; continuing without card data")

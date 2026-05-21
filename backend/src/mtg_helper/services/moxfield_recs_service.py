@@ -53,10 +53,10 @@ _SENTINEL_PAYLOAD: dict[str, Any] = {
     "by_oracle": {},
 }
 
-# Heuristic precon filter. Conservative — under-filtering is fine, over-
-# filtering throws away signal. Author usernames are case-insensitive.
+# Heuristic precon filter: only drop decks authored by the official accounts.
+# Hub-name matching ("precon" / "preconstructed") was removed because it also
+# trips on upgraded-precon decks, which carry real deck-building signal.
 _PRECON_AUTHOR_USERNAMES: frozenset[str] = frozenset({"wotc_official", "officialmtg", "moxfield"})
-_PRECON_HUB_KEYWORDS: tuple[str, ...] = ("precon", "preconstructed")
 
 
 async def fetch_moxfield_card_id(
@@ -100,15 +100,7 @@ async def fetch_moxfield_card_id(
 def _is_precon(deck: dict[str, Any]) -> bool:
     """Best-effort precon detector for a Moxfield search result deck."""
     author = (deck.get("createdByUser") or {}).get("userName") or ""
-    if author.lower() in _PRECON_AUTHOR_USERNAMES:
-        return True
-    hubs = deck.get("hubs") or []
-    for hub in hubs:
-        name = (hub.get("name") if isinstance(hub, dict) else hub) or ""
-        lowered = str(name).lower()
-        if any(keyword in lowered for keyword in _PRECON_HUB_KEYWORDS):
-            return True
-    return False
+    return author.lower() in _PRECON_AUTHOR_USERNAMES
 
 
 async def fetch_top_decks(

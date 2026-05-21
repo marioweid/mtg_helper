@@ -94,9 +94,14 @@ def test_is_precon_by_author_username() -> None:
     assert _is_precon(deck) is True
 
 
-def test_is_precon_by_hub_keyword() -> None:
+def test_is_precon_keeps_upgraded_precon_decks() -> None:
+    """Hub names that contain 'precon' must NOT trigger the filter.
+
+    Upgraded-precon decks are a primary source of real deck-building signal;
+    they're authored by community members, not the official accounts.
+    """
     deck = {"createdByUser": {"userName": "Random"}, "hubs": [{"name": "Precon Upgrades"}]}
-    assert _is_precon(deck) is True
+    assert _is_precon(deck) is False
 
 
 def test_is_precon_normal_deck() -> None:

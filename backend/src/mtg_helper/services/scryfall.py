@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import asyncpg
 import httpx
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.config import settings
 
 if TYPE_CHECKING:
-    from mtg_helper.services.llm_client import LLMClient
+    from mtg_helper.services.admin_jobs import ProgressCb
 
 _log = logging.getLogger(__name__)
 
@@ -278,59 +277,46 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
 
 async def run_sync(
     pool: asyncpg.Pool,
-    ai_client: "LLMClient | None" = None,
-    qdrant_client: AsyncQdrantClient | None = None,
+    progress: "ProgressCb | None" = None,
 ) -> dict[str, Any]:
     """Download Scryfall oracle_cards bulk data and upsert into the cards table.
 
-    When ai_client and qdrant_client are provided, also embeds any cards that
-    are new or updated since their last embedding.
-
     Args:
         pool: asyncpg connection pool.
-        ai_client: Optional LLM adapter for post-sync embedding.
-        qdrant_client: Optional Qdrant client for post-sync embedding.
+        progress: Optional callback ``(phase, current, total)`` invoked at
+            each phase transition and after every upsert batch. Phases:
+            ``"downloading"``, ``"filtering"``, ``"upserting"``.
 
     Returns:
-        Summary dict with cards_processed, duration_seconds, and optionally
-        cards_embedded.
+        Summary dict with cards_processed and duration_seconds.
     """
-    from mtg_helper.services.embedding_service import run_batch_embed
-    from mtg_helper.services.tag_service import run_batch_tag
+    from mtg_helper.services.admin_jobs import noop_progress
 
+    cb = progress or noop_progress
     start = time.monotonic()
+
+    cb("downloading", 0, 0)
     async with httpx.AsyncClient(timeout=120) as client:
         download_url = await _fetch_bulk_data_url(client)
         response = await client.get(download_url)
         response.raise_for_status()
         all_cards: list[dict[str, Any]] = response.json()
 
+    cb("filtering", 0, len(all_cards))
     relevant = [
         _map_card(c) for c in all_cards if _is_commander_relevant(c) and _is_commander_playable(c)
     ]
 
+    total = len(relevant)
+    _log.info("Upserting %d Commander-relevant cards", total)
     async with pool.acquire() as conn:
-        for i in range(0, len(relevant), _BATCH_SIZE):
+        for i in range(0, total, _BATCH_SIZE):
             await _upsert_batch(conn, relevant[i : i + _BATCH_SIZE])
+            done = min(i + _BATCH_SIZE, total)
+            cb("upserting", done, total)
+            _log.info("Upserted %d / %d cards", done, total)
 
-    result: dict[str, Any] = {
-        "cards_processed": len(relevant),
+    return {
+        "cards_processed": total,
         "duration_seconds": round(time.monotonic() - start, 2),
     }
-
-    if ai_client is not None and qdrant_client is not None:
-        _log.info("Running post-sync tagging")
-        try:
-            tag_result = await run_batch_tag(pool)
-            result["cards_tagged"] = tag_result["cards_tagged"]
-        except Exception:
-            _log.exception("Post-sync tagging failed")
-
-        _log.info("Running post-sync embedding for new/updated cards")
-        try:
-            embed_result = await run_batch_embed(pool, ai_client, qdrant_client)
-            result["cards_embedded"] = embed_result["cards_embedded"]
-        except Exception:
-            _log.exception("Post-sync embedding failed; cards will be embedded on next run")
-
-    return result

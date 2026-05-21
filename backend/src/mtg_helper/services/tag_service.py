@@ -4,10 +4,13 @@ import asyncio
 import logging
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import asyncpg
 from qdrant_client import AsyncQdrantClient
+
+if TYPE_CHECKING:
+    from mtg_helper.services.admin_jobs import ProgressCb
 
 _log = logging.getLogger(__name__)
 
@@ -696,7 +699,11 @@ def classify_card(
     return tags
 
 
-async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantClient) -> None:
+async def _sync_tags_to_qdrant(
+    pool: asyncpg.Pool,
+    qdrant_client: AsyncQdrantClient,
+    progress: "ProgressCb | None" = None,
+) -> None:
     """Push updated tags and traits from Postgres into Qdrant point payloads.
 
     Uses concurrent set_payload calls in batches to avoid 30k sequential
@@ -705,6 +712,7 @@ async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantCli
     Args:
         pool: asyncpg connection pool.
         qdrant_client: Async Qdrant client.
+        progress: Optional progress callback for the ``"syncing-qdrant"`` phase.
     """
     from mtg_helper.config import settings
 
@@ -713,7 +721,12 @@ async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantCli
             "SELECT id, tags, traits, token_types FROM cards WHERE embedded_at IS NOT NULL"
         )
 
-    _log.info("Syncing %d card tags/traits to Qdrant", len(rows))
+    from mtg_helper.services.admin_jobs import noop_progress
+
+    cb = progress or noop_progress
+    total = len(rows)
+    _log.info("Syncing %d card tags/traits to Qdrant", total)
+    cb("syncing-qdrant", 0, total)
 
     async def _update_one(
         card_id: Any, tags: list[str], traits: list[str], token_types: list[str]
@@ -724,7 +737,7 @@ async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantCli
             points=[str(card_id)],
         )
 
-    for i in range(0, len(rows), _QDRANT_CONCURRENCY):
+    for i in range(0, total, _QDRANT_CONCURRENCY):
         chunk = rows[i : i + _QDRANT_CONCURRENCY]
         await asyncio.gather(
             *[
@@ -732,11 +745,13 @@ async def _sync_tags_to_qdrant(pool: asyncpg.Pool, qdrant_client: AsyncQdrantCli
                 for r in chunk
             ]
         )
+        cb("syncing-qdrant", min(i + _QDRANT_CONCURRENCY, total), total)
 
 
 async def run_batch_tag(
     pool: asyncpg.Pool,
     qdrant_client: AsyncQdrantClient | None = None,
+    progress: "ProgressCb | None" = None,
 ) -> dict[str, Any]:
     """Classify all cards and persist their tags to the database.
 
@@ -747,10 +762,15 @@ async def run_batch_tag(
     Args:
         pool: asyncpg connection pool.
         qdrant_client: Optional Qdrant client for payload sync.
+        progress: Optional callback ``(phase, current, total)`` invoked at each
+            batch boundary. Phases: ``"tagging"`` then ``"syncing-qdrant"``.
 
     Returns:
         Summary dict with cards_tagged and duration_seconds.
     """
+    from mtg_helper.services.admin_jobs import noop_progress
+
+    cb = progress or noop_progress
     start = time.monotonic()
 
     async with pool.acquire() as conn:
@@ -758,10 +778,12 @@ async def run_batch_tag(
             "SELECT id, name, type_line, oracle_text, keywords, cmc FROM cards ORDER BY name"
         )
 
-    _log.info("Tagging %d cards", len(rows))
+    row_count = len(rows)
+    _log.info("Tagging %d cards", row_count)
+    cb("tagging", 0, row_count)
     total = 0
 
-    for i in range(0, len(rows), _BATCH_SIZE):
+    for i in range(0, row_count, _BATCH_SIZE):
         batch = rows[i : i + _BATCH_SIZE]
         updates: list[tuple[list[str], list[str], list[str], Any]] = [
             (
@@ -786,9 +808,10 @@ async def run_batch_tag(
             )
 
         total += len(batch)
+        cb("tagging", total, row_count)
 
     if qdrant_client is not None:
-        await _sync_tags_to_qdrant(pool, qdrant_client)
+        await _sync_tags_to_qdrant(pool, qdrant_client, progress=cb)
 
     _log.info("Tagged %d cards", total)
     return {

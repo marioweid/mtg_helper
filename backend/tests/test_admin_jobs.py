@@ -1,0 +1,205 @@
+"""Tests for the admin job registry and the admin router's background-task flow."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+from unittest.mock import AsyncMock
+
+import pytest
+from httpx import AsyncClient
+
+from mtg_helper.main import app
+from mtg_helper.services.admin_jobs import (
+    JobRegistry,
+    JobState,
+    finish_error,
+    finish_ok,
+    make_progress_cb,
+    start,
+)
+
+# ── registry primitives ──────────────────────────────────────────────────────
+
+
+def test_registry_initial_state() -> None:
+    reg = JobRegistry()
+    for job in (reg.sync, reg.tag, reg.embed, reg.refresh_all):
+        assert job.status == "idle"
+        assert job.current == 0
+        assert job.total == 0
+        assert job.started_at is None
+        assert job.finished_at is None
+        assert job.error is None
+
+
+def test_start_marks_running_and_stamps_time() -> None:
+    job = JobState(key="sync")
+    start(job)
+    assert job.status == "running"
+    assert job.started_at is not None
+    assert job.finished_at is None
+
+
+def test_progress_cb_updates_job_in_place() -> None:
+    job = JobState(key="sync")
+    cb = make_progress_cb(job)
+    cb("upserting", 250, 1000)
+    assert job.phase == "upserting"
+    assert job.current == 250
+    assert job.total == 1000
+
+
+def test_finish_ok_stamps_result() -> None:
+    job = JobState(key="sync")
+    start(job)
+    finish_ok(job, {"cards_processed": 42})
+    assert job.status == "ok"
+    assert job.finished_at is not None
+    assert job.result == {"cards_processed": 42}
+
+
+def test_finish_error_records_message() -> None:
+    job = JobState(key="sync")
+    start(job)
+    finish_error(job, "boom")
+    assert job.status == "error"
+    assert job.error == "boom"
+    assert job.finished_at is not None
+
+
+# ── router behaviour ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_status_endpoint_returns_all_four_slots(client: AsyncClient) -> None:
+    resp = await client.get("/api/v1/admin/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"sync", "tag", "embed", "refresh_all"}
+    for key, slot in body.items():
+        assert slot["status"] == "idle"
+        assert slot["key"] in {"sync", "tag", "embed", "refresh-all"}
+        del key  # keys checked above; loop var quietens linters
+
+
+@pytest.mark.asyncio
+async def test_sync_endpoint_returns_202_and_runs_in_background(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """POST returns 202 immediately; the background task drives state to ok."""
+    done = asyncio.Event()
+
+    async def _fake_run_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        progress("upserting", 10, 100)
+        await asyncio.sleep(0)
+        done.set()
+        return {"cards_processed": 100, "duration_seconds": 0.01}
+
+    monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _fake_run_sync)
+
+    resp = await client.post("/api/v1/admin/sync-cards")
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["job"] == "sync"
+
+    await asyncio.wait_for(done.wait(), timeout=2.0)
+    await asyncio.sleep(0)  # let _wrap finalize
+
+    status = (await client.get("/api/v1/admin/status")).json()["sync"]
+    assert status["status"] == "ok"
+    assert status["result"]["cards_processed"] == 100
+
+
+@pytest.mark.asyncio
+async def test_sync_endpoint_rejects_concurrent_runs(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second POST while the first is running returns 409."""
+    block = asyncio.Event()
+
+    async def _slow_run_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        del progress
+        await block.wait()
+        return {"cards_processed": 0, "duration_seconds": 0.0}
+
+    monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _slow_run_sync)
+
+    first = await client.post("/api/v1/admin/sync-cards")
+    assert first.status_code == 202
+
+    second = await client.post("/api/v1/admin/sync-cards")
+    assert second.status_code == 409
+
+    block.set()
+    await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_sync_endpoint_records_error_on_failure(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _boom(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        del progress
+        raise RuntimeError("scryfall unreachable")
+
+    monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _boom)
+
+    resp = await client.post("/api/v1/admin/sync-cards")
+    assert resp.status_code == 202
+
+    # Let the background task run.
+    for _ in range(20):
+        await asyncio.sleep(0.01)
+        status = (await client.get("/api/v1/admin/status")).json()["sync"]
+        if status["status"] != "running":
+            break
+
+    assert status["status"] == "error"
+    assert "scryfall unreachable" in status["error"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_all_chains_sync_tag_embed(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """refresh-all calls sync, tag, embed in order and updates phase as it goes."""
+    phases_seen: list[str] = []
+
+    async def _fake_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        progress("upserting", 5, 5)
+        phases_seen.append("sync")
+        return {"cards_processed": 5}
+
+    async def _fake_tag(_pool: Any, _qdr: Any, *, progress: Any) -> dict[str, Any]:
+        progress("tagging", 5, 5)
+        phases_seen.append("tag")
+        return {"cards_tagged": 5}
+
+    async def _fake_embed(_pool: Any, _ai: Any, _qdr: Any, *, progress: Any) -> dict[str, Any]:
+        progress("embedding", 5, 5)
+        phases_seen.append("embed")
+        return {"cards_embedded": 5}
+
+    monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _fake_sync)
+    monkeypatch.setattr("mtg_helper.routers.admin.run_batch_tag", _fake_tag)
+    monkeypatch.setattr("mtg_helper.routers.admin.run_batch_embed", _fake_embed)
+    # ai_client is read but only by the fake; stub it so app.state has the attribute.
+    app.state.ai_client = AsyncMock()
+
+    resp = await client.post("/api/v1/admin/refresh-all")
+    assert resp.status_code == 202
+
+    for _ in range(50):
+        await asyncio.sleep(0.01)
+        status = (await client.get("/api/v1/admin/status")).json()["refresh_all"]
+        if status["status"] != "running":
+            break
+
+    assert status["status"] == "ok"
+    assert phases_seen == ["sync", "tag", "embed"]
+    assert status["result"] == {
+        "cards_processed": 5,
+        "cards_tagged": 5,
+        "cards_embedded": 5,
+    }

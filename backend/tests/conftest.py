@@ -207,12 +207,14 @@ async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
         require_admin_or_internal,
     )
     from mtg_helper.models.accounts import AccountResponse
+    from mtg_helper.services.admin_jobs import JobRegistry
 
     app.state.db_pool = db_pool
 
     mock_qdrant = MagicMock()
     mock_qdrant.search = AsyncMock(return_value=[])
     app.state.qdrant_client = mock_qdrant
+    app.state.admin_jobs = JobRegistry()
 
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(

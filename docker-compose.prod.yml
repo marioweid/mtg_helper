@@ -66,8 +66,8 @@ services:
         while true; do
           echo 'Waiting for backend...';
           until curl -sf -o /dev/null http://backend:8000/docs; do sleep 10; done;
-          echo 'Running Scryfall sync (sync + tag + embed)...';
-          curl -sf --max-time 1800 -X POST -H \"X-Internal-Token: $$INTERNAL_API_TOKEN\" http://backend:8000/api/v1/admin/sync-cards && echo 'Sync complete' || echo 'Sync failed';
+          echo 'Kicking off refresh-all (sync + tag + embed) in background...';
+          curl -sf --max-time 30 -X POST -H \"X-Internal-Token: $$INTERNAL_API_TOKEN\" http://backend:8000/api/v1/admin/refresh-all && echo 'Refresh kicked off' || echo 'Refresh kickoff failed';
           sleep 604800;
         done
       "

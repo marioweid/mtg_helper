@@ -5,7 +5,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import asyncpg
 from qdrant_client import AsyncQdrantClient
@@ -13,6 +13,9 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from mtg_helper.config import settings
 from mtg_helper.services.llm_client import LLMClient
+
+if TYPE_CHECKING:
+    from mtg_helper.services.admin_jobs import ProgressCb
 
 _log = logging.getLogger(__name__)
 
@@ -130,6 +133,7 @@ async def run_batch_embed(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
+    progress: "ProgressCb | None" = None,
 ) -> dict[str, Any]:
     """Embed all cards not yet in Qdrant and upsert them into the collection.
 
@@ -141,10 +145,15 @@ async def run_batch_embed(
         pool: asyncpg connection pool.
         ai_client: LLM adapter.
         qdrant_client: Async Qdrant client.
+        progress: Optional callback ``(phase, current, total)`` invoked after
+            each batch. Phase is ``"embedding"``.
 
     Returns:
         Summary dict with cards_embedded and duration_seconds.
     """
+    from mtg_helper.services.admin_jobs import noop_progress
+
+    cb = progress or noop_progress
     await ensure_collection(qdrant_client)
     start = time.monotonic()
 
@@ -161,13 +170,16 @@ async def run_batch_embed(
         )
 
     if not rows:
+        cb("embedding", 0, 0)
         return {"cards_embedded": 0, "duration_seconds": 0.0}
 
-    _log.info("Embedding %d cards", len(rows))
+    row_count = len(rows)
+    _log.info("Embedding %d cards", row_count)
+    cb("embedding", 0, row_count)
     total = 0
     batch_size = settings.embedding_batch_size
 
-    for i in range(0, len(rows), batch_size):
+    for i in range(0, row_count, batch_size):
         if i > 0:
             await asyncio.sleep(_EMBED_BATCH_DELAY_SECONDS)
         batch = rows[i : i + batch_size]
@@ -225,7 +237,8 @@ async def run_batch_embed(
             )
 
         total += len(batch)
-        _log.info("Embedded %d / %d cards", total, len(rows))
+        _log.info("Embedded %d / %d cards", total, row_count)
+        cb("embedding", total, row_count)
 
     return {
         "cards_embedded": total,
