@@ -8,7 +8,12 @@ import pytest
 from httpx import AsyncClient
 
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
-from mtg_helper.models.playtest import PlaytestSimulateRequest
+from mtg_helper.models.playtest import (
+    BoardStateThreshold,
+    EngineThresholdConfig,
+    ManaEngineThreshold,
+    PlaytestSimulateRequest,
+)
 from mtg_helper.services.playtest_service import (
     ManaSource,
     _can_cast,
@@ -33,6 +38,7 @@ def _make_card(
     qualifying_stages: list[str] | None = None,
     oracle_text: str | None = None,
     tags: list[str] | None = None,
+    power: int | None = None,
 ) -> DeckCardItem:
     return DeckCardItem(
         deck_card_id=uuid4(),
@@ -52,6 +58,7 @@ def _make_card(
         ai_reasoning=None,
         qualifying_stages=qualifying_stages or [],
         tags=tags or [],
+        power=power,
         price_eur_cents=None,
     )
 
@@ -512,6 +519,100 @@ class TestFirstMissedLand:
         stats = simulate(deck, PlaytestSimulateRequest(trials=50, turns=4, seed=2))
         # Never misses → reported as turns + 1 sentinel value.
         assert stats.avg_first_missed_land_turn == pytest.approx(5.0)
+
+
+class TestEngineThresholds:
+    def _forests(self, quantity: int = 37) -> DeckCardItem:
+        return _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            quantity=quantity,
+            qualifying_stages=["lands"],
+        )
+
+    def test_pure_lands_never_hits_any_threshold(self):
+        deck = _make_deck([self._forests(99)], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=30, turns=6, seed=11))
+        # No creatures, no spells, mana plateaus at land count → no threshold.
+        assert stats.engine_thresholds.pct_ever_any == 0.0
+        assert stats.per_turn[-1].pct_any_threshold_hit_cum == 0.0
+
+    def test_token_deck_hits_board_state_via_creature_count(self):
+        # 99 free 1/1 creatures with {G} cost: deck floods the board fast.
+        # Lower the threshold so the small-trial sim reliably crosses it.
+        forest = self._forests(40)
+        weenie = _make_card(
+            "Weenie",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            quantity=59,
+            power=1,
+        )
+        deck = _make_deck([forest, weenie], ["G"])
+        cfg = EngineThresholdConfig(board_state=BoardStateThreshold(min_power=999, min_creatures=4))
+        stats = simulate(
+            deck,
+            PlaytestSimulateRequest(trials=200, turns=6, seed=17, thresholds=cfg),
+        )
+        assert stats.engine_thresholds.pct_ever_board_state > 0.5
+
+    def test_big_creatures_hit_board_state_via_power(self):
+        forest = self._forests(40)
+        # 6/6 for {G}{G} — power scales fast even with few bodies.
+        beast = _make_card(
+            "Mock Beast",
+            mana_cost="{G}{G}",
+            cmc=2,
+            color_identity=["G"],
+            quantity=59,
+            power=6,
+        )
+        deck = _make_deck([forest, beast], ["G"])
+        cfg = EngineThresholdConfig(
+            board_state=BoardStateThreshold(min_power=18, min_creatures=999)
+        )
+        stats = simulate(
+            deck,
+            PlaytestSimulateRequest(trials=200, turns=6, seed=23, thresholds=cfg),
+        )
+        # By T6 the deck should have stacked enough power to cross 18.
+        assert stats.engine_thresholds.pct_ever_board_state > 0.5
+
+    def test_threshold_override_makes_mana_engine_easier(self):
+        forest = self._forests(99)
+        deck = _make_deck([forest], ["G"])
+        # Override min_mana=4 + min_hand=0 so a lands-only deck on T4 qualifies.
+        cfg = EngineThresholdConfig(mana_engine=ManaEngineThreshold(min_mana=4, min_hand=0))
+        stats = simulate(
+            deck,
+            PlaytestSimulateRequest(trials=50, turns=6, seed=29, thresholds=cfg),
+        )
+        # Sentinel for never-hit is turns + 1 = 7. With the override every trial
+        # should hit by T4 → average well below 7.
+        assert stats.engine_thresholds.pct_ever_mana_engine == 1.0
+        assert stats.engine_thresholds.avg_first_mana_engine_turn < 5.0
+
+    def test_per_turn_cumulative_hit_is_monotonic(self):
+        forest = self._forests(40)
+        weenie = _make_card(
+            "Weenie",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            quantity=59,
+            power=1,
+        )
+        deck = _make_deck([forest, weenie], ["G"])
+        cfg = EngineThresholdConfig(board_state=BoardStateThreshold(min_power=999, min_creatures=3))
+        stats = simulate(
+            deck,
+            PlaytestSimulateRequest(trials=100, turns=6, seed=31, thresholds=cfg),
+        )
+        cum_vals = [t.pct_board_state_hit_cum for t in stats.per_turn]
+        for prev, nxt in zip(cum_vals, cum_vals[1:], strict=True):
+            assert nxt >= prev
 
 
 @pytest.mark.asyncio

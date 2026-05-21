@@ -14,11 +14,15 @@ from dataclasses import dataclass, field
 
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.models.playtest import (
+    EngineThresholdConfig,
+    EngineThresholdSummary,
     OpeningHandStats,
     PlaytestSimulateRequest,
     PlaytestStats,
     TurnStat,
 )
+
+_THRESHOLD_NAMES: tuple[str, ...] = ("mana_engine", "board_state", "velocity")
 
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G", "C")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
@@ -80,6 +84,8 @@ class SimCard:
     is_interaction: bool = False
     is_selection: bool = False
     is_tutor: bool = False
+    is_creature: bool = False
+    power: int = 0
 
 
 @dataclass(frozen=True)
@@ -101,6 +107,8 @@ class TurnCounts:
     cards_drawn_extra: int = 0
     selections: int = 0
     tutors: int = 0
+    creatures: int = 0
+    power: int = 0
 
 
 @dataclass
@@ -117,6 +125,10 @@ class TrialResult:
     cards_drawn_extra_by_turn: list[int]
     selection_events_by_turn: list[int]
     tutors_cast_by_turn: list[int]
+    creatures_on_board_by_turn: list[int]
+    total_power_by_turn: list[int]
+    cards_in_hand_by_turn: list[int]
+    threshold_first_hit: dict[str, int | None] = field(default_factory=dict)
     first_missed_land_turn: int | None = None
     total_mana_spent: int = field(default=0)
 
@@ -182,7 +194,8 @@ def _ramp_produces_for(card: DeckCardItem) -> tuple[str, ...]:
 
 
 def _to_sim_card(card: DeckCardItem) -> SimCard:
-    is_land = "Land" in (card.type_line or "")
+    type_line = card.type_line or ""
+    is_land = "Land" in type_line
     produces = _land_produces(card) if is_land else ()
     cost = None if is_land else parse_cost(card.mana_cost)
     cmc = int(card.cmc) if card.cmc is not None else 0
@@ -195,6 +208,8 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
     is_interaction = not is_land and bool(tags & _INTERACTION_TAGS)
     is_selection = not is_land and _SELECTION_TAG in tags
     is_tutor = not is_land and _TUTOR_TAG in tags
+    is_creature = not is_land and "Creature" in type_line
+    power = card.power if is_creature and card.power is not None and card.power >= 0 else 0
     return SimCard(
         name=card.name,
         cmc=cmc,
@@ -208,6 +223,8 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
         is_interaction=is_interaction,
         is_selection=is_selection,
         is_tutor=is_tutor,
+        is_creature=is_creature,
+        power=power,
     )
 
 
@@ -391,6 +408,9 @@ def _cast_turn(
             counts.selections += 1
         if spell.is_tutor:
             counts.tutors += 1
+        if spell.is_creature:
+            counts.creatures += 1
+            counts.power += spell.power
         drawn = _resolve_card_draw_effect(spell, hand, library)
         counts.cards_drawn_extra += drawn
         if spell.is_ramp:
@@ -419,12 +439,36 @@ def _count_dead_and_interaction(
     return dead, interaction
 
 
+def _evaluate_thresholds(
+    *,
+    mana_available: int,
+    cards_in_hand: int,
+    creatures_on_board: int,
+    total_power: int,
+    spells_this_turn: int,
+    config: EngineThresholdConfig,
+) -> set[str]:
+    """Return the set of threshold names crossed this turn. Pure function."""
+    hit: set[str] = set()
+    me = config.mana_engine
+    if mana_available >= me.min_mana and cards_in_hand >= me.min_hand:
+        hit.add("mana_engine")
+    bs = config.board_state
+    if total_power >= bs.min_power or creatures_on_board >= bs.min_creatures:
+        hit.add("board_state")
+    vel = config.velocity
+    if spells_this_turn >= vel.min_spells_per_turn and cards_in_hand >= vel.min_hand:
+        hit.add("velocity")
+    return hit
+
+
 def _run_trial(
     library_template: list[SimCard],
     rng: random.Random,
     turns: int,
     on_the_play: bool,
     max_mulligans: int,
+    thresholds: EngineThresholdConfig,
 ) -> TrialResult:
     hand, library, mulligans, opening_lands = _draw_opening(library_template, rng, max_mulligans)
     battlefield_lands: list[SimCard] = []
@@ -439,8 +483,14 @@ def _run_trial(
     drawn_extra_by_turn: list[int] = []
     selection_by_turn: list[int] = []
     tutors_by_turn: list[int] = []
+    creatures_by_turn: list[int] = []
+    power_by_turn: list[int] = []
+    hand_by_turn: list[int] = []
+    threshold_first_hit: dict[str, int | None] = {name: None for name in _THRESHOLD_NAMES}
     total_cast = 0
     total_mana_spent = 0
+    creatures_on_board = 0
+    total_power = 0
     first_missed = None
     prev_lands = 0
     for turn in range(1, turns + 1):
@@ -452,12 +502,26 @@ def _run_trial(
         counts = _cast_turn(hand, library, mana_sources, turn)
         total_cast += counts.spells
         total_mana_spent += counts.mana_spent
+        creatures_on_board += counts.creatures
+        total_power += counts.power
         turn_available = [s for s in mana_sources if s.available_from_turn <= turn]
         dead, held_interaction = _count_dead_and_interaction(hand, turn_available)
         lands_now = len(battlefield_lands)
         if first_missed is None and lands_now == prev_lands:
             first_missed = turn
         prev_lands = lands_now
+        active_after = sum(1 for s in mana_sources if s.available_from_turn <= turn)
+        hits = _evaluate_thresholds(
+            mana_available=active_after,
+            cards_in_hand=len(hand),
+            creatures_on_board=creatures_on_board,
+            total_power=total_power,
+            spells_this_turn=counts.spells,
+            config=thresholds,
+        )
+        for name in hits:
+            if threshold_first_hit[name] is None:
+                threshold_first_hit[name] = turn
         lands_by_turn.append(lands_now)
         mana_by_turn.append(active)
         mana_spent_by_turn.append(counts.mana_spent)
@@ -468,6 +532,9 @@ def _run_trial(
         drawn_extra_by_turn.append(counts.cards_drawn_extra)
         selection_by_turn.append(counts.selections)
         tutors_by_turn.append(counts.tutors)
+        creatures_by_turn.append(creatures_on_board)
+        power_by_turn.append(total_power)
+        hand_by_turn.append(len(hand))
     return TrialResult(
         mulligans=mulligans,
         opening_lands=opening_lands,
@@ -481,6 +548,10 @@ def _run_trial(
         cards_drawn_extra_by_turn=drawn_extra_by_turn,
         selection_events_by_turn=selection_by_turn,
         tutors_cast_by_turn=tutors_by_turn,
+        creatures_on_board_by_turn=creatures_by_turn,
+        total_power_by_turn=power_by_turn,
+        cards_in_hand_by_turn=hand_by_turn,
+        threshold_first_hit=threshold_first_hit,
         first_missed_land_turn=first_missed,
         total_mana_spent=total_mana_spent,
     )
@@ -545,6 +616,20 @@ def _opening_hand_stats(
     )
 
 
+def _cum_hit_pct(trials: list[TrialResult], turn_idx: int, name: str) -> float:
+    """Fraction of trials that have first-hit threshold ``name`` by ``turn_idx``."""
+    turn = turn_idx + 1
+    n = len(trials)
+    if n == 0:
+        return 0.0
+    hits = 0
+    for t in trials:
+        first = t.threshold_first_hit.get(name)
+        if first is not None and first <= turn:
+            hits += 1
+    return hits / n
+
+
 def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
     n = len(trials)
     lands = [t.lands_in_play_by_turn[turn_idx] for t in trials]
@@ -557,12 +642,26 @@ def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
     drawn = [t.cards_drawn_extra_by_turn[turn_idx] for t in trials]
     selection = [t.selection_events_by_turn[turn_idx] for t in trials]
     tutors = [t.tutors_cast_by_turn[turn_idx] for t in trials]
+    creatures = [t.creatures_on_board_by_turn[turn_idx] for t in trials]
+    power = [t.total_power_by_turn[turn_idx] for t in trials]
+    hand = [t.cards_in_hand_by_turn[turn_idx] for t in trials]
     played_land = sum(1 for t in trials if _played_land(t, turn_idx))
     cast_any = sum(1 for c in cast_this if c > 0)
     util_samples = [s / m for s, m in zip(spent, mana, strict=True) if m > 0]
     utilization = sum(util_samples) / len(util_samples) if util_samples else 0.0
     lands_p25, lands_p50, lands_p75 = _quantiles_or_zero(lands)
     mana_p25, mana_p50, mana_p75 = _quantiles_or_zero(mana)
+    pct_mana = _cum_hit_pct(trials, turn_idx, "mana_engine")
+    pct_board = _cum_hit_pct(trials, turn_idx, "board_state")
+    pct_vel = _cum_hit_pct(trials, turn_idx, "velocity")
+    pct_any = (
+        sum(
+            1
+            for t in trials
+            if any((v is not None and v <= turn_idx + 1) for v in t.threshold_first_hit.values())
+        )
+        / n
+    )
     return TurnStat(
         turn=turn_idx + 1,
         avg_lands_in_play=sum(lands) / n,
@@ -583,6 +682,53 @@ def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
         mana_p25=mana_p25,
         mana_p50=mana_p50,
         mana_p75=mana_p75,
+        avg_creatures_on_board=sum(creatures) / n,
+        avg_total_power=sum(power) / n,
+        avg_cards_in_hand=sum(hand) / n,
+        pct_mana_engine_hit_cum=pct_mana,
+        pct_board_state_hit_cum=pct_board,
+        pct_velocity_hit_cum=pct_vel,
+        pct_any_threshold_hit_cum=pct_any,
+    )
+
+
+def _build_threshold_summary(trials: list[TrialResult], turns: int) -> EngineThresholdSummary:
+    n = len(trials)
+    sentinel = float(turns + 1)
+
+    def first_or_sentinel(name: str) -> float:
+        values = [
+            t.threshold_first_hit.get(name)
+            if t.threshold_first_hit.get(name) is not None
+            else turns + 1
+            for t in trials
+        ]
+        return sum(values) / n if n else sentinel
+
+    def pct_ever(name: str) -> float:
+        return sum(1 for t in trials if t.threshold_first_hit.get(name) is not None) / n
+
+    def pct_ever_any() -> float:
+        return (
+            sum(1 for t in trials if any(v is not None for v in t.threshold_first_hit.values())) / n
+        )
+
+    def first_any() -> float:
+        values: list[int] = []
+        for t in trials:
+            firsts = [v for v in t.threshold_first_hit.values() if v is not None]
+            values.append(min(firsts) if firsts else turns + 1)
+        return sum(values) / n if n else sentinel
+
+    return EngineThresholdSummary(
+        avg_first_mana_engine_turn=first_or_sentinel("mana_engine"),
+        avg_first_board_state_turn=first_or_sentinel("board_state"),
+        avg_first_velocity_turn=first_or_sentinel("velocity"),
+        avg_first_any_threshold_turn=first_any(),
+        pct_ever_mana_engine=pct_ever("mana_engine"),
+        pct_ever_board_state=pct_ever("board_state"),
+        pct_ever_velocity=pct_ever("velocity"),
+        pct_ever_any=pct_ever_any(),
     )
 
 
@@ -619,6 +765,7 @@ def _aggregate(
         pct_screw=pct_screw,
         avg_first_missed_land_turn=avg_first_missed,
         opening_hand=_opening_hand_stats(trials, distribution),
+        engine_thresholds=_build_threshold_summary(trials, turns),
         per_turn=per_turn,
     )
 
@@ -641,8 +788,16 @@ def simulate(deck: DeckDetailResponse, request: PlaytestSimulateRequest) -> Play
     """
     library_template = _expand_deck(deck.cards)
     rng = random.Random(request.seed)
+    thresholds = request.thresholds or EngineThresholdConfig()
     results = [
-        _run_trial(library_template, rng, request.turns, request.on_the_play, request.max_mulligans)
+        _run_trial(
+            library_template,
+            rng,
+            request.turns,
+            request.on_the_play,
+            request.max_mulligans,
+            thresholds,
+        )
         for _ in range(request.trials)
     ]
     return _aggregate(results, request.turns, request.on_the_play, request.max_mulligans)

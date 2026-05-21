@@ -411,6 +411,7 @@ SELECT
     c.image_uri,
     c.rarity,
     c.tags,
+    c.power,
     CASE
         WHEN (c.prices->>'eur') IS NULL THEN NULL
         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer

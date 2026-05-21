@@ -98,6 +98,21 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
     )
 
 
+def _parse_power(raw: str | None) -> int | None:
+    """Scryfall ``power`` is TEXT — may be ``"*"``, ``"X"``, ``"1+*"``, etc. Only
+    purely numeric strings are honored; everything else returns ``None``.
+    """
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    if not stripped:
+        return None
+    try:
+        return int(stripped)
+    except ValueError:
+        return None
+
+
 def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
     tags = list(row["tags"] or []) if "tags" in row.keys() else []
     categories = list(row["categories"] or [])
@@ -105,6 +120,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
     for cat in categories:
         if cat not in stages:
             stages.append(cat)
+    power = _parse_power(row["power"]) if "power" in row.keys() else None
     return DeckCardItem(
         deck_card_id=row["deck_card_id"],
         card_id=row["card_id"],
@@ -123,6 +139,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
         tags=tags,
+        power=power,
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
     )
 
