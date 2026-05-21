@@ -50,6 +50,7 @@ SCHEMA_PATH = Path(__file__).parent.parent / "src/mtg_helper/sql/schema.sql"
 _TEST_CARDS = [
     {
         "scryfall_id": "1d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "1d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
         "name": "Doubling Season",
         "color_identity": ["G"],
         "oracle_text": "If an effect would put one or more tokens into play under your control, "
@@ -64,6 +65,7 @@ _TEST_CARDS = [
     },
     {
         "scryfall_id": "2d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "2d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
         "name": "Rhystic Study",
         "color_identity": ["U"],
         "oracle_text": "Whenever an opponent casts a spell, you may draw a card "
@@ -78,6 +80,7 @@ _TEST_CARDS = [
     },
     {
         "scryfall_id": "3d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "3d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
         "name": "Sol Ring",
         "color_identity": [],
         "oracle_text": "{T}: Add {C}{C}.",
@@ -91,6 +94,7 @@ _TEST_CARDS = [
     },
     {
         "scryfall_id": "4d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "4d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
         "name": "Hazel of the Rootbloom",
         "color_identity": ["G", "W"],
         "oracle_text": "Legendary Creature — Elf Druid. Whenever you cast a spell with X "
@@ -107,6 +111,7 @@ _TEST_CARDS = [
     },
     {
         "scryfall_id": "5d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "5d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
         "name": "Dockside Extortionist",
         "color_identity": ["R"],
         "oracle_text": "When Dockside Extortionist enters the battlefield, "
@@ -136,13 +141,14 @@ async def _setup_schema() -> None:
         for card in _TEST_CARDS:
             await conn.execute(
                 """
-                INSERT INTO cards (scryfall_id, name, color_identity, oracle_text,
+                INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, oracle_text,
                     type_line, cmc, mana_cost, rarity, set_code, legalities,
                     power, toughness, colors, keywords, prices)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 ON CONFLICT (scryfall_id) DO NOTHING
                 """,
                 card["scryfall_id"],
+                card["oracle_id"],
                 card["name"],
                 card["color_identity"],
                 card["oracle_text"],
@@ -254,6 +260,12 @@ SOL_RING_SCRYFALL_ID = UUID("3d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 DOUBLING_SEASON_SCRYFALL_ID = UUID("1d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 RHYSTIC_STUDY_SCRYFALL_ID = UUID("2d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 DOCKSIDE_SCRYFALL_ID = UUID("5d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
+
+HAZEL_ORACLE_ID = UUID("4d7b8d2c-aaaa-40e7-91de-9c8c1b44da67")
+SOL_RING_ORACLE_ID = UUID("3d7b8d2c-aaaa-40e7-91de-9c8c1b44da67")
+DOUBLING_SEASON_ORACLE_ID = UUID("1d7b8d2c-aaaa-40e7-91de-9c8c1b44da67")
+RHYSTIC_STUDY_ORACLE_ID = UUID("2d7b8d2c-aaaa-40e7-91de-9c8c1b44da67")
+DOCKSIDE_ORACLE_ID = UUID("5d7b8d2c-aaaa-40e7-91de-9c8c1b44da67")
 
 
 async def create_test_account(client: AsyncClient, display_name: str = "Test User") -> str:

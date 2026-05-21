@@ -20,7 +20,13 @@ from mtg_helper.services.moxfield_recs_service import (
     fetch_top_decks,
     score_inclusion,
 )
-from tests.conftest import HAZEL_SCRYFALL_ID, SOL_RING_SCRYFALL_ID
+from tests.conftest import (
+    DOCKSIDE_ORACLE_ID,
+    HAZEL_ORACLE_ID,
+    HAZEL_SCRYFALL_ID,
+    SOL_RING_ORACLE_ID,
+    SOL_RING_SCRYFALL_ID,
+)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -171,24 +177,43 @@ def test_aggregate_payload_counts_distinct_decks() -> None:
         ["sf-1", "sf-2", "sf-1"],  # duplicate within deck counts once
         ["sf-1", "sf-3"],
     ]
-    payload = _aggregate_payload("MOX", deck_summaries, deck_cards)
+    oracle_by_scryfall = {"sf-1": "oracle-1", "sf-2": "oracle-2", "sf-3": "oracle-3"}
+    payload = _aggregate_payload("MOX", deck_summaries, deck_cards, oracle_by_scryfall)
     assert payload["moxfield_card_id"] == "MOX"
-    assert payload["by_scryfall"]["sf-1"] == 2
-    assert payload["by_scryfall"]["sf-2"] == 1
-    assert payload["by_scryfall"]["sf-3"] == 1
+    assert payload["by_oracle"]["oracle-1"] == 2
+    assert payload["by_oracle"]["oracle-2"] == 1
+    assert payload["by_oracle"]["oracle-3"] == 1
+
+
+def test_aggregate_payload_collapses_printings_of_same_oracle() -> None:
+    """Two scryfall_ids resolving to the same oracle_id count as one card per deck."""
+    deck_summaries = [{"id": "a", "likes": 10}]
+    deck_cards = [["sf-alt-art", "sf-normal"]]
+    oracle_by_scryfall = {"sf-alt-art": "oracle-1", "sf-normal": "oracle-1"}
+    payload = _aggregate_payload("MOX", deck_summaries, deck_cards, oracle_by_scryfall)
+    assert payload["by_oracle"] == {"oracle-1": 1}
+
+
+def test_aggregate_payload_drops_unresolved_scryfall_ids() -> None:
+    """scryfall_ids missing from the oracle map are silently dropped."""
+    deck_summaries = [{"id": "a", "likes": 10}]
+    deck_cards = [["sf-known", "sf-unknown"]]
+    oracle_by_scryfall = {"sf-known": "oracle-1"}
+    payload = _aggregate_payload("MOX", deck_summaries, deck_cards, oracle_by_scryfall)
+    assert payload["by_oracle"] == {"oracle-1": 1}
 
 
 # ── score_inclusion (DB integration) ──────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_score_inclusion_resolves_scryfall_to_id(db_pool: asyncpg.Pool) -> None:
+async def test_score_inclusion_resolves_oracle_to_id(db_pool: asyncpg.Pool) -> None:
     payload = {
         "moxfield_card_id": "MOX",
         "decks": [],
-        "by_scryfall": {
-            str(SOL_RING_SCRYFALL_ID): 10,  # in all 10 decks → 1.0
-            str(HAZEL_SCRYFALL_ID): 1,  # 1/10 → 0.1
+        "by_oracle": {
+            str(SOL_RING_ORACLE_ID): 10,  # in all 10 decks → 1.0
+            str(HAZEL_ORACLE_ID): 1,  # 1/10 → 0.1
         },
     }
     scores = await score_inclusion(db_pool, payload, ["G", "W"])
@@ -203,19 +228,17 @@ async def test_score_inclusion_resolves_scryfall_to_id(db_pool: asyncpg.Pool) ->
 @pytest.mark.asyncio
 async def test_score_inclusion_filters_color_identity(db_pool: asyncpg.Pool) -> None:
     # Dockside is red; commander mono-green → excluded.
-    from tests.conftest import DOCKSIDE_SCRYFALL_ID
-
     payload = {
         "moxfield_card_id": "MOX",
         "decks": [],
-        "by_scryfall": {str(DOCKSIDE_SCRYFALL_ID): 5},
+        "by_oracle": {str(DOCKSIDE_ORACLE_ID): 5},
     }
     assert await score_inclusion(db_pool, payload, ["G"]) == {}
 
 
 @pytest.mark.asyncio
 async def test_score_inclusion_empty_payload(db_pool: asyncpg.Pool) -> None:
-    sentinel: dict[str, Any] = {"moxfield_card_id": None, "decks": [], "by_scryfall": {}}
+    sentinel: dict[str, Any] = {"moxfield_card_id": None, "decks": [], "by_oracle": {}}
     assert await score_inclusion(db_pool, sentinel, ["G"]) == {}
 
 
@@ -223,7 +246,9 @@ async def test_score_inclusion_empty_payload(db_pool: asyncpg.Pool) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_refresh_inserts_row_on_first_call(db_pool: asyncpg.Pool) -> None:
+async def test_get_or_refresh_inserts_row_on_first_call(
+    db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
     async with db_pool.acquire() as conn:
         commander_id = await conn.fetchval(
             "SELECT id FROM cards WHERE scryfall_id = $1", HAZEL_SCRYFALL_ID
@@ -254,10 +279,15 @@ async def test_get_or_refresh_inserts_row_on_first_call(db_pool: asyncpg.Pool) -
     )
     client = _stub_client(named_resp, search_resp, deck_resp)
 
+    async def _fake_resolve(sf_ids: list[str], *, client: Any) -> dict[str, str]:  # noqa: ARG001
+        return {str(SOL_RING_SCRYFALL_ID).lower(): str(SOL_RING_ORACLE_ID).lower()}
+
+    monkeypatch.setattr(moxfield_recs_service, "_resolve_oracle_ids", _fake_resolve)
+
     payload = await moxfield_recs_service.get_or_refresh(db_pool, commander_id, client=client)
 
     assert payload["moxfield_card_id"] == "MOX"
-    assert payload["by_scryfall"][str(SOL_RING_SCRYFALL_ID)] == 1
+    assert payload["by_oracle"][str(SOL_RING_ORACLE_ID).lower()] == 1
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT moxfield_card_id, payload FROM moxfield_commander_recs WHERE commander_id = $1",
@@ -285,7 +315,13 @@ async def test_get_or_refresh_uses_cache_within_max_age(db_pool: asyncpg.Pool) -
             """,
             commander_id,
             "CACHED",
-            json.dumps({"moxfield_card_id": "CACHED", "decks": [], "by_scryfall": {}}),
+            json.dumps(
+                {
+                    "moxfield_card_id": "CACHED",
+                    "decks": [],
+                    "by_oracle": {str(SOL_RING_ORACLE_ID): 3},
+                }
+            ),
         )
 
     client = _stub_client(_stub_response(500))  # would fail if called
@@ -306,7 +342,7 @@ async def test_get_or_refresh_writes_sentinel_on_404(db_pool: asyncpg.Pool) -> N
 
     payload = await moxfield_recs_service.get_or_refresh(db_pool, commander_id, client=client)
 
-    assert payload == {"moxfield_card_id": None, "decks": [], "by_scryfall": {}}
+    assert payload == {"moxfield_card_id": None, "decks": [], "by_oracle": {}}
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT moxfield_card_id, payload FROM moxfield_commander_recs WHERE commander_id = $1",
@@ -376,7 +412,7 @@ async def test_get_or_refresh_returns_cached_on_transient_error(db_pool: asyncpg
                 {
                     "moxfield_card_id": "OLD",
                     "decks": [],
-                    "by_scryfall": {str(SOL_RING_SCRYFALL_ID): 3},
+                    "by_oracle": {str(SOL_RING_ORACLE_ID): 3},
                 }
             ),
         )
@@ -387,4 +423,4 @@ async def test_get_or_refresh_returns_cached_on_transient_error(db_pool: asyncpg
     payload = await moxfield_recs_service.get_or_refresh(db_pool, commander_id, client=client)
 
     assert payload["moxfield_card_id"] == "OLD"
-    assert payload["by_scryfall"][str(SOL_RING_SCRYFALL_ID)] == 3
+    assert payload["by_oracle"][str(SOL_RING_ORACLE_ID)] == 3

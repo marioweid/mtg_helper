@@ -1,8 +1,11 @@
 """Moxfield top-decks recommendations: fetch + cache + score.
 
 Mirrors :mod:`mtg_helper.services.edhrec_service`. For each commander we fetch
-the top 5 most-liked Moxfield decks and aggregate the scryfall ids of every
-mainboard card. Cards appearing in more of the top decks score higher.
+the top 5 most-liked Moxfield decks, resolve every mainboard printing to its
+oracle_id via Scryfall, and aggregate the oracle_ids. Cards appearing in more
+of the top decks score higher. Resolving to oracle_id (vs. printing-level
+scryfall_id) is what lets alternate-art / reprint references match our local
+cards table, which only stores one printing per oracle.
 
 The cache row lives in ``moxfield_commander_recs`` and is refreshed when
 absent or older than ``max_age`` (default 28 days). 4xx responses persist a
@@ -10,6 +13,7 @@ sentinel empty payload so we don't keep retrying; 5xx / network errors fall
 back to the cached payload (or sentinel) without persisting.
 """
 
+import asyncio
 import json
 import logging
 from datetime import UTC, timedelta
@@ -34,10 +38,19 @@ _REQUEST_TIMEOUT = 30.0
 _TOP_DECKS = 10
 _SEARCH_PAGE_SIZE = 64
 
+# Scryfall's /cards/collection accepts up to 75 identifiers per call. We use it
+# to resolve Moxfield-referenced printing scryfall_ids to their oracle_ids;
+# without this, alternate-art or reprint references fall through the local
+# JOIN (our cards table only stores one printing per oracle).
+_SCRYFALL_COLLECTION_URL = "https://api.scryfall.com/cards/collection"
+_SCRYFALL_COLLECTION_BATCH = 75
+_SCRYFALL_HEADERS = {"User-Agent": "mtg-helper/1.0", "Accept": "application/json"}
+_SCRYFALL_INTER_BATCH_DELAY = 0.1
+
 _SENTINEL_PAYLOAD: dict[str, Any] = {
     "moxfield_card_id": None,
     "decks": [],
-    "by_scryfall": {},
+    "by_oracle": {},
 }
 
 # Heuristic precon filter. Conservative — under-filtering is fine, over-
@@ -185,25 +198,80 @@ async def fetch_deck_cards(
     return scryfall_ids
 
 
+async def _resolve_oracle_ids(
+    scryfall_ids: list[str],
+    *,
+    client: httpx.AsyncClient,
+) -> dict[str, str]:
+    """Batch-resolve printing scryfall_ids to oracle_ids via Scryfall.
+
+    Moxfield's deck data references a specific printing per card; our local
+    cards table only stores one printing per oracle (Scryfall's oracle_cards
+    bulk). Joining on scryfall_id silently drops any deck entry whose
+    printing differs from the one bulk picked. Resolving to oracle_id and
+    joining there fixes that.
+
+    Args:
+        scryfall_ids: Unique printing ids (lowercased) to resolve.
+        client: httpx client (no curl_cffi needed; Scryfall is not gated).
+
+    Returns:
+        Map of ``scryfall_id -> oracle_id`` (both lowercased). Missing ids
+        and failed batches are omitted.
+    """
+    if not scryfall_ids:
+        return {}
+    out: dict[str, str] = {}
+    for offset in range(0, len(scryfall_ids), _SCRYFALL_COLLECTION_BATCH):
+        batch = scryfall_ids[offset : offset + _SCRYFALL_COLLECTION_BATCH]
+        body = {"identifiers": [{"id": sf_id} for sf_id in batch]}
+        try:
+            response = await client.post(
+                _SCRYFALL_COLLECTION_URL, json=body, headers=_SCRYFALL_HEADERS
+            )
+        except httpx.HTTPError as exc:
+            _log.warning("Scryfall /cards/collection request error: %s", exc)
+            continue
+        if response.status_code >= 400:
+            _log.warning(
+                "Scryfall /cards/collection returned %s; skipping batch", response.status_code
+            )
+            continue
+        for card in response.json().get("data") or []:
+            sf_id = (card.get("id") or "").lower()
+            oracle_id = (card.get("oracle_id") or "").lower()
+            if sf_id and oracle_id:
+                out[sf_id] = oracle_id
+        if offset + _SCRYFALL_COLLECTION_BATCH < len(scryfall_ids):
+            await asyncio.sleep(_SCRYFALL_INTER_BATCH_DELAY)
+    return out
+
+
 def _aggregate_payload(
     moxfield_card_id: str,
     deck_summaries: list[dict[str, Any]],
     deck_cards: list[list[str]],
+    oracle_by_scryfall: dict[str, str],
 ) -> dict[str, Any]:
-    """Combine deck summaries + per-deck card lists into a cached payload."""
-    by_scryfall: dict[str, int] = {}
+    """Combine deck summaries + per-deck card lists into a cached payload.
+
+    Counts oracle_id occurrences across decks (one increment per deck, even
+    if a deck lists multiple printings of the same oracle). Entries whose
+    scryfall_id failed to resolve to an oracle_id are dropped.
+    """
+    by_oracle: dict[str, int] = {}
     for cards in deck_cards:
         seen_in_deck: set[str] = set()
         for sf_id in cards:
-            normalized = sf_id.lower()
-            if normalized in seen_in_deck:
+            oracle_id = oracle_by_scryfall.get(sf_id.lower())
+            if not oracle_id or oracle_id in seen_in_deck:
                 continue
-            seen_in_deck.add(normalized)
-            by_scryfall[normalized] = by_scryfall.get(normalized, 0) + 1
+            seen_in_deck.add(oracle_id)
+            by_oracle[oracle_id] = by_oracle.get(oracle_id, 0) + 1
     return {
         "moxfield_card_id": moxfield_card_id,
         "decks": deck_summaries,
-        "by_scryfall": by_scryfall,
+        "by_oracle": by_oracle,
     }
 
 
@@ -290,14 +358,14 @@ async def _refresh_payload(
     *,
     client: Any,
 ) -> dict[str, Any] | None:
-    """Run the lookup → search → per-deck fetch pipeline."""
+    """Run the lookup → search → per-deck fetch → oracle-resolve pipeline."""
     moxfield_card_id = await fetch_moxfield_card_id(str(scryfall_id), commander_name, client=client)
     if moxfield_card_id is None:
         return None
 
     deck_summaries = await fetch_top_decks(moxfield_card_id, client=client)
     if not deck_summaries:
-        return _aggregate_payload(moxfield_card_id, [], [])
+        return _aggregate_payload(moxfield_card_id, [], [], {})
 
     deck_cards: list[list[str]] = []
     for summary in deck_summaries:
@@ -307,7 +375,12 @@ async def _refresh_payload(
             _log.warning("Skipping Moxfield deck %s due to error: %s", summary["id"], exc)
             continue
         deck_cards.append(cards)
-    return _aggregate_payload(moxfield_card_id, deck_summaries, deck_cards)
+
+    unique_sf_ids = sorted({sf.lower() for cards in deck_cards for sf in cards})
+    async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT) as scryfall_client:
+        oracle_by_scryfall = await _resolve_oracle_ids(unique_sf_ids, client=scryfall_client)
+
+    return _aggregate_payload(moxfield_card_id, deck_summaries, deck_cards, oracle_by_scryfall)
 
 
 async def _close_client(client: Any) -> None:
@@ -342,29 +415,29 @@ async def score_inclusion(
     Returns:
         ``{card_id: score}`` where score is in ``[0.0, 1.0]``.
     """
-    by_scryfall = payload.get("by_scryfall") or {}
-    if not by_scryfall:
+    by_oracle = payload.get("by_oracle") or {}
+    if not by_oracle:
         return {}
 
-    scryfall_ids = list(by_scryfall.keys())
+    oracle_ids = list(by_oracle.keys())
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT id, scryfall_id::text AS sf_id, color_identity
+            SELECT id, oracle_id::text AS oid, color_identity
             FROM cards
-            WHERE scryfall_id::text = ANY($1::text[])
+            WHERE oracle_id::text = ANY($1::text[])
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND COALESCE(border_color, '') != 'gold'
               AND COALESCE(security_stamp, '') != 'acorn'
               AND type_line NOT LIKE '%Conspiracy%'
             """,
-            scryfall_ids,
+            oracle_ids,
             commander_color_identity,
         )
     scores: dict[UUID, float] = {}
     for row in rows:
-        count = by_scryfall.get(row["sf_id"], 0)
+        count = by_oracle.get(row["oid"], 0)
         if not count:
             continue
         scores[row["id"]] = min(1.0, count / _TOP_DECKS)
@@ -391,10 +464,9 @@ def _parse(payload: Any) -> dict[str, Any]:
 def _is_empty_payload(payload: Any) -> bool:
     """Return True for sentinel rows that carry no usable inclusion signal.
 
-    Rows written while Moxfield was Cloudflare-blocked store the sentinel
-    (``by_scryfall = {}``) and would otherwise sit cached for 28 days.
-    Treating them as stale forces a refresh on the next request — once the
-    upstream block clears (curl_cffi rollout, etc.), suggestions auto-recover.
+    Catches three cases: (1) sentinel rows written while Moxfield was
+    Cloudflare-blocked; (2) legacy rows from before the oracle-id migration,
+    which only have ``by_scryfall``. Both force a refresh on next request.
     """
     parsed = _parse(payload)
-    return not parsed.get("by_scryfall")
+    return not parsed.get("by_oracle")
