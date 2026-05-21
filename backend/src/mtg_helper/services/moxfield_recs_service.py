@@ -56,7 +56,27 @@ _SENTINEL_PAYLOAD: dict[str, Any] = {
 # Heuristic precon filter: only drop decks authored by the official accounts.
 # Hub-name matching ("precon" / "preconstructed") was removed because it also
 # trips on upgraded-precon decks, which carry real deck-building signal.
-_PRECON_AUTHOR_USERNAMES: frozenset[str] = frozenset({"wotc_official", "officialmtg", "moxfield"})
+_PRECON_AUTHOR_USERNAMES: frozenset[str] = frozenset(
+    {
+        # Legacy / placeholder names kept for safety — never observed in
+        # practice but cheap to keep.
+        "wotc_official",
+        "officialmtg",
+        "moxfield",
+        # Canonical Moxfield-operated host for every recent WotC precon
+        # decklist — confirmed across Murders at Karlov Manor, Outlaws of
+        # Thunder Junction, Modern Horizons 3, Bloomburrow, Duskmourn,
+        # Aetherdrift, Tarkir Dragonstorm, Final Fantasy, Doctor Who, LotR,
+        # Fallout, and Secret Lair Commander. The account bio states it's
+        # Moxfield staff hosting official lists, not WotC themselves.
+        "wizardsofthecoast",
+        # Community accounts that systematically mirror raw precon decklists
+        # (no upgrades). Identifiable by deck titles ending in "Precon
+        # Decklist" and covering multiple sets.
+        "kamininja",
+        "edhpreconlists",
+    }
+)
 
 
 async def fetch_moxfield_card_id(
