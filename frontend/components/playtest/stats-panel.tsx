@@ -123,30 +123,49 @@ function pct(value: number): string {
 }
 
 function StatsTable({ stats }: { stats: PlaytestStats }) {
+  const oh = stats.opening_hand;
   return (
     <div className="flex flex-col gap-3 text-xs">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Trials" value={String(stats.trials)} />
         <Stat label="Avg mulligans" value={stats.avg_mulligans.toFixed(2)} />
-        <Stat
-          label="Kept at 7"
-          value={pct((stats.mulligan_distribution[0] ?? 0) / stats.trials)}
-        />
+        <Stat label="Kept at 7" value={pct(oh.pct_kept_7)} />
         <Stat
           label={`Avg spells (T1–T${stats.turns})`}
-          value={stats.avg_total_spells_cast.toFixed(2)}
+          value={`${stats.avg_total_spells_cast.toFixed(2)} ± ${stats.total_spells_stddev.toFixed(2)}`}
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="Flood rate" value={pct(stats.pct_flood)} />
+        <Stat label="Screw rate" value={pct(stats.pct_screw)} />
+        <Stat label="Opening flood mull" value={pct(oh.pct_flood_mull)} />
+        <Stat label="Opening screw mull" value={pct(oh.pct_screwed_mull)} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <Stat
+          label="Avg first missed land drop"
+          value={`T${stats.avg_first_missed_land_turn.toFixed(2)}`}
+        />
+        <Stat label="Kept at 6" value={pct(oh.pct_kept_6)} />
+        <Stat label="Kept ≤ 5" value={pct(oh.pct_kept_5 + oh.pct_kept_le4)} />
       </div>
 
       <table className="w-full table-fixed text-left">
         <thead>
           <tr className="border-b border-white/10 text-gray-500">
             <th className="py-1 font-medium">Turn</th>
-            <th className="py-1 font-medium">Avg lands</th>
-            <th className="py-1 font-medium">Avg mana</th>
+            <th className="py-1 font-medium">Lands</th>
+            <th className="py-1 font-medium">Mana</th>
+            <th className="py-1 font-medium">Spent</th>
+            <th className="py-1 font-medium">Util</th>
             <th className="py-1 font-medium">Land drop</th>
             <th className="py-1 font-medium">Cast any</th>
-            <th className="py-1 font-medium">Spells (cum)</th>
+            <th className="py-1 font-medium">Cum spells</th>
+            <th className="py-1 font-medium">Dead</th>
+            <th className="py-1 font-medium">Interact</th>
+            <th className="py-1 font-medium">+Cards</th>
           </tr>
         </thead>
         <tbody>
@@ -159,15 +178,35 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
               <td className="py-1.5 tabular-nums text-gray-200">
                 {row.avg_mana_available.toFixed(2)}
               </td>
+              <td className="py-1.5 tabular-nums text-gray-200">
+                {row.avg_mana_spent.toFixed(2)}
+              </td>
+              <td className="py-1.5 tabular-nums text-gray-200">{pct(row.mana_utilization)}</td>
               <td className="py-1.5 tabular-nums text-gray-200">{pct(row.pct_land_drop)}</td>
               <td className="py-1.5 tabular-nums text-gray-200">{pct(row.pct_cast_any)}</td>
               <td className="py-1.5 tabular-nums text-gray-200">
                 {row.avg_spells_cast_cumulative.toFixed(2)}
               </td>
+              <td className="py-1.5 tabular-nums text-gray-200">
+                {row.avg_dead_cards.toFixed(2)}
+              </td>
+              <td className="py-1.5 tabular-nums text-gray-200">
+                {row.avg_interaction_in_hand.toFixed(2)}
+              </td>
+              <td className="py-1.5 tabular-nums text-gray-200">
+                {row.avg_cards_drawn_extra.toFixed(2)}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <p className="text-[10px] leading-snug text-gray-500">
+        <strong>Dead</strong> = uncastable non-land non-interaction cards in hand at
+        end of turn. <strong>Interact</strong> excludes removal/board wipes/counterspells
+        from dead-card count. <strong>+Cards</strong> = extra cards drawn this turn
+        (tutors counted as draw 1).
+      </p>
 
       <details className="text-gray-500">
         <summary className="cursor-pointer hover:text-gray-300">
@@ -183,6 +222,50 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
             </li>
           ))}
         </ul>
+      </details>
+
+      <details className="text-gray-500">
+        <summary className="cursor-pointer hover:text-gray-300">
+          Distribution percentiles (lands / mana)
+        </summary>
+        <table className="mt-1 w-full table-fixed text-left">
+          <thead>
+            <tr className="text-gray-500">
+              <th className="py-0.5 font-medium">Turn</th>
+              <th className="py-0.5 font-medium">L p25</th>
+              <th className="py-0.5 font-medium">L p50</th>
+              <th className="py-0.5 font-medium">L p75</th>
+              <th className="py-0.5 font-medium">M p25</th>
+              <th className="py-0.5 font-medium">M p50</th>
+              <th className="py-0.5 font-medium">M p75</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.per_turn.map((row) => (
+              <tr key={row.turn}>
+                <td className="py-0.5 text-gray-200">{row.turn}</td>
+                <td className="py-0.5 tabular-nums text-gray-200">
+                  {row.lands_p25.toFixed(1)}
+                </td>
+                <td className="py-0.5 tabular-nums text-gray-200">
+                  {row.lands_p50.toFixed(1)}
+                </td>
+                <td className="py-0.5 tabular-nums text-gray-200">
+                  {row.lands_p75.toFixed(1)}
+                </td>
+                <td className="py-0.5 tabular-nums text-gray-200">
+                  {row.mana_p25.toFixed(1)}
+                </td>
+                <td className="py-0.5 tabular-nums text-gray-200">
+                  {row.mana_p50.toFixed(1)}
+                </td>
+                <td className="py-0.5 tabular-nums text-gray-200">
+                  {row.mana_p75.toFixed(1)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </details>
     </div>
   );

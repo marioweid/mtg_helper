@@ -395,9 +395,32 @@ export interface PlaytestTurnStat {
   turn: number;
   avg_lands_in_play: number;
   avg_mana_available: number;
+  avg_mana_spent: number;
+  mana_utilization: number;
   avg_spells_cast_cumulative: number;
   pct_land_drop: number;
   pct_cast_any: number;
+  avg_dead_cards: number;
+  avg_interaction_in_hand: number;
+  avg_cards_drawn_extra: number;
+  avg_selection_events: number;
+  avg_tutors_cast: number;
+  lands_p25: number;
+  lands_p50: number;
+  lands_p75: number;
+  mana_p25: number;
+  mana_p50: number;
+  mana_p75: number;
+}
+
+export interface PlaytestOpeningHandStats {
+  pct_screwed_mull: number;
+  pct_balanced: number;
+  pct_flood_mull: number;
+  pct_kept_7: number;
+  pct_kept_6: number;
+  pct_kept_5: number;
+  pct_kept_le4: number;
 }
 
 export interface PlaytestStats {
@@ -407,6 +430,11 @@ export interface PlaytestStats {
   avg_mulligans: number;
   mulligan_distribution: number[];
   avg_total_spells_cast: number;
+  total_spells_stddev: number;
+  pct_flood: number;
+  pct_screw: number;
+  avg_first_missed_land_turn: number;
+  opening_hand: PlaytestOpeningHandStats;
   per_turn: PlaytestTurnStat[];
 }
 

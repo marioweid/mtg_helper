@@ -32,6 +32,7 @@ def _make_card(
     quantity: int = 1,
     qualifying_stages: list[str] | None = None,
     oracle_text: str | None = None,
+    tags: list[str] | None = None,
 ) -> DeckCardItem:
     return DeckCardItem(
         deck_card_id=uuid4(),
@@ -50,6 +51,7 @@ def _make_card(
         added_by="ai",
         ai_reasoning=None,
         qualifying_stages=qualifying_stages or [],
+        tags=tags or [],
         price_eur_cents=None,
     )
 
@@ -384,6 +386,132 @@ class TestSimulate:
         assert len(stats.per_turn) == 4
         assert len(stats.mulligan_distribution) == 4  # max_mulligans default 3 → 4 buckets
         assert sum(stats.mulligan_distribution) == 10
+
+
+class TestFloodScrew:
+    def test_pure_lands_flagged_as_flood(self):
+        cards = [
+            _make_card("Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=99)
+        ]
+        deck = _make_deck(cards, ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=50, turns=5, seed=42))
+        assert stats.pct_flood == 1.0
+        assert stats.pct_screw == 0.0
+
+    def test_pure_spells_flagged_as_screw(self):
+        cards = [_make_card(f"Spell{i}", mana_cost="{2}{G}{G}", cmc=4) for i in range(99)]
+        deck = _make_deck(cards, ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=30, turns=5, seed=1))
+        assert stats.pct_screw == 1.0
+        assert stats.pct_flood == 0.0
+
+
+class TestManaUtilization:
+    def test_utilization_climbs_on_curve_deck(self):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            quantity=37,
+            qualifying_stages=["lands"],
+        )
+        one_drop = _make_card("1-Drop", mana_cost="{G}", cmc=1, color_identity=["G"], quantity=20)
+        two_drop = _make_card(
+            "2-Drop", mana_cost="{1}{G}", cmc=2, color_identity=["G"], quantity=20
+        )
+        three_drop = _make_card(
+            "3-Drop", mana_cost="{2}{G}", cmc=3, color_identity=["G"], quantity=22
+        )
+        deck = _make_deck([forest, one_drop, two_drop, three_drop], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=300, turns=4, seed=7))
+        # By T3 a curve deck should have at least some mana spent on average.
+        assert stats.per_turn[2].avg_mana_spent > 0.5
+        assert stats.per_turn[2].mana_utilization > 0.0
+
+
+class TestOpeningHandStats:
+    def test_kept_breakdown_sums_to_one(self):
+        forest = _make_card(
+            "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=37
+        )
+        bear = _make_card("Bear", mana_cost="{1}{G}", cmc=2, color_identity=["G"], quantity=62)
+        deck = _make_deck([forest, bear], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=4, seed=3))
+        oh = stats.opening_hand
+        total = oh.pct_kept_7 + oh.pct_kept_6 + oh.pct_kept_5 + oh.pct_kept_le4
+        assert total == pytest.approx(1.0)
+        # Reasonable mana base → most hands keep at 7.
+        assert oh.pct_kept_7 > 0.5
+
+
+class TestDeadCardsAndInteraction:
+    def test_interaction_excluded_from_dead_count(self):
+        # Forest base + a single colored removal spell that won't be cast in
+        # early turns (CMC 4) — it must NOT show up as dead because of tags.
+        forest = _make_card(
+            "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=37
+        )
+        removal = _make_card(
+            "Beast Within",
+            mana_cost="{2}{G}",
+            cmc=3,
+            color_identity=["G"],
+            tags=["removal"],
+            quantity=62,
+        )
+        deck = _make_deck([forest, removal], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=2, seed=5))
+        # Removal sits in hand for T1 — should be counted as interaction, not dead.
+        assert stats.per_turn[0].avg_interaction_in_hand > 0.0
+        assert stats.per_turn[0].avg_dead_cards == 0.0
+
+    def test_untagged_uncastable_counted_as_dead(self):
+        forest = _make_card(
+            "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=37
+        )
+        big = _make_card(
+            "Big Beast",
+            mana_cost="{4}{G}{G}{G}",
+            cmc=7,
+            color_identity=["G"],
+            quantity=62,
+        )
+        deck = _make_deck([forest, big], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=2, seed=9))
+        # 7-drops are not castable by T2 and not tagged interaction → dead.
+        assert stats.per_turn[0].avg_dead_cards > 0.0
+
+
+class TestTutorAsDraw:
+    def test_tutor_resolution_adds_to_cards_drawn_extra(self):
+        forest = _make_card(
+            "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=37
+        )
+        # A 1-mana "tutor" — not tagged as draw, only as tutor — should pull one
+        # card from the top of the library per resolution.
+        tutor = _make_card(
+            "Mock Tutor",
+            mana_cost="{G}",
+            cmc=1,
+            color_identity=["G"],
+            tags=["tutor"],
+            quantity=62,
+        )
+        deck = _make_deck([forest, tutor], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=3, seed=13))
+        assert stats.per_turn[2].avg_tutors_cast > 0.0
+        assert stats.per_turn[2].avg_cards_drawn_extra > 0.0
+
+
+class TestFirstMissedLand:
+    def test_smooth_deck_never_misses_within_window(self):
+        forest = _make_card(
+            "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=99
+        )
+        deck = _make_deck([forest], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=50, turns=4, seed=2))
+        # Never misses → reported as turns + 1 sentinel value.
+        assert stats.avg_first_missed_land_turn == pytest.approx(5.0)
 
 
 @pytest.mark.asyncio
