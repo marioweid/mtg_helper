@@ -411,10 +411,10 @@ SELECT
     c.image_uri,
     c.rarity,
     c.tags,
-    c.power,
     CASE
         WHEN (c.prices->>'eur') IS NULL THEN NULL
         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
-    END           AS price_eur_cents
+    END           AS price_eur_cents,
+    c.power
 FROM deck_cards dc
 JOIN cards c ON dc.card_id = c.id;
