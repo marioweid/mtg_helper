@@ -1,10 +1,17 @@
 # Next Features
 
-- why are these cards not shown for: Terra, Herald of Hope (shouldbe in moxfield)
-  - wall of Ba sing sea
-  - same for boggart dweller
-  - Lotho, Corrupt Shirrif
-  - witch enchanter
-  - Grave researcher
-  - Reprive
-  - 
+- migrate all agents to pydantic ai
+- Bild steps should be:
+  - theme: no target
+  - Ramp: 12
+  - draw: 12
+  - interaction: 12
+    - this is protection
+    - utility
+    - removale
+    - counter spells
+    - board wipes
+    - etc.
+  - Lands: 38
+- in the simulation, the agent should not suggest cards that we already have in our deck unless they are baisc lands
+- in the simulation deck view we need a card search to add/change based on the agent suggestions

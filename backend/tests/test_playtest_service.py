@@ -11,12 +11,15 @@ from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDeta
 from mtg_helper.models.playtest import PlaytestSimulateRequest
 from mtg_helper.services.playtest_service import (
     ManaSource,
+    SimCard,
     _can_cast,
+    _cast_turn,
     _expand_deck,
     _is_basic_fetch,
     _is_enters_tapped,
     _land_produces,
     _parse_draw_count,
+    _pick_spell,
     _to_sim_card,
     parse_cost,
     simulate,
@@ -1050,6 +1053,145 @@ async def test_playtest_endpoint_404_for_missing_deck(client: AsyncClient) -> No
         json={"trials": 5},
     )
     assert resp.status_code == 404
+
+
+def _sim_land(name: str, *colors: str) -> SimCard:
+    return SimCard(name=name, cmc=0, is_land=True, produces=tuple(colors), cost=None)
+
+
+def _sim_source(*colors: str, turn: int = 0) -> ManaSource:
+    return ManaSource(produces=tuple(colors), available_from_turn=turn)
+
+
+def _sim_spell(
+    name: str,
+    *,
+    cmc: int,
+    cost: str,
+    is_ramp: bool = False,
+    mana_count: int = 0,
+    mana_colors: tuple[str, ...] = (),
+    is_creature: bool = False,
+) -> SimCard:
+    return SimCard(
+        name=name,
+        cmc=cmc,
+        is_land=False,
+        produces=(),
+        cost=parse_cost(cost),
+        is_ramp=is_ramp,
+        mana_count=mana_count,
+        mana_colors=mana_colors,
+        is_creature=is_creature,
+    )
+
+
+class TestCastPriority:
+    def test_sol_ring_taps_same_turn(self):
+        # Hand: Sol Ring (1-cost rock, +2C same turn) + Cultivate-shaped sorc.
+        # Available: 2 Forests on T2. Sol Ring + Cultivate cost 4 total — only
+        # possible if Sol Ring taps the same turn it enters.
+        sol_ring = _sim_spell(
+            "Sol Ring", cmc=1, cost="{1}", is_ramp=True, mana_count=2, mana_colors=("C",)
+        )
+        cultivate = _sim_spell("Cultivate-3", cmc=3, cost="{2}{G}", is_ramp=True)
+        hand = [sol_ring, cultivate]
+        sources = [_sim_source("G"), _sim_source("G")]
+        counts, _ = _cast_turn(hand, [], sources, turn=2)
+        assert counts.spells == 2  # both resolved — Sol Ring fed Cultivate
+        assert hand == []  # both spells left the hand
+
+    def test_commander_priority_over_other_spells(self):
+        # Both castable; commander in zone must win even though a non-commander
+        # spell shares the same CMC.
+        commander = _sim_spell("Test Cmdr", cmc=4, cost="{2}{G}{G}", is_creature=True)
+        rival = _sim_spell("4cc Beast", cmc=4, cost="{2}{G}{G}", is_creature=True)
+        hand = [rival]
+        zone = [commander]
+        sources = [_sim_source("G"), _sim_source("G"), _sim_source("G"), _sim_source("G")]
+        counts, resolved = _cast_turn(hand, [], sources, turn=4, command_zone=zone)
+        assert counts.spells == 1
+        assert resolved == [commander]
+        assert hand == [rival]  # only one cast worth of mana — beast stays
+
+    def test_ramp_priority_when_commander_not_castable(self):
+        # No castable commander → ramp beats highest-CMC. With 2 Forests and
+        # hand of Llanowar (ramp, {G}) + Grizzly Bear ({1}{G}, no ramp), the
+        # old greedy picked Bear and locked Llanowar out. New priority must
+        # cast Llanowar first.
+        llanowar = _sim_spell(
+            "Llanowar",
+            cmc=1,
+            cost="{G}",
+            is_ramp=True,
+            mana_count=1,
+            mana_colors=("G",),
+            is_creature=True,
+        )
+        bear = _sim_spell("Grizzly Bear", cmc=2, cost="{1}{G}", is_creature=True)
+        hand = [llanowar, bear]
+        sources = [_sim_source("G"), _sim_source("G")]
+        counts, _ = _cast_turn(hand, [], sources, turn=1)
+        assert counts.spells == 1
+        assert hand == [bear]  # Llanowar cast, Bear stranded with 1 mana left
+
+    def test_pick_spell_falls_back_to_highest_cmc(self):
+        # No commanders castable, no ramp → highest-CMC behavior preserved.
+        small = _sim_spell("Small", cmc=1, cost="{G}")
+        big = _sim_spell("Big", cmc=3, cost="{2}{G}")
+        chosen = _pick_spell([small, big], zone=[])
+        assert chosen is big
+
+
+class TestSolRingSameTurnSim:
+    """End-to-end via ``simulate``: a deck of Forests + Sol Rings + a 4-CMC
+    commander should cast the commander measurably earlier than the same deck
+    without Sol Ring, because Sol Ring now taps the turn it enters."""
+
+    def _deck(self, sol_ring_count: int):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            quantity=37,
+            qualifying_stages=["lands"],
+        )
+        sol_ring = _make_card(
+            "Sol Ring",
+            mana_cost="{1}",
+            cmc=1,
+            type_line="Artifact",
+            color_identity=[],
+            quantity=sol_ring_count,
+            qualifying_stages=["ramp"],
+            oracle_text="{T}: Add {C}{C}.",
+        )
+        filler = _make_card(
+            "Bear",
+            mana_cost="{1}{G}",
+            cmc=2,
+            color_identity=["G"],
+            quantity=99 - 37 - sol_ring_count,
+        )
+        commander = _make_commander(
+            name="Vorinclex",
+            mana_cost="{4}{G}{G}",
+            cmc=6,
+            type_line="Legendary Creature — Praetor",
+            color_identity=["G"],
+        )
+        return _make_deck([forest, sol_ring, filler], ["G"], commander=commander)
+
+    def test_sol_ring_lowers_commander_cast_turn(self):
+        with_ring = simulate(self._deck(20), PlaytestSimulateRequest(trials=300, turns=6, seed=99))
+        without_ring = simulate(
+            self._deck(0), PlaytestSimulateRequest(trials=300, turns=6, seed=99)
+        )
+        assert with_ring.commander is not None
+        assert without_ring.commander is not None
+        # With same-turn rock mana the commander should be cast earlier on
+        # average than the no-ramp baseline (lower avg_cast_turn).
+        assert with_ring.commander.avg_cast_turn < without_ring.commander.avg_cast_turn
 
 
 @pytest.mark.asyncio

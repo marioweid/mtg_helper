@@ -764,6 +764,33 @@ def _apply_spell_effects(
         mana_sources.append(ManaSource(produces=spell.ramp_produces, available_from_turn=turn + 1))
 
 
+def _available_now(
+    mana_sources: list[ManaSource], turn: int, consumed: list[ManaSource]
+) -> list[ManaSource]:
+    """Mana sources usable right now: available this turn and not yet tapped
+    this turn. Rebuilt after each cast so non-summoning-sick rocks (Sol Ring)
+    that entered earlier in the same turn are picked up.
+    """
+    consumed_ids = {id(s) for s in consumed}
+    return [s for s in mana_sources if s.available_from_turn <= turn and id(s) not in consumed_ids]
+
+
+def _pick_spell(castable: list[SimCard], zone: list[SimCard]) -> SimCard:
+    """Priority: (1) commander from command zone, (2) ramp (rocks/dorks/ramp
+    spells), (3) any other spell. Picks the lowest-CMC ramp to free maximum
+    mana for additional casts the same turn; picks the highest-CMC non-ramp
+    to maximize curve impact.
+    """
+    zone_ids = {id(c) for c in zone}
+    commanders = [c for c in castable if id(c) in zone_ids]
+    if commanders:
+        return max(commanders, key=lambda c: c.cmc)
+    ramp = [c for c in castable if c.is_ramp or c.mana_count > 0]
+    if ramp:
+        return min(ramp, key=lambda c: c.cmc)
+    return max(castable, key=lambda c: c.cmc)
+
+
 def _cast_turn(
     hand: list[SimCard],
     library: list[SimCard],
@@ -773,25 +800,28 @@ def _cast_turn(
     drawn_sink: list[SimCard] | None = None,
     cast_log: list[tuple[int, str]] | None = None,
 ) -> tuple[TurnCounts, list[SimCard]]:
-    """Repeatedly cast the highest-CMC castable spell until none remain.
-    Commands from ``command_zone`` are included in the candidate pool and
-    removed from there when chosen. ``drawn_sink`` / ``cast_log`` are forwarded
-    to ``_apply_spell_effects`` for per-trial recording.
+    """Repeatedly cast the highest-priority castable spell until none remain.
+
+    Priority is commander > ramp > highest-CMC (see ``_pick_spell``). The
+    available-mana pool is rebuilt after each cast so a non-summoning-sick rock
+    cast this turn taps for mana the same turn it entered. Commanders in
+    ``command_zone`` are removed from there once cast. ``drawn_sink`` /
+    ``cast_log`` are forwarded to ``_apply_spell_effects`` for per-trial
+    recording.
     """
     counts = TurnCounts()
     zone = command_zone if command_zone is not None else []
     resolved_from_zone: list[SimCard] = []
-    available = [s for s in mana_sources if s.available_from_turn <= turn]
+    consumed: list[ManaSource] = []
     while True:
+        available = _available_now(mana_sources, turn, consumed)
         candidates = [c for c in hand if not c.is_land] + zone
         castable = [c for c in candidates if c.cost is not None and _can_cast(c.cost, available)]
         if not castable:
             return counts, resolved_from_zone
-        spell = max(castable, key=lambda c: c.cmc)
+        spell = _pick_spell(castable, zone)
         assert spell.cost is not None
-        consumed = _pay_cost(spell.cost, available)
-        for src in consumed:
-            available.remove(src)
+        consumed.extend(_pay_cost(spell.cost, available))
         if _remove_cast_spell(spell, hand, zone):
             resolved_from_zone.append(spell)
         _apply_spell_effects(spell, counts, hand, library, mana_sources, turn, drawn_sink, cast_log)

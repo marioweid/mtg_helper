@@ -1,37 +1,41 @@
 """AI agent that diagnoses a goldfish sim run and proposes card swaps.
 
-Drives a Gemini tool-calling loop with a single ``card_search`` tool so the
-model's swap recommendations stay grounded in our card DB and within the
-deck's color identity. Hard caps on tool calls and wall clock keep the loop
-bounded.
+Built on `pydantic-ai`: a single ``card_search`` tool grounds the model's
+recommendations in our card DB, and ``output_type=SimulationAnalysisResponse``
+makes the response shape enforced by the framework — no manual JSON parsing
+or truncation fallback. Hard caps on requests (tool calls) and wall clock keep
+the loop bounded.
 """
 
 import asyncio
 import json
 import logging
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
 import asyncpg
-from google.genai import types as genai_types
+from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.google import GoogleProvider
 
-# Assuming these imports remain the same, but ensure SimulationAnalysisResponse 
-# can accept a "thought_process" string field if you update your Pydantic schemas.
+from mtg_helper.config import settings
 from mtg_helper.models.ai import (
-    AnalysisFinding,
     CardSearchHit,
     CardSearchInput,
     SimulationAnalysisResponse,
-    SwapSuggestion,
 )
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestStats
 from mtg_helper.services.card_search_tool import search_cards
-from mtg_helper.services.llm_client import ChatToolResponse, LLMClient, ToolCall
+from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
 _MAX_TOOL_CALLS = 6
+# request_limit counts every model request (initial + each tool round-trip),
+# so leave a margin above _MAX_TOOL_CALLS for the final structured response.
+_REQUEST_LIMIT = _MAX_TOOL_CALLS + 2
 _WALL_CLOCK_SECONDS = 30.0
 
 _TEMPERATURE = 0.55
@@ -43,80 +47,84 @@ You analyze goldfish simulation telemetry to identify strategic and structural b
 Use these absolute baseline telemetry thresholds to evaluate deck health:
 - Mana Screw (pct_screw): Target < 10%. Critical if > 12%.
 - Mana Flood (pct_flood): Target < 12%. Critical if > 15%.
-- Color Screw (pct_color_screw): Target < 8%. Critical if > 10%. (Top priority to fix via multi-color lands/rocks).
+- Color Screw (pct_color_screw): Target < 8%. Critical if > 10%.
+  Top priority to fix via multi-color lands/rocks.
 - Average Mulligans (avg_mulligans): Target < 0.9. High friction if > 1.1.
 - Kept Hand at 7 (kept_at_7): Target > 50%. Critical if < 45%.
 - Commander Cast Rate: Critical if < 60% due to color/mana gaps.
 
 --- INTERACTION FLOW ---
-1. You have access to the `card_search` tool. You CAN and SHOULD execute tool calls immediately to find multi-color lands, mana rocks, or synergy pieces before making your final judgment.
-2. If you need to search the database, output your thought process briefly, call the tool, and wait for the results.
-3. ONCE YOU HAVE EXECUTED ALL NECESSARY TOOL CALLS AND ARE READY TO PREPARE YOUR FINAL REPORT, you must return a single JSON object matching the schema below.
-
-FINAL REPORT JSON SCHEMA:
-{
-  "thought_process": "Write a 1-2 paragraph analytical breakdown evaluating how the archetype matches performance data.",
-  "summary": "A cohesive 2-3 sentence strategic summary outlining the primary bottleneck.",
-  "findings": [
-    {
-      "category": "mana_base|consistency|curve|commander|color_fix|card_quality",
-      "severity": "info|warn|critical",
-      "title": "Short strategic headline",
-      "detail": "Strategic breakdown of what is failing.",
-      "evidence": "Specific simulation stat backing this up."
-    }
-  ],
-  "swap_suggestions": [
-    {
-      "remove": ["Exact Card Name to remove"],
-      "add": ["Exact Card Name from card_search results"],
-      "reason": "Explain the mechanical or synergy upgrade."
-    }
-  ]
-}
-
-Do not return the JSON structure until your tool-searching process is complete."""
+1. You have access to the `card_search` tool. You CAN and SHOULD execute tool calls
+   to find multi-color lands, mana rocks, or synergy pieces before making your
+   final judgment.
+2. Use the tool for at most six calls; budget them — each call narrows a specific
+   gap (e.g. one query per missing color, or one for ramp upgrades).
+3. When you have enough evidence, return the final structured response. `summary`
+   is 2–3 sentences, `findings` lists the strategic problems, and
+   `swap_suggestions` proposes concrete swaps using exact card names from your
+   `card_search` results."""
 
 
-def _tool_declaration() -> genai_types.Tool:
-    return genai_types.Tool(
-        function_declarations=[
-            genai_types.FunctionDeclaration(
-                name="card_search",
-                description=(
-                    "Search the card pool for replacement candidates. Always "
-                    "filtered to the deck's color identity. Provide structural "
-                    "filters; the tool returns up to `limit` matching cards."
-                ),
-                parameters=genai_types.Schema(
-                    type=genai_types.Type.OBJECT,
-                    properties={
-                        "text_query": genai_types.Schema(
-                            type=genai_types.Type.STRING,
-                            description="Optional free-form search over name/oracle text.",
-                        ),
-                        "types": genai_types.Schema(
-                            type=genai_types.Type.ARRAY,
-                            items=genai_types.Schema(type=genai_types.Type.STRING),
-                            description="Substrings to match in type_line (e.g. 'Land').",
-                        ),
-                        "tags": genai_types.Schema(
-                            type=genai_types.Type.ARRAY,
-                            items=genai_types.Schema(type=genai_types.Type.STRING),
-                            description="Tags to match (e.g. 'ramp', 'removal', 'draw').",
-                        ),
-                        "min_cmc": genai_types.Schema(type=genai_types.Type.INTEGER),
-                        "max_cmc": genai_types.Schema(type=genai_types.Type.INTEGER),
-                        "max_price_eur_cents": genai_types.Schema(type=genai_types.Type.INTEGER),
-                        "limit": genai_types.Schema(
-                            type=genai_types.Type.INTEGER,
-                            description="Up to 20.",
-                        ),
-                    },
-                ),
-            )
-        ]
+@dataclass
+class _AnalysisDeps:
+    """Per-run dependencies threaded through the agent's tools."""
+
+    pool: asyncpg.Pool
+    deck_color_identity: list[str]
+    tool_call_count: list[int] = field(default_factory=lambda: [0])
+
+
+def _build_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
+    """Construct the analysis agent. Re-built per process (cheap) so the API
+    key from settings is captured at the time the app boots.
+    """
+    provider = GoogleProvider(api_key=settings.gemini_api_key)
+    model = GoogleModel(settings.chat_model, provider=provider)
+    agent = Agent[_AnalysisDeps, SimulationAnalysisResponse](
+        model=model,
+        deps_type=_AnalysisDeps,
+        output_type=SimulationAnalysisResponse,
+        system_prompt=_SYSTEM_PROMPT,
+        model_settings={
+            "temperature": _TEMPERATURE,
+            "max_tokens": _MAX_OUTPUT_TOKENS,
+        },
+        retries=1,
     )
+
+    @agent.tool
+    async def card_search(
+        ctx: RunContext[_AnalysisDeps], inp: CardSearchInput
+    ) -> list[CardSearchHit]:
+        """Search the card pool for replacement candidates. Always filtered
+        to the deck's color identity. Provide structural filters; up to
+        `limit` matching cards are returned.
+        """
+        ctx.deps.tool_call_count[0] += 1
+        return await search_cards(
+            ctx.deps.pool,
+            deck_color_identity=ctx.deps.deck_color_identity,
+            inp=inp,
+        )
+
+    return agent
+
+
+_AGENT: Agent[_AnalysisDeps, SimulationAnalysisResponse] | None = None
+
+
+def _get_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
+    """Lazy singleton — building the provider eagerly at import time fails
+    when settings.gemini_api_key is unset (test env).
+    """
+    global _AGENT
+    if _AGENT is None:
+        _AGENT = _build_agent()
+    return _AGENT
+
+
+def _deck_colors(deck: DeckDetailResponse) -> list[str]:
+    return [c for c in (deck.commander_color_identity or []) if c in {"W", "U", "B", "R", "G"}]
 
 
 def _brief_payload(deck: DeckDetailResponse, stats: PlaytestStats) -> dict[str, Any]:
@@ -176,168 +184,44 @@ def _turn_snapshot(turn: Any) -> dict[str, float | int]:
     }
 
 
-async def _run_tool(pool: asyncpg.Pool, deck_colors: list[str], call: ToolCall) -> dict[str, Any]:
-    """Execute a tool call; return a JSON-serializable response payload."""
-    if call.name != "card_search":
-        return {"error": f"unknown tool: {call.name}"}
-    try:
-        inp = CardSearchInput.model_validate(call.args)
-    except Exception as exc:  # noqa: BLE001 — surface validation errors to the agent
-        return {"error": f"invalid args: {exc}"}
-    hits = await search_cards(pool, deck_color_identity=deck_colors, inp=inp)
-    return {"hits": [h.model_dump() for h in hits]}
-
-
-def _user_brief_part(deck: DeckDetailResponse, stats: PlaytestStats) -> genai_types.Content:
+def _build_prompt(deck: DeckDetailResponse, stats: PlaytestStats) -> str:
     payload = _brief_payload(deck, stats)
-    text = "Analyze this deck and simulation. Respond with the JSON schema described.\n\n"
-    text += json.dumps(payload, indent=2, default=str)
-    return genai_types.Content(role="user", parts=[genai_types.Part.from_text(text=text)])
-
-
-def _function_response_content(name: str, response: dict[str, Any]) -> genai_types.Content:
-    return genai_types.Content(
-        role="user",
-        parts=[genai_types.Part.from_function_response(name=name, response=response)],
-    )
-
-
-def _function_call_content(call: ToolCall) -> genai_types.Content:
-    return genai_types.Content(
-        role="model",
-        parts=[
-            genai_types.Part(function_call=genai_types.FunctionCall(name=call.name, args=call.args))
-        ],
-    )
-
-
-def _normalize_add_entry(entry: Any) -> CardSearchHit:
-    if isinstance(entry, str):
-        return CardSearchHit(name=entry)
-    return CardSearchHit.model_validate(entry)
-
-
-def _parse_final_response(text: str, tool_call_count: int) -> SimulationAnalysisResponse:
-    """Parse the model's final JSON response with support for the thought process wrapper."""
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.startswith("json\n"):
-            cleaned = cleaned[5:]
-    try:
-        data = json.loads(cleaned)
-    except json.JSONDecodeError:
-        return SimulationAnalysisResponse(
-            summary=text.strip()[:500] or "Analysis returned no parseable output.",
-            tool_call_count=tool_call_count,
-        )
-    
-    # Extract thought process for internal logs if your Pydantic schema doesn't store it yet
-    thought_process = data.get("thought_process", "")
-    if thought_process:
-        _log.info("Agent Internal Strategy Thoughts:\n%s", thought_process)
-
-    findings = [AnalysisFinding.model_validate(f) for f in data.get("findings", [])]
-    swaps_raw = data.get("swap_suggestions", [])
-    swaps: list[SwapSuggestion] = []
-    for s in swaps_raw:
-        add_raw = s.get("add", [])
-        add_hits = [_normalize_add_entry(entry) for entry in add_raw]
-        swaps.append(
-            SwapSuggestion(
-                remove=list(s.get("remove", [])),
-                add=add_hits,
-                reason=str(s.get("reason", "")),
-            )
-        )
-    
-    return SimulationAnalysisResponse(
-        summary=str(data.get("summary", "")),
-        findings=findings,
-        swap_suggestions=swaps,
-        tool_call_count=tool_call_count,
-        # If your SimulationAnalysisResponse model supports it, pass thought_process here!
+    return "Analyze this deck and simulation. Respond with the structured output.\n\n" + json.dumps(
+        payload, indent=2, default=str
     )
 
 
 async def analyze_simulation(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
+    ai_client: LLMClient,  # noqa: ARG001 — kept for caller compatibility
     deck: DeckDetailResponse,
     stats: PlaytestStats,
 ) -> SimulationAnalysisResponse:
-    """Drive the agent loop. Returns a structured response — may include a
-    partial result if the loop hit the tool-call cap or wall-clock timeout.
+    """Drive the analysis agent. Returns a structured response — may include
+    a partial summary if the loop hit the request cap or wall-clock timeout.
     """
-    deck_colors = _deck_colors(deck)
-    history: list[genai_types.Content] = [_user_brief_part(deck, stats)]
-    tools = [_tool_declaration()]
-    deadline = time.monotonic() + _WALL_CLOCK_SECONDS
-    tool_calls = 0
-    last_text: str = ""
-    for _ in range(_MAX_TOOL_CALLS + 1):
-        if time.monotonic() > deadline:
-            _log.warning("analysis wall-clock timeout after %d tool calls", tool_calls)
-            break
-        resp = await _invoke_llm(ai_client, history, tools, deadline)
-        if resp is None:
-            break
-        if resp.text is not None:
-            last_text = resp.text
-            if "swap_suggestions" in resp.text:
-                break
-        if resp.tool_calls is None:
-            break
-        tool_calls = await _dispatch_tool_calls(
-            pool, deck_colors, resp.tool_calls, history, tool_calls
-        )
-        if tool_calls >= _MAX_TOOL_CALLS:
-            break
-    if not last_text:
-        return SimulationAnalysisResponse(
-            summary="Agent did not produce a final response within limits.",
-            tool_call_count=tool_calls,
-        )
-    return _parse_final_response(last_text, tool_calls)
-
-
-def _deck_colors(deck: DeckDetailResponse) -> list[str]:
-    return [c for c in (deck.commander_color_identity or []) if c in {"W", "U", "B", "R", "G"}]
-
-
-async def _invoke_llm(
-    ai_client: LLMClient,
-    history: list[genai_types.Content],
-    tools: list[genai_types.Tool],
-    deadline: float,
-) -> ChatToolResponse | None:
+    agent = _get_agent()
+    deps = _AnalysisDeps(pool=pool, deck_color_identity=_deck_colors(deck))
+    prompt = _build_prompt(deck, stats)
+    started = time.monotonic()
     try:
-        return await asyncio.wait_for(
-            ai_client.chat_with_tools(
-                system=_SYSTEM_PROMPT,
-                history=history,
-                tools=tools,
-                temperature=_TEMPERATURE,
-                max_output_tokens=_MAX_OUTPUT_TOKENS,
-            ),
-            timeout=max(1.0, deadline - time.monotonic()),
+        result = await asyncio.wait_for(
+            agent.run(prompt, deps=deps, usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT)),
+            timeout=_WALL_CLOCK_SECONDS,
         )
     except TimeoutError:
-        return None
-
-
-async def _dispatch_tool_calls(
-    pool: asyncpg.Pool,
-    deck_colors: list[str],
-    calls: list[ToolCall],
-    history: list[genai_types.Content],
-    tool_calls: int,
-) -> int:
-    for call in calls:
-        history.append(_function_call_content(call))
-        tool_calls += 1
-        result = await _run_tool(pool, deck_colors, call)
-        history.append(_function_response_content(call.name, result))
-        if tool_calls >= _MAX_TOOL_CALLS:
-            break
-    return tool_calls
+        elapsed = time.monotonic() - started
+        _log.warning("analysis wall-clock timeout after %.1fs", elapsed)
+        return SimulationAnalysisResponse(
+            summary="Analysis timed out before the agent produced a final response.",
+            tool_call_count=deps.tool_call_count[0],
+        )
+    except UsageLimitExceeded as exc:
+        _log.warning("analysis usage cap hit: %s", exc)
+        return SimulationAnalysisResponse(
+            summary="Analysis exceeded the tool-call budget before finalizing.",
+            tool_call_count=deps.tool_call_count[0],
+        )
+    output = result.output
+    output.tool_call_count = deps.tool_call_count[0]
+    return output
