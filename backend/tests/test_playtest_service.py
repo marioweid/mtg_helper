@@ -13,6 +13,8 @@ from mtg_helper.services.playtest_service import (
     ManaSource,
     _can_cast,
     _expand_deck,
+    _is_basic_fetch,
+    _is_enters_tapped,
     _land_produces,
     _parse_draw_count,
     _to_sim_card,
@@ -546,6 +548,141 @@ class TestFirstMissedLand:
         stats = simulate(deck, PlaytestSimulateRequest(trials=50, turns=4, seed=2))
         # Never misses → reported as turns + 1 sentinel value.
         assert stats.avg_first_missed_land_turn == pytest.approx(5.0)
+
+
+class TestBasicFetchAndTapped:
+    def test_basic_fetch_produces_all_five_colors(self):
+        wilds = _make_card(
+            "Evolving Wilds",
+            type_line="Land",
+            color_identity=[],
+            oracle_text=(
+                "{T}, Sacrifice Evolving Wilds: Search your library for a basic "
+                "land card, put it onto the battlefield tapped, then shuffle."
+            ),
+        )
+        assert _is_basic_fetch(wilds) is True
+        assert set(_land_produces(wilds)) == {"W", "U", "B", "R", "G"}
+
+    def test_basic_fetch_with_tapped_oracle_is_enters_tapped(self):
+        wilds = _make_card(
+            "Evolving Wilds",
+            type_line="Land",
+            color_identity=[],
+            oracle_text=(
+                "{T}, Sacrifice Evolving Wilds: Search your library for a basic "
+                "land card, put it onto the battlefield tapped, then shuffle."
+            ),
+        )
+        assert _is_enters_tapped(wilds) is True
+        sim = _to_sim_card(wilds)
+        assert sim.enters_tapped is True
+
+    def test_prismatic_vista_is_basic_fetch_but_not_tapped(self):
+        vista = _make_card(
+            "Prismatic Vista",
+            type_line="Land",
+            color_identity=[],
+            oracle_text=(
+                "{T}, Pay 1 life, Sacrifice Prismatic Vista: Search your library "
+                "for a basic land card, put it onto the battlefield, then shuffle."
+            ),
+        )
+        assert _is_basic_fetch(vista) is True
+        assert _is_enters_tapped(vista) is False
+        assert set(_land_produces(vista)) == {"W", "U", "B", "R", "G"}
+
+    def test_misty_rainforest_stays_dual_and_untapped(self):
+        misty = _make_card(
+            "Misty Rainforest",
+            type_line="Land",
+            color_identity=["G", "U"],
+            oracle_text=(
+                "{T}, Pay 1 life, Sacrifice Misty Rainforest: Search your library "
+                "for a Forest or Island card, put it onto the battlefield, then "
+                "shuffle."
+            ),
+        )
+        # Non-empty color_identity → not a basic fetch.
+        assert _is_basic_fetch(misty) is False
+        assert _is_enters_tapped(misty) is False
+        assert set(_land_produces(misty)) == {"G", "U"}
+
+    def test_shock_land_treated_as_untapped(self):
+        # Shock lands say "you may pay 2 life" — assume the player pays. The
+        # conditional escape hatch overrides the bare "enters tapped" match.
+        temple = _make_card(
+            "Temple Garden",
+            type_line="Land — Forest Plains",
+            color_identity=["G", "W"],
+            oracle_text=(
+                "({T}: Add {G} or {W}.) As Temple Garden enters, you may pay 2 "
+                "life. If you don't, it enters tapped."
+            ),
+        )
+        assert _is_enters_tapped(temple) is False
+        sim = _to_sim_card(temple)
+        assert sim.enters_tapped is False
+        assert set(sim.produces) == {"G", "W"}
+
+    def test_check_land_treated_as_untapped(self):
+        # Check lands say "enters tapped unless you control..." — assume the
+        # condition is met (normal deckbuilding outcome).
+        grove = _make_card(
+            "Sunpetal Grove",
+            type_line="Land",
+            color_identity=["G", "W"],
+            oracle_text=(
+                "Sunpetal Grove enters tapped unless you control a Forest or a "
+                "Plains. {T}: Add {G} or {W}."
+            ),
+        )
+        assert _is_enters_tapped(grove) is False
+
+    def test_triome_stays_tapped(self):
+        # Triomes enter tapped unconditionally → stay flagged.
+        triome = _make_card(
+            "Ketria Triome",
+            type_line="Land — Forest Island Mountain",
+            color_identity=["G", "U", "R"],
+            oracle_text=("Ketria Triome enters tapped. {T}: Add {G}, {U}, or {R}. Cycling {3}"),
+        )
+        assert _is_enters_tapped(triome) is True
+
+    def test_tapped_land_delays_mana_by_one_turn(self):
+        # 99 Evolving Wilds → every "land" played is tapped. Mana available is
+        # always lands_in_play - 1 because the newly-played land enters next
+        # turn. On T1: 1 land in play, 0 mana available.
+        wilds = _make_card(
+            "Evolving Wilds",
+            type_line="Land",
+            color_identity=[],
+            oracle_text=(
+                "{T}, Sacrifice Evolving Wilds: Search your library for a basic "
+                "land card, put it onto the battlefield tapped, then shuffle."
+            ),
+            quantity=99,
+        )
+        deck = _make_deck([wilds], [])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=30, turns=4, seed=99))
+        for i, row in enumerate(stats.per_turn):
+            expected_lands = float(i + 1)
+            assert row.avg_lands_in_play == pytest.approx(expected_lands)
+            # Mana available at the start of casting lags one turn behind lands.
+            assert row.avg_mana_available == pytest.approx(expected_lands - 1.0)
+
+    def test_basic_land_unchanged(self):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            oracle_text="({T}: Add {G}.)",
+        )
+        assert _is_basic_fetch(forest) is False
+        assert _is_enters_tapped(forest) is False
+        sim = _to_sim_card(forest)
+        assert sim.enters_tapped is False
+        assert _land_produces(forest) == ("G",)
 
 
 class TestColorScrew:

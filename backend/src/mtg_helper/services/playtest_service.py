@@ -48,6 +48,27 @@ _BASIC_LAND_PRODUCES: dict[str, str] = {
     "Wastes": "C",
 }
 
+# Basic-fetch detection: a land with no color identity (it doesn't tap for
+# mana itself) whose oracle text describes searching the library. Captures
+# Evolving Wilds, Terramorphic Expanse, Prismatic Vista. Excludes shock-fetches
+# (Misty et al.) — those have non-empty color_identity and stay dual.
+_FETCH_LIBRARY_RE = re.compile(r"search your library for", re.IGNORECASE)
+# Tapped detection: covers "enters tapped", "enters the battlefield tapped"
+# (older phrasing), and "onto the battlefield tapped" (fetched-land effects
+# like Evolving Wilds).
+_TAPPED_RE = re.compile(
+    r"\b(?:enters\s+(?:the battlefield\s+)?tapped|battlefield\s+tapped)\b",
+    re.IGNORECASE,
+)
+# Conditional-tapped escape hatches: shock lands ("you may pay 2 life…"),
+# check lands and slow lands ("enters tapped unless…"). Assumes the player
+# usually meets the condition — treat those as untapped.
+_CONDITIONAL_UNTAPPED_RE = re.compile(
+    r"(tapped\s+unless\b|you may pay)",
+    re.IGNORECASE,
+)
+_ALL_COLORS_NON_C: tuple[str, ...] = ("W", "U", "B", "R", "G")
+
 _INTERACTION_TAGS: frozenset[str] = frozenset({"removal", "board_wipe", "counterspell"})
 _SELECTION_TAG = "card_selection"
 _TUTOR_TAG = "tutor"
@@ -94,6 +115,7 @@ class SimCard:
     is_interaction: bool = False
     is_selection: bool = False
     is_tutor: bool = False
+    enters_tapped: bool = False
 
 
 @dataclass(frozen=True)
@@ -147,12 +169,44 @@ def _basic_land_color(name: str) -> str | None:
     return _BASIC_LAND_PRODUCES.get(base)
 
 
+def _is_basic_fetch(card: DeckCardItem) -> bool:
+    """Detect a 'fetch any basic' land: type_line contains Land, empty
+    ``color_identity``, and oracle text describes a library search. Catches
+    Evolving Wilds / Terramorphic Expanse / Prismatic Vista. Shock-fetches
+    (Misty et al.) have non-empty color_identity and are excluded.
+    """
+    if "Land" not in (card.type_line or ""):
+        return False
+    if card.color_identity:
+        return False
+    text = card.oracle_text or ""
+    return bool(_FETCH_LIBRARY_RE.search(text))
+
+
+def _is_enters_tapped(card: DeckCardItem) -> bool:
+    """Oracle-text heuristic: True when the land (or its fetched basic) enters
+    tapped *unconditionally*. Shock lands ("you may pay 2 life"), check lands
+    and slow lands ("enters tapped unless…") are treated as untapped on the
+    assumption that the player meets the condition or pays the life.
+    """
+    text = card.oracle_text or ""
+    if not _TAPPED_RE.search(text):
+        return False
+    if _CONDITIONAL_UNTAPPED_RE.search(text):
+        return False
+    return True
+
+
 def _land_produces(card: DeckCardItem) -> tuple[str, ...]:
     basic = _basic_land_color(card.name)
     if basic is not None:
         return (basic,)
     identity = tuple(c for c in (card.color_identity or []) if c in _COLORS)
-    return identity if identity else ("C",)
+    if identity:
+        return identity
+    if _is_basic_fetch(card):
+        return _ALL_COLORS_NON_C
+    return ("C",)
 
 
 def parse_cost(mana_cost: str | None) -> ParsedCost:
@@ -216,6 +270,7 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
     is_interaction = not is_land and bool(tags & _INTERACTION_TAGS)
     is_selection = not is_land and _SELECTION_TAG in tags
     is_tutor = not is_land and _TUTOR_TAG in tags
+    enters_tapped = is_land and _is_enters_tapped(card)
     return SimCard(
         name=card.name,
         cmc=cmc,
@@ -229,6 +284,7 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
         is_interaction=is_interaction,
         is_selection=is_selection,
         is_tutor=is_tutor,
+        enters_tapped=enters_tapped,
     )
 
 
@@ -414,7 +470,10 @@ def _play_land(
     for i, card in enumerate(hand):
         if card.is_land:
             battlefield_lands.append(card)
-            mana_sources.append(ManaSource(produces=card.produces, available_from_turn=turn))
+            available_from = turn + 1 if card.enters_tapped else turn
+            mana_sources.append(
+                ManaSource(produces=card.produces, available_from_turn=available_from)
+            )
             hand.pop(i)
             return True
     return False
