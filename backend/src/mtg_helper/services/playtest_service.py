@@ -18,17 +18,13 @@ from mtg_helper.models.decks import (
     DeckDetailResponse,
 )
 from mtg_helper.models.playtest import (
+    ColorScrewStats,
     CommanderStats,
-    EngineClass,
-    EngineThresholdConfig,
-    EngineThresholdSummary,
     OpeningHandStats,
     PlaytestSimulateRequest,
     PlaytestStats,
     TurnStat,
 )
-
-_THRESHOLD_NAMES: tuple[str, ...] = ("mana_engine", "board_state", "velocity")
 
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G", "C")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
@@ -56,19 +52,6 @@ _INTERACTION_TAGS: frozenset[str] = frozenset({"removal", "board_wipe", "counter
 _SELECTION_TAG = "card_selection"
 _TUTOR_TAG = "tutor"
 
-# Commander engine archetype classification — first match wins. Tag matches are
-# tested in priority order; more specific archetypes (sac payoffs) come first.
-_ENGINE_TAG_PRIORITY: tuple[tuple[EngineClass, frozenset[str]], ...] = (
-    (EngineClass.SAC_PAYOFF, frozenset({"aristocrats", "sacrifice"})),
-    (EngineClass.TOKEN_GENERATOR, frozenset({"token"})),
-    (
-        EngineClass.COUNTER_DISTRIBUTOR,
-        frozenset({"plus_one_counters", "anthem", "proliferate"}),
-    ),
-    (EngineClass.RAMP_ENGINE, frozenset({"ramp"})),
-    (EngineClass.DRAW_ENGINE, frozenset({"draw", "card_selection"})),
-)
-
 # Flood: hit a turn ≥ 4 with at least 2 more lands than the turn number AND
 # used less than half the mana that turn. Screw: a turn ≥ 3 where the deck
 # fell at least 2 lands behind on the curve. Thresholds tuned for Commander.
@@ -78,6 +61,10 @@ _FLOOD_UTILIZATION_CEIL = 0.5
 _SCREW_TURN_FLOOR = 3
 _SCREW_LAND_DEFICIT = 2
 
+# Color screw: a turn ≥ this where the hand contains an affordable-by-CMC
+# spell that can't be paid due to missing colored pips.
+_COLOR_SCREW_TURN_FLOOR = 3
+
 
 @dataclass(frozen=True)
 class ParsedCost:
@@ -85,6 +72,10 @@ class ParsedCost:
 
     generic: int
     colored: tuple[tuple[str, int], ...]
+
+    @property
+    def total_mana_value(self) -> int:
+        return self.generic + sum(count for _, count in self.colored)
 
 
 @dataclass(frozen=True)
@@ -103,8 +94,6 @@ class SimCard:
     is_interaction: bool = False
     is_selection: bool = False
     is_tutor: bool = False
-    is_creature: bool = False
-    power: int = 0
 
 
 @dataclass(frozen=True)
@@ -126,8 +115,6 @@ class TurnCounts:
     cards_drawn_extra: int = 0
     selections: int = 0
     tutors: int = 0
-    creatures: int = 0
-    power: int = 0
 
 
 @dataclass
@@ -140,14 +127,14 @@ class TrialResult:
     spells_cast_by_turn: list[int]
     cumulative_spells_by_turn: list[int]
     dead_cards_by_turn: list[int]
+    color_dead_cards_by_turn: list[int]
     interaction_in_hand_by_turn: list[int]
     cards_drawn_extra_by_turn: list[int]
     selection_events_by_turn: list[int]
     tutors_cast_by_turn: list[int]
-    creatures_on_board_by_turn: list[int]
-    total_power_by_turn: list[int]
     cards_in_hand_by_turn: list[int]
-    threshold_first_hit: dict[str, int | None] = field(default_factory=dict)
+    color_screw_shortages: set[str] = field(default_factory=set)
+    first_color_screw_turn: int | None = None
     first_missed_land_turn: int | None = None
     total_mana_spent: int = field(default=0)
     commander_cast_turn: int | None = None
@@ -229,8 +216,6 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
     is_interaction = not is_land and bool(tags & _INTERACTION_TAGS)
     is_selection = not is_land and _SELECTION_TAG in tags
     is_tutor = not is_land and _TUTOR_TAG in tags
-    is_creature = not is_land and "Creature" in type_line
-    power = card.power if is_creature and card.power is not None and card.power >= 0 else 0
     return SimCard(
         name=card.name,
         cmc=cmc,
@@ -244,19 +229,15 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
         is_interaction=is_interaction,
         is_selection=is_selection,
         is_tutor=is_tutor,
-        is_creature=is_creature,
-        power=power,
     )
 
 
 def _summary_to_sim_card(summary: CommanderCardSummary) -> SimCard:
-    """Build a sim card from a ``CommanderCardSummary``. Same shape as
-    ``_to_sim_card`` for ``DeckCardItem`` — kept separate because the commander
-    summary doesn't carry ``qualifying_stages`` (it's derived from tags here).
+    """Build a sim card from a ``CommanderCardSummary``. Mirrors ``_to_sim_card``
+    but reads tags directly from the summary (no ``qualifying_stages`` plumbing).
     """
     type_line = summary.type_line or ""
-    is_land = "Land" in type_line  # commanders are never lands, but be safe
-    produces = ()
+    is_land = "Land" in type_line
     cost = None if is_land else parse_cost(summary.mana_cost)
     cmc = int(summary.cmc) if summary.cmc is not None else 0
     tags = set(summary.tags or [])
@@ -268,13 +249,11 @@ def _summary_to_sim_card(summary: CommanderCardSummary) -> SimCard:
     is_interaction = not is_land and bool(tags & _INTERACTION_TAGS)
     is_selection = not is_land and _SELECTION_TAG in tags
     is_tutor = not is_land and _TUTOR_TAG in tags
-    is_creature = not is_land and "Creature" in type_line
-    power = summary.power if is_creature and summary.power is not None and summary.power >= 0 else 0
     return SimCard(
         name=summary.name,
         cmc=cmc,
         is_land=is_land,
-        produces=produces,
+        produces=(),
         cost=cost,
         is_ramp=is_ramp,
         is_draw=is_draw,
@@ -283,28 +262,11 @@ def _summary_to_sim_card(summary: CommanderCardSummary) -> SimCard:
         is_interaction=is_interaction,
         is_selection=is_selection,
         is_tutor=is_tutor,
-        is_creature=is_creature,
-        power=power,
     )
 
 
-def _classify_engine(commander: CommanderCardSummary | None) -> EngineClass:
-    """Classify the commander into an engine archetype based on its tags.
-
-    First-match-wins in priority order (sac payoff > token > counter > ramp >
-    draw). Returns ``EngineClass.NONE`` if nothing matches or no commander.
-    """
-    if commander is None:
-        return EngineClass.NONE
-    tags = set(commander.tags or [])
-    for engine, required in _ENGINE_TAG_PRIORITY:
-        if tags & required:
-            return engine
-    return EngineClass.NONE
-
-
 def _commander_sim_cards(deck: DeckDetailResponse) -> list[SimCard]:
-    """Build the command-zone sim cards (commander + optional partner)."""
+    """Build command-zone sim cards (commander + optional partner)."""
     out: list[SimCard] = []
     if deck.commander_card is not None:
         out.append(_summary_to_sim_card(deck.commander_card))
@@ -376,6 +338,20 @@ def _pay_cost(cost: ParsedCost, sources: list[ManaSource]) -> list[ManaSource]:
     return [sources[i] for i in range(len(sources)) if used[i]]
 
 
+def _color_shortage_for(cost: ParsedCost, sources: list[ManaSource]) -> set[str]:
+    """Return the set of colors short for this cost. A color is short when the
+    number of sources that can produce it is less than the cost's requirement
+    for that color. Loose attribution for dual lands (counts a multi-color
+    source toward each of its colors independently).
+    """
+    shortages: set[str] = set()
+    for color, count in cost.colored:
+        producers = sum(1 for s in sources if color in s.produces)
+        if producers < count:
+            shortages.add(color)
+    return shortages
+
+
 def _count_lands(hand: list[SimCard]) -> int:
     return sum(1 for c in hand if c.is_land)
 
@@ -414,11 +390,9 @@ def _bottom_hand(hand: list[SimCard], n: int) -> tuple[list[SimCard], list[SimCa
 def _draw_opening(
     library_template: list[SimCard], rng: random.Random, max_mulligans: int
 ) -> tuple[list[SimCard], list[SimCard], int, int]:
-    """Simulate the London mulligan: draw 7 until keep, then bottom N cards.
-
-    Returns ``(hand, library, mulligans, opening_lands)`` where ``opening_lands``
-    is the land count in the final pre-bottom 7-card hand (i.e., the hand the
-    player decided to keep).
+    """Simulate the London mulligan. Returns ``(hand, library, mulligans,
+    opening_lands)`` where opening_lands is the land count in the final
+    pre-bottom 7-card hand.
     """
     mulligans = 0
     while True:
@@ -448,8 +422,8 @@ def _play_land(
 
 def _resolve_card_draw_effect(spell: SimCard, hand: list[SimCard], library: list[SimCard]) -> int:
     """Apply a spell's draw/tutor effect to ``hand``. Tutors approximate as
-    ``draw 1`` from top of library — no target selection. Returns the number of
-    cards actually moved from library to hand.
+    ``draw 1`` from top of library. Returns the number of cards moved from
+    library to hand.
     """
     to_draw = spell.draw_count
     if spell.is_tutor and to_draw == 0:
@@ -469,8 +443,6 @@ def _remove_cast_spell(spell: SimCard, hand: list[SimCard], zone: list[SimCard])
     """Remove a resolved spell from its source list. Returns ``True`` if the
     spell came from the command zone (identity check), else ``False``.
     """
-    # `is` works because command-zone SimCards are built once per trial as
-    # distinct instances from any hand card.
     if any(s is spell for s in zone):
         zone.remove(spell)
         return True
@@ -486,16 +458,13 @@ def _apply_spell_effects(
     mana_sources: list[ManaSource],
     turn: int,
 ) -> None:
-    """Apply a resolved spell's effects to the counts and game state."""
+    """Apply a resolved spell's effects to counts and game state."""
     counts.spells += 1
     counts.mana_spent += spell.cmc
     if spell.is_selection:
         counts.selections += 1
     if spell.is_tutor:
         counts.tutors += 1
-    if spell.is_creature:
-        counts.creatures += 1
-        counts.power += spell.power
     drawn = _resolve_card_draw_effect(spell, hand, library)
     counts.cards_drawn_extra += drawn
     if spell.is_ramp:
@@ -509,13 +478,9 @@ def _cast_turn(
     turn: int,
     command_zone: list[SimCard] | None = None,
 ) -> tuple[TurnCounts, list[SimCard]]:
-    """Repeatedly cast the highest-CMC castable spell until none remain. Applies
-    ramp + draw + tutor effects as each spell resolves. The command zone (if
-    provided) is included in the castable candidate pool; commanders chosen are
-    removed from ``command_zone`` rather than ``hand``.
-
-    Returns the per-turn counts and the list of command-zone members that
-    resolved this turn (in resolution order).
+    """Repeatedly cast the highest-CMC castable spell until none remain.
+    Commands from ``command_zone`` are included in the candidate pool and
+    removed from there when chosen.
     """
     counts = TurnCounts()
     zone = command_zone if command_zone is not None else []
@@ -536,15 +501,21 @@ def _cast_turn(
         _apply_spell_effects(spell, counts, hand, library, mana_sources, turn)
 
 
-def _count_dead_and_interaction(
+def _count_hand_state(
     hand: list[SimCard], turn_available: list[ManaSource]
-) -> tuple[int, int]:
-    """Count dead cards (non-castable non-interaction non-land) and interaction
-    cards held in hand at end of turn. Castability uses the turn's untapped
-    mana — i.e., would the card have been castable at any point this turn?
+) -> tuple[int, int, int, set[str]]:
+    """For the end-of-turn hand, return (dead, color_dead, interaction, color_shortages).
+
+    - ``dead``: non-land non-interaction cards that can't be cast with this turn's mana.
+    - ``color_dead``: subset of dead where total mana would suffice but colors block.
+    - ``interaction``: removal/board wipe/counterspell cards held in hand.
+    - ``color_shortages``: union of missing-color sets across all color-dead cards.
     """
     dead = 0
+    color_dead = 0
     interaction = 0
+    shortages: set[str] = set()
+    total_available = len(turn_available)
     for card in hand:
         if card.is_land:
             continue
@@ -553,7 +524,10 @@ def _count_dead_and_interaction(
             continue
         if card.cost is None or not _can_cast(card.cost, turn_available):
             dead += 1
-    return dead, interaction
+            if card.cost is not None and total_available >= card.cost.total_mana_value:
+                color_dead += 1
+                shortages |= _color_shortage_for(card.cost, turn_available)
+    return dead, color_dead, interaction, shortages
 
 
 def _record_commander_casts(
@@ -563,10 +537,6 @@ def _record_commander_casts(
     partner_cast_turn: int | None,
     turn: int,
 ) -> tuple[int | None, int | None]:
-    """Update commander/partner cast-turn slots when zone cards resolve. Matches
-    by name against the original template (resolved cards are removed from the
-    live zone list before we get here).
-    """
     if not resolved_zone or not template:
         return commander_cast_turn, partner_cast_turn
     primary = template[0].name
@@ -579,87 +549,13 @@ def _record_commander_casts(
     return commander_cast_turn, partner_cast_turn
 
 
-@dataclass(frozen=True)
-class _Yield:
-    """Per-turn yield deltas applied by an engine archetype."""
-
-    creatures: int = 0
-    power: int = 0
-    mana_next_turn: int = 0
-    draws: int = 0
-
-
-_ENGINE_YIELDS: dict[EngineClass, _Yield] = {
-    EngineClass.TOKEN_GENERATOR: _Yield(creatures=1, power=1),
-    EngineClass.COUNTER_DISTRIBUTOR: _Yield(power=1),
-    EngineClass.SAC_PAYOFF: _Yield(creatures=1, power=1),
-    EngineClass.RAMP_ENGINE: _Yield(mana_next_turn=1),
-    EngineClass.DRAW_ENGINE: _Yield(draws=1),
-}
-
-
-def _apply_engine_yield(
-    engine: EngineClass,
-    *,
-    counts: TurnCounts,
-    hand: list[SimCard],
-    library: list[SimCard],
-    mana_sources: list[ManaSource],
-    turn: int,
-    commander_cast_turn: int | None,
-) -> None:
-    """Apply the per-turn yield for the commander's engine archetype. Yields
-    are additive on top of normal cast effects and represent the commander's
-    recurring (activated/triggered) abilities. No-op when the commander hasn't
-    resolved yet (yield fires on turns after first cast).
-    """
-    if commander_cast_turn is None or turn <= commander_cast_turn:
-        return
-    spec = _ENGINE_YIELDS.get(engine)
-    if spec is None:
-        return
-    counts.creatures += spec.creatures
-    counts.power += spec.power
-    for _ in range(spec.mana_next_turn):
-        mana_sources.append(ManaSource(produces=("C",), available_from_turn=turn + 1))
-    for _ in range(spec.draws):
-        if library:
-            hand.append(library.pop(0))
-            counts.cards_drawn_extra += 1
-
-
-def _evaluate_thresholds(
-    *,
-    mana_available: int,
-    cards_in_hand: int,
-    creatures_on_board: int,
-    total_power: int,
-    spells_this_turn: int,
-    config: EngineThresholdConfig,
-) -> set[str]:
-    """Return the set of threshold names crossed this turn. Pure function."""
-    hit: set[str] = set()
-    me = config.mana_engine
-    if mana_available >= me.min_mana and cards_in_hand >= me.min_hand:
-        hit.add("mana_engine")
-    bs = config.board_state
-    if total_power >= bs.min_power or creatures_on_board >= bs.min_creatures:
-        hit.add("board_state")
-    vel = config.velocity
-    if spells_this_turn >= vel.min_spells_per_turn and cards_in_hand >= vel.min_hand:
-        hit.add("velocity")
-    return hit
-
-
 def _run_trial(
     library_template: list[SimCard],
     rng: random.Random,
     turns: int,
     on_the_play: bool,
     max_mulligans: int,
-    thresholds: EngineThresholdConfig,
     command_zone_template: list[SimCard],
-    engine: EngineClass,
 ) -> TrialResult:
     hand, library, mulligans, opening_lands = _draw_opening(library_template, rng, max_mulligans)
     battlefield_lands: list[SimCard] = []
@@ -670,23 +566,19 @@ def _run_trial(
     cast_by_turn: list[int] = []
     cumulative_by_turn: list[int] = []
     dead_by_turn: list[int] = []
+    color_dead_by_turn: list[int] = []
     interaction_by_turn: list[int] = []
     drawn_extra_by_turn: list[int] = []
     selection_by_turn: list[int] = []
     tutors_by_turn: list[int] = []
-    creatures_by_turn: list[int] = []
-    power_by_turn: list[int] = []
     hand_by_turn: list[int] = []
-    threshold_first_hit: dict[str, int | None] = {name: None for name in _THRESHOLD_NAMES}
-    # Copy of the template so per-trial mutations stay local. The commander
-    # entry at index 0 always corresponds to the deck's primary commander.
+    color_shortages: set[str] = set()
+    first_color_screw: int | None = None
     command_zone: list[SimCard] = list(command_zone_template)
     commander_cast_turn: int | None = None
     partner_cast_turn: int | None = None
     total_cast = 0
     total_mana_spent = 0
-    creatures_on_board = 0
-    total_power = 0
     first_missed = None
     prev_lands = 0
     for turn in range(1, turns + 1):
@@ -697,55 +589,31 @@ def _run_trial(
         active = sum(1 for s in mana_sources if s.available_from_turn <= turn)
         counts, resolved_zone = _cast_turn(hand, library, mana_sources, turn, command_zone)
         commander_cast_turn, partner_cast_turn = _record_commander_casts(
-            resolved_zone,
-            command_zone_template,
-            commander_cast_turn,
-            partner_cast_turn,
-            turn,
-        )
-        _apply_engine_yield(
-            engine,
-            counts=counts,
-            hand=hand,
-            library=library,
-            mana_sources=mana_sources,
-            turn=turn,
-            commander_cast_turn=commander_cast_turn,
+            resolved_zone, command_zone_template, commander_cast_turn, partner_cast_turn, turn
         )
         total_cast += counts.spells
         total_mana_spent += counts.mana_spent
-        creatures_on_board += counts.creatures
-        total_power += counts.power
         turn_available = [s for s in mana_sources if s.available_from_turn <= turn]
-        dead, held_interaction = _count_dead_and_interaction(hand, turn_available)
+        dead, color_dead, held_interaction, turn_shortages = _count_hand_state(hand, turn_available)
+        if turn >= _COLOR_SCREW_TURN_FLOOR and color_dead > 0:
+            if first_color_screw is None:
+                first_color_screw = turn
+            color_shortages |= turn_shortages
         lands_now = len(battlefield_lands)
         if first_missed is None and lands_now == prev_lands:
             first_missed = turn
         prev_lands = lands_now
-        active_after = sum(1 for s in mana_sources if s.available_from_turn <= turn)
-        hits = _evaluate_thresholds(
-            mana_available=active_after,
-            cards_in_hand=len(hand),
-            creatures_on_board=creatures_on_board,
-            total_power=total_power,
-            spells_this_turn=counts.spells,
-            config=thresholds,
-        )
-        for name in hits:
-            if threshold_first_hit[name] is None:
-                threshold_first_hit[name] = turn
         lands_by_turn.append(lands_now)
         mana_by_turn.append(active)
         mana_spent_by_turn.append(counts.mana_spent)
         cast_by_turn.append(counts.spells)
         cumulative_by_turn.append(total_cast)
         dead_by_turn.append(dead)
+        color_dead_by_turn.append(color_dead)
         interaction_by_turn.append(held_interaction)
         drawn_extra_by_turn.append(counts.cards_drawn_extra)
         selection_by_turn.append(counts.selections)
         tutors_by_turn.append(counts.tutors)
-        creatures_by_turn.append(creatures_on_board)
-        power_by_turn.append(total_power)
         hand_by_turn.append(len(hand))
     return TrialResult(
         mulligans=mulligans,
@@ -756,14 +624,14 @@ def _run_trial(
         spells_cast_by_turn=cast_by_turn,
         cumulative_spells_by_turn=cumulative_by_turn,
         dead_cards_by_turn=dead_by_turn,
+        color_dead_cards_by_turn=color_dead_by_turn,
         interaction_in_hand_by_turn=interaction_by_turn,
         cards_drawn_extra_by_turn=drawn_extra_by_turn,
         selection_events_by_turn=selection_by_turn,
         tutors_cast_by_turn=tutors_by_turn,
-        creatures_on_board_by_turn=creatures_by_turn,
-        total_power_by_turn=power_by_turn,
         cards_in_hand_by_turn=hand_by_turn,
-        threshold_first_hit=threshold_first_hit,
+        color_screw_shortages=color_shortages,
+        first_color_screw_turn=first_color_screw,
         first_missed_land_turn=first_missed,
         total_mana_spent=total_mana_spent,
         commander_cast_turn=commander_cast_turn,
@@ -796,9 +664,6 @@ def _classify_flood_screw(trial: TrialResult) -> str:
 
 
 def _quantiles_or_zero(values: list[int]) -> tuple[float, float, float]:
-    """Return (p25, p50, p75). Falls back to the single value when n < 2 since
-    ``statistics.quantiles`` requires at least two data points.
-    """
     if not values:
         return 0.0, 0.0, 0.0
     if len(values) == 1:
@@ -830,18 +695,18 @@ def _opening_hand_stats(
     )
 
 
-def _cum_hit_pct(trials: list[TrialResult], turn_idx: int, name: str) -> float:
-    """Fraction of trials that have first-hit threshold ``name`` by ``turn_idx``."""
-    turn = turn_idx + 1
+def _build_color_screw(trials: list[TrialResult]) -> ColorScrewStats:
     n = len(trials)
     if n == 0:
-        return 0.0
-    hits = 0
+        return ColorScrewStats(pct_color_screw=0.0, shortages_by_color={})
+    screwed = sum(1 for t in trials if t.first_color_screw_turn is not None)
+    by_color: dict[str, int] = {color: 0 for color in _COLORS}
     for t in trials:
-        first = t.threshold_first_hit.get(name)
-        if first is not None and first <= turn:
-            hits += 1
-    return hits / n
+        for color in t.color_screw_shortages:
+            if color in by_color:
+                by_color[color] += 1
+    shortages = {color: count / n for color, count in by_color.items() if count > 0}
+    return ColorScrewStats(pct_color_screw=screwed / n, shortages_by_color=shortages)
 
 
 def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
@@ -852,12 +717,11 @@ def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
     cast_cum = [t.cumulative_spells_by_turn[turn_idx] for t in trials]
     cast_this = [t.spells_cast_by_turn[turn_idx] for t in trials]
     dead = [t.dead_cards_by_turn[turn_idx] for t in trials]
+    color_dead = [t.color_dead_cards_by_turn[turn_idx] for t in trials]
     interaction = [t.interaction_in_hand_by_turn[turn_idx] for t in trials]
     drawn = [t.cards_drawn_extra_by_turn[turn_idx] for t in trials]
     selection = [t.selection_events_by_turn[turn_idx] for t in trials]
     tutors = [t.tutors_cast_by_turn[turn_idx] for t in trials]
-    creatures = [t.creatures_on_board_by_turn[turn_idx] for t in trials]
-    power = [t.total_power_by_turn[turn_idx] for t in trials]
     hand = [t.cards_in_hand_by_turn[turn_idx] for t in trials]
     played_land = sum(1 for t in trials if _played_land(t, turn_idx))
     cast_any = sum(1 for c in cast_this if c > 0)
@@ -865,17 +729,6 @@ def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
     utilization = sum(util_samples) / len(util_samples) if util_samples else 0.0
     lands_p25, lands_p50, lands_p75 = _quantiles_or_zero(lands)
     mana_p25, mana_p50, mana_p75 = _quantiles_or_zero(mana)
-    pct_mana = _cum_hit_pct(trials, turn_idx, "mana_engine")
-    pct_board = _cum_hit_pct(trials, turn_idx, "board_state")
-    pct_vel = _cum_hit_pct(trials, turn_idx, "velocity")
-    pct_any = (
-        sum(
-            1
-            for t in trials
-            if any((v is not None and v <= turn_idx + 1) for v in t.threshold_first_hit.values())
-        )
-        / n
-    )
     return TurnStat(
         turn=turn_idx + 1,
         avg_lands_in_play=sum(lands) / n,
@@ -886,70 +739,22 @@ def _build_turn_stat(turn_idx: int, trials: list[TrialResult]) -> TurnStat:
         pct_land_drop=played_land / n,
         pct_cast_any=cast_any / n,
         avg_dead_cards=sum(dead) / n,
+        avg_color_dead_cards=sum(color_dead) / n,
         avg_interaction_in_hand=sum(interaction) / n,
         avg_cards_drawn_extra=sum(drawn) / n,
         avg_selection_events=sum(selection) / n,
         avg_tutors_cast=sum(tutors) / n,
+        avg_cards_in_hand=sum(hand) / n,
         lands_p25=lands_p25,
         lands_p50=lands_p50,
         lands_p75=lands_p75,
         mana_p25=mana_p25,
         mana_p50=mana_p50,
         mana_p75=mana_p75,
-        avg_creatures_on_board=sum(creatures) / n,
-        avg_total_power=sum(power) / n,
-        avg_cards_in_hand=sum(hand) / n,
-        pct_mana_engine_hit_cum=pct_mana,
-        pct_board_state_hit_cum=pct_board,
-        pct_velocity_hit_cum=pct_vel,
-        pct_any_threshold_hit_cum=pct_any,
-    )
-
-
-def _build_threshold_summary(trials: list[TrialResult], turns: int) -> EngineThresholdSummary:
-    n = len(trials)
-    sentinel = float(turns + 1)
-
-    def first_or_sentinel(name: str) -> float:
-        values = [
-            t.threshold_first_hit.get(name)
-            if t.threshold_first_hit.get(name) is not None
-            else turns + 1
-            for t in trials
-        ]
-        return sum(values) / n if n else sentinel
-
-    def pct_ever(name: str) -> float:
-        return sum(1 for t in trials if t.threshold_first_hit.get(name) is not None) / n
-
-    def pct_ever_any() -> float:
-        return (
-            sum(1 for t in trials if any(v is not None for v in t.threshold_first_hit.values())) / n
-        )
-
-    def first_any() -> float:
-        values: list[int] = []
-        for t in trials:
-            firsts = [v for v in t.threshold_first_hit.values() if v is not None]
-            values.append(min(firsts) if firsts else turns + 1)
-        return sum(values) / n if n else sentinel
-
-    return EngineThresholdSummary(
-        avg_first_mana_engine_turn=first_or_sentinel("mana_engine"),
-        avg_first_board_state_turn=first_or_sentinel("board_state"),
-        avg_first_velocity_turn=first_or_sentinel("velocity"),
-        avg_first_any_threshold_turn=first_any(),
-        pct_ever_mana_engine=pct_ever("mana_engine"),
-        pct_ever_board_state=pct_ever("board_state"),
-        pct_ever_velocity=pct_ever("velocity"),
-        pct_ever_any=pct_ever_any(),
     )
 
 
 def _commander_stats(trials: list[TrialResult], turns: int, name: str, slot: str) -> CommanderStats:
-    """Aggregate commander/partner cast-turn stats. ``slot`` is ``"commander"``
-    or ``"partner"``.
-    """
     n = len(trials)
     sentinel = float(turns + 1)
     raw_turns = [
@@ -967,7 +772,6 @@ def _aggregate(
     on_the_play: bool,
     max_mulligans: int,
     deck: DeckDetailResponse,
-    engine: EngineClass,
 ) -> PlaytestStats:
     n = len(trials)
     distribution = [0] * (max_mulligans + 1)
@@ -1009,10 +813,9 @@ def _aggregate(
         pct_screw=pct_screw,
         avg_first_missed_land_turn=avg_first_missed,
         opening_hand=_opening_hand_stats(trials, distribution),
-        engine_thresholds=_build_threshold_summary(trials, turns),
+        color_screw=_build_color_screw(trials),
         commander=commander_stats,
         partner=partner_stats,
-        engine_class=engine,
         per_turn=per_turn,
     )
 
@@ -1026,16 +829,12 @@ def simulate(deck: DeckDetailResponse, request: PlaytestSimulateRequest) -> Play
     """Run ``request.trials`` goldfish games and return aggregate stats.
 
     The commander (and partner, when present) is modeled as a virtual card in
-    the command zone. It's cast as soon as affordable and contributes to
-    creature/power/ramp/draw counts via its tags. The deck's engine archetype
-    is auto-classified from commander tags; once the commander is in play, a
-    per-turn yield representing its recurring ability is applied.
+    the command zone and cast as soon as affordable. Its tag-derived effects
+    (ramp/draw/tutor/interaction) apply normally on cast.
     """
     library_template = _expand_deck(deck.cards)
     rng = random.Random(request.seed)
-    thresholds = request.thresholds or EngineThresholdConfig()
     command_zone_template = _commander_sim_cards(deck)
-    engine = _classify_engine(deck.commander_card)
     results = [
         _run_trial(
             library_template,
@@ -1043,9 +842,7 @@ def simulate(deck: DeckDetailResponse, request: PlaytestSimulateRequest) -> Play
             request.turns,
             request.on_the_play,
             request.max_mulligans,
-            thresholds,
             command_zone_template,
-            engine,
         )
         for _ in range(request.trials)
     ]
@@ -1055,5 +852,4 @@ def simulate(deck: DeckDetailResponse, request: PlaytestSimulateRequest) -> Play
         request.on_the_play,
         request.max_mulligans,
         deck,
-        engine,
     )

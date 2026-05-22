@@ -383,34 +383,12 @@ export interface SwapRequest {
 }
 
 // Playtest
-export interface ManaEngineThreshold {
-  min_mana?: number;
-  min_hand?: number;
-}
-
-export interface BoardStateThreshold {
-  min_power?: number;
-  min_creatures?: number;
-}
-
-export interface VelocityThreshold {
-  min_spells_per_turn?: number;
-  min_hand?: number;
-}
-
-export interface EngineThresholdConfig {
-  mana_engine?: ManaEngineThreshold;
-  board_state?: BoardStateThreshold;
-  velocity?: VelocityThreshold;
-}
-
 export interface PlaytestSimulateRequest {
   trials?: number;
   turns?: number;
   on_the_play?: boolean;
   max_mulligans?: number;
   seed?: number | null;
-  thresholds?: EngineThresholdConfig | null;
 }
 
 export interface PlaytestTurnStat {
@@ -423,34 +401,23 @@ export interface PlaytestTurnStat {
   pct_land_drop: number;
   pct_cast_any: number;
   avg_dead_cards: number;
+  avg_color_dead_cards: number;
   avg_interaction_in_hand: number;
   avg_cards_drawn_extra: number;
   avg_selection_events: number;
   avg_tutors_cast: number;
+  avg_cards_in_hand: number;
   lands_p25: number;
   lands_p50: number;
   lands_p75: number;
   mana_p25: number;
   mana_p50: number;
   mana_p75: number;
-  avg_creatures_on_board: number;
-  avg_total_power: number;
-  avg_cards_in_hand: number;
-  pct_mana_engine_hit_cum: number;
-  pct_board_state_hit_cum: number;
-  pct_velocity_hit_cum: number;
-  pct_any_threshold_hit_cum: number;
 }
 
-export interface EngineThresholdSummary {
-  avg_first_mana_engine_turn: number;
-  avg_first_board_state_turn: number;
-  avg_first_velocity_turn: number;
-  avg_first_any_threshold_turn: number;
-  pct_ever_mana_engine: number;
-  pct_ever_board_state: number;
-  pct_ever_velocity: number;
-  pct_ever_any: number;
+export interface PlaytestColorScrewStats {
+  pct_color_screw: number;
+  shortages_by_color: Record<string, number>;
 }
 
 export interface PlaytestOpeningHandStats {
@@ -475,10 +442,9 @@ export interface PlaytestStats {
   pct_screw: number;
   avg_first_missed_land_turn: number;
   opening_hand: PlaytestOpeningHandStats;
-  engine_thresholds: EngineThresholdSummary;
+  color_screw: PlaytestColorScrewStats;
   commander: PlaytestCommanderStats | null;
   partner: PlaytestCommanderStats | null;
-  engine_class: PlaytestEngineClass;
   per_turn: PlaytestTurnStat[];
 }
 
@@ -487,14 +453,6 @@ export interface PlaytestCommanderStats {
   avg_cast_turn: number;
   pct_ever_cast: number;
 }
-
-export type PlaytestEngineClass =
-  | "none"
-  | "token_generator"
-  | "counter_distributor"
-  | "sac_payoff"
-  | "ramp_engine"
-  | "draw_engine";
 
 // Import
 export interface DeckImportRequest {

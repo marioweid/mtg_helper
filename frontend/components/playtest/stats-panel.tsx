@@ -3,11 +3,7 @@
 import { useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api";
-import type {
-  PlaytestCommanderStats,
-  PlaytestEngineClass,
-  PlaytestStats,
-} from "@/lib/types";
+import type { PlaytestCommanderStats, PlaytestStats } from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -18,6 +14,16 @@ const TRIAL_OPTIONS = [100, 500, 1000, 5000] as const;
 
 const TURNS_MIN = 1;
 const TURNS_MAX = 10;
+
+const COLOR_ORDER: readonly string[] = ["W", "U", "B", "R", "G", "C"];
+const COLOR_LABEL: Record<string, string> = {
+  W: "White",
+  U: "Blue",
+  B: "Black",
+  R: "Red",
+  G: "Green",
+  C: "Colorless",
+};
 
 const TIPS = {
   trials:
@@ -41,18 +47,14 @@ const TIPS = {
     "% of opening 7-card hands (before mulligan decision) that held 0–1 lands.",
   first_missed:
     "Average turn the deck first failed to drop a land. Sentinel: turns + 1 means it never missed within the sim window.",
-  threshold_mana:
-    "Mana-engine threshold: trial crossed when ≥12 mana available AND ≥3 cards in hand. Tracks ramp / big-mana decks.",
-  threshold_board:
-    "Board-state threshold: trial crossed when total creature power ≥30 OR creatures on board ≥10. Tracks go-wide / aggro.",
-  threshold_velocity:
-    "Velocity threshold: trial crossed when ≥5 spells cast in one turn AND ≥4 cards in hand. Tracks spellslinger / storm.",
-  threshold_any:
-    "Trial crossed any of the three engine thresholds at least once during the sim window.",
-  threshold_ever:
-    "% of trials that ever crossed this threshold within the simulated turns.",
-  threshold_first:
-    "Average turn at which this threshold was first crossed. Sentinel = turns + 1 means it never crossed.",
+  color_screw_pct:
+    "% of trials where, at any turn ≥3, the hand held a spell whose total mana value was affordable but whose colored pips couldn't be paid from available sources.",
+  color_shortage:
+    "How often this color was the missing pip across the sim. Higher = you're frequently short on this color's sources.",
+  commander_avg_cast:
+    "Average turn the commander first resolves. Sentinel = turns + 1 means it never resolved within the sim window.",
+  commander_pct_ever:
+    "% of trials in which the commander was successfully cast within the sim window.",
   // Per-turn columns
   col_turn: "Turn number in the goldfish game.",
   col_lands: "Average number of lands in play at end of this turn.",
@@ -66,24 +68,13 @@ const TIPS = {
   col_cum_spells: "Average cumulative non-land spells cast from T1 through this turn.",
   col_dead:
     "Avg uncastable non-land non-interaction cards stuck in hand at end of turn (wrong colors or not enough mana).",
+  col_color_dead:
+    "Avg cards in hand that COULD be paid with the total mana available but can't be cast because of missing colored pips. Subset of Dead.",
   col_interact:
     "Avg removal / board-wipe / counterspell cards held in hand. These are NOT counted as dead — they're held for defense.",
   col_extra_cards:
     "Avg extra cards drawn this turn (draw spells + tutors-as-draw-1 proxy). Excludes the natural turn draw.",
-  col_creatures:
-    "Avg cumulative creatures on the battlefield by end of this turn. Once cast they stay — no removal in goldfish.",
-  col_power:
-    "Avg cumulative total printed power of creatures on the battlefield. Used for the board-state threshold.",
   col_hand: "Avg cards in hand at end of turn (after draw, land drop, and casting phase).",
-  col_engine_cum:
-    "Cumulative % of trials that have crossed any engine threshold by end of this turn.",
-  // Commander + engine class
-  commander_avg_cast:
-    "Average turn the commander first resolves. Sentinel = turns + 1 means it never resolved within the sim window.",
-  commander_pct_ever:
-    "% of trials in which the commander was successfully cast within the sim window.",
-  engine_class:
-    "Auto-classified engine archetype from the commander's tags. Drives a per-turn yield (extra tokens/power/mana/cards) once the commander is in play. NONE = no archetype matched; commander still contributes via its printed stats and ramp/draw/etc. flags.",
   // Percentiles
   col_lands_p25: "25th percentile of lands in play (1/4 of trials had this many or fewer).",
   col_lands_p50: "Median lands in play.",
@@ -202,7 +193,7 @@ function pct(value: number): string {
 
 function StatsTable({ stats }: { stats: PlaytestStats }) {
   const oh = stats.opening_hand;
-  const et = stats.engine_thresholds;
+  const cs = stats.color_screw;
   return (
     <div className="flex flex-col gap-3 text-xs">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -224,6 +215,19 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
         <Stat label="Flood rate" tip={TIPS.flood_rate} value={pct(stats.pct_flood)} />
         <Stat label="Screw rate" tip={TIPS.screw_rate} value={pct(stats.pct_screw)} />
         <Stat
+          label="Color screw rate"
+          tip={TIPS.color_screw_pct}
+          value={pct(cs.pct_color_screw)}
+        />
+        <Stat
+          label="Avg first missed land drop"
+          tip={TIPS.first_missed}
+          value={`T${stats.avg_first_missed_land_turn.toFixed(2)}`}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <Stat
           label="Opening flood mull"
           tip={TIPS.opening_flood_mull}
           value={pct(oh.pct_flood_mull)}
@@ -233,15 +237,6 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
           tip={TIPS.opening_screw_mull}
           value={pct(oh.pct_screwed_mull)}
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Stat
-          label="Avg first missed land drop"
-          tip={TIPS.first_missed}
-          value={`T${stats.avg_first_missed_land_turn.toFixed(2)}`}
-        />
-        <Stat label="Kept at 6" tip={TIPS.kept_6} value={pct(oh.pct_kept_6)} />
         <Stat
           label="Kept ≤ 5"
           tip={TIPS.kept_le5}
@@ -249,61 +244,19 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
         />
       </div>
 
+      <ColorShortagePanel stats={cs} />
+
       {(stats.commander !== null || stats.partner !== null) && (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-          <div className="mb-2 flex items-baseline justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-              Commander
-            </p>
-            <p
-              title={TIPS.engine_class}
-              className="cursor-help text-[10px] tabular-nums text-emerald-300"
-            >
-              engine class: {formatEngineClass(stats.engine_class)}
-            </p>
-          </div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            Commander
+          </p>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {stats.commander !== null && <CommanderRow stats={stats.commander} />}
             {stats.partner !== null && <CommanderRow stats={stats.partner} />}
           </div>
         </div>
       )}
-
-      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-          Engine thresholds — does the deck do its thing?
-        </p>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-4">
-          <ThresholdRow
-            label="Mana engine"
-            hint="≥12 mana + ≥3 cards in hand"
-            tip={TIPS.threshold_mana}
-            everPct={et.pct_ever_mana_engine}
-            avgFirst={et.avg_first_mana_engine_turn}
-          />
-          <ThresholdRow
-            label="Board state"
-            hint="≥30 power OR ≥10 creatures"
-            tip={TIPS.threshold_board}
-            everPct={et.pct_ever_board_state}
-            avgFirst={et.avg_first_board_state_turn}
-          />
-          <ThresholdRow
-            label="Velocity"
-            hint="≥5 spells/turn + ≥4 in hand"
-            tip={TIPS.threshold_velocity}
-            everPct={et.pct_ever_velocity}
-            avgFirst={et.avg_first_velocity_turn}
-          />
-          <ThresholdRow
-            label="Any threshold"
-            hint="at least one of the above"
-            tip={TIPS.threshold_any}
-            everPct={et.pct_ever_any}
-            avgFirst={et.avg_first_any_threshold_turn}
-          />
-        </div>
-      </div>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left">
@@ -318,12 +271,10 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
               <Th tip={TIPS.col_cast_any}>Cast any</Th>
               <Th tip={TIPS.col_cum_spells}>Cum spells</Th>
               <Th tip={TIPS.col_dead}>Dead</Th>
+              <Th tip={TIPS.col_color_dead}>Color dead</Th>
               <Th tip={TIPS.col_interact}>Interact</Th>
               <Th tip={TIPS.col_extra_cards}>+Cards</Th>
-              <Th tip={TIPS.col_creatures}>Crts</Th>
-              <Th tip={TIPS.col_power}>Power</Th>
               <Th tip={TIPS.col_hand}>Hand</Th>
-              <Th tip={TIPS.col_engine_cum}>Engine</Th>
             </tr>
           </thead>
           <tbody>
@@ -348,6 +299,9 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
                 <td className="py-1.5 tabular-nums text-gray-200">
                   {row.avg_dead_cards.toFixed(2)}
                 </td>
+                <td className="py-1.5 tabular-nums text-amber-300">
+                  {row.avg_color_dead_cards.toFixed(2)}
+                </td>
                 <td className="py-1.5 tabular-nums text-gray-200">
                   {row.avg_interaction_in_hand.toFixed(2)}
                 </td>
@@ -355,16 +309,7 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
                   {row.avg_cards_drawn_extra.toFixed(2)}
                 </td>
                 <td className="py-1.5 tabular-nums text-gray-200">
-                  {row.avg_creatures_on_board.toFixed(2)}
-                </td>
-                <td className="py-1.5 tabular-nums text-gray-200">
-                  {row.avg_total_power.toFixed(2)}
-                </td>
-                <td className="py-1.5 tabular-nums text-gray-200">
                   {row.avg_cards_in_hand.toFixed(2)}
-                </td>
-                <td className="py-1.5 tabular-nums text-emerald-300">
-                  {pct(row.pct_any_threshold_hit_cum)}
                 </td>
               </tr>
             ))}
@@ -439,30 +384,30 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
   );
 }
 
-function Tip({ text, children }: { text: string; children: React.ReactNode }) {
-  return (
-    <span
-      title={text}
-      className="cursor-help underline decoration-dotted decoration-gray-600 underline-offset-2"
-    >
-      {children}
-    </span>
+function ColorShortagePanel({ stats }: { stats: PlaytestStats["color_screw"] }) {
+  const entries = COLOR_ORDER.filter((c) => (stats.shortages_by_color[c] ?? 0) > 0).map(
+    (c) => ({ color: c, rate: stats.shortages_by_color[c] ?? 0 }),
   );
-}
-
-function Th({ tip, children }: { tip: string; children: React.ReactNode }) {
+  if (entries.length === 0) return null;
   return (
-    <th className="py-1 font-medium">
-      <Tip text={tip}>{children}</Tip>
-    </th>
-  );
-}
-
-function Stat({ label, value, tip }: { label: string; value: string; tip?: string }) {
-  return (
-    <div className="rounded-lg bg-white/5 px-3 py-2">
-      <p className="text-gray-500">{tip ? <Tip text={tip}>{label}</Tip> : label}</p>
-      <p className="font-semibold text-white tabular-nums">{value}</p>
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+        Color shortages — which pips are missing?
+      </p>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+        {entries.map(({ color, rate }) => (
+          <div
+            key={color}
+            title={TIPS.color_shortage}
+            className="cursor-help rounded-md bg-white/[0.04] px-3 py-2"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="font-semibold text-white">{COLOR_LABEL[color] ?? color}</p>
+              <p className="tabular-nums text-amber-300">{pct(rate)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -492,48 +437,30 @@ function CommanderRow({ stats }: { stats: PlaytestCommanderStats }) {
   );
 }
 
-const ENGINE_CLASS_LABELS: Record<PlaytestEngineClass, string> = {
-  none: "none",
-  token_generator: "token generator",
-  counter_distributor: "counter / anthem",
-  sac_payoff: "sacrifice payoff",
-  ramp_engine: "ramp",
-  draw_engine: "card draw",
-};
-
-function formatEngineClass(engine: PlaytestEngineClass): string {
-  return ENGINE_CLASS_LABELS[engine] ?? engine;
-}
-
-interface ThresholdRowProps {
-  label: string;
-  hint: string;
-  tip: string;
-  everPct: number;
-  avgFirst: number;
-}
-
-function ThresholdRow({ label, hint, tip, everPct, avgFirst }: ThresholdRowProps) {
+function Tip({ text, children }: { text: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-md bg-white/[0.04] px-3 py-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="font-semibold text-white">
-          <Tip text={tip}>{label}</Tip>
-        </p>
-        <p title={TIPS.threshold_ever} className="cursor-help tabular-nums text-emerald-300">
-          {pct(everPct)}
-        </p>
-      </div>
-      <p className="text-[10px] leading-tight text-gray-500">{hint}</p>
-      <p className="mt-0.5 text-[10px] text-gray-400">
-        avg first hit:{" "}
-        <span
-          title={TIPS.threshold_first}
-          className="cursor-help tabular-nums text-gray-200"
-        >
-          T{avgFirst.toFixed(2)}
-        </span>
-      </p>
+    <span
+      title={text}
+      className="cursor-help underline decoration-dotted decoration-gray-600 underline-offset-2"
+    >
+      {children}
+    </span>
+  );
+}
+
+function Th({ tip, children }: { tip: string; children: React.ReactNode }) {
+  return (
+    <th className="py-1 font-medium">
+      <Tip text={tip}>{children}</Tip>
+    </th>
+  );
+}
+
+function Stat({ label, value, tip }: { label: string; value: string; tip?: string }) {
+  return (
+    <div className="rounded-lg bg-white/5 px-3 py-2">
+      <p className="text-gray-500">{tip ? <Tip text={tip}>{label}</Tip> : label}</p>
+      <p className="font-semibold text-white tabular-nums">{value}</p>
     </div>
   );
 }

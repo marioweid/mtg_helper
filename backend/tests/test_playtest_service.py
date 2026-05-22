@@ -8,13 +8,7 @@ import pytest
 from httpx import AsyncClient
 
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
-from mtg_helper.models.playtest import (
-    BoardStateThreshold,
-    EngineClass,
-    EngineThresholdConfig,
-    ManaEngineThreshold,
-    PlaytestSimulateRequest,
-)
+from mtg_helper.models.playtest import PlaytestSimulateRequest
 from mtg_helper.services.playtest_service import (
     ManaSource,
     _can_cast,
@@ -554,101 +548,51 @@ class TestFirstMissedLand:
         assert stats.avg_first_missed_land_turn == pytest.approx(5.0)
 
 
-class TestEngineThresholds:
-    def _forests(self, quantity: int = 37) -> DeckCardItem:
-        return _make_card(
-            "Forest",
-            type_line="Basic Land — Forest",
-            color_identity=["G"],
-            quantity=quantity,
+class TestColorScrew:
+    def test_off_color_deck_flags_color_screw(self):
+        # Mountains in hand but every spell requires {G}{G}. Total mana value
+        # is reachable from T2+ but colored pips can never be paid.
+        mountain = _make_card(
+            "Mountain",
+            type_line="Basic Land — Mountain",
+            color_identity=["R"],
+            quantity=37,
             qualifying_stages=["lands"],
         )
-
-    def test_pure_lands_never_hits_any_threshold(self):
-        deck = _make_deck([self._forests(99)], ["G"])
-        stats = simulate(deck, PlaytestSimulateRequest(trials=30, turns=6, seed=11))
-        # No creatures, no spells, mana plateaus at land count → no threshold.
-        assert stats.engine_thresholds.pct_ever_any == 0.0
-        assert stats.per_turn[-1].pct_any_threshold_hit_cum == 0.0
-
-    def test_token_deck_hits_board_state_via_creature_count(self):
-        # 99 free 1/1 creatures with {G} cost: deck floods the board fast.
-        # Lower the threshold so the small-trial sim reliably crosses it.
-        forest = self._forests(40)
-        weenie = _make_card(
-            "Weenie",
-            mana_cost="{G}",
-            cmc=1,
-            color_identity=["G"],
-            quantity=59,
-            power=1,
-        )
-        deck = _make_deck([forest, weenie], ["G"])
-        cfg = EngineThresholdConfig(board_state=BoardStateThreshold(min_power=999, min_creatures=4))
-        stats = simulate(
-            deck,
-            PlaytestSimulateRequest(trials=200, turns=6, seed=17, thresholds=cfg),
-        )
-        assert stats.engine_thresholds.pct_ever_board_state > 0.5
-
-    def test_big_creatures_hit_board_state_via_power(self):
-        forest = self._forests(40)
-        # 6/6 for {G}{G} — power scales fast even with few bodies.
-        beast = _make_card(
-            "Mock Beast",
+        green_spell = _make_card(
+            "Big Green",
             mana_cost="{G}{G}",
             cmc=2,
             color_identity=["G"],
-            quantity=59,
-            power=6,
+            quantity=62,
         )
-        deck = _make_deck([forest, beast], ["G"])
-        cfg = EngineThresholdConfig(
-            board_state=BoardStateThreshold(min_power=18, min_creatures=999)
-        )
-        stats = simulate(
-            deck,
-            PlaytestSimulateRequest(trials=200, turns=6, seed=23, thresholds=cfg),
-        )
-        # By T6 the deck should have stacked enough power to cross 18.
-        assert stats.engine_thresholds.pct_ever_board_state > 0.5
+        deck = _make_deck([mountain, green_spell], ["G", "R"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=5, seed=101))
+        assert stats.color_screw.pct_color_screw > 0.8
+        # Missing pip is G — should dominate the shortages map.
+        assert stats.color_screw.shortages_by_color.get("G", 0.0) > 0.8
 
-    def test_threshold_override_makes_mana_engine_easier(self):
-        forest = self._forests(99)
-        deck = _make_deck([forest], ["G"])
-        # Override min_mana=4 + min_hand=0 so a lands-only deck on T4 qualifies.
-        cfg = EngineThresholdConfig(mana_engine=ManaEngineThreshold(min_mana=4, min_hand=0))
-        stats = simulate(
-            deck,
-            PlaytestSimulateRequest(trials=50, turns=6, seed=29, thresholds=cfg),
-        )
-        # Sentinel for never-hit is turns + 1 = 7. With the override every trial
-        # should hit by T4 → average well below 7.
-        assert stats.engine_thresholds.pct_ever_mana_engine == 1.0
-        assert stats.engine_thresholds.avg_first_mana_engine_turn < 5.0
-
-    def test_per_turn_cumulative_hit_is_monotonic(self):
-        forest = self._forests(40)
-        weenie = _make_card(
-            "Weenie",
-            mana_cost="{G}",
-            cmc=1,
+    def test_on_color_deck_no_color_screw(self):
+        forest = _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
             color_identity=["G"],
-            quantity=59,
-            power=1,
+            quantity=37,
+            qualifying_stages=["lands"],
         )
-        deck = _make_deck([forest, weenie], ["G"])
-        cfg = EngineThresholdConfig(board_state=BoardStateThreshold(min_power=999, min_creatures=3))
-        stats = simulate(
-            deck,
-            PlaytestSimulateRequest(trials=100, turns=6, seed=31, thresholds=cfg),
+        green_spell = _make_card(
+            "Big Green",
+            mana_cost="{G}{G}",
+            cmc=2,
+            color_identity=["G"],
+            quantity=62,
         )
-        cum_vals = [t.pct_board_state_hit_cum for t in stats.per_turn]
-        for prev, nxt in zip(cum_vals, cum_vals[1:], strict=True):
-            assert nxt >= prev
+        deck = _make_deck([forest, green_spell], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=5, seed=103))
+        assert stats.color_screw.pct_color_screw == 0.0
 
 
-class TestCommanderAndEngine:
+class TestCommander:
     def _forests(self, quantity: int = 99) -> DeckCardItem:
         return _make_card(
             "Forest",
@@ -658,15 +602,14 @@ class TestCommanderAndEngine:
             qualifying_stages=["lands"],
         )
 
-    def test_no_commander_means_no_stats_and_none_engine(self):
+    def test_no_commander_means_no_stats(self):
         deck = _make_deck([self._forests()], ["G"])
         stats = simulate(deck, PlaytestSimulateRequest(trials=20, turns=4, seed=1))
         assert stats.commander is None
         assert stats.partner is None
-        assert stats.engine_class is EngineClass.NONE
 
     def test_commander_cast_turn_close_to_cmc(self):
-        cmdr = _make_commander(name="Hazel", mana_cost="{2}{G}", cmc=3, power=2)
+        cmdr = _make_commander(name="Hazel", mana_cost="{2}{G}", cmc=3)
         deck = _make_deck([self._forests()], ["G"], commander=cmdr)
         stats = simulate(
             deck,
@@ -676,38 +619,9 @@ class TestCommanderAndEngine:
         assert stats.commander.pct_ever_cast > 0.9
         assert stats.commander.avg_cast_turn < 4.0
 
-    def test_token_commander_yields_extra_creatures(self):
-        cmdr = _make_commander(
-            name="Token Lord",
-            mana_cost="{1}{G}",
-            cmc=2,
-            power=2,
-            tags=["token"],
-        )
-        deck = _make_deck([self._forests()], ["G"], commander=cmdr)
-        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=6, seed=61))
-        assert stats.engine_class is EngineClass.TOKEN_GENERATOR
-        # Commander cast ~T2; from T3 onward yield adds +1 creature/turn.
-        assert stats.per_turn[-1].avg_creatures_on_board > 1.5
-
-    def test_ramp_commander_accelerates_mana_threshold(self):
-        ramp_cmdr = _make_commander(
-            name="Ramp Bot", mana_cost="{G}{G}", cmc=2, power=1, tags=["ramp"]
-        )
-        plain_cmdr = _make_commander(name="Plain Bot", mana_cost="{G}{G}", cmc=2, power=1, tags=[])
-        ramp_deck = _make_deck([self._forests()], ["G"], commander=ramp_cmdr)
-        plain_deck = _make_deck([self._forests()], ["G"], commander=plain_cmdr)
-        cfg = EngineThresholdConfig(mana_engine=ManaEngineThreshold(min_mana=6, min_hand=0))
-        req = PlaytestSimulateRequest(trials=300, turns=8, seed=71, thresholds=cfg)
-        ramp_stats = simulate(ramp_deck, req)
-        plain_stats = simulate(plain_deck, req)
-        assert ramp_stats.engine_thresholds.avg_first_mana_engine_turn < (
-            plain_stats.engine_thresholds.avg_first_mana_engine_turn
-        )
-
     def test_partner_cast_turn_tracked_independently(self):
-        cmdr_a = _make_commander(name="Captain", mana_cost="{1}{G}", cmc=2, power=2)
-        cmdr_b = _make_commander(name="Mate", mana_cost="{2}{G}", cmc=3, power=2)
+        cmdr_a = _make_commander(name="Captain", mana_cost="{1}{G}", cmc=2)
+        cmdr_b = _make_commander(name="Mate", mana_cost="{2}{G}", cmc=3)
         deck = _make_deck([self._forests()], ["G"], commander=cmdr_a, partner=cmdr_b)
         stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=6, seed=81))
         assert stats.commander is not None
