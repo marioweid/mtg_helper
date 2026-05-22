@@ -6,12 +6,34 @@ Single touchpoint to `google.genai` so services stay provider-agnostic.
 import asyncio
 import logging
 import random
+from dataclasses import dataclass
+from typing import Any
 
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
 _log = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolCall:
+    """One function-call request emitted by the model."""
+
+    name: str
+    args: dict[str, Any]
+
+
+@dataclass
+class ChatToolResponse:
+    """Either a final text response or pending tool calls to dispatch.
+
+    Exactly one of ``text`` and ``tool_calls`` is populated per turn.
+    """
+
+    text: str | None = None
+    tool_calls: list[ToolCall] | None = None
+
 
 _EMBED_RETRY_ATTEMPTS = 6
 _EMBED_RETRY_BASE_SECONDS = 2.0
@@ -76,6 +98,52 @@ class LLMClient:
             ),
         )
         return response.text or ""
+
+    async def chat_with_tools(
+        self,
+        *,
+        system: str,
+        history: list[types.Content],
+        tools: list[types.Tool],
+        temperature: float,
+        max_output_tokens: int,
+    ) -> ChatToolResponse:
+        """Run a chat completion with function-calling enabled.
+
+        ``history`` is the raw Gemini content list (the caller manages turn
+        appending) so tool_call / tool_response pairs can be threaded without
+        format translation. Returns either text or a list of pending tool
+        calls — exactly one branch is populated per turn.
+        """
+        # Cast through Any: google-genai's stubs declare `tools` as a union
+        # involving generic callables that confuses ty.
+        config_kwargs: dict[str, Any] = {
+            "system_instruction": system,
+            "tools": tools,
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+        }
+        response = await self._client.aio.models.generate_content(
+            model=self.chat_model,
+            contents=history,
+            config=types.GenerateContentConfig(**config_kwargs),
+        )
+        calls: list[ToolCall] = []
+        text_parts: list[str] = []
+        candidates = response.candidates or []
+        if not candidates:
+            return ChatToolResponse(text=response.text or "")
+        content = candidates[0].content
+        for part in content.parts if content and content.parts else []:
+            if part.function_call is not None:
+                fc = part.function_call
+                calls.append(ToolCall(name=fc.name or "", args=dict(fc.args or {})))
+                continue
+            if part.text:
+                text_parts.append(part.text)
+        if calls:
+            return ChatToolResponse(tool_calls=calls)
+        return ChatToolResponse(text="".join(text_parts))
 
     async def embed(
         self,

@@ -413,6 +413,13 @@ export interface PlaytestTurnStat {
   mana_p25: number;
   mana_p50: number;
   mana_p75: number;
+  avg_mana_unspent: number;
+  avg_hand_lands: number;
+  avg_hand_ramp: number;
+  avg_hand_draw: number;
+  avg_hand_interaction: number;
+  avg_hand_tutors: number;
+  avg_hand_other: number;
 }
 
 export interface PlaytestColorScrewStats {
@@ -445,6 +452,12 @@ export interface PlaytestStats {
   color_screw: PlaytestColorScrewStats;
   commander: PlaytestCommanderStats | null;
   partner: PlaytestCommanderStats | null;
+  per_card: PlaytestCardSimStat[];
+  top_stuck_cards: PlaytestStuckCard[];
+  unpaid_cost_summary: PlaytestUnpaidCost[];
+  sample_trials: PlaytestSampleTrial[];
+  cast_rate_by_cmc: Record<string, number>;
+  mulligan_reasons: PlaytestMulliganReasonStats;
   per_turn: PlaytestTurnStat[];
 }
 
@@ -452,6 +465,82 @@ export interface PlaytestCommanderStats {
   name: string;
   avg_cast_turn: number;
   pct_ever_cast: number;
+}
+
+export interface PlaytestCardSimStat {
+  name: string;
+  quantity_in_deck: number;
+  pct_drawn_by_end: number;
+  avg_first_cast_turn: number;
+  pct_ever_cast: number;
+  pct_stuck_in_hand_at_end: number;
+}
+
+export interface PlaytestStuckCard {
+  name: string;
+  cost: string | null;
+  pct_stuck: number;
+  blocker: "mana" | "colors" | "never_drawn";
+}
+
+export interface PlaytestUnpaidCost {
+  cost: string;
+  pct_failed: number;
+  missing_colors: string[];
+}
+
+export interface PlaytestSampleTrial {
+  bucket: "best" | "median" | "worst";
+  mulligans: number;
+  commander_cast_turn: number | null;
+  land_turns: number[];
+  spells_cast_turns: [number, string][];
+  stuck_at_end: string[];
+}
+
+export interface PlaytestMulliganReasonStats {
+  total: number;
+  low_lands: number;
+  high_lands: number;
+  no_commander_color: number;
+  no_early_play: number;
+}
+
+export interface AnalysisFinding {
+  category:
+    | "mana_base"
+    | "consistency"
+    | "curve"
+    | "commander"
+    | "color_fix"
+    | "card_quality";
+  severity: "info" | "warn" | "critical";
+  title: string;
+  detail: string;
+  evidence: string;
+}
+
+export interface AnalysisCardHit {
+  name: string;
+  mana_cost?: string | null;
+  cmc?: number | null;
+  type_line?: string | null;
+  color_identity?: string[];
+  tags?: string[];
+  price_eur_cents?: number | null;
+}
+
+export interface AnalysisSwapSuggestion {
+  remove: string[];
+  add: AnalysisCardHit[];
+  reason: string;
+}
+
+export interface SimulationAnalysisResponse {
+  summary: string;
+  findings: AnalysisFinding[];
+  swap_suggestions: AnalysisSwapSuggestion[];
+  tool_call_count: number;
 }
 
 // Import

@@ -768,6 +768,256 @@ class TestCommander:
         assert stats.commander.avg_cast_turn < stats.partner.avg_cast_turn
 
 
+class TestManaProducers:
+    def _forests(self, quantity: int = 99) -> DeckCardItem:
+        return _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            quantity=quantity,
+            qualifying_stages=["lands"],
+        )
+
+    def test_sol_ring_parses_as_two_colorless_no_sickness(self):
+        sol_ring = _make_card(
+            "Sol Ring",
+            mana_cost="{1}",
+            cmc=1,
+            type_line="Artifact",
+            color_identity=[],
+            oracle_text="{T}: Add {C}{C}.",
+        )
+        sim = _to_sim_card(sol_ring)
+        assert sim.mana_count == 2
+        assert sim.mana_colors == ("C",)
+        assert sim.is_creature is False
+
+    def test_llanowar_elves_parses_as_one_green_with_sickness(self):
+        elves = _make_card(
+            "Llanowar Elves",
+            mana_cost="{G}",
+            cmc=1,
+            type_line="Creature — Elf Druid",
+            color_identity=["G"],
+            oracle_text="{T}: Add {G}.",
+        )
+        sim = _to_sim_card(elves)
+        assert sim.mana_count == 1
+        assert sim.mana_colors == ("G",)
+        assert sim.is_creature is True
+
+    def test_birds_of_paradise_any_color(self):
+        birds = _make_card(
+            "Birds of Paradise",
+            mana_cost="{G}",
+            cmc=1,
+            type_line="Creature — Bird",
+            color_identity=["G"],
+            oracle_text="Flying. {T}: Add one mana of any color.",
+        )
+        sim = _to_sim_card(birds)
+        assert sim.mana_count == 1
+        assert set(sim.mana_colors) == {"W", "U", "B", "R", "G"}
+        assert sim.is_creature is True
+
+    def test_talisman_dual_choice(self):
+        talisman = _make_card(
+            "Talisman of Dominance",
+            mana_cost="{2}",
+            cmc=2,
+            type_line="Artifact",
+            color_identity=["U", "B"],
+            oracle_text=("{T}: Add {C}. {T}, Pay 1 life: Add {U} or {B}."),
+        )
+        sim = _to_sim_card(talisman)
+        # Max count across clauses is 1; colors union is {C, U, B}.
+        assert sim.mana_count == 1
+        assert set(sim.mana_colors) == {"C", "U", "B"}
+        assert sim.is_creature is False
+
+    def test_cultivate_falls_back_to_ramp_tag(self):
+        # Sorcery that searches for a land — no "Add" in oracle text. The
+        # ramp tag drives the single-source fallback in _apply_spell_effects.
+        cultivate = _make_card(
+            "Cultivate",
+            mana_cost="{2}{G}",
+            cmc=3,
+            type_line="Sorcery",
+            color_identity=["G"],
+            qualifying_stages=["ramp"],
+            oracle_text=(
+                "Search your library for up to two basic land cards, reveal "
+                "those cards, put one onto the battlefield tapped and the other "
+                "into your hand, then shuffle."
+            ),
+        )
+        sim = _to_sim_card(cultivate)
+        assert sim.mana_count == 0
+        assert sim.is_ramp is True
+        assert sim.ramp_produces == ("G",)
+
+    def test_sol_ring_yields_same_turn_mana_in_sim(self):
+        # Deck of forests + Sol Rings — on T1 player drops a Forest *and* may
+        # cast Sol Ring (costs {1}, played as part of resolution). Sol Ring's
+        # +2 colorless should be available the turn cast.
+        forest = self._forests(40)
+        sol_ring = _make_card(
+            "Sol Ring",
+            mana_cost="{1}",
+            cmc=1,
+            type_line="Artifact",
+            color_identity=[],
+            oracle_text="{T}: Add {C}{C}.",
+            quantity=59,
+        )
+        deck = _make_deck([forest, sol_ring], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=2, seed=131))
+        # Pre-G0 baseline: T1 mana = ~1 (the Forest). With G0: when Sol Ring
+        # is in opening hand, T1 mana ≥ 3 (Forest + 2 from Sol Ring). Across
+        # 200 trials that lifts the T1 average meaningfully above 1.
+        assert stats.per_turn[0].avg_mana_available > 1.2
+
+    def test_llanowar_creature_still_sickness(self):
+        # Pure Llanowar deck — first ramp source comes from T2 (T1 cast w/
+        # sickness, taps T2).
+        forest = self._forests(40)
+        elves = _make_card(
+            "Llanowar Elves",
+            mana_cost="{G}",
+            cmc=1,
+            type_line="Creature — Elf Druid",
+            color_identity=["G"],
+            oracle_text="{T}: Add {G}.",
+            quantity=59,
+        )
+        deck = _make_deck([forest, elves], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=4, seed=137))
+        # T2 mana should be greater than T2 lands when ramp landed on T1.
+        assert stats.per_turn[1].avg_mana_available > stats.per_turn[1].avg_lands_in_play
+
+
+class TestEnrichedSimOutput:
+    def _forests(self, quantity: int = 99) -> DeckCardItem:
+        return _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            quantity=quantity,
+            qualifying_stages=["lands"],
+        )
+
+    def test_per_card_stats_populated(self):
+        forest = self._forests(40)
+        bear = _make_card("Bear", mana_cost="{1}{G}", cmc=2, color_identity=["G"], quantity=59)
+        deck = _make_deck([forest, bear], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=4, seed=201))
+        assert len(stats.per_card) == 2
+        names = {c.name for c in stats.per_card}
+        assert names == {"Forest", "Bear"}
+        # With 59 Bears and a curve-friendly deck, bears should cast often.
+        bear_stat = next(c for c in stats.per_card if c.name == "Bear")
+        assert bear_stat.pct_ever_cast > 0.5
+
+    def test_top_stuck_classifies_color_blocker(self):
+        mountain = _make_card(
+            "Mountain",
+            type_line="Basic Land — Mountain",
+            color_identity=["R"],
+            quantity=37,
+            qualifying_stages=["lands"],
+        )
+        green_spell = _make_card(
+            "Big Green",
+            mana_cost="{G}{G}",
+            cmc=2,
+            color_identity=["G"],
+            quantity=62,
+        )
+        deck = _make_deck([mountain, green_spell], ["G", "R"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=5, seed=211))
+        # Big Green is the obvious dead card → should appear in top_stuck with
+        # blocker = "colors" since 5 mountains provide enough mana but no G.
+        assert stats.top_stuck_cards
+        offender = stats.top_stuck_cards[0]
+        assert offender.name == "Big Green"
+        assert offender.blocker == "colors"
+        assert offender.cost == "{G}{G}"
+
+    def test_unpaid_costs_lists_failed_costs(self):
+        mountain = _make_card(
+            "Mountain",
+            type_line="Basic Land — Mountain",
+            color_identity=["R"],
+            quantity=37,
+            qualifying_stages=["lands"],
+        )
+        green_spell = _make_card(
+            "Big Green",
+            mana_cost="{G}{G}",
+            cmc=2,
+            color_identity=["G"],
+            quantity=62,
+        )
+        deck = _make_deck([mountain, green_spell], ["G", "R"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=80, turns=4, seed=221))
+        assert stats.unpaid_cost_summary
+        top = stats.unpaid_cost_summary[0]
+        assert top.cost == "{G}{G}"
+        assert "G" in top.missing_colors
+
+    def test_sample_trials_returns_three(self):
+        forest = self._forests(40)
+        bear = _make_card("Bear", mana_cost="{1}{G}", cmc=2, color_identity=["G"], quantity=59)
+        deck = _make_deck([forest, bear], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=50, turns=4, seed=231))
+        assert len(stats.sample_trials) == 3
+        buckets = [s.bucket for s in stats.sample_trials]
+        assert buckets == ["worst", "median", "best"]
+
+    def test_cast_rate_by_cmc(self):
+        forest = self._forests(40)
+        cheap = _make_card("Cheap", mana_cost="{G}", cmc=1, color_identity=["G"], quantity=30)
+        expensive = _make_card(
+            "Expensive",
+            mana_cost="{5}{G}{G}",
+            cmc=7,
+            color_identity=["G"],
+            quantity=29,
+        )
+        deck = _make_deck([forest, cheap, expensive], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=4, seed=241))
+        # Cheap (CMC 1) should cast far more often than Expensive (CMC 7+).
+        assert stats.cast_rate_by_cmc.get("0-1", 0.0) > stats.cast_rate_by_cmc.get("5+", 0.0)
+
+    def test_mulligan_reasons_classify_low_lands(self):
+        # All-spells deck → opening hands are mostly 0-1 land, forcing
+        # low_lands-classified mulligans.
+        cards = [_make_card(f"Spell{i}", mana_cost="{2}{G}", cmc=3) for i in range(99)]
+        deck = _make_deck(cards, ["G"])
+        stats = simulate(
+            deck, PlaytestSimulateRequest(trials=200, turns=4, max_mulligans=3, seed=251)
+        )
+        # Should produce mulligans, and the dominant reason is low_lands.
+        assert stats.mulligan_reasons.total > 0
+        assert stats.mulligan_reasons.low_lands > 0.5
+
+    def test_avg_mana_unspent_nonzero_for_curve_deck(self):
+        # Sol Ring-heavy deck → extra mana sitting around in early turns.
+        forest = self._forests(40)
+        sol_ring = _make_card(
+            "Sol Ring",
+            mana_cost="{1}",
+            cmc=1,
+            type_line="Artifact",
+            color_identity=[],
+            oracle_text="{T}: Add {C}{C}.",
+            quantity=59,
+        )
+        deck = _make_deck([forest, sol_ring], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=3, seed=261))
+        assert any(t.avg_mana_unspent > 0 for t in stats.per_turn)
+
+
 @pytest.mark.asyncio
 async def test_playtest_endpoint_returns_stats(client: AsyncClient) -> None:
     create = await client.post(

@@ -1,5 +1,6 @@
 """Pydantic models for AI deck building endpoints."""
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -169,6 +170,64 @@ class ManaFixResponse(BaseModel):
     report: ManaBaseReport
     suggestions: list[CardSuggestion] = Field(default_factory=list)
     unresolved: list[str] = Field(default_factory=list)
+
+
+class CardSearchInput(BaseModel):
+    """Arguments the LLM passes to the ``card_search`` tool. The backend
+    overlays the deck's color identity onto every query — the LLM cannot
+    escape it.
+    """
+
+    text_query: str | None = None
+    types: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    min_cmc: int | None = Field(default=None, ge=0, le=20)
+    max_cmc: int | None = Field(default=None, ge=0, le=20)
+    max_price_eur_cents: int | None = Field(default=None, ge=0)
+    limit: int = Field(default=8, ge=1, le=20)
+
+
+class CardSearchHit(BaseModel):
+    """A single card returned by the ``card_search`` tool. Already validated
+    against the deck's color identity.
+    """
+
+    name: str
+    mana_cost: str | None = None
+    cmc: float | None = None
+    type_line: str | None = None
+    color_identity: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    price_eur_cents: int | None = None
+
+
+class AnalysisFinding(BaseModel):
+    """One diagnosis line produced by the analysis agent."""
+
+    category: Literal["mana_base", "consistency", "curve", "commander", "color_fix", "card_quality"]
+    severity: Literal["info", "warn", "critical"]
+    title: str
+    detail: str
+    evidence: str
+
+
+class SwapSuggestion(BaseModel):
+    """A concrete swap recommendation — remove cards from the deck and replace
+    them with candidates the agent retrieved via ``card_search``.
+    """
+
+    remove: list[str] = Field(default_factory=list)
+    add: list[CardSearchHit] = Field(default_factory=list)
+    reason: str
+
+
+class SimulationAnalysisResponse(BaseModel):
+    """Structured output of the simulation analysis agent."""
+
+    summary: str
+    findings: list[AnalysisFinding] = Field(default_factory=list)
+    swap_suggestions: list[SwapSuggestion] = Field(default_factory=list)
+    tool_call_count: int = 0
 
 
 class KeywordExtractResponse(BaseModel):

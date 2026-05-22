@@ -3,7 +3,13 @@
 import { useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api";
-import type { PlaytestCommanderStats, PlaytestStats } from "@/lib/types";
+import type {
+  AnalysisFinding,
+  AnalysisSwapSuggestion,
+  PlaytestCommanderStats,
+  PlaytestStats,
+  SimulationAnalysisResponse,
+} from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -97,6 +103,9 @@ export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
   const [stats, setStats] = useState<PlaytestStats | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<SimulationAnalysisResponse | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   async function handleRun() {
     const turns = clampTurns(turnsText, defaultTurns);
@@ -114,6 +123,25 @@ export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
       setError(err instanceof ApiError ? err.message : "Simulation failed");
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function handleAnalyze() {
+    const turns = clampTurns(turnsText, defaultTurns);
+    setTurnsText(String(turns));
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const result = await apiClient.playtestAnalyze(deckId, {
+        trials,
+        turns,
+        on_the_play: onThePlay,
+      });
+      setAnalysis(result);
+    } catch (err) {
+      setAnalysisError(err instanceof ApiError ? err.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
     }
   }
 
@@ -174,6 +202,15 @@ export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
         >
           {running ? "Running…" : "Run sims"}
         </button>
+        <button
+          type="button"
+          onClick={() => void handleAnalyze()}
+          disabled={analyzing}
+          className="rounded-lg border border-emerald-400/40 px-4 py-1.5 text-xs font-medium text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-50"
+          title="Run a sim and ask the AI agent for diagnosis + concrete swap suggestions."
+        >
+          {analyzing ? "Analyzing…" : "Analyze with AI"}
+        </button>
       </div>
 
       {error && (
@@ -181,6 +218,14 @@ export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
           {error}
         </p>
       )}
+
+      {analysisError && (
+        <p className="mb-3 rounded border border-red-500/30 bg-red-900/20 px-3 py-2 text-xs text-red-300">
+          {analysisError}
+        </p>
+      )}
+
+      {analysis && <AnalysisPanel analysis={analysis} />}
 
       {stats && <StatsTable stats={stats} />}
     </div>
@@ -461,6 +506,98 @@ function Stat({ label, value, tip }: { label: string; value: string; tip?: strin
     <div className="rounded-lg bg-white/5 px-3 py-2">
       <p className="text-gray-500">{tip ? <Tip text={tip}>{label}</Tip> : label}</p>
       <p className="font-semibold text-white tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+const SEVERITY_STYLES: Record<AnalysisFinding["severity"], string> = {
+  info: "border-sky-400/40 text-sky-300",
+  warn: "border-amber-400/40 text-amber-300",
+  critical: "border-red-500/40 text-red-300",
+};
+
+function AnalysisPanel({ analysis }: { analysis: SimulationAnalysisResponse }) {
+  return (
+    <div className="mb-3 flex flex-col gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-3 text-xs">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">
+          AI analysis
+        </p>
+        <p className="text-[10px] text-gray-500">
+          {analysis.tool_call_count} tool call{analysis.tool_call_count === 1 ? "" : "s"}
+        </p>
+      </div>
+      {analysis.summary && (
+        <p className="leading-snug text-gray-100">{analysis.summary}</p>
+      )}
+      {analysis.findings.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+            Findings
+          </p>
+          {analysis.findings.map((finding, i) => (
+            <FindingRow key={i} finding={finding} />
+          ))}
+        </div>
+      )}
+      {analysis.swap_suggestions.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+            Swap suggestions
+          </p>
+          {analysis.swap_suggestions.map((swap, i) => (
+            <SwapRow key={i} swap={swap} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FindingRow({ finding }: { finding: AnalysisFinding }) {
+  return (
+    <div
+      className={`rounded-md border-l-2 bg-white/[0.04] px-3 py-2 ${SEVERITY_STYLES[finding.severity]}`}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-semibold text-white">{finding.title}</p>
+        <p className="text-[10px] uppercase tracking-wide">{finding.category}</p>
+      </div>
+      <p className="mt-1 text-gray-200">{finding.detail}</p>
+      <p className="mt-1 text-[10px] text-gray-500">Evidence: {finding.evidence}</p>
+    </div>
+  );
+}
+
+function SwapRow({ swap }: { swap: AnalysisSwapSuggestion }) {
+  return (
+    <div className="rounded-md bg-white/[0.04] px-3 py-2">
+      <p className="text-gray-200">{swap.reason}</p>
+      <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-red-300">Remove</p>
+          <ul className="mt-0.5 flex flex-col gap-0.5">
+            {swap.remove.map((name) => (
+              <li key={name} className="text-gray-300">
+                {name}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-emerald-300">Add</p>
+          <ul className="mt-0.5 flex flex-col gap-0.5">
+            {swap.add.map((card) => (
+              <li key={card.name} className="text-gray-200">
+                {card.name}
+                {card.mana_cost ? (
+                  <span className="ml-1 text-[10px] text-gray-500">{card.mana_cost}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

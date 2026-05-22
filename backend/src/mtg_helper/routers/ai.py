@@ -16,6 +16,7 @@ from mtg_helper.models.ai import (
     KeywordExtractRequest,
     KeywordExtractResponse,
     ManaFixResponse,
+    SimulationAnalysisResponse,
     SuggestRequest,
     SuggestResponse,
 )
@@ -28,6 +29,7 @@ from mtg_helper.services import (
     mana_base_service,
     playtest_service,
     rate_limit_service,
+    simulation_analysis_service,
     swap_service,
 )
 from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
@@ -40,6 +42,7 @@ CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
 # for interactive use; drop the limit when deploying to a multi-replica setup.
 _DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
 _PLAYTEST_LIMIT = (20, 60)  # 20 sim runs / 60 seconds — CPU-bound, cap abuse
+_ANALYZE_LIMIT = (5, 60)  # 5 analyses / 60 seconds — LLM + multiple tool calls
 
 
 def _llm_unavailable(detail: str) -> HTTPException:
@@ -164,6 +167,32 @@ async def playtest_simulate(
         raise _deck_not_found(deck_id)
     stats = playtest_service.simulate(deck, body)
     return DataResponse(data=stats)
+
+
+@router.post(
+    "/{deck_id}/playtest/analyze",
+    response_model=DataResponse[SimulationAnalysisResponse],
+)
+async def playtest_analyze(
+    deck_id: UUID,
+    body: PlaytestSimulateRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[SimulationAnalysisResponse]:
+    """Run a sim then drive the analysis agent for swap recommendations."""
+    email = _require_email(account)
+    _enforce_rate_limit(account, "playtest_analyze", _ANALYZE_LIMIT)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    stats = playtest_service.simulate(deck, body)
+    result = await simulation_analysis_service.analyze_simulation(
+        request.app.state.db_pool,
+        request.app.state.ai_client,
+        deck,
+        stats,
+    )
+    return DataResponse(data=result)
 
 
 @router.post("/{deck_id}/mana-fix", response_model=DataResponse[ManaFixResponse])

@@ -36,6 +36,7 @@ import type {
   PaginationMeta,
   PlaytestSimulateRequest,
   PlaytestStats,
+  SimulationAnalysisResponse,
   PreferenceCreate,
   PreferenceResponse,
   QuickstartRequest,
@@ -168,6 +169,12 @@ export const apiClient = {
 
   playtestSimulate: (deckId: string, body: PlaytestSimulateRequest = {}) =>
     request<PlaytestStats>(`/decks/${deckId}/playtest/simulate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  playtestAnalyze: (deckId: string, body: PlaytestSimulateRequest = {}) =>
+    request<SimulationAnalysisResponse>(`/decks/${deckId}/playtest/analyze`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
