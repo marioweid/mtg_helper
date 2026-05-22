@@ -1,6 +1,21 @@
 """Pydantic models for the goldfish playtest simulation endpoint."""
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
+
+
+class EngineClass(StrEnum):
+    """Commander engine archetypes. Each class has a fixed per-turn yield that
+    fires once the commander is in play. Auto-classified from commander tags.
+    """
+
+    NONE = "none"
+    TOKEN_GENERATOR = "token_generator"
+    COUNTER_DISTRIBUTOR = "counter_distributor"
+    SAC_PAYOFF = "sac_payoff"
+    RAMP_ENGINE = "ramp_engine"
+    DRAW_ENGINE = "draw_engine"
 
 
 class ManaEngineThreshold(BaseModel):
@@ -111,6 +126,16 @@ class OpeningHandStats(BaseModel):
     pct_kept_le4: float
 
 
+class CommanderStats(BaseModel):
+    """Per-commander cast-turn stats. ``avg_cast_turn`` uses ``turns + 1`` as a
+    sentinel for trials where the commander was never cast.
+    """
+
+    name: str
+    avg_cast_turn: float
+    pct_ever_cast: float
+
+
 class PlaytestStats(BaseModel):
     """Aggregate output of the goldfish sim across trials."""
 
@@ -126,4 +151,7 @@ class PlaytestStats(BaseModel):
     avg_first_missed_land_turn: float
     opening_hand: OpeningHandStats
     engine_thresholds: EngineThresholdSummary
+    commander: CommanderStats | None = None
+    partner: CommanderStats | None = None
+    engine_class: EngineClass = EngineClass.NONE
     per_turn: list[TurnStat]

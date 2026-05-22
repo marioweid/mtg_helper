@@ -99,15 +99,20 @@ class DeckCardItem(BaseModel):
 
 
 class CommanderCardSummary(BaseModel):
-    """Minimal commander/partner card fields needed for the detail-page preview."""
+    """Minimal commander/partner card fields needed for the detail-page preview
+    and the goldfish sim. ``cmc``, ``power``, and ``tags`` are sim inputs.
+    """
 
     id: UUID
     name: str
     mana_cost: str | None = None
+    cmc: Decimal | None = None
     type_line: str | None = None
     oracle_text: str | None = None
     image_uri: str | None = None
     color_identity: list[str] = Field(default_factory=list)
+    power: int | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class DeckDetailResponse(BaseModel):

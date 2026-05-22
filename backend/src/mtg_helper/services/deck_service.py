@@ -396,7 +396,8 @@ async def _fetch_commander_summary(
 ) -> CommanderCardSummary | None:
     """Load minimal card fields for the deck detail commander preview."""
     row = await conn.fetchrow(
-        "SELECT id, name, mana_cost, type_line, oracle_text, image_uri, color_identity "
+        "SELECT id, name, mana_cost, cmc, type_line, oracle_text, image_uri, "
+        "color_identity, power, tags "
         "FROM cards WHERE id = $1",
         card_id,
     )
@@ -406,10 +407,13 @@ async def _fetch_commander_summary(
         id=row["id"],
         name=row["name"],
         mana_cost=row["mana_cost"],
+        cmc=row["cmc"],
         type_line=row["type_line"],
         oracle_text=row["oracle_text"],
         image_uri=row["image_uri"],
         color_identity=list(row["color_identity"] or []),
+        power=_parse_power(row["power"]),
+        tags=list(row["tags"] or []),
     )
 
 

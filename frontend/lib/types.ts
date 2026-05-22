@@ -476,8 +476,25 @@ export interface PlaytestStats {
   avg_first_missed_land_turn: number;
   opening_hand: PlaytestOpeningHandStats;
   engine_thresholds: EngineThresholdSummary;
+  commander: PlaytestCommanderStats | null;
+  partner: PlaytestCommanderStats | null;
+  engine_class: PlaytestEngineClass;
   per_turn: PlaytestTurnStat[];
 }
+
+export interface PlaytestCommanderStats {
+  name: string;
+  avg_cast_turn: number;
+  pct_ever_cast: number;
+}
+
+export type PlaytestEngineClass =
+  | "none"
+  | "token_generator"
+  | "counter_distributor"
+  | "sac_payoff"
+  | "ramp_engine"
+  | "draw_engine";
 
 // Import
 export interface DeckImportRequest {

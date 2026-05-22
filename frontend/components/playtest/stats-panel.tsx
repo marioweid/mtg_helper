@@ -3,7 +3,11 @@
 import { useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api";
-import type { PlaytestStats } from "@/lib/types";
+import type {
+  PlaytestCommanderStats,
+  PlaytestEngineClass,
+  PlaytestStats,
+} from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -73,6 +77,13 @@ const TIPS = {
   col_hand: "Avg cards in hand at end of turn (after draw, land drop, and casting phase).",
   col_engine_cum:
     "Cumulative % of trials that have crossed any engine threshold by end of this turn.",
+  // Commander + engine class
+  commander_avg_cast:
+    "Average turn the commander first resolves. Sentinel = turns + 1 means it never resolved within the sim window.",
+  commander_pct_ever:
+    "% of trials in which the commander was successfully cast within the sim window.",
+  engine_class:
+    "Auto-classified engine archetype from the commander's tags. Drives a per-turn yield (extra tokens/power/mana/cards) once the commander is in play. NONE = no archetype matched; commander still contributes via its printed stats and ramp/draw/etc. flags.",
   // Percentiles
   col_lands_p25: "25th percentile of lands in play (1/4 of trials had this many or fewer).",
   col_lands_p50: "Median lands in play.",
@@ -237,6 +248,26 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
           value={pct(oh.pct_kept_5 + oh.pct_kept_le4)}
         />
       </div>
+
+      {(stats.commander !== null || stats.partner !== null) && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+          <div className="mb-2 flex items-baseline justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              Commander
+            </p>
+            <p
+              title={TIPS.engine_class}
+              className="cursor-help text-[10px] tabular-nums text-emerald-300"
+            >
+              engine class: {formatEngineClass(stats.engine_class)}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {stats.commander !== null && <CommanderRow stats={stats.commander} />}
+            {stats.partner !== null && <CommanderRow stats={stats.partner} />}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
@@ -434,6 +465,44 @@ function Stat({ label, value, tip }: { label: string; value: string; tip?: strin
       <p className="font-semibold text-white tabular-nums">{value}</p>
     </div>
   );
+}
+
+function CommanderRow({ stats }: { stats: PlaytestCommanderStats }) {
+  return (
+    <div className="rounded-md bg-white/[0.04] px-3 py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="truncate font-semibold text-white">{stats.name}</p>
+        <p
+          title={TIPS.commander_pct_ever}
+          className="cursor-help tabular-nums text-emerald-300"
+        >
+          {pct(stats.pct_ever_cast)}
+        </p>
+      </div>
+      <p className="mt-0.5 text-[10px] text-gray-400">
+        avg first cast:{" "}
+        <span
+          title={TIPS.commander_avg_cast}
+          className="cursor-help tabular-nums text-gray-200"
+        >
+          T{stats.avg_cast_turn.toFixed(2)}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+const ENGINE_CLASS_LABELS: Record<PlaytestEngineClass, string> = {
+  none: "none",
+  token_generator: "token generator",
+  counter_distributor: "counter / anthem",
+  sac_payoff: "sacrifice payoff",
+  ramp_engine: "ramp",
+  draw_engine: "card draw",
+};
+
+function formatEngineClass(engine: PlaytestEngineClass): string {
+  return ENGINE_CLASS_LABELS[engine] ?? engine;
 }
 
 interface ThresholdRowProps {

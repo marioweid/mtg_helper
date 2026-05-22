@@ -7,9 +7,10 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
+from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.models.playtest import (
     BoardStateThreshold,
+    EngineClass,
     EngineThresholdConfig,
     ManaEngineThreshold,
     PlaytestSimulateRequest,
@@ -63,7 +64,37 @@ def _make_card(
     )
 
 
-def _make_deck(cards: list[DeckCardItem], color_identity: list[str]) -> DeckDetailResponse:
+def _make_commander(
+    name: str = "Test Commander",
+    *,
+    mana_cost: str | None = "{2}{G}",
+    cmc: int = 3,
+    type_line: str = "Legendary Creature — Elf",
+    color_identity: list[str] | None = None,
+    power: int | None = 3,
+    tags: list[str] | None = None,
+    oracle_text: str | None = None,
+) -> CommanderCardSummary:
+    return CommanderCardSummary(
+        id=uuid4(),
+        name=name,
+        mana_cost=mana_cost,
+        cmc=Decimal(str(cmc)),
+        type_line=type_line,
+        oracle_text=oracle_text,
+        image_uri=None,
+        color_identity=color_identity or ["G"],
+        power=power,
+        tags=tags or [],
+    )
+
+
+def _make_deck(
+    cards: list[DeckCardItem],
+    color_identity: list[str],
+    commander: CommanderCardSummary | None = None,
+    partner: CommanderCardSummary | None = None,
+) -> DeckDetailResponse:
     now = datetime(2026, 5, 18)
     return DeckDetailResponse(
         id=uuid4(),
@@ -72,8 +103,10 @@ def _make_deck(cards: list[DeckCardItem], color_identity: list[str]) -> DeckDeta
         bracket=3,
         stage="complete",
         commander_id=uuid4(),
-        partner_id=None,
+        partner_id=uuid4() if partner is not None else None,
         commander_color_identity=color_identity,
+        commander_card=commander,
+        partner_card=partner,
         owner_email=None,
         created_at=now,
         updated_at=now,
@@ -613,6 +646,75 @@ class TestEngineThresholds:
         cum_vals = [t.pct_board_state_hit_cum for t in stats.per_turn]
         for prev, nxt in zip(cum_vals, cum_vals[1:], strict=True):
             assert nxt >= prev
+
+
+class TestCommanderAndEngine:
+    def _forests(self, quantity: int = 99) -> DeckCardItem:
+        return _make_card(
+            "Forest",
+            type_line="Basic Land — Forest",
+            color_identity=["G"],
+            quantity=quantity,
+            qualifying_stages=["lands"],
+        )
+
+    def test_no_commander_means_no_stats_and_none_engine(self):
+        deck = _make_deck([self._forests()], ["G"])
+        stats = simulate(deck, PlaytestSimulateRequest(trials=20, turns=4, seed=1))
+        assert stats.commander is None
+        assert stats.partner is None
+        assert stats.engine_class is EngineClass.NONE
+
+    def test_commander_cast_turn_close_to_cmc(self):
+        cmdr = _make_commander(name="Hazel", mana_cost="{2}{G}", cmc=3, power=2)
+        deck = _make_deck([self._forests()], ["G"], commander=cmdr)
+        stats = simulate(
+            deck,
+            PlaytestSimulateRequest(trials=200, turns=6, seed=51, on_the_play=True),
+        )
+        assert stats.commander is not None
+        assert stats.commander.pct_ever_cast > 0.9
+        assert stats.commander.avg_cast_turn < 4.0
+
+    def test_token_commander_yields_extra_creatures(self):
+        cmdr = _make_commander(
+            name="Token Lord",
+            mana_cost="{1}{G}",
+            cmc=2,
+            power=2,
+            tags=["token"],
+        )
+        deck = _make_deck([self._forests()], ["G"], commander=cmdr)
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=6, seed=61))
+        assert stats.engine_class is EngineClass.TOKEN_GENERATOR
+        # Commander cast ~T2; from T3 onward yield adds +1 creature/turn.
+        assert stats.per_turn[-1].avg_creatures_on_board > 1.5
+
+    def test_ramp_commander_accelerates_mana_threshold(self):
+        ramp_cmdr = _make_commander(
+            name="Ramp Bot", mana_cost="{G}{G}", cmc=2, power=1, tags=["ramp"]
+        )
+        plain_cmdr = _make_commander(name="Plain Bot", mana_cost="{G}{G}", cmc=2, power=1, tags=[])
+        ramp_deck = _make_deck([self._forests()], ["G"], commander=ramp_cmdr)
+        plain_deck = _make_deck([self._forests()], ["G"], commander=plain_cmdr)
+        cfg = EngineThresholdConfig(mana_engine=ManaEngineThreshold(min_mana=6, min_hand=0))
+        req = PlaytestSimulateRequest(trials=300, turns=8, seed=71, thresholds=cfg)
+        ramp_stats = simulate(ramp_deck, req)
+        plain_stats = simulate(plain_deck, req)
+        assert ramp_stats.engine_thresholds.avg_first_mana_engine_turn < (
+            plain_stats.engine_thresholds.avg_first_mana_engine_turn
+        )
+
+    def test_partner_cast_turn_tracked_independently(self):
+        cmdr_a = _make_commander(name="Captain", mana_cost="{1}{G}", cmc=2, power=2)
+        cmdr_b = _make_commander(name="Mate", mana_cost="{2}{G}", cmc=3, power=2)
+        deck = _make_deck([self._forests()], ["G"], commander=cmdr_a, partner=cmdr_b)
+        stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=6, seed=81))
+        assert stats.commander is not None
+        assert stats.partner is not None
+        assert stats.commander.pct_ever_cast > 0.9
+        assert stats.partner.pct_ever_cast > 0.9
+        assert stats.commander.avg_cast_turn < stats.partner.avg_cast_turn
 
 
 @pytest.mark.asyncio
