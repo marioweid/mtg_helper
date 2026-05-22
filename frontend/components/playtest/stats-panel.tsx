@@ -236,6 +236,37 @@ function pct(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
 }
 
+/**
+ * Score a metric on a 0..1 scale where 1 is healthy and 0 is critical.
+ * ``good`` is the threshold beyond which the metric is fine; ``critical``
+ * is the threshold beyond which it's failing. Values between interpolate
+ * linearly. ``higherIsBetter`` flips the comparison for inverted metrics
+ * like kept-at-7 and commander cast rate. Thresholds mirror the ones the
+ * AI analysis agent uses in ``simulation_analysis_service.py``.
+ */
+function score(
+  value: number,
+  good: number,
+  critical: number,
+  higherIsBetter: boolean,
+): number {
+  if (higherIsBetter) {
+    if (value >= good) return 1;
+    if (value <= critical) return 0;
+    return (value - critical) / (good - critical);
+  }
+  if (value <= good) return 1;
+  if (value >= critical) return 0;
+  return (critical - value) / (critical - good);
+}
+
+/** Map a 0..1 score to an HSL color: red (0) → amber → green (1). */
+function severityColor(s: number): string {
+  const clamped = Math.max(0, Math.min(1, s));
+  const hue = Math.round(clamped * 120);
+  return `hsl(${hue}, 75%, 60%)`;
+}
+
 function StatsTable({ stats }: { stats: PlaytestStats }) {
   const oh = stats.opening_hand;
   const cs = stats.color_screw;
@@ -247,8 +278,14 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
           label="Avg mulligans"
           tip={TIPS.avg_mulligans}
           value={stats.avg_mulligans.toFixed(2)}
+          severity={score(stats.avg_mulligans, 0.9, 1.1, false)}
         />
-        <Stat label="Kept at 7" tip={TIPS.kept_7} value={pct(oh.pct_kept_7)} />
+        <Stat
+          label="Kept at 7"
+          tip={TIPS.kept_7}
+          value={pct(oh.pct_kept_7)}
+          severity={score(oh.pct_kept_7, 0.5, 0.45, true)}
+        />
         <Stat
           label={`Avg spells (T1–T${stats.turns})`}
           tip={TIPS.avg_total_spells}
@@ -257,12 +294,23 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Flood rate" tip={TIPS.flood_rate} value={pct(stats.pct_flood)} />
-        <Stat label="Screw rate" tip={TIPS.screw_rate} value={pct(stats.pct_screw)} />
+        <Stat
+          label="Flood rate"
+          tip={TIPS.flood_rate}
+          value={pct(stats.pct_flood)}
+          severity={score(stats.pct_flood, 0.12, 0.15, false)}
+        />
+        <Stat
+          label="Screw rate"
+          tip={TIPS.screw_rate}
+          value={pct(stats.pct_screw)}
+          severity={score(stats.pct_screw, 0.1, 0.12, false)}
+        />
         <Stat
           label="Color screw rate"
           tip={TIPS.color_screw_pct}
           value={pct(cs.pct_color_screw)}
+          severity={score(cs.pct_color_screw, 0.08, 0.1, false)}
         />
         <Stat
           label="Avg first missed land drop"
@@ -458,13 +506,15 @@ function ColorShortagePanel({ stats }: { stats: PlaytestStats["color_screw"] }) 
 }
 
 function CommanderRow({ stats }: { stats: PlaytestCommanderStats }) {
+  const castColor = severityColor(score(stats.pct_ever_cast, 0.8, 0.6, true));
   return (
     <div className="rounded-md bg-white/[0.04] px-3 py-2">
       <div className="flex items-baseline justify-between gap-2">
         <p className="truncate font-semibold text-white">{stats.name}</p>
         <p
           title={TIPS.commander_pct_ever}
-          className="cursor-help tabular-nums text-emerald-300"
+          className="cursor-help tabular-nums"
+          style={{ color: castColor }}
         >
           {pct(stats.pct_ever_cast)}
         </p>
@@ -501,11 +551,25 @@ function Th({ tip, children }: { tip: string; children: React.ReactNode }) {
   );
 }
 
-function Stat({ label, value, tip }: { label: string; value: string; tip?: string }) {
+function Stat({
+  label,
+  value,
+  tip,
+  severity,
+}: {
+  label: string;
+  value: string;
+  tip?: string;
+  /** 0..1 score: 1 = healthy, 0 = critical. Tints the value red→green. */
+  severity?: number;
+}) {
+  const style = severity !== undefined ? { color: severityColor(severity) } : undefined;
   return (
     <div className="rounded-lg bg-white/5 px-3 py-2">
       <p className="text-gray-500">{tip ? <Tip text={tip}>{label}</Tip> : label}</p>
-      <p className="font-semibold text-white tabular-nums">{value}</p>
+      <p className="font-semibold tabular-nums text-white" style={style}>
+        {value}
+      </p>
     </div>
   );
 }
