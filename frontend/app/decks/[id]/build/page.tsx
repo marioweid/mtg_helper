@@ -8,8 +8,7 @@ import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardSearchResult } from "@/components/card-search-result";
 import { CardHover } from "@/components/card-hover";
 import { CardDetailModal } from "@/components/card-detail-modal";
-import { DeckBrowserPanel } from "@/components/deck-browser-panel";
-import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
+import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
 import {
   type CardSuggestion,
   type CardResponse,
@@ -350,31 +349,7 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
-  const [commandBarOpen, setCommandBarOpenState] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-
-  // Open/close the command bar through the browser history so the system
-  // back button (mobile + browser) collapses it instead of leaving the page.
-  const setCommandBarOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
-    setCommandBarOpenState((prev) => {
-      const resolved = typeof next === "function" ? next(prev) : next;
-      if (typeof window !== "undefined") {
-        if (resolved && !prev) {
-          window.history.pushState({ deckBar: true }, "");
-        } else if (!resolved && prev && window.history.state?.deckBar) {
-          window.history.back();
-        }
-      }
-      return resolved;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onPop = () => setCommandBarOpenState(false);
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<string | null>(null);
@@ -1488,42 +1463,14 @@ export default function BuildPage() {
         onSetCategories={handleSetCategories}
       />
 
-      {/* Expandable command bar (sticky). Click to expand the deck browser. */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/90 backdrop-blur"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        {commandBarOpen && (
-          <div className="mx-auto max-w-5xl border-b border-white/10 px-4 pt-3">
-            <div className="h-[70vh] max-h-[640px]">
-              <DeckBrowserPanel
-                cards={deckCards}
-                onRemove={handleRemoveCard}
-                onUndoCut={handleUndoCut}
-                onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
-                onSetQuantity={handleSetQuantity}
-                petCardNames={petCardNames}
-              />
-            </div>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setCommandBarOpen((v) => !v)}
-          aria-expanded={commandBarOpen}
-          aria-label={commandBarOpen ? "Collapse deck browser" : "Expand deck browser"}
-          className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-        >
-          <DeckTypeBreakdown cards={deckCards} target={100} />
-          <span
-            className="shrink-0 text-gray-400 transition-transform"
-            style={{ transform: commandBarOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-            aria-hidden
-          >
-            ▲
-          </span>
-        </button>
-      </div>
+      <ExpandableDeckBar
+        cards={deckCards}
+        onRemove={handleRemoveCard}
+        onUndoCut={handleUndoCut}
+        onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
+        onSetQuantity={handleSetQuantity}
+        petCardNames={petCardNames}
+      />
     </div>
   );
 }

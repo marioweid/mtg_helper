@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
-import { CommandBar } from "@/components/command-bar";
+import { CardDetailModal } from "@/components/card-detail-modal";
 import { DeckCardSearch } from "@/components/deck-card-search";
+import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
 import { PlaytestStatsPanel } from "@/components/playtest/stats-panel";
-import { StatsModal } from "@/components/stats-modal";
+import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
-import type { DeckDetailResponse } from "@/lib/types";
+import type { DeckCardItem, DeckDetailResponse } from "@/lib/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -16,9 +17,10 @@ interface PageProps {
 
 export default function SimulatePage({ params }: PageProps) {
   const { id: deckId } = use(params);
+  const toast = useToast();
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [statsOpen, setStatsOpen] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const loadDeck = async () => {
     try {
@@ -46,7 +48,52 @@ export default function SimulatePage({ params }: PageProps) {
     };
   }, [deckId]);
 
-  const buildLabel = deck?.stage === "complete" ? "Edit deck" : "Continue building";
+  async function handleRemoveCard(scryfallId: string) {
+    try {
+      await apiClient.removeCard(deckId, scryfallId);
+      await loadDeck();
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Failed to remove card", "error");
+    }
+  }
+
+  async function handleSetQuantity(scryfallId: string, quantity: number) {
+    try {
+      if (quantity < 1) {
+        await apiClient.removeCard(deckId, scryfallId);
+      } else {
+        await apiClient.updateCardQuantity(deckId, scryfallId, quantity);
+      }
+      await loadDeck();
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Failed to update quantity", "error");
+    }
+  }
+
+  async function handleUndoCut(card: DeckCardItem) {
+    try {
+      await apiClient.addCard(deckId, {
+        card_scryfall_id: card.scryfall_id,
+        quantity: card.quantity,
+        categories: card.categories,
+        added_by: card.added_by === "ai" ? "ai" : "user",
+      });
+      await loadDeck();
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Failed to undo cut", "error");
+    }
+  }
+
+  async function handleSetCategories(scryfallId: string, categories: string[]) {
+    try {
+      await apiClient.updateCardCategories(deckId, scryfallId, categories);
+      await loadDeck();
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Failed to update categories", "error");
+    }
+  }
+
+  const selectedCard = deck?.cards.find((c) => c.deck_card_id === selectedCardId) ?? null;
 
   return (
     <div className="flex flex-col gap-4 pb-28">
@@ -76,21 +123,30 @@ export default function SimulatePage({ params }: PageProps) {
 
       <PlaytestStatsPanel deckId={deckId} />
 
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCardId(null)}
+        deckId={deckId}
+        onRemove={async (id) => {
+          await handleRemoveCard(id);
+          setSelectedCardId(null);
+        }}
+        onSetCategories={handleSetCategories}
+        onSwapped={async () => {
+          await loadDeck();
+          setSelectedCardId(null);
+        }}
+      />
+
       {deck && (
-        <StatsModal
-          open={statsOpen}
-          onClose={() => setStatsOpen(false)}
+        <ExpandableDeckBar
           cards={deck.cards}
-          minPriceCents={deck.min_price_cents}
-          maxPriceCents={deck.max_price_cents}
+          onRemove={handleRemoveCard}
+          onUndoCut={handleUndoCut}
+          onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
+          onSetQuantity={handleSetQuantity}
         />
       )}
-
-      <CommandBar
-        deckId={deckId}
-        buildLabel={buildLabel}
-        onOpenStats={() => setStatsOpen(true)}
-      />
     </div>
   );
 }
