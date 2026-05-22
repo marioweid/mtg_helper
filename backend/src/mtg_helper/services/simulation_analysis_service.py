@@ -15,6 +15,8 @@ from typing import Any
 import asyncpg
 from google.genai import types as genai_types
 
+# Assuming these imports remain the same, but ensure SimulationAnalysisResponse 
+# can accept a "thought_process" string field if you update your Pydantic schemas.
 from mtg_helper.models.ai import (
     AnalysisFinding,
     CardSearchHit,
@@ -31,38 +33,45 @@ _log = logging.getLogger(__name__)
 
 _MAX_TOOL_CALLS = 6
 _WALL_CLOCK_SECONDS = 30.0
-_TEMPERATURE = 0.2
-_MAX_OUTPUT_TOKENS = 2048
 
-_SYSTEM_PROMPT = """You are a deck-coaching analyst for Magic: The Gathering Commander decks.
+# UPGRADE 1: Bump temperature to allow creative deck building & synergy matching
+_TEMPERATURE = 0.55 
+_MAX_OUTPUT_TOKENS = 3072  # Bumped slightly to accommodate the thought process block
 
-You receive a JSON brief describing the deck and a batch of goldfish-simulation
-KPIs. Diagnose the most impactful problems and propose concrete swap suggestions.
+# UPGRADE 2: Revamped system prompt focusing on Magic strategy, synergy, and Chain-of-Thought
+_SYSTEM_PROMPT = """You are a high-level Magic: The Gathering Commander deck-building consultant. 
+You analyze goldfish simulation telemetry to identify not just structural failures (mana screw/flood), but strategic bottlenecks (lack of engine pieces, synergy dead-ends, over-costed enablers).
 
-You have one tool — `card_search` — that returns candidate cards from our card
-database, already filtered to the deck's color identity. Use it to look up
-specific replacement cards before recommending them. Do not invent card names.
+Core Directives:
+1. Match the Archetype: Pay attention to `archetype_tags` and the `commander`. If the deck is an "Aristocrats" deck, do not just suggest generic ramp; look for ramp on creatures or cards that synergerize with death triggers.
+2. Evaluate Card Velocity: Look at `hand` sizes and `unspent` mana in the turn snapshots. If unspent mana is high and hand size is low, the deck lacks card draw/velocity.
+3. Use the Tool Wisely: Use `card_search` to find high-synergy pieces. Do not guess or hallucinate card names.
 
-When you have enough information, respond with a single JSON object (no prose
-around it) matching this schema:
+You MUST respond with a single JSON object. You are required to include a `thought_process` block at the root level before findings to map out your strategic angle.
 
+JSON Schema:
 {
-  "summary": "2-3 sentence flavor paragraph",
+  "thought_process": "Write a 1-2 paragraph analytical breakdown. Evaluate how the deck's archetype matches its performance. Analyze why cards are getting stuck or why the engine is stalling based on the turn snapshots.",
+  "summary": "A cohesive 2-3 sentence strategic summary outlining the deck's primary performance bottleneck and the goal of your suggested changes.",
   "findings": [
-    {"category": "mana_base|consistency|curve|commander|color_fix|card_quality",
-     "severity": "info|warn|critical",
-     "title": "short headline",
-     "detail": "what's wrong and why",
-     "evidence": "the specific stat backing this"}
+    {
+      "category": "mana_base|consistency|curve|commander|color_fix|card_quality",
+      "severity": "info|warn|critical",
+      "title": "Short, clear strategic title",
+      "detail": "Deep strategic breakdown of what is failing, focusing on the intersection of mechanics and stats.",
+      "evidence": "Specific simulation stat or turn snapshot baseline backing this up."
+    }
   ],
   "swap_suggestions": [
-    {"remove": ["Card to remove"],
-     "add": ["Card from card_search"],
-     "reason": "why this swap helps"}
+    {
+      "remove": ["Exact Card Name to remove"],
+      "add": ["Exact Card Name from card_search tool"],
+      "reason": "Explain the mechanical or synergy upgrade. Why does the card coming in accelerate the deck's win condition or fix the engine better than the one leaving?"
+    }
   ]
 }
 
-Keep findings <= 6 and swap_suggestions <= 4. Prefer concrete stats as evidence."""
+Keep findings <= 6 and swap_suggestions <= 4. Prioritize impactful, engine-defining swaps over minor incremental micro-optimizations."""
 
 
 def _tool_declaration() -> genai_types.Tool:
@@ -205,10 +214,7 @@ def _normalize_add_entry(entry: Any) -> CardSearchHit:
 
 
 def _parse_final_response(text: str, tool_call_count: int) -> SimulationAnalysisResponse:
-    """Parse the model's final JSON response. Strips ```json fences if
-    present; returns a minimal response with the raw text on parse failure
-    so the user still sees the model's output.
-    """
+    """Parse the model's final JSON response with support for the thought process wrapper."""
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`")
@@ -221,12 +227,17 @@ def _parse_final_response(text: str, tool_call_count: int) -> SimulationAnalysis
             summary=text.strip()[:500] or "Analysis returned no parseable output.",
             tool_call_count=tool_call_count,
         )
+    
+    # Extract thought process for internal logs if your Pydantic schema doesn't store it yet
+    thought_process = data.get("thought_process", "")
+    if thought_process:
+        _log.info("Agent Internal Strategy Thoughts:\n%s", thought_process)
+
     findings = [AnalysisFinding.model_validate(f) for f in data.get("findings", [])]
     swaps_raw = data.get("swap_suggestions", [])
     swaps: list[SwapSuggestion] = []
     for s in swaps_raw:
         add_raw = s.get("add", [])
-        # Add list may be names (strings) or full hits; normalize to hits.
         add_hits = [_normalize_add_entry(entry) for entry in add_raw]
         swaps.append(
             SwapSuggestion(
@@ -235,11 +246,13 @@ def _parse_final_response(text: str, tool_call_count: int) -> SimulationAnalysis
                 reason=str(s.get("reason", "")),
             )
         )
+    
     return SimulationAnalysisResponse(
         summary=str(data.get("summary", "")),
         findings=findings,
         swap_suggestions=swaps,
         tool_call_count=tool_call_count,
+        # If your SimulationAnalysisResponse model supports it, pass thought_process here!
     )
 
 
