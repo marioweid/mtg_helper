@@ -73,7 +73,7 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
           href={`/decks/${deckId}/playtest`}
           className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-center text-sm text-gray-200 transition-colors hover:border-white/40 hover:text-white sm:flex-none"
         >
-          Playtest
+          Simulate
         </Link>
         <button
           type="button"
