@@ -577,8 +577,8 @@ function SwapRow({ swap }: { swap: AnalysisSwapSuggestion }) {
         <div>
           <p className="text-[10px] uppercase tracking-wide text-red-300">Remove</p>
           <ul className="mt-0.5 flex flex-col gap-0.5">
-            {swap.remove.map((name) => (
-              <li key={name} className="text-gray-300">
+            {swap.remove.map((name, i) => (
+              <li key={`${i}-${name}`} className="text-gray-300">
                 {name}
               </li>
             ))}
@@ -587,8 +587,8 @@ function SwapRow({ swap }: { swap: AnalysisSwapSuggestion }) {
         <div>
           <p className="text-[10px] uppercase tracking-wide text-emerald-300">Add</p>
           <ul className="mt-0.5 flex flex-col gap-0.5">
-            {swap.add.map((card) => (
-              <li key={card.name} className="text-gray-200">
+            {swap.add.map((card, i) => (
+              <li key={`${i}-${card.name}`} className="text-gray-200">
                 {card.name}
                 {card.mana_cost ? (
                   <span className="ml-1 text-[10px] text-gray-500">{card.mana_cost}</span>

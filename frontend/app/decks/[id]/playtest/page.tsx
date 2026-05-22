@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
 import { CommandBar } from "@/components/command-bar";
+import { DeckCardSearch } from "@/components/deck-card-search";
 import { PlaytestStatsPanel } from "@/components/playtest/stats-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { apiClient, ApiError } from "@/lib/api";
@@ -18,6 +19,15 @@ export default function SimulatePage({ params }: PageProps) {
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+
+  const loadDeck = async () => {
+    try {
+      const loaded = await apiClient.getDeck(deckId);
+      setDeck(loaded);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load deck");
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +71,8 @@ export default function SimulatePage({ params }: PageProps) {
           {error}
         </p>
       )}
+
+      <DeckCardSearch deckId={deckId} onAdded={() => void loadDeck()} />
 
       <PlaytestStatsPanel deckId={deckId} />
 

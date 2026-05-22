@@ -32,11 +32,11 @@ from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
-_MAX_TOOL_CALLS = 6
+_MAX_TOOL_CALLS = 10
 # request_limit counts every model request (initial + each tool round-trip),
 # so leave a margin above _MAX_TOOL_CALLS for the final structured response.
 _REQUEST_LIMIT = _MAX_TOOL_CALLS + 2
-_WALL_CLOCK_SECONDS = 30.0
+_WALL_CLOCK_SECONDS = 60.0
 
 _TEMPERATURE = 0.55
 _MAX_OUTPUT_TOKENS = 8192
@@ -56,9 +56,12 @@ Use these absolute baseline telemetry thresholds to evaluate deck health:
 --- INTERACTION FLOW ---
 1. You have access to the `card_search` tool. You CAN and SHOULD execute tool calls
    to find multi-color lands, mana rocks, or synergy pieces before making your
-   final judgment.
-2. Use the tool for at most six calls; budget them — each call narrows a specific
-   gap (e.g. one query per missing color, or one for ramp upgrades).
+   final judgment. The tool already excludes cards already in the deck (except
+   basic lands), so every hit is a real candidate.
+2. Use the tool for at most ten calls; budget them — each call narrows a specific
+   gap (e.g. one query per missing color, or one for ramp upgrades). Stop calling
+   the tool as soon as you have enough evidence; do not keep searching for
+   marginal upgrades.
 3. When you have enough evidence, return the final structured response. `summary`
    is 2–3 sentences, `findings` lists the strategic problems, and
    `swap_suggestions` proposes concrete swaps using exact card names from your
@@ -71,6 +74,7 @@ class _AnalysisDeps:
 
     pool: asyncpg.Pool
     deck_color_identity: list[str]
+    deck_card_names: list[str] = field(default_factory=list)
     tool_call_count: list[int] = field(default_factory=lambda: [0])
 
 
@@ -97,15 +101,28 @@ def _build_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
         ctx: RunContext[_AnalysisDeps], inp: CardSearchInput
     ) -> list[CardSearchHit]:
         """Search the card pool for replacement candidates. Always filtered
-        to the deck's color identity. Provide structural filters; up to
+        to the deck's color identity AND excludes cards already in the deck
+        (basic lands are allowed through). Provide structural filters; up to
         `limit` matching cards are returned.
         """
         ctx.deps.tool_call_count[0] += 1
-        return await search_cards(
+        call_idx = ctx.deps.tool_call_count[0]
+        call_started = time.monotonic()
+        hits = await search_cards(
             ctx.deps.pool,
             deck_color_identity=ctx.deps.deck_color_identity,
             inp=inp,
+            exclude_names=ctx.deps.deck_card_names,
         )
+        _log.info(
+            "card_search #%d returned %d hits in %.2fs (query=%r tags=%s)",
+            call_idx,
+            len(hits),
+            time.monotonic() - call_started,
+            inp.text_query,
+            inp.tags,
+        )
+        return hits
 
     return agent
 
@@ -201,9 +218,20 @@ async def analyze_simulation(
     a partial summary if the loop hit the request cap or wall-clock timeout.
     """
     agent = _get_agent()
-    deps = _AnalysisDeps(pool=pool, deck_color_identity=_deck_colors(deck))
+    deck_card_names = sorted({c.name for c in deck.cards})
+    deps = _AnalysisDeps(
+        pool=pool,
+        deck_color_identity=_deck_colors(deck),
+        deck_card_names=deck_card_names,
+    )
     prompt = _build_prompt(deck, stats)
     started = time.monotonic()
+    _log.info(
+        "analysis start: deck=%s cards=%d colors=%s",
+        deck.name,
+        len(deck_card_names),
+        deps.deck_color_identity,
+    )
     try:
         result = await asyncio.wait_for(
             agent.run(prompt, deps=deps, usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT)),
@@ -211,17 +239,37 @@ async def analyze_simulation(
         )
     except TimeoutError:
         elapsed = time.monotonic() - started
-        _log.warning("analysis wall-clock timeout after %.1fs", elapsed)
+        calls = deps.tool_call_count[0]
+        _log.warning("analysis wall-clock timeout: %.1fs elapsed, %d tool calls", elapsed, calls)
+        plural = "s" if calls != 1 else ""
         return SimulationAnalysisResponse(
-            summary="Analysis timed out before the agent produced a final response.",
-            tool_call_count=deps.tool_call_count[0],
+            summary=(
+                f"Analysis timed out after {elapsed:.0f}s and {calls} tool "
+                f"call{plural}. The agent was still searching when the "
+                f"{_WALL_CLOCK_SECONDS:.0f}s cap was reached — try again with "
+                "a smaller deck change or a narrower question."
+            ),
+            tool_call_count=calls,
         )
     except UsageLimitExceeded as exc:
-        _log.warning("analysis usage cap hit: %s", exc)
+        calls = deps.tool_call_count[0]
+        _log.warning("analysis usage cap hit: %s (%d tool calls)", exc, calls)
         return SimulationAnalysisResponse(
-            summary="Analysis exceeded the tool-call budget before finalizing.",
-            tool_call_count=deps.tool_call_count[0],
+            summary=(
+                f"Analysis exceeded the tool-call budget ({calls} calls) "
+                "before finalizing. The agent kept searching instead of "
+                "settling on a recommendation."
+            ),
+            tool_call_count=calls,
         )
+    elapsed = time.monotonic() - started
     output = result.output
     output.tool_call_count = deps.tool_call_count[0]
+    _log.info(
+        "analysis done: %.1fs, %d tool calls, %d findings, %d swaps",
+        elapsed,
+        output.tool_call_count,
+        len(output.findings),
+        len(output.swap_suggestions),
+    )
     return output

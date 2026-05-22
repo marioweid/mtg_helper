@@ -382,12 +382,6 @@ export default function BuildPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchAdded, setSearchAdded] = useState<Set<string>>(new Set());
-  const [promptInput, setPromptInput] = useState("");
-  const [promptSuggestions, setPromptSuggestions] = useState<CardSuggestion[]>([]);
-  const [promptStatuses, setPromptStatuses] = useState<Record<string, SuggestionStatus>>({});
-  const [promptQuantities, setPromptQuantities] = useState<Record<string, number>>({});
-  const [promptLoading, setPromptLoading] = useState(false);
-  const [promptOpen, setPromptOpen] = useState(false);
   const [basicLandQuantities, setBasicLandQuantities] = useState<Record<string, number>>(
     () => Object.fromEntries(BASIC_LAND_NAMES.map((n) => [n, 1])),
   );
@@ -821,74 +815,6 @@ export default function BuildPage() {
     }
   }
 
-  async function handlePromptSubmit() {
-    if (!promptInput.trim()) return;
-    setPromptLoading(true);
-    setPromptSuggestions([]);
-    setPromptStatuses({});
-    setPromptQuantities({});
-    try {
-      const result = await apiClient.suggestCards(deckId, promptInput.trim(), 10, {
-        card_types: cardTypeFilters,
-        subtypes: subtypeFilters,
-      });
-      setPromptSuggestions(result.suggestions);
-      const statuses: Record<string, SuggestionStatus> = {};
-      for (const s of result.suggestions) statuses[s.scryfall_id] = "pending";
-      setPromptStatuses(statuses);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to get suggestions");
-    } finally {
-      setPromptLoading(false);
-    }
-  }
-
-  async function handlePromptAccept(suggestion: CardSuggestion) {
-    setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "accepted" }));
-    const qty = isBasicLand(suggestion) ? (promptQuantities[suggestion.scryfall_id] ?? 1) : undefined;
-    try {
-      await apiClient.addCard(deckId, {
-        card_scryfall_id: suggestion.scryfall_id,
-        ...(qty !== undefined && { quantity: qty }),
-        categories: [suggestion.category],
-        added_by: "ai",
-        ai_reasoning: suggestion.reasoning,
-      });
-      void refreshDeck();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to add card");
-      setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "pending" }));
-    }
-  }
-
-  async function handlePromptReject(suggestion: CardSuggestion) {
-    setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "rejected" }));
-    setGlobalRejectedIds((prev) => {
-      const next = new Set(prev);
-      next.add(suggestion.scryfall_id);
-      return next;
-    });
-    setGlobalRejectedNames((prev) =>
-      prev.includes(suggestion.name) ? prev : [...prev, suggestion.name],
-    );
-    try {
-      await apiClient.addFeedback(deckId, { card_scryfall_id: suggestion.scryfall_id, feedback: "down" });
-    } catch {
-      /* non-critical */
-    }
-  }
-
-  async function handlePromptRemove(suggestion: CardSuggestion) {
-    setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "pending" }));
-    try {
-      await apiClient.removeCard(deckId, suggestion.scryfall_id);
-      void refreshDeck();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to remove card");
-      setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "accepted" }));
-    }
-  }
-
   async function handleSetQuantity(scryfallId: string, quantity: number) {
     try {
       if (quantity < 1) {
@@ -942,24 +868,6 @@ export default function BuildPage() {
     }
   }
 
-  async function handlePromptAddBack(suggestion: CardSuggestion) {
-    setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "accepted" }));
-    const qty = isBasicLand(suggestion) ? (promptQuantities[suggestion.scryfall_id] ?? 1) : undefined;
-    try {
-      await apiClient.addCard(deckId, {
-        card_scryfall_id: suggestion.scryfall_id,
-        ...(qty !== undefined && { quantity: qty }),
-        categories: [suggestion.category],
-        added_by: "ai",
-        ai_reasoning: suggestion.reasoning,
-      });
-      void refreshDeck();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to add card");
-      setPromptStatuses((prev) => ({ ...prev, [suggestion.scryfall_id]: "rejected" }));
-    }
-  }
-
   const activeStageState = state.stages[state.activeStage];
 
   function isHiddenCrossStage(s: CardSuggestion, status: SuggestionStatus): boolean {
@@ -975,12 +883,6 @@ export default function BuildPage() {
         return true;
       })
     : [];
-  const filteredPromptSuggestions = promptSuggestions.filter((s) => {
-    const status = promptStatuses[s.scryfall_id] ?? "pending";
-    if (isHiddenCrossStage(s, status)) return false;
-    return true;
-  });
-
   return (
     <div className="pb-24">
       {/* Header */}
@@ -1472,72 +1374,6 @@ export default function BuildPage() {
                   searchResults.length === 0 && (
                     <p className="mt-2 text-xs text-gray-500">No results.</p>
                   )}
-              </div>
-            )}
-          </div>
-
-          {/* Custom Prompt Suggestions */}
-          <div className="mb-4">
-            <button
-              onClick={() => setPromptOpen((v) => !v)}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              <span>Suggest cards</span>
-              <span className="text-xs">{promptOpen ? "▲" : "▼"}</span>
-            </button>
-            {promptOpen && (
-              <div className="mt-2 rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={promptInput}
-                    onChange={(e) => setPromptInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void handlePromptSubmit();
-                    }}
-                    placeholder="e.g. token doublers, graveyard recursion..."
-                    className="flex-1 rounded-lg bg-white/10 px-3 py-2 text-sm text-white
-                      placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                  <button
-                    onClick={() => void handlePromptSubmit()}
-                    disabled={promptLoading || !promptInput.trim()}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white
-                      hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                  >
-                    Suggest
-                  </button>
-                </div>
-                {promptLoading && (
-                  <p className="mt-3 text-xs text-gray-500">Generating suggestions...</p>
-                )}
-                {!promptLoading && promptSuggestions.length > 0 && (
-                  <div className="mt-3">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
-                      Custom Suggestions
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                      {filteredPromptSuggestions.map((s) => (
-                        <CardSuggestionCard
-                          key={s.scryfall_id}
-                          suggestion={s}
-                          status={promptStatuses[s.scryfall_id] ?? "pending"}
-                          onAccept={() => void handlePromptAccept(s)}
-                          onReject={() => void handlePromptReject(s)}
-                          onRemove={() => void handlePromptRemove(s)}
-                          onAddBack={() => void handlePromptAddBack(s)}
-                          isPetCard={petCardNames.has(s.name)}
-                          isBasicLand={isBasicLand(s)}
-                          inCombo={comboCardNames.has(s.name.toLowerCase())}
-                          quantity={promptQuantities[s.scryfall_id] ?? 1}
-                          onQuantityChange={(qty) =>
-                            setPromptQuantities((prev) => ({ ...prev, [s.scryfall_id]: qty }))
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>

@@ -13,6 +13,7 @@ import { DeckHistoryPanel } from "@/components/deck-history-panel";
 import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
 import { CommanderSection } from "@/components/commander-section";
+import { DeckCardSearch } from "@/components/deck-card-search";
 import { DeckCompactColumns } from "@/components/deck-compact-columns";
 import {
   applyDeckFilter,
@@ -295,6 +296,7 @@ export default function DeckDetailPage() {
                 bracket={deck.bracket}
                 onBracketChange={(b) => setDeck({ ...deck, bracket: b })}
               />
+              <DeckCardSearch deckId={deck.id} onAdded={() => void load()} />
               {deck.cards.length > 0 && (
                 <DeckFilterBar
                   value={filter}
