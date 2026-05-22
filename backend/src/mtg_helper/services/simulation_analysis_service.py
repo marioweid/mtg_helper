@@ -35,7 +35,7 @@ _MAX_TOOL_CALLS = 6
 _WALL_CLOCK_SECONDS = 30.0
 
 _TEMPERATURE = 0.55
-_MAX_OUTPUT_TOKENS = 4096  # Bumped slightly to accommodate the thought process block
+_MAX_OUTPUT_TOKENS = 8192  # Bumped slightly to accommodate the thought process block
 
 _SYSTEM_PROMPT = """You are a high-level Magic: The Gathering Commander deck-building consultant.
 You analyze goldfish simulation telemetry to identify strategic and structural bottlenecks.
