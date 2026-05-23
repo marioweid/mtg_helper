@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DeckBrowserPanel } from "@/components/deck-browser-panel";
+import { DeckCardSearch } from "@/components/deck-card-search";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import type { DeckCardItem } from "@/lib/types";
 
@@ -17,6 +18,10 @@ interface Props {
   commander?: { type_line: string | null } | null;
   /** Target card count for the breakdown bar. Defaults to 100 (Commander). */
   target?: number;
+  /** When provided, shows an "Add card" search inside the open panel. */
+  deckId?: string;
+  /** Called after a card is added via the embedded search. */
+  onCardAdded?: () => void;
 }
 
 /**
@@ -36,8 +41,11 @@ export function ExpandableDeckBar({
   petCardNames,
   commander,
   target = 100,
+  deckId,
+  onCardAdded,
 }: Props) {
   const [open, setOpenState] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const setOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
     setOpenState((prev) => {
@@ -60,13 +68,33 @@ export function ExpandableDeckBar({
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open, setOpen]);
+
   return (
     <div
+      ref={rootRef}
       className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-zinc-950/90 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {open && (
         <div className="mx-auto max-w-5xl border-b border-white/10 px-4 pt-3">
+          {deckId && (
+            <div className="mb-3">
+              <DeckCardSearch
+                deckId={deckId}
+                {...(onCardAdded && { onAdded: onCardAdded })}
+              />
+            </div>
+          )}
           <div className="h-[70vh] max-h-[640px]">
             <DeckBrowserPanel
               cards={cards}
@@ -79,22 +107,31 @@ export function ExpandableDeckBar({
           </div>
         </div>
       )}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
         aria-expanded={open}
         aria-label={open ? "Collapse deck browser" : "Expand deck browser"}
-        className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+        className="w-full cursor-pointer hover:bg-white/5 transition-colors"
       >
-        <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
-        <span
-          className="shrink-0 text-gray-400 transition-transform"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-          aria-hidden
-        >
-          ▲
-        </span>
-      </button>
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left">
+          <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
+          <span
+            className="shrink-0 text-gray-400 transition-transform"
+            style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+            aria-hidden
+          >
+            ▲
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

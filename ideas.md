@@ -1,10 +1,7 @@
 # Next Features
 
-- the expandable bar in the bottom of the deck build and simulation page should collapse again if you click at the page below. also it should expand when clicked anywhere in the bar not only in the small area.
-- i want the search from the build page move to the deck view expandable bar in the bottom
-
 - Bild steps should be:
-  - theme: no target
+  - theme: no target (also contains old utility and bangers)
   - Ramp: 12
   - draw: 12
   - interaction: 12
@@ -15,6 +12,7 @@
     - board wipes
     - etc.
   - Lands: 38
+- Tags can be migrated from the all old ones to the new interaction one and the pipeline should tag with the new one from now on, no backward compatibility needed
 
 - migrate all agents to pydantic ai
 

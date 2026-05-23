@@ -4,7 +4,6 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
 import { CardDetailModal } from "@/components/card-detail-modal";
-import { DeckCardSearch } from "@/components/deck-card-search";
 import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
 import { PlaytestStatsPanel } from "@/components/playtest/stats-panel";
 import { useToast } from "@/components/toast";
@@ -119,8 +118,6 @@ export default function SimulatePage({ params }: PageProps) {
         </p>
       )}
 
-      <DeckCardSearch deckId={deckId} onAdded={() => void loadDeck()} />
-
       <PlaytestStatsPanel deckId={deckId} />
 
       <CardDetailModal
@@ -146,6 +143,8 @@ export default function SimulatePage({ params }: PageProps) {
           onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
           onSetQuantity={handleSetQuantity}
           commander={deck.commander_card}
+          deckId={deckId}
+          onCardAdded={() => void loadDeck()}
         />
       )}
     </div>
