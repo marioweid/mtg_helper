@@ -10,7 +10,7 @@ import {
   type DeckFilter,
 } from "@/components/deck-filter-bar";
 import { STAGE_LABELS } from "@/lib/constants";
-import { bucketsFor, type DeckCardItem, totalCardCount } from "@/lib/types";
+import { bucketsFor, type CardResponse, type DeckCardItem, totalCardCount } from "@/lib/types";
 
 type GroupMode = "type" | "tag" | "flat";
 
@@ -30,6 +30,9 @@ interface Props {
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
+  /** When set, the filter input also searches the card pool and lets the user add matches. */
+  onAddCard?: (card: CardResponse) => void | Promise<void>;
+  commanderLegal?: boolean;
 }
 
 function CardRow({
@@ -102,6 +105,8 @@ export function DeckBrowserPanel({
   onSetQuantity,
   petCardNames,
   comboCardIds,
+  onAddCard,
+  commanderLegal,
 }: Props) {
   const [filter, setFilter] = useState<DeckFilter>({
     query: "",
@@ -184,6 +189,8 @@ export function DeckBrowserPanel({
         onChange={setFilter}
         resultCount={totalCardCount(filtered)}
         totalCount={total}
+        {...(onAddCard ? { onAddCard } : {})}
+        {...(commanderLegal ? { commanderLegal } : {})}
       />
 
       <div className="-mr-1 flex-1 overflow-y-auto pr-1">

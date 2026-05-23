@@ -16,10 +16,7 @@ from typing import Any
 
 import asyncpg
 from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
 
-from mtg_helper.config import settings
 from mtg_helper.models.ai import (
     CardSearchHit,
     CardSearchInput,
@@ -27,6 +24,7 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestStats
+from mtg_helper.services.agents._model import make_google_model
 from mtg_helper.services.card_search_tool import search_cards
 from mtg_helper.services.llm_client import LLMClient
 
@@ -108,10 +106,8 @@ def _build_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
     """Construct the analysis agent. Re-built per process (cheap) so the API
     key from settings is captured at the time the app boots.
     """
-    provider = GoogleProvider(api_key=settings.gemini_api_key)
-    model = GoogleModel(settings.chat_model, provider=provider)
     agent = Agent[_AnalysisDeps, SimulationAnalysisResponse](
-        model=model,
+        model=make_google_model(),
         deps_type=_AnalysisDeps,
         output_type=SimulationAnalysisResponse,
         system_prompt=_SYSTEM_PROMPT,

@@ -54,14 +54,13 @@ def _make_candidate(
     )
 
 
-def _make_ai_client(response_text: str = "[]") -> MagicMock:
-    """Build a mock LLMClient (used for embeddings and chat)."""
+def _make_ai_client() -> MagicMock:
+    """Build a mock LLMClient (embeddings only after the agent migration)."""
 
     async def _embed(texts: list[str], **_: object) -> list[list[float]]:
         return [[0.0] * 1536 for _ in texts]
 
     ai = MagicMock()
-    ai.chat = AsyncMock(return_value=response_text)
     ai.embed = AsyncMock(side_effect=_embed)
     return ai
 

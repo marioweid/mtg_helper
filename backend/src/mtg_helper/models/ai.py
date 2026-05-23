@@ -3,7 +3,7 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class BuildRequest(BaseModel):
@@ -235,7 +235,8 @@ class KeywordExtractResponse(BaseModel):
 
     ``archetype_tags`` is the running set of canonical keywords the agent has
     inferred from the conversation. The frontend mirrors them as live chips so
-    the user can refine selection mid-conversation.
+    the user can refine selection mid-conversation. Unknown tags are silently
+    dropped — see :meth:`_filter_known_archetype_tags`.
     """
 
     reply: str
@@ -243,3 +244,25 @@ class KeywordExtractResponse(BaseModel):
     archetype_tags: list[str] = Field(default_factory=list)
     suggested_name: str | None = None
     stage_targets: dict[str, int] | None = None
+
+    @field_validator("archetype_tags", mode="after")
+    @classmethod
+    def _filter_known_archetype_tags(cls, value: list[str]) -> list[str]:
+        """Drop tags outside the agent's archetype/tribal vocab; preserve order."""
+        from mtg_helper.services.agents.extract_agent import KEYWORD_VOCAB
+        from mtg_helper.services.tag_service import _TRIBAL_SUBTYPES
+
+        allowed_archetypes = set(KEYWORD_VOCAB)
+        allowed_tribes = {f"{s.lower()}_tribal" for s in _TRIBAL_SUBTYPES}
+        seen: set[str] = set()
+        out: list[str] = []
+        for item in value:
+            if not isinstance(item, str):
+                continue
+            tag = item.strip().lower()
+            if tag in seen:
+                continue
+            if tag in allowed_archetypes or tag in allowed_tribes:
+                seen.add(tag)
+                out.append(tag)
+        return out

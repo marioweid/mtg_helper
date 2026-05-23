@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DeckBrowserPanel } from "@/components/deck-browser-panel";
-import { DeckCardSearch } from "@/components/deck-card-search";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
-import type { DeckCardItem } from "@/lib/types";
+import { useToast } from "@/components/toast";
+import { apiClient, ApiError } from "@/lib/api";
+import type { CardResponse, DeckCardItem } from "@/lib/types";
 
 interface Props {
   cards: DeckCardItem[];
@@ -18,9 +19,9 @@ interface Props {
   commander?: { type_line: string | null } | null;
   /** Target card count for the breakdown bar. Defaults to 100 (Commander). */
   target?: number;
-  /** When provided, shows an "Add card" search inside the open panel. */
+  /** When provided, the merged filter+search input can add cards to this deck. */
   deckId?: string;
-  /** Called after a card is added via the embedded search. */
+  /** Called after a card is added via the merged search. */
   onCardAdded?: () => void;
 }
 
@@ -46,6 +47,7 @@ export function ExpandableDeckBar({
 }: Props) {
   const [open, setOpenState] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   const setOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
     setOpenState((prev) => {
@@ -79,6 +81,24 @@ export function ExpandableDeckBar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, setOpen]);
 
+  const handleAddCard = useCallback(
+    async (card: CardResponse) => {
+      if (!deckId) return;
+      try {
+        await apiClient.addCard(deckId, {
+          card_scryfall_id: card.scryfall_id,
+          quantity: 1,
+          added_by: "user",
+        });
+        toast.push(`Added ${card.name}`, "success");
+        onCardAdded?.();
+      } catch (err) {
+        toast.push(err instanceof ApiError ? err.message : "Failed to add card", "error");
+      }
+    },
+    [deckId, onCardAdded, toast],
+  );
+
   return (
     <div
       ref={rootRef}
@@ -87,14 +107,6 @@ export function ExpandableDeckBar({
     >
       {open && (
         <div className="mx-auto max-w-5xl border-b border-white/10 px-4 pt-3">
-          {deckId && (
-            <div className="mb-3">
-              <DeckCardSearch
-                deckId={deckId}
-                {...(onCardAdded && { onAdded: onCardAdded })}
-              />
-            </div>
-          )}
           <div className="h-[70vh] max-h-[640px]">
             <DeckBrowserPanel
               cards={cards}
@@ -103,6 +115,7 @@ export function ExpandableDeckBar({
               {...(onCardClick && { onCardClick })}
               {...(onSetQuantity && { onSetQuantity })}
               {...(petCardNames && { petCardNames })}
+              {...(deckId ? { onAddCard: handleAddCard, commanderLegal: true } : {})}
             />
           </div>
         </div>

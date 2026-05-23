@@ -23,15 +23,11 @@ TEST_DB_URL = os.environ.get(
 )
 
 
-def make_mock_llm_client(chat_text: str = "[]") -> "object":
-    """Build a mock LLMClient with `chat` and `embed` async methods.
-
-    Args:
-        chat_text: Text that `chat()` returns.
+def make_mock_llm_client() -> "object":
+    """Build a mock LLMClient with an async ``embed`` method.
 
     Returns:
-        MagicMock whose `.chat` returns `chat_text` and `.embed` returns one
-        1536-dim zero vector per input.
+        MagicMock whose ``.embed`` returns one 1536-dim zero vector per input.
     """
     from unittest.mock import AsyncMock, MagicMock
 
@@ -39,7 +35,6 @@ def make_mock_llm_client(chat_text: str = "[]") -> "object":
         return [[0.0] * 1536 for _ in texts]
 
     ai = MagicMock()
-    ai.chat = AsyncMock(return_value=chat_text)
     ai.embed = AsyncMock(side_effect=_embed)
     return ai
 

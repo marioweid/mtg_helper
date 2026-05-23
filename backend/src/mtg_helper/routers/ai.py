@@ -24,6 +24,7 @@ from mtg_helper.models.common import DataResponse
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
 from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
+    agents,
     ai_service,
     deck_service,
     mana_base_service,
@@ -32,7 +33,8 @@ from mtg_helper.services import (
     simulation_analysis_service,
     swap_service,
 )
-from mtg_helper.services.ai_service import DeckNotFoundError, LLMEmptyResponseError
+from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
+from mtg_helper.services.ai_service import DeckNotFoundError
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
 from mtg_helper.services.swap_service import SwapError
 
@@ -43,13 +45,6 @@ CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
 _DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
 _PLAYTEST_LIMIT = (20, 60)  # 20 sim runs / 60 seconds — CPU-bound, cap abuse
 _ANALYZE_LIMIT = (5, 60)  # 5 analyses / 60 seconds — LLM + multiple tool calls
-
-
-def _llm_unavailable(detail: str) -> HTTPException:
-    return HTTPException(
-        status_code=502,
-        detail={"code": "LLM_EMPTY_RESPONSE", "message": detail},
-    )
 
 
 def _require_email(account: AccountResponse) -> str:
@@ -256,19 +251,16 @@ async def describe_deck(
     """Run one turn of the deck description agent to build a structured deck strategy."""
     _enforce_rate_limit(account, "describe", _DESCRIBE_LIMIT)
     try:
-        result = await ai_service.describe_deck(
+        result = await agents.describe_turn(
             request.app.state.db_pool,
-            request.app.state.ai_client,
             body.commander_scryfall_id,
             body.partner_scryfall_id,
             body.bracket,
             [{"role": m.role, "content": m.content} for m in body.history],
             body.message,
         )
-    except DeckNotFoundError as e:
+    except CommanderNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
-    except LLMEmptyResponseError as e:
-        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 
@@ -285,19 +277,16 @@ async def extract_keywords(
     """
     _enforce_rate_limit(account, "extract_keywords", _DESCRIBE_LIMIT)
     try:
-        result = await ai_service.extract_keywords(
+        result = await agents.extract_turn(
             request.app.state.db_pool,
-            request.app.state.ai_client,
             body.commander_scryfall_id,
             body.partner_scryfall_id,
             body.bracket,
             [{"role": m.role, "content": m.content} for m in body.history],
             body.message,
         )
-    except DeckNotFoundError as e:
+    except CommanderNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
-    except LLMEmptyResponseError as e:
-        raise _llm_unavailable(str(e))
     return DataResponse(data=result)
 
 

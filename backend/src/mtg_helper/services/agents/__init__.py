@@ -1,0 +1,12 @@
+"""LLM-driven agents built on pydantic-ai.
+
+Each agent module owns its dependency dataclass, system-prompt builder, and
+a public driver coroutine the routers call. All three agents in the
+application (describe, extract, simulation analysis) share
+``_model.make_google_model`` so model construction stays consistent.
+"""
+
+from mtg_helper.services.agents.describe_agent import describe_turn
+from mtg_helper.services.agents.extract_agent import extract_turn
+
+__all__ = ["describe_turn", "extract_turn"]
