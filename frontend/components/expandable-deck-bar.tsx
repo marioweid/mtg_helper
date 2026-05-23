@@ -17,7 +17,11 @@ interface Props {
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
   /** Commander card. Counts as +1 toward the deck total in the breakdown. */
-  commander?: { type_line: string | null; name?: string | null } | null;
+  commander?: {
+    type_line: string | null;
+    name?: string | null;
+    game_changer?: boolean;
+  } | null;
   /** Target card count for the breakdown bar. Defaults to 100 (Commander). */
   target?: number;
   /** Declared deck bracket (1-4). Drives the Game Changer cap badge. */
@@ -143,7 +147,11 @@ export function ExpandableDeckBar({
           <GameChangerBadge
             cards={cards}
             bracket={bracket ?? null}
-            commanderName={commander?.name ?? null}
+            commander={
+              commander?.name
+                ? { name: commander.name, game_changer: commander.game_changer ?? false }
+                : null
+            }
           />
           <span
             className="shrink-0 text-gray-400 transition-transform"

@@ -9,7 +9,7 @@ import type { DeckCardItem } from "@/lib/types";
 interface Props {
   cards: readonly DeckCardItem[];
   bracket: number | null | undefined;
-  commanderName?: string | null;
+  commander?: { name: string; game_changer: boolean } | null;
   /** Compact = no leading label. Useful inside dense headers. */
   compact?: boolean;
 }
@@ -19,8 +19,8 @@ interface Props {
  * reveals the matching card names. Brackets 1/2 cap at 0, bracket 3 at 3,
  * bracket 4 is unlimited (shown as ``∞``).
  */
-export function GameChangerBadge({ cards, bracket, commanderName, compact }: Props) {
-  const matches = findGameChangers(cards, commanderName);
+export function GameChangerBadge({ cards, bracket, commander, compact }: Props) {
+  const matches = findGameChangers(cards, commander ?? null);
   const count = matches.length;
   const limit = gameChangerLimit(bracket);
   const overLimit = limit != null && count > limit;
@@ -52,13 +52,13 @@ export function GameChangerBadge({ cards, bracket, commanderName, compact }: Pro
         {matches.length === 0 ? (
           <span className="text-gray-400">None in deck.</span>
         ) : (
-          <ul className="space-y-0.5">
+          <span className="flex flex-col gap-0.5">
             {matches.map((name) => (
-              <li key={name} className="truncate">
+              <span key={name} className="truncate">
                 {name}
-              </li>
+              </span>
             ))}
-          </ul>
+          </span>
         )}
       </span>
     </span>

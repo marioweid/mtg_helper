@@ -30,6 +30,7 @@ class CardResponse(BaseModel):
     set_code: str | None
     released_at: date | None
     edhrec_rank: int | None
+    game_changer: bool = False
 
 
 class CardSearchParams(BaseModel):

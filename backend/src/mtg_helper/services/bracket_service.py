@@ -15,49 +15,6 @@ from mtg_helper.models.brackets import BracketValidationResponse, BracketViolati
 from mtg_helper.models.combos import ComboListResponse
 from mtg_helper.models.decks import DeckDetailResponse
 
-# Curated WotC "Game Changers" list (Commander Bracket System). Names are
-# matched case-insensitively against the deck's card list and the commander.
-GAME_CHANGERS: frozenset[str] = frozenset(
-    {
-        "Ancient Tomb",
-        "Bolas's Citadel",
-        "Chrome Mox",
-        "Coalition Victory",
-        "Cyclonic Rift",
-        "Demonic Tutor",
-        "Dockside Extortionist",
-        "Drannith Magistrate",
-        "Enlightened Tutor",
-        "Field of the Dead",
-        "Gaea's Cradle",
-        "Glacial Chasm",
-        "Grim Monolith",
-        "Imperial Seal",
-        "Jeweled Lotus",
-        "Kinnan, Bonder Prodigy",
-        "Lion's Eye Diamond",
-        "Mana Crypt",
-        "Mana Vault",
-        "Mox Diamond",
-        "Mox Opal",
-        "Mystical Tutor",
-        "Opposition Agent",
-        "Ragavan, Nimble Pilferer",
-        "Rhystic Study",
-        "Serra's Sanctum",
-        "Smothering Tithe",
-        "Tergrid, God of Fright",
-        "Thassa's Oracle",
-        "The One Ring",
-        "The Tabernacle at Pendrell Vale",
-        "Trouble in Pairs",
-        "Underworld Breach",
-        "Vampiric Tutor",
-        "Winota, Joiner of Forces",
-        "Yuriko, the Tiger's Shadow",
-    }
-)
-
 # Mass land destruction — board wipes of lands and similar effects.
 MASS_LAND_DESTRUCTION: frozenset[str] = frozenset(
     {
@@ -138,6 +95,19 @@ def _two_card_active_combos(combos: ComboListResponse | None) -> list[list[str]]
             continue
         result.append([p.card.name for p in combo.pieces])
     return result
+
+
+def _game_changer_hits(deck: DeckDetailResponse) -> list[str]:
+    """Game Changer cards (and commanders) currently in the deck, sorted."""
+    hits: set[str] = set()
+    for card in deck.cards:
+        if card.game_changer and card.name:
+            hits.add(card.name)
+    if deck.commander_card and deck.commander_card.game_changer:
+        hits.add(deck.commander_card.name)
+    if deck.partner_card and deck.partner_card.game_changer:
+        hits.add(deck.partner_card.name)
+    return sorted(hits)
 
 
 def _check_game_changers(hits: list[str], declared: int) -> BracketViolation | None:
@@ -226,7 +196,7 @@ def validate_bracket(
     names_in_deck = _normalize_names(deck)
 
     candidates = [
-        _check_game_changers(_match(names_in_deck, GAME_CHANGERS), declared),
+        _check_game_changers(_game_changer_hits(deck), declared),
         _check_mld(_match(names_in_deck, MASS_LAND_DESTRUCTION), declared),
         _check_fast_mana(_match(names_in_deck, FAST_MANA), declared),
         _check_infinite_combos(_two_card_active_combos(combos), declared),

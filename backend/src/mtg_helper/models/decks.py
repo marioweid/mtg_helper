@@ -96,6 +96,7 @@ class DeckCardItem(BaseModel):
     power: int | None = None
     price_eur_cents: int | None = None
     owned_in: list[CollectionMembership] = Field(default_factory=list)
+    game_changer: bool = False
 
 
 class CommanderCardSummary(BaseModel):
@@ -113,6 +114,7 @@ class CommanderCardSummary(BaseModel):
     color_identity: list[str] = Field(default_factory=list)
     power: int | None = None
     tags: list[str] = Field(default_factory=list)
+    game_changer: bool = False
 
 
 class DeckDetailResponse(BaseModel):

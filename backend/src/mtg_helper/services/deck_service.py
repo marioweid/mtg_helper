@@ -141,6 +141,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         tags=tags,
         power=power,
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
+        game_changer=bool(row["game_changer"]) if "game_changer" in row.keys() else False,
     )
 
 
@@ -398,7 +399,7 @@ async def _fetch_commander_summary(
     """Load minimal card fields for the deck detail commander preview."""
     row = await conn.fetchrow(
         "SELECT id, name, mana_cost, cmc, type_line, oracle_text, image_uri, "
-        "color_identity, power, tags "
+        "color_identity, power, tags, game_changer "
         "FROM cards WHERE id = $1",
         card_id,
     )
@@ -415,6 +416,7 @@ async def _fetch_commander_summary(
         color_identity=list(row["color_identity"] or []),
         power=_parse_power(row["power"]),
         tags=list(row["tags"] or []),
+        game_changer=bool(row["game_changer"]),
     )
 
 

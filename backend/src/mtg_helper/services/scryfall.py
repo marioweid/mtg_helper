@@ -129,6 +129,7 @@ def _map_card(card: dict[str, Any]) -> dict[str, Any]:
         "subtypes": subtypes,
         "border_color": card.get("border_color"),
         "security_stamp": card.get("security_stamp"),
+        "game_changer": bool(card.get("game_changer", False)),
     }
 
 
@@ -214,10 +215,10 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
             scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
             color_identity, colors, keywords, power, toughness, legalities,
             image_uri, prices, rarity, set_code, released_at, edhrec_rank,
-            card_types, subtypes, border_color, security_stamp, updated_at
+            card_types, subtypes, border_color, security_stamp, game_changer, updated_at
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, now()
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, now()
         )
         ON CONFLICT (scryfall_id) DO UPDATE SET
             oracle_id      = EXCLUDED.oracle_id,
@@ -242,6 +243,7 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
             subtypes       = EXCLUDED.subtypes,
             border_color   = EXCLUDED.border_color,
             security_stamp = EXCLUDED.security_stamp,
+            game_changer   = EXCLUDED.game_changer,
             updated_at     = now()
         """,
         [
@@ -269,6 +271,7 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
                 c["subtypes"],
                 c["border_color"],
                 c["security_stamp"],
+                c["game_changer"],
             )
             for c in batch
         ],

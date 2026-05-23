@@ -1,67 +1,19 @@
 import type { DeckCardItem } from "@/lib/types";
 
 /**
- * WotC Commander Bracket "Game Changers" list. Mirrors
- * ``backend/src/mtg_helper/services/bracket_service.py``. Keep in sync.
+ * Names of Game Changer cards in ``cards`` (and optional commander), sorted.
+ * Authoritative source is the per-card ``game_changer`` flag synced from
+ * Scryfall, so this stays current automatically.
  */
-export const GAME_CHANGERS: ReadonlySet<string> = new Set([
-  "Ancient Tomb",
-  "Bolas's Citadel",
-  "Chrome Mox",
-  "Coalition Victory",
-  "Cyclonic Rift",
-  "Demonic Tutor",
-  "Dockside Extortionist",
-  "Drannith Magistrate",
-  "Enlightened Tutor",
-  "Field of the Dead",
-  "Gaea's Cradle",
-  "Glacial Chasm",
-  "Grim Monolith",
-  "Imperial Seal",
-  "Jeweled Lotus",
-  "Kinnan, Bonder Prodigy",
-  "Lion's Eye Diamond",
-  "Mana Crypt",
-  "Mana Vault",
-  "Mox Diamond",
-  "Mox Opal",
-  "Mystical Tutor",
-  "Opposition Agent",
-  "Ragavan, Nimble Pilferer",
-  "Rhystic Study",
-  "Serra's Sanctum",
-  "Smothering Tithe",
-  "Tergrid, God of Fright",
-  "Thassa's Oracle",
-  "The One Ring",
-  "The Tabernacle at Pendrell Vale",
-  "Trouble in Pairs",
-  "Underworld Breach",
-  "Vampiric Tutor",
-  "Winota, Joiner of Forces",
-  "Yuriko, the Tiger's Shadow",
-]);
-
-const LOWER_GAME_CHANGERS: ReadonlySet<string> = new Set(
-  [...GAME_CHANGERS].map((n) => n.toLowerCase()),
-);
-
-export function isGameChanger(name: string | null | undefined): boolean {
-  if (!name) return false;
-  return LOWER_GAME_CHANGERS.has(name.toLowerCase());
-}
-
-/** Names from ``cards`` (and optional commander) that are Game Changers, sorted. */
 export function findGameChangers(
   cards: readonly DeckCardItem[],
-  commanderName?: string | null,
+  commander?: { name: string; game_changer: boolean } | null,
 ): string[] {
   const matches = new Set<string>();
   for (const c of cards) {
-    if (isGameChanger(c.name)) matches.add(c.name);
+    if (c.game_changer) matches.add(c.name);
   }
-  if (commanderName && isGameChanger(commanderName)) matches.add(commanderName);
+  if (commander?.game_changer) matches.add(commander.name);
   return [...matches].sort((a, b) => a.localeCompare(b));
 }
 

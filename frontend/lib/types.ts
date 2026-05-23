@@ -37,6 +37,7 @@ export interface CardResponse {
   image_uri: string | null;
   rarity: string | null;
   commander_legal: boolean;
+  game_changer: boolean;
 }
 
 // Decks
@@ -91,6 +92,7 @@ export interface DeckCardItem {
   tags: string[];
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
+  game_changer: boolean;
 }
 
 export interface CommanderCardSummary {
@@ -101,6 +103,7 @@ export interface CommanderCardSummary {
   oracle_text: string | null;
   image_uri: string | null;
   color_identity: string[];
+  game_changer: boolean;
 }
 
 export interface DeckDetailResponse {

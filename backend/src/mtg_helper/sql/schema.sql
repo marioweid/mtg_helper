@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS cards (
     token_types     TEXT[] NOT NULL DEFAULT '{}',
     border_color    TEXT,
     security_stamp  TEXT,
+    game_changer    BOOLEAN NOT NULL DEFAULT false,
     embedded_at     TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -248,6 +249,7 @@ CREATE INDEX IF NOT EXISTS idx_collection_cards_card ON collection_cards(card_id
 -- ============================================================
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS security_stamp TEXT;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS game_changer BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE deck_feedback ADD COLUMN IF NOT EXISTS reject_count INT NOT NULL DEFAULT 0;
 ALTER TABLE deck_feedback DROP CONSTRAINT IF EXISTS deck_feedback_feedback_check;
@@ -415,6 +417,7 @@ SELECT
         WHEN (c.prices->>'eur') IS NULL THEN NULL
         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
     END           AS price_eur_cents,
-    c.power
+    c.power,
+    c.game_changer
 FROM deck_cards dc
 JOIN cards c ON dc.card_id = c.id;

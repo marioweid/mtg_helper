@@ -41,6 +41,7 @@ def _row_to_card(row: asyncpg.Record) -> CardResponse:
         set_code=row["set_code"],
         released_at=row["released_at"],
         edhrec_rank=row["edhrec_rank"],
+        game_changer=bool(row["game_changer"]),
     )
 
 

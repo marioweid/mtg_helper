@@ -308,7 +308,7 @@ export default function DeckDetailPage() {
                 <GameChangerBadge
                   cards={deck.cards}
                   bracket={deck.bracket}
-                  commanderName={deck.commander_card?.name ?? null}
+                  commander={deck.commander_card}
                 />
               </div>
               <DeckCardSearch deckId={deck.id} onAdded={() => void load()} />
