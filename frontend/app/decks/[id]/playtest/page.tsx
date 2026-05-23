@@ -143,6 +143,7 @@ export default function SimulatePage({ params }: PageProps) {
           onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
           onSetQuantity={handleSetQuantity}
           commander={deck.commander_card}
+          bracket={deck.bracket}
           deckId={deckId}
           onCardAdded={() => void loadDeck()}
         />

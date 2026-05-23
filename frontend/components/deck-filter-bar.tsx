@@ -135,9 +135,7 @@ export function DeckFilterBar({
           onFocus={() => {
             if (poolResults.length > 0) setPoolOpen(true);
           }}
-          placeholder={
-            onAddCard ? "Filter deck or search to add…" : "Filter by name or text…"
-          }
+          placeholder={onAddCard ? "Filter deck or search to add…" : "Filter by name…"}
           className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-indigo-400 focus:outline-none"
         />
         {onAddCard && poolLoading && (
@@ -230,11 +228,7 @@ export function DeckFilterBar({
 export function applyDeckFilter(cards: DeckCardItem[], filter: DeckFilter): DeckCardItem[] {
   const q = filter.query.trim().toLowerCase();
   const filtered = cards.filter((c) => {
-    if (q) {
-      const name = c.name.toLowerCase();
-      const text = (c.oracle_text ?? "").toLowerCase();
-      if (!name.includes(q) && !text.includes(q)) return false;
-    }
+    if (q && !c.name.toLowerCase().includes(q)) return false;
     if (filter.colors.length > 0) {
       const ci = c.color_identity ?? [];
       const wantsColorless = filter.colors.includes("C");

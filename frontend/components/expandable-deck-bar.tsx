@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DeckBrowserPanel } from "@/components/deck-browser-panel";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
+import { GameChangerBadge } from "@/components/game-changer-badge";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
 import type { CardResponse, DeckCardItem } from "@/lib/types";
@@ -16,9 +17,11 @@ interface Props {
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
   /** Commander card. Counts as +1 toward the deck total in the breakdown. */
-  commander?: { type_line: string | null } | null;
+  commander?: { type_line: string | null; name?: string | null } | null;
   /** Target card count for the breakdown bar. Defaults to 100 (Commander). */
   target?: number;
+  /** Declared deck bracket (1-4). Drives the Game Changer cap badge. */
+  bracket?: number | null;
   /** When provided, the merged filter+search input can add cards to this deck. */
   deckId?: string;
   /** Called after a card is added via the merged search. */
@@ -42,6 +45,7 @@ export function ExpandableDeckBar({
   petCardNames,
   commander,
   target = 100,
+  bracket,
   deckId,
   onCardAdded,
 }: Props) {
@@ -136,6 +140,11 @@ export function ExpandableDeckBar({
       >
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left">
           <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
+          <GameChangerBadge
+            cards={cards}
+            bracket={bracket ?? null}
+            commanderName={commander?.name ?? null}
+          />
           <span
             className="shrink-0 text-gray-400 transition-transform"
             style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}

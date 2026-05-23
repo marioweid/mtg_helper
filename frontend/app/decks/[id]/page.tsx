@@ -24,6 +24,7 @@ import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
 import { DeckScorecard } from "@/components/deck-scorecard";
 import { DeckStats } from "@/components/deck-stats";
+import { GameChangerBadge } from "@/components/game-changer-badge";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
 import { StatsModal } from "@/components/stats-modal";
@@ -296,11 +297,20 @@ export default function DeckDetailPage() {
                   })}
                 </div>
               )}
-              <BracketSelector
-                deckId={deck.id}
-                bracket={deck.bracket}
-                onBracketChange={(b) => setDeck({ ...deck, bracket: b })}
-              />
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="flex-1 min-w-[220px]">
+                  <BracketSelector
+                    deckId={deck.id}
+                    bracket={deck.bracket}
+                    onBracketChange={(b) => setDeck({ ...deck, bracket: b })}
+                  />
+                </div>
+                <GameChangerBadge
+                  cards={deck.cards}
+                  bracket={deck.bracket}
+                  commanderName={deck.commander_card?.name ?? null}
+                />
+              </div>
               <DeckCardSearch deckId={deck.id} onAdded={() => void load()} />
               {deck.cards.length > 0 && (
                 <DeckFilterBar
