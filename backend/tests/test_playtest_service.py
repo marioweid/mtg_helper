@@ -10,12 +10,15 @@ from httpx import AsyncClient
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestSimulateRequest
 from mtg_helper.services.playtest_service import (
+    HandState,
     ManaSource,
     SimCard,
+    TurnCounts,
     _can_cast,
     _cast_turn,
     _expand_deck,
     _is_basic_fetch,
+    _is_color_screwed_turn,
     _is_enters_tapped,
     _land_produces,
     _parse_draw_count,
@@ -730,6 +733,36 @@ class TestColorScrew:
         deck = _make_deck([forest, green_spell], ["G"])
         stats = simulate(deck, PlaytestSimulateRequest(trials=100, turns=5, seed=103))
         assert stats.color_screw.pct_color_screw == 0.0
+
+    def test_color_screw_gate_not_flagged_when_another_spell_cast(self):
+        # Color-dead card in hand, but the player cast at least one other spell
+        # this turn — the turn isn't wasted, so it must not be flagged.
+        hs = HandState(color_dead=1, shortages={"U"})
+        counts = TurnCounts(spells=1)
+        assert _is_color_screwed_turn(3, hs, counts) is False
+        assert _is_color_screwed_turn(5, hs, counts) is False
+
+    def test_color_screw_gate_flagged_when_nothing_cast(self):
+        # Color-dead card in hand AND no spell cast this turn — genuine screw.
+        hs = HandState(color_dead=1, shortages={"U"})
+        counts = TurnCounts(spells=0)
+        assert _is_color_screwed_turn(3, hs, counts) is True
+        assert _is_color_screwed_turn(7, hs, counts) is True
+
+    def test_color_screw_gate_respects_turn_floor(self):
+        # Even on a wasted turn, turns 1-2 don't count as screw (curve is the
+        # cause, not pips).
+        hs = HandState(color_dead=1)
+        counts = TurnCounts(spells=0)
+        assert _is_color_screwed_turn(1, hs, counts) is False
+        assert _is_color_screwed_turn(2, hs, counts) is False
+
+    def test_color_screw_gate_skips_when_no_color_dead(self):
+        # No color-dead card in hand → nothing to flag, regardless of cast
+        # activity.
+        hs = HandState(color_dead=0)
+        counts = TurnCounts(spells=0)
+        assert _is_color_screwed_turn(5, hs, counts) is False
 
 
 class TestCommander:

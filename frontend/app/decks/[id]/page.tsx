@@ -28,7 +28,12 @@ import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
-import { totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
+import {
+  deckTotal,
+  totalCardCount,
+  type DeckCardItem,
+  type DeckDetailResponse,
+} from "@/lib/types";
 
 type ViewMode = "tags" | "types" | "grid";
 type DeckTab = "cards" | "combos" | "history";
@@ -218,7 +223,7 @@ export default function DeckDetailPage() {
         commander={deck.commander_card}
         partner={deck.partner_card}
         colors={colors}
-        cardCount={totalCardCount(deck.cards)}
+        cardCount={deckTotal(deck)}
         stage={stage}
         bracket={bracket}
         archetypeTags={deck.archetype_tags ?? []}
@@ -302,7 +307,7 @@ export default function DeckDetailPage() {
                   value={filter}
                   onChange={setFilter}
                   resultCount={totalCardCount(visibleCards)}
-                  totalCount={totalCardCount(deck.cards)}
+                  totalCount={deckTotal(deck)}
                   availableColors={deck.commander_color_identity}
                 />
               )}

@@ -263,6 +263,16 @@ export function totalCardCount(cards: DeckCardItem[]): number {
 }
 
 /**
+ * Full deck size including the commander. Every Commander deck has exactly
+ * one commander that counts toward the 100-card total, so an empty deck
+ * with just a commander reads as 1/100 and a complete deck as 100/100.
+ * Partner commanders are ignored — only the primary counts.
+ */
+export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknown }): number {
+  return totalCardCount(deck.cards) + (deck.commander_card ? 1 : 0);
+}
+
+/**
  * Buckets a deck card belongs to: union of user-set categories and the
  * auto-derived qualifying_stages, minus the retrieval-only "bangers" pseudo-
  * stage (it isn't a real classification). Cards left with no buckets fall

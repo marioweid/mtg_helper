@@ -32,9 +32,12 @@ function classify(type_line: string | null): TypeLabel | null {
 export function DeckTypeBreakdown({
   cards,
   target,
+  commander,
 }: {
   cards: TypeBreakdownCard[];
   target?: number;
+  /** Commander card. Counts as 1 toward the total and classifies by type. */
+  commander?: { type_line: string | null } | null;
 }) {
   const counts: Record<string, number> = {};
   let total = 0;
@@ -43,6 +46,11 @@ export function DeckTypeBreakdown({
     total += q;
     const label = classify(card.type_line);
     if (label) counts[label] = (counts[label] ?? 0) + q;
+  }
+  if (commander) {
+    total += 1;
+    const label = classify(commander.type_line);
+    if (label) counts[label] = (counts[label] ?? 0) + 1;
   }
   const visible = TYPE_ORDER.filter((t) => (counts[t] ?? 0) > 0);
 

@@ -879,6 +879,16 @@ def _record_commander_casts(
     return commander_cast_turn, partner_cast_turn
 
 
+def _is_color_screwed_turn(turn: int, hs: HandState, counts: TurnCounts) -> bool:
+    """A turn counts as color-screwed only when *nothing* could be cast and a
+    castable-by-CMC card sat in hand with missing pips. ``counts.spells == 0``
+    iff the greedy cast loop found no playable spell — so a color-dead card
+    was the actual blocker, not just hand clutter while the player still
+    made a play.
+    """
+    return turn >= _COLOR_SCREW_TURN_FLOOR and hs.color_dead > 0 and counts.spells == 0
+
+
 def _run_trial(
     library_template: list[SimCard],
     rng: random.Random,
@@ -939,7 +949,7 @@ def _run_trial(
         total_mana_spent += counts.mana_spent
         turn_available = [s for s in mana_sources if s.available_from_turn <= turn]
         hs = _count_hand_state(hand, turn_available)
-        if turn >= _COLOR_SCREW_TURN_FLOOR and hs.color_dead > 0:
+        if _is_color_screwed_turn(turn, hs, counts):
             if result.first_color_screw_turn is None:
                 result.first_color_screw_turn = turn
             result.color_screw_shortages |= hs.shortages

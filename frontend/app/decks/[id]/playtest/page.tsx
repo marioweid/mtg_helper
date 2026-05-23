@@ -145,6 +145,7 @@ export default function SimulatePage({ params }: PageProps) {
           onUndoCut={handleUndoCut}
           onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
           onSetQuantity={handleSetQuantity}
+          commander={deck.commander_card}
         />
       )}
     </div>

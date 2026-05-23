@@ -349,6 +349,7 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
+  const [deckCommander, setDeckCommander] = useState<{ type_line: string | null } | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -421,6 +422,7 @@ export default function BuildPage() {
       const deck = await apiClient.getDeck(deckId);
       setDeckCategoryCounts(computeStageCounts(deck.cards));
       setDeckCards(deck.cards);
+      setDeckCommander(deck.commander_card ?? null);
     } catch {
       /* non-critical */
     }
@@ -436,6 +438,7 @@ export default function BuildPage() {
         setDeckColorIdentity(deck.commander_color_identity.join(","));
         setDeckCategoryCounts(computeStageCounts(deck.cards));
         setDeckCards(deck.cards);
+        setDeckCommander(deck.commander_card ?? null);
         setSelectedCollectionIds(deck.suggestion_collection_ids);
         setMaxPriceCents(deck.max_price_cents ?? null);
         setPricePanelDraft(deck.max_price_cents ? (deck.max_price_cents / 100).toFixed(2) : "");
@@ -1470,6 +1473,7 @@ export default function BuildPage() {
         onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
         onSetQuantity={handleSetQuantity}
         petCardNames={petCardNames}
+        commander={deckCommander}
       />
     </div>
   );

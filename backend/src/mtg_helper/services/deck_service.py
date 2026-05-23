@@ -288,9 +288,10 @@ async def list_decks(
                 d.id, d.name, d.bracket, d.stage, d.created_at, d.updated_at,
                 c.name AS commander_name, c.image_uri AS commander_image,
                 c.color_identity AS commander_color_identity,
+                -- +1 for the commander (INNER JOIN above guarantees one).
                 (SELECT COALESCE(SUM(quantity), 0)
                    FROM deck_cards
-                  WHERE deck_id = d.id)::int AS card_count
+                  WHERE deck_id = d.id)::int + 1 AS card_count
             FROM decks d
             JOIN cards c ON d.commander_id = c.id
             WHERE lower(d.owner_email) = $1

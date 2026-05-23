@@ -13,6 +13,8 @@ interface Props {
   onCardClick?: (card: DeckCardItem) => void;
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
+  /** Commander card. Counts as +1 toward the deck total in the breakdown. */
+  commander?: { type_line: string | null } | null;
   /** Target card count for the breakdown bar. Defaults to 100 (Commander). */
   target?: number;
 }
@@ -32,6 +34,7 @@ export function ExpandableDeckBar({
   onCardClick,
   onSetQuantity,
   petCardNames,
+  commander,
   target = 100,
 }: Props) {
   const [open, setOpenState] = useState(false);
@@ -83,7 +86,7 @@ export function ExpandableDeckBar({
         aria-label={open ? "Collapse deck browser" : "Expand deck browser"}
         className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
       >
-        <DeckTypeBreakdown cards={cards} target={target} />
+        <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
         <span
           className="shrink-0 text-gray-400 transition-transform"
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
