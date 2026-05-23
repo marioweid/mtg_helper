@@ -75,7 +75,7 @@ _CONDITIONAL_UNTAPPED_RE = re.compile(
 )
 _ALL_COLORS_NON_C: tuple[str, ...] = ("W", "U", "B", "R", "G")
 
-_INTERACTION_TAGS: frozenset[str] = frozenset({"removal", "board_wipe", "counterspell"})
+_INTERACTION_TAGS: frozenset[str] = frozenset({"interaction"})
 _SELECTION_TAG = "card_selection"
 _TUTOR_TAG = "tutor"
 

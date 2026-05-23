@@ -64,18 +64,16 @@ _SANDBOX_RULES = (
 
 # Stage metadata: (category label, target count description)
 _STAGE_META: dict[str, tuple[str, str]] = {
-    "ramp": ("ramp / mana acceleration", "10-12"),
+    "theme": ("core theme / synergy and flex picks", "remaining slots"),
+    "ramp": ("ramp / mana acceleration", "12"),
+    "draw": ("card draw / card advantage", "12"),
     "interaction": (
-        "interaction / removal and protection — targeted removal, board wipes, "
-        "counterspells, hexproof/shroud givers (e.g. Lightning Greaves, Swiftfoot Boots), "
-        "and indestructible effects (e.g. Heroic Intervention, Boros Charm)",
-        "8-10",
+        "interaction — targeted removal, board wipes, counterspells, protection "
+        "(hexproof/shroud/indestructible givers like Lightning Greaves, Swiftfoot "
+        "Boots, Heroic Intervention, Boros Charm), and graveyard hate",
+        "12",
     ),
-    "draw": ("card draw / card advantage", "8-10"),
-    "theme": ("core theme / synergy", "20-25"),
-    "utility": ("utility / flex", "5-8"),
-    "lands": ("mana base / lands", "35-38"),
-    "bangers": ("bangers", "top picks across all categories"),
+    "lands": ("mana base / lands", "38"),
 }
 
 _BRACKET_DESCRIPTIONS = {
@@ -387,7 +385,7 @@ def _resolve_stage(
         ValueError: If requested_stage is not a valid active stage.
     """
     if requested_stage is not None:
-        active_stages = [s for s in STAGES if s != "complete"] + ["bangers"]
+        active_stages = [s for s in STAGES if s != "complete"]
         if requested_stage not in active_stages:
             raise ValueError(f"Invalid stage: {requested_stage!r}")
         return requested_stage, False
@@ -791,8 +789,8 @@ async def suggest_cards(
 # so the synthesized description aligns with parse_query_tags() vocabulary.
 _STRATEGY_TAGS = (
     "ramp, token, tokens, voltron, aristocrats, graveyard, blink, stax, mill, tribal, "
-    "sacrifice, lifegain, counters, equipment, counterspell, board wipe, tutor, "
-    "protection, extra turn, group hug, fast mana, draw, removal, reanimator"
+    "sacrifice, lifegain, counters, equipment, interaction, tutor, "
+    "extra turn, group hug, fast mana, draw, reanimator"
 )
 
 
@@ -859,16 +857,14 @@ def _build_describe_system_prompt(
         "- Reference the commander's specific abilities when relevant.",
         "- When you have gathered enough (3-5 exchanges), output this JSON block on its own line:",
         '  {"done": true, "name": "Deck Name", "description": "...", '
-        '"stage_targets": {"ramp": 12, "interaction": 10, "draw": 8, "theme": 22, '
-        '"utility": 6, "lands": 37}}',
+        '"stage_targets": {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}}',
         "",
-        "STAGE TARGET GUIDELINES (adjust based on player preferences):",
-        "- ramp: 8-14 (default 10-12; increase for ramp-heavy or high-CMC decks)",
-        "- interaction: 6-12 (default 8-10; increase for control/stax)",
-        "- draw: 6-12 (default 8-10; increase for draw-heavy decks)",
-        "- theme: 18-28 (default 20-25; flex based on how tight the theme is)",
-        "- utility: 3-10 (default 5-8)",
-        "- lands: 33-38 (default 35-38; lower for low-curve or mana-light builds)",
+        "STAGE TARGET GUIDELINES (defaults are intentionally fixed at 12/12/12/38):",
+        "- ramp: 12 (mana acceleration)",
+        "- draw: 12 (card draw / card advantage)",
+        "- interaction: 12 (removal, board wipes, counterspells, protection, graveyard hate)",
+        "- lands: 38 (mana base)",
+        "- theme has no fixed target — fills remaining slots with synergy + flex picks",
         "",
         "DESCRIPTION FORMAT:",
         "The description MUST naturally include relevant strategy keywords so the retrieval",
@@ -1017,15 +1013,12 @@ async def describe_deck(
 _KEYWORD_VOCAB: tuple[str, ...] = (
     "ramp",
     "draw",
-    "removal",
-    "board_wipe",
-    "counterspell",
+    "interaction",
     "tutor",
     "token",
     "plus_one_counters",
     "lifegain",
     "graveyard",
-    "graveyard_hate",
     "sacrifice",
     "aristocrats",
     "cost_reduction",
@@ -1039,7 +1032,6 @@ _KEYWORD_VOCAB: tuple[str, ...] = (
     "fast_mana",
     "blink",
     "mill",
-    "protection",
     "extra_turn",
     "land_destruction",
     "tribal",
@@ -1113,16 +1105,14 @@ def _build_extract_system_prompt(
         "- After 1-3 exchanges, output the final JSON block on its own line:",
         '  {"done": true, "name": "Deck Name",',
         '   "archetype_tags": ["voltron", "equipment", "squirrel_tribal"],',
-        '   "stage_targets": {"ramp": 12, "interaction": 10, "draw": 8,',
-        '                     "theme": 22, "utility": 6, "lands": 37}}',
+        '   "stage_targets": {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}}',
         "",
-        "STAGE TARGET GUIDELINES:",
-        "- ramp: 8-14 (default 10-12)",
-        "- interaction: 6-12 (default 8-10)",
-        "- draw: 6-12 (default 8-10)",
-        "- theme: 18-28 (default 20-25)",
-        "- utility: 3-10 (default 5-8)",
-        "- lands: 33-38 (default 35-38)",
+        "STAGE TARGET GUIDELINES (defaults are fixed):",
+        "- ramp: 12",
+        "- draw: 12",
+        "- interaction: 12",
+        "- lands: 38",
+        "- theme has no fixed target — fills remaining slots",
         "",
         "FORBIDDEN:",
         "- Do NOT invent tags outside the vocabulary above.",

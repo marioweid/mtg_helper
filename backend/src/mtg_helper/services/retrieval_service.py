@@ -132,18 +132,18 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "card draw": ["draw"],
     "card advantage": ["draw"],
     "cantrip": ["draw"],
-    "removal": ["removal"],
-    "kill": ["removal"],
-    "destroy": ["removal"],
-    "exile": ["removal"],
-    "interaction": ["removal", "counterspell", "board_wipe", "protection"],
-    "interactive": ["removal", "counterspell", "board_wipe"],
-    "board wipe": ["board_wipe"],
-    "wrath": ["board_wipe"],
-    "sweeper": ["board_wipe"],
-    "counterspell": ["counterspell"],
-    "counter": ["counterspell"],
-    "counters": ["counterspell", "plus_one_counters"],
+    "removal": ["interaction"],
+    "kill": ["interaction"],
+    "destroy": ["interaction"],
+    "exile": ["interaction"],
+    "interaction": ["interaction"],
+    "interactive": ["interaction"],
+    "board wipe": ["interaction"],
+    "wrath": ["interaction"],
+    "sweeper": ["interaction"],
+    "counterspell": ["interaction"],
+    "counter": ["interaction"],
+    "counters": ["interaction", "plus_one_counters"],
     "tutor": ["tutor"],
     "search": ["tutor"],
     "token": ["token"],
@@ -157,9 +157,9 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "graveyard": ["graveyard"],
     "reanimator": ["graveyard"],
     "recursion": ["graveyard"],
-    "graveyard hate": ["graveyard_hate"],
-    "exile graveyard": ["graveyard_hate"],
-    "graveyard removal": ["graveyard_hate"],
+    "graveyard hate": ["interaction"],
+    "exile graveyard": ["interaction"],
+    "graveyard removal": ["interaction"],
     "sacrifice": ["sacrifice"],
     "sac": ["sacrifice"],
     "aristocrats": ["aristocrats"],
@@ -175,9 +175,9 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "blink": ["blink"],
     "flicker": ["blink"],
     "mill": ["mill"],
-    "protection": ["protection"],
-    "hexproof": ["protection"],
-    "indestructible": ["protection"],
+    "protection": ["interaction"],
+    "hexproof": ["interaction"],
+    "indestructible": ["interaction"],
     "extra turn": ["extra_turn"],
     "land destruction": ["land_destruction"],
     "tribal": ["tribal"],
@@ -259,17 +259,11 @@ _TOKEN_TYPE_NAMES: dict[str, str] = {
 }
 
 # Stages that a card auto-cross-counts into based on tags / type. Theme is
-# deck-specific (no tag mapping) and bangers is a tag superset that would
-# double-count everything; both are excluded from auto-membership.
+# deck-specific (no tag mapping) and is excluded from auto-membership.
 _STAGE_TAG_MEMBERSHIP: dict[str, frozenset[str]] = {
     "ramp": frozenset({"ramp", "fast_mana", "cost_reduction"}),
-    "interaction": frozenset(
-        {"removal", "counterspell", "board_wipe", "protection", "graveyard_hate"}
-    ),
     "draw": frozenset({"draw", "card_selection"}),
-    "utility": frozenset(
-        {"tutor", "graveyard", "graveyard_hate", "blink", "protection", "proliferate"}
-    ),
+    "interaction": frozenset({"interaction"}),
 }
 
 
@@ -280,7 +274,7 @@ def card_qualifying_stages(tags: list[str], type_line: str | None) -> list[str]:
     and `draw` qualifies for both. Lands always qualify for the `lands`
     stage by type and never for the non-land stages (basics auto-tag as
     ``ramp`` from "Add {G}" oracle text — that boost only makes sense for
-    nonland cards). `theme` and `bangers` are excluded.
+    nonland cards). `theme` is excluded.
 
     Args:
         tags: Tag list from `cards.tags`.
@@ -299,20 +293,12 @@ def card_qualifying_stages(tags: list[str], type_line: str | None) -> list[str]:
 # Maps stage names to (query_text, query_tags)
 _STAGE_QUERIES: dict[str, tuple[str, list[str]]] = {
     "ramp": ("mana ramp acceleration mana rocks mana dorks", ["ramp", "fast_mana"]),
-    "interaction": (
-        "removal counterspell board wipe protection",
-        ["removal", "counterspell", "board_wipe", "protection"],
-    ),
     "draw": ("card draw card advantage cantrips", ["draw"]),
-    "utility": (
-        "utility recursion graveyard toolbox",
-        ["tutor", "graveyard", "blink", "protection"],
+    "interaction": (
+        "removal counterspell board wipe protection graveyard hate",
+        ["interaction"],
     ),
     "lands": ("lands mana base mana fixing", ["ramp"]),
-    "bangers": (
-        "powerful staples synergy commander",
-        ["ramp", "draw", "removal", "board_wipe", "protection", "tutor", "token", "graveyard"],
-    ),
 }
 
 

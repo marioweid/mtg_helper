@@ -498,7 +498,7 @@ class TestDeadCardsAndInteraction:
             mana_cost="{2}{G}",
             cmc=3,
             color_identity=["G"],
-            tags=["removal"],
+            tags=["interaction"],
             quantity=62,
         )
         deck = _make_deck([forest, removal], ["G"])

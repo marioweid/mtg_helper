@@ -1144,7 +1144,9 @@ export default function BuildPage() {
               {deckCategoryCounts[state.activeStage] ?? 0} / {activeStageState.target} in deck
             </span>
             {(() => {
-              const [min, max] = CATEGORY_TARGETS[state.activeStage] ?? [0, 0];
+              const range = CATEGORY_TARGETS[state.activeStage];
+              if (!range) return null;
+              const [min, max] = range;
               return (
                 <span className="text-xs text-gray-600">
                   (recommended {min}–{max})

@@ -24,7 +24,7 @@ from mtg_helper.services.retrieval_service import card_qualifying_stages
 _log = logging.getLogger(__name__)
 
 # Ordered list of build stages. "created" is the initial state before any stage.
-STAGES: list[str] = ["ramp", "interaction", "draw", "theme", "utility", "lands", "complete"]
+STAGES: list[str] = ["theme", "ramp", "draw", "interaction", "lands", "complete"]
 
 
 def next_stage(current: str) -> str | None:

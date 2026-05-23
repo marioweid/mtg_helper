@@ -31,20 +31,19 @@ _log = logging.getLogger(__name__)
 QUICKSTART_STAGE_ORDER: tuple[str, ...] = (
     "theme",
     "ramp",
-    "interaction",
     "draw",
-    "utility",
+    "interaction",
     "lands",
 )
 
-# Per-stage acceptance targets. Sums to ~89 nonland + 36 lands = 99 + commander.
+# Per-stage acceptance targets. Sums to 99 + commander.
+# theme = 99 - (ramp + draw + interaction + lands) - 1 commander = 99 - 12 - 12 - 12 - 38 - 1 = 24
 QUICKSTART_TARGETS: dict[str, int] = {
-    "theme": 22,
-    "ramp": 10,
-    "interaction": 8,
-    "draw": 8,
-    "utility": 5,
-    "lands": 36,
+    "theme": 24,
+    "ramp": 12,
+    "draw": 12,
+    "interaction": 12,
+    "lands": 38,
 }
 
 # Land the user at stage 1 of the wizard so they can review/swap from the

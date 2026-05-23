@@ -460,20 +460,17 @@ def test_parse_query_tags_single_term() -> None:
 
 def test_parse_query_tags_multi_word_key_before_single_word() -> None:
     tags = parse_query_tags("board wipe effects")
-    assert "board_wipe" in tags
+    assert "interaction" in tags
 
 
 def test_parse_query_tags_interaction_expands() -> None:
     tags = parse_query_tags("interaction spells")
-    assert "removal" in tags
-    assert "counterspell" in tags
-    assert "board_wipe" in tags
-    assert "protection" in tags
+    assert tags == ["interaction"]
 
 
 def test_parse_query_tags_deduplicates() -> None:
     tags = parse_query_tags("removal kill effects")
-    assert tags.count("removal") == 1
+    assert tags.count("interaction") == 1
 
 
 def test_parse_query_tags_case_insensitive() -> None:
@@ -498,7 +495,7 @@ def test_parse_query_tags_voltron_includes_equipment() -> None:
 
 
 def test_stage_retrieval_query_known_stages() -> None:
-    for stage in ("ramp", "interaction", "draw", "utility", "lands"):
+    for stage in ("ramp", "draw", "interaction", "lands"):
         text, tags = stage_retrieval_query(stage, None)
         assert isinstance(text, str) and len(text) > 0
         assert isinstance(tags, list)
@@ -511,8 +508,7 @@ def test_stage_retrieval_query_ramp_tags() -> None:
 
 def test_stage_retrieval_query_interaction_tags() -> None:
     _, tags = stage_retrieval_query("interaction", None)
-    assert "removal" in tags
-    assert "counterspell" in tags
+    assert "interaction" in tags
 
 
 def test_stage_retrieval_query_theme_uses_description() -> None:

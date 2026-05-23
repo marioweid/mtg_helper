@@ -64,17 +64,17 @@ def test_each_player_draws() -> None:
 
 def test_removal_destroy_target() -> None:
     tags = _classify("Destroy target creature.")
-    assert "removal" in tags
+    assert "interaction" in tags
 
 
 def test_removal_exile_target() -> None:
     tags = _classify("Exile target artifact or enchantment.")
-    assert "removal" in tags
+    assert "interaction" in tags
 
 
 def test_removal_damage_target_creature() -> None:
     tags = _classify("This spell deals 3 damage to target creature.")
-    assert "removal" in tags
+    assert "interaction" in tags
 
 
 # ── board wipe ────────────────────────────────────────────────────────────────
@@ -82,17 +82,17 @@ def test_removal_damage_target_creature() -> None:
 
 def test_board_wipe_destroy_all() -> None:
     tags = _classify("Destroy all creatures.")
-    assert "board_wipe" in tags
+    assert "interaction" in tags
 
 
 def test_board_wipe_exile_all() -> None:
     tags = _classify("Exile all artifacts and enchantments.")
-    assert "board_wipe" in tags
+    assert "interaction" in tags
 
 
 def test_board_wipe_minus_all() -> None:
     tags = _classify("All creatures get -3/-3 until end of turn.")
-    assert "board_wipe" in tags
+    assert "interaction" in tags
 
 
 # ── counterspell ──────────────────────────────────────────────────────────────
@@ -100,12 +100,12 @@ def test_board_wipe_minus_all() -> None:
 
 def test_counterspell_target_spell() -> None:
     tags = _classify("Counter target spell.")
-    assert "counterspell" in tags
+    assert "interaction" in tags
 
 
 def test_counterspell_noncreature() -> None:
     tags = _classify("Counter target noncreature spell.")
-    assert "counterspell" in tags
+    assert "interaction" in tags
 
 
 # ── tutor ─────────────────────────────────────────────────────────────────────
@@ -157,19 +157,18 @@ def test_lifegain_you_gain() -> None:
 def test_graveyard_return_from() -> None:
     tags = _classify("Return target creature card from your graveyard to your hand.")
     assert "graveyard" in tags
-    assert "graveyard_hate" not in tags
 
 
 def test_graveyard_hate_exile_target_card() -> None:
     tags = _classify("Exile target card from a graveyard.")
-    assert "graveyard_hate" in tags
+    assert "interaction" in tags
     # Hate-only cards must not double-count as recursion.
     assert "graveyard" not in tags
 
 
 def test_graveyard_hate_exile_all_in_graveyard() -> None:
     tags = _classify("Exile all cards from target player's graveyard.")
-    assert "graveyard_hate" in tags
+    assert "interaction" in tags
     assert "graveyard" not in tags
 
 
@@ -347,12 +346,12 @@ def test_mill_keyword() -> None:
 
 def test_protection_hexproof_in_text() -> None:
     tags = _classify("This creature has hexproof.")
-    assert "protection" in tags
+    assert "interaction" in tags
 
 
 def test_protection_indestructible_keyword() -> None:
     tags = _classify("", keywords=["Indestructible"])
-    assert "protection" in tags
+    assert "interaction" in tags
 
 
 # ── extra turn ────────────────────────────────────────────────────────────────

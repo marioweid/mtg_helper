@@ -16,8 +16,7 @@ interface Props {
   showImage?: boolean | undefined;
 }
 
-// Bangers is a retrieval-only stage; users shouldn't tag cards into it manually.
-const CATEGORY_OPTIONS = CATEGORY_ORDER.filter((c) => c !== "bangers");
+const CATEGORY_OPTIONS = CATEGORY_ORDER;
 
 /**
  * Shared detail surface for a deck card — image, type line, oracle text,

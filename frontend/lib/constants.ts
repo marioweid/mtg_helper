@@ -1,11 +1,10 @@
 import { MECHANIC_LABELS } from "./mechanics";
 
 export const STAGES = [
-  "ramp",
-  "interaction",
-  "draw",
   "theme",
-  "utility",
+  "ramp",
+  "draw",
+  "interaction",
   "lands",
   "complete",
 ] as const;
@@ -13,13 +12,10 @@ export const STAGES = [
 export type Stage = (typeof STAGES)[number];
 
 export const STAGE_LABELS: Record<string, string> = {
-  bangers: "Bangers",
-  ramp: "Ramp",
-  interaction: "Removal",
-  wipes: "Wipes",
-  draw: "Card Draw",
   theme: "Theme",
-  utility: "Utility",
+  ramp: "Ramp",
+  draw: "Card Draw",
+  interaction: "Interaction",
   lands: "Lands",
   complete: "Complete",
 };
@@ -32,27 +28,20 @@ export const BRACKET_LABELS: Record<number, string> = {
 };
 
 export const CATEGORY_TARGETS: Record<string, [number, number]> = {
-  bangers: [10, 15],
-  ramp: [10, 12],
-  interaction: [8, 10],
-  draw: [8, 10],
-  theme: [20, 25],
-  utility: [5, 8],
-  lands: [35, 38],
+  ramp: [12, 12],
+  draw: [12, 12],
+  interaction: [12, 12],
+  lands: [38, 38],
 };
 
 export const STAGE_DEFAULTS: Record<string, number> = {
-  bangers: 10,
-  ramp: 10,
-  interaction: 8,
-  wipes: 2,
-  draw: 9,
-  theme: 22,
-  utility: 6,
-  lands: 36,
+  ramp: 12,
+  draw: 12,
+  interaction: 12,
+  lands: 38,
 };
 
-export const CATEGORY_ORDER = ["bangers", "ramp", "interaction", "draw", "theme", "utility", "lands"];
+export const CATEGORY_ORDER = ["theme", "ramp", "draw", "interaction", "lands"];
 
 export const COLOR_SYMBOLS: Record<string, { label: string; bg: string; text: string }> = {
   W: { label: "W", bg: "bg-yellow-50", text: "text-yellow-800" },
@@ -107,7 +96,6 @@ export const ARCHETYPE_GROUPS: { group: string; chips: ArchetypeChip[] }[] = [
       { tag: "graveyard", label: "Graveyard / Recursion" },
       { tag: "reanimator", label: "Reanimator" },
       { tag: "mill", label: "Mill" },
-      { tag: "graveyard_hate", label: "Graveyard hate" },
     ],
   },
   {

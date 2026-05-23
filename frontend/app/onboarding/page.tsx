@@ -20,9 +20,8 @@ const SPINNER_MESSAGES = [
   "Reading the commander's text…",
   "Picking the synergy spine…",
   "Filling out ramp…",
-  "Adding interaction…",
   "Wiring up card draw…",
-  "Sprinkling in utility…",
+  "Adding interaction…",
   "Tuning the mana base…",
 ];
 

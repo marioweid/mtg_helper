@@ -39,7 +39,7 @@ _SECTION_TO_CATEGORY: dict[str, str | None] = {
     "sorcery": "theme",
     "planeswalkers": "theme",
     "planeswalker": "theme",
-    "utility": "utility",
+    "utility": "theme",
     "lands": "lands",
     "land": "lands",
     "mana base": "lands",
@@ -314,11 +314,8 @@ _GENERIC_STAGE_TAGS: frozenset[str] = frozenset(
     {
         "ramp",
         "draw",
-        "removal",
-        "board_wipe",
-        "counterspell",
+        "interaction",
         "tutor",
-        "protection",
         "card_selection",
         "fast_mana",
     }

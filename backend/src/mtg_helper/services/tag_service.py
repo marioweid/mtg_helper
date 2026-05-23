@@ -520,17 +520,17 @@ def _tag_removal(text: str, tags: list[str]) -> None:
         or _PAT_EXILE_TARGET.search(text)
         or _PAT_DAMAGE_TARGET.search(text)
     ):
-        tags.append("removal")
+        tags.append("interaction")
 
 
 def _tag_board_wipe(text: str, tags: list[str]) -> None:
     if _PAT_DESTROY_ALL.search(text) or _PAT_EXILE_ALL.search(text) or _PAT_MINUS_ALL.search(text):
-        tags.append("board_wipe")
+        tags.append("interaction")
 
 
 def _tag_tutor_token_counter(text: str, tags: list[str]) -> None:
     if _PAT_COUNTER.search(text):
-        tags.append("counterspell")
+        tags.append("interaction")
     if _PAT_TUTOR.search(text):
         tags.append("tutor")
     if _PAT_TOKEN.search(text):
@@ -545,7 +545,7 @@ def _tag_graveyard_sacrifice(text: str, kw_set: set[str], tags: list[str]) -> No
     # Hate first so we don't double-tag with the recursion bucket.
     is_hate = bool(_PAT_GRAVEYARD_HATE.search(text))
     if is_hate:
-        tags.append("graveyard_hate")
+        tags.append("interaction")
     if not is_hate and _PAT_GRAVEYARD.search(text):
         tags.append("graveyard")
     has_sacrifice = bool(_PAT_SACRIFICE.search(text))
@@ -613,7 +613,7 @@ def _tag_stax_hug_mana(name: str, text: str, cmc: float | None, tags: list[str])
 
 def _tag_protection_misc(text: str, tl: str, kw_set: set[str], tags: list[str]) -> None:
     if _has_protection(text, kw_set):
-        tags.append("protection")
+        tags.append("interaction")
     if _PAT_EXTRA_TURN.search(text):
         tags.append("extra_turn")
     if _PAT_LAND_DESTROY.search(text):
@@ -696,7 +696,13 @@ def classify_card(
     _tag_full_mechanics(text, tags)
     tags.extend(classify_tribal(oracle_text))
 
-    return tags
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for t in tags:
+        if t not in seen:
+            seen.add(t)
+            deduped.append(t)
+    return deduped
 
 
 async def _sync_tags_to_qdrant(

@@ -1,14 +1,7 @@
 import type { DeckCardItem } from "@/lib/types";
 import { STAGE_DEFAULTS, STAGE_LABELS } from "@/lib/constants";
 
-const SCORECARD_STAGES = [
-  "ramp",
-  "interaction",
-  "wipes",
-  "draw",
-  "utility",
-  "lands",
-] as const;
+const SCORECARD_STAGES = ["ramp", "draw", "interaction", "lands"] as const;
 type ScorecardStage = (typeof SCORECARD_STAGES)[number];
 
 type Status = "low" | "ok" | "high";
@@ -21,8 +14,6 @@ interface Row {
   status: Status;
 }
 
-const WIPE_TAGS = new Set(["destroy_all", "exile_all"]);
-
 function qty(card: DeckCardItem): number {
   return card.quantity ?? 1;
 }
@@ -34,12 +25,6 @@ function isLand(card: DeckCardItem): boolean {
 function countStage(cards: DeckCardItem[], stage: ScorecardStage): number {
   if (stage === "lands") {
     return cards.reduce((sum, c) => (isLand(c) ? sum + qty(c) : sum), 0);
-  }
-  if (stage === "wipes") {
-    return cards.reduce(
-      (sum, c) => (!isLand(c) && c.tags.some((t) => WIPE_TAGS.has(t)) ? sum + qty(c) : sum),
-      0,
-    );
   }
   return cards.reduce(
     (sum, c) => (c.qualifying_stages.includes(stage) && !isLand(c) ? sum + qty(c) : sum),

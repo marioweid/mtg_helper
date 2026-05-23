@@ -77,7 +77,7 @@ const TIPS = {
   col_color_dead:
     "Avg cards in hand that COULD be paid with the total mana available but can't be cast because of missing colored pips. Subset of Dead.",
   col_interact:
-    "Avg removal / board-wipe / counterspell cards held in hand. These are NOT counted as dead — they're held for defense.",
+    "Avg interaction cards (removal, board wipes, counterspells, protection, graveyard hate) held in hand. These are NOT counted as dead — they're held for defense.",
   col_extra_cards:
     "Avg extra cards drawn this turn (draw spells + tutors-as-draw-1 proxy). Excludes the natural turn draw.",
   col_hand: "Avg cards in hand at end of turn (after draw, land drop, and casting phase).",

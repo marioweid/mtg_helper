@@ -274,18 +274,13 @@ export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknow
 
 /**
  * Buckets a deck card belongs to: union of user-set categories and the
- * auto-derived qualifying_stages, minus the retrieval-only "bangers" pseudo-
- * stage (it isn't a real classification). Cards left with no buckets fall
- * into "untagged".
+ * auto-derived qualifying_stages. Cards left with no buckets fall into
+ * "untagged".
  */
 export function bucketsFor(card: DeckCardItem): string[] {
   const buckets = new Set<string>();
-  for (const c of card.categories) {
-    if (c !== "bangers") buckets.add(c);
-  }
-  for (const s of card.qualifying_stages) {
-    if (s !== "bangers") buckets.add(s);
-  }
+  for (const c of card.categories) buckets.add(c);
+  for (const s of card.qualifying_stages) buckets.add(s);
   if (buckets.size === 0) buckets.add("untagged");
   return [...buckets];
 }

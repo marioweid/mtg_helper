@@ -83,10 +83,10 @@ class TestTagJaccard:
         assert _tag_jaccard(["ramp", "draw"], ["ramp", "draw"]) == 1.0
 
     def test_no_overlap(self):
-        assert _tag_jaccard(["ramp"], ["removal"]) == 0.0
+        assert _tag_jaccard(["ramp"], ["interaction"]) == 0.0
 
     def test_partial_overlap(self):
-        assert _tag_jaccard(["ramp", "draw"], ["ramp", "removal"]) == pytest.approx(1 / 3)
+        assert _tag_jaccard(["ramp", "draw"], ["ramp", "interaction"]) == pytest.approx(1 / 3)
 
     def test_both_empty_is_1(self):
         assert _tag_jaccard([], []) == 1.0
@@ -197,7 +197,7 @@ class TestFunctionSimilarity:
     def test_complete_mismatch_scores_near_zero(self):
         src = _source(tags=("ramp",), type_line="Instant", cmc=2.0, color_identity=frozenset({"W"}))
         cand = _retrieved(
-            tags=["removal"], type_line="Creature — Elf", cmc=7.0, color_identity=["B"]
+            tags=["interaction"], type_line="Creature — Elf", cmc=7.0, color_identity=["B"]
         )
         result = function_similarity(src, cand)
         # Worst components: tag=0, type=0, cmc=0, color=0 → total = 0
