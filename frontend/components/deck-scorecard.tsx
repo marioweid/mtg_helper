@@ -26,10 +26,11 @@ function countStage(cards: DeckCardItem[], stage: ScorecardStage): number {
   if (stage === "lands") {
     return cards.reduce((sum, c) => (isLand(c) ? sum + qty(c) : sum), 0);
   }
-  return cards.reduce(
-    (sum, c) => (c.qualifying_stages.includes(stage) && !isLand(c) ? sum + qty(c) : sum),
-    0,
-  );
+  return cards.reduce((sum, c) => {
+    if (isLand(c)) return sum;
+    const stages = c.categories.length > 0 ? c.categories : c.qualifying_stages;
+    return stages.includes(stage) ? sum + qty(c) : sum;
+  }, 0);
 }
 
 function statusFor(actual: number, target: number): Status {

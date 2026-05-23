@@ -42,30 +42,56 @@ _TEMPERATURE = 0.55
 _MAX_OUTPUT_TOKENS = 8192
 
 _SYSTEM_PROMPT = """You are a high-level Magic: The Gathering Commander deck-building consultant.
-You analyze goldfish simulation telemetry to identify strategic and structural bottlenecks.
+You analyze goldfish simulation telemetry. Your job is honest assessment — affirm a
+healthy deck instead of inventing problems; flag real issues with the right weight.
 
-Use these absolute baseline telemetry thresholds to evaluate deck health:
-- Mana Screw (pct_screw): Target < 10%. Critical if > 12%.
-- Mana Flood (pct_flood): Target < 12%. Critical if > 15%.
-- Color Screw (pct_color_screw): Target < 8%. Critical if > 10%.
-  Top priority to fix via multi-color lands/rocks.
-- Average Mulligans (avg_mulligans): Target < 0.9. High friction if > 1.1.
-- Kept Hand at 7 (kept_at_7): Target > 50%. Critical if < 45%.
-- Commander Cast Rate: Critical if < 60% due to color/mana gaps.
+--- BASELINE THRESHOLDS ---
+A metric is "breached" when it crosses the CRITICAL line.
+- Mana Screw (pct_screw): healthy < 10%, breach if > 12%.
+- Mana Flood (pct_flood): healthy < 12%, breach if > 15%.
+- Color Screw (pct_color_screw): healthy < 8%, breach if > 10%.
+- Average Mulligans (avg_mulligans): healthy < 0.9, breach if > 1.1.
+- Kept Hand at 7 (kept_at_7): healthy > 50%, breach if < 45%.
+- Commander Cast Rate (pct_ever_cast): healthy > 80%, breach if < 60%.
+
+--- SEVERITY DISCIPLINE ---
+- `critical`: ONLY when a baseline threshold is breached. Use sparingly.
+- `warn`: a metric is between healthy and breach (clear adverse trend but not failing).
+- `info`: optional soft observation, e.g. "color X tends to be the missing pip when
+  you screw — not actionable yet but worth watching."
+
+--- HEALTHY-DECK BEHAVIOR ---
+If NO baseline threshold is breached and no metric is in the warn band:
+- Return ZERO findings and ZERO swap_suggestions.
+- Write a 1–2 sentence summary that affirms the deck (e.g. "Deck looks solid —
+  consistency and mana base are within healthy targets across all tracked
+  metrics."). Optionally add ONE soft `info` note if a metric is trending toward
+  the warn band, phrased as a watch-out, not a fix-it.
+
+If only minor (warn-band) issues exist:
+- Findings allowed at `warn` or `info`. No `critical`.
+- Swap_suggestions OPTIONAL — only include if you actually found a concrete,
+  better card via `card_search`. Otherwise leave the swap list empty and phrase
+  the finding as "you might look into ..." instead of prescribing a swap.
+
+Only when at least one threshold is breached should swap_suggestions be your
+primary output.
 
 --- INTERACTION FLOW ---
-1. You have access to the `card_search` tool. You CAN and SHOULD execute tool calls
-   to find multi-color lands, mana rocks, or synergy pieces before making your
-   final judgment. The tool already excludes cards already in the deck (except
-   basic lands), so every hit is a real candidate.
-2. Use the tool for at most ten calls; budget them — each call narrows a specific
-   gap (e.g. one query per missing color, or one for ramp upgrades). Stop calling
-   the tool as soon as you have enough evidence; do not keep searching for
-   marginal upgrades.
-3. When you have enough evidence, return the final structured response. `summary`
-   is 2–3 sentences, `findings` lists the strategic problems, and
+1. First, evaluate the metrics against the thresholds above. Decide whether the
+   deck is healthy, has minor warn-band issues, or has breaches. That decision
+   shapes everything else — DO NOT call tools speculatively when the deck is
+   healthy.
+2. You have access to the `card_search` tool. Use it ONLY when you have an
+   actual breach or warn-band issue that calls for a concrete replacement
+   candidate. The tool already excludes cards already in the deck (except
+   basic lands), so every hit is real.
+3. Budget at most ten calls; each call narrows a specific gap. Healthy decks
+   should need zero calls.
+4. Return the structured response. `summary` is 1–3 sentences (shorter when
+   healthy). `findings` lists real issues at the appropriate severity.
    `swap_suggestions` proposes concrete swaps using exact card names from your
-   `card_search` results."""
+   `card_search` results — only when something actually needs swapping."""
 
 
 @dataclass
@@ -208,6 +234,48 @@ def _build_prompt(deck: DeckDetailResponse, stats: PlaytestStats) -> str:
     )
 
 
+# Critical thresholds — must match the numbers in _SYSTEM_PROMPT.
+def _critical_breaches(stats: PlaytestStats) -> list[str]:
+    breaches: list[str] = []
+    if stats.pct_screw > 0.12:
+        breaches.append("pct_screw")
+    if stats.pct_flood > 0.15:
+        breaches.append("pct_flood")
+    if stats.color_screw.pct_color_screw > 0.10:
+        breaches.append("pct_color_screw")
+    if stats.avg_mulligans > 1.1:
+        breaches.append("avg_mulligans")
+    if stats.opening_hand.pct_kept_7 < 0.45:
+        breaches.append("kept_at_7")
+    if stats.commander is not None and stats.commander.pct_ever_cast < 0.60:
+        breaches.append("commander_cast_rate")
+    return breaches
+
+
+def _enforce_severity_floor(
+    output: SimulationAnalysisResponse, stats: PlaytestStats
+) -> SimulationAnalysisResponse:
+    """Belt-and-suspenders post-filter. The agent is instructed to stay quiet on
+    a healthy deck; this guarantees it. If no critical threshold is breached we
+    drop fabricated `critical` findings and clear swap_suggestions — soft `warn`
+    and `info` notes are kept as hints.
+    """
+    breaches = _critical_breaches(stats)
+    if breaches:
+        return output
+    cleaned = [f for f in output.findings if f.severity != "critical"]
+    if len(cleaned) != len(output.findings) or output.swap_suggestions:
+        _log.info(
+            "analysis post-filter: no critical breaches — dropped %d critical "
+            "findings and %d swap_suggestions",
+            len(output.findings) - len(cleaned),
+            len(output.swap_suggestions),
+        )
+    output.findings = cleaned
+    output.swap_suggestions = []
+    return output
+
+
 async def analyze_simulation(
     pool: asyncpg.Pool,
     ai_client: LLMClient,  # noqa: ARG001 — kept for caller compatibility
@@ -265,6 +333,7 @@ async def analyze_simulation(
     elapsed = time.monotonic() - started
     output = result.output
     output.tool_call_count = deps.tool_call_count[0]
+    output = _enforce_severity_floor(output, stats)
     _log.info(
         "analysis done: %.1fs, %d tool calls, %d findings, %d swaps",
         elapsed,

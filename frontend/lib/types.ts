@@ -273,16 +273,15 @@ export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknow
 }
 
 /**
- * Buckets a deck card belongs to: union of user-set categories and the
- * auto-derived qualifying_stages. Cards left with no buckets fall into
- * "untagged".
+ * Buckets a deck card belongs to. Explicit `categories` fully override the
+ * auto-derived `qualifying_stages` — set any category and the auto tags are
+ * suppressed. Clear categories to revert to auto. Cards with neither fall
+ * into "untagged".
  */
 export function bucketsFor(card: DeckCardItem): string[] {
-  const buckets = new Set<string>();
-  for (const c of card.categories) buckets.add(c);
-  for (const s of card.qualifying_stages) buckets.add(s);
-  if (buckets.size === 0) buckets.add("untagged");
-  return [...buckets];
+  const source = card.categories.length > 0 ? card.categories : card.qualifying_stages;
+  if (source.length === 0) return ["untagged"];
+  return [...new Set(source)];
 }
 
 // Combos (Commander Spellbook)

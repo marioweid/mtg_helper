@@ -69,13 +69,17 @@ export function CardDetailPanel({
             <p className="mb-1.5 text-xs uppercase tracking-wide text-gray-500">
               Categories
               <span className="ml-2 normal-case tracking-normal text-gray-600">
-                (dotted = auto from card text)
+                {card.categories.length > 0
+                  ? "(explicit picks override auto tags — clear all to revert)"
+                  : "(dotted = auto from card text — click to override)"}
               </span>
             </p>
             <div className="flex flex-wrap gap-1.5">
               {CATEGORY_OPTIONS.map((opt) => {
                 const active = card.categories.includes(opt);
-                const auto = !active && card.qualifying_stages.includes(opt);
+                const hasExplicit = card.categories.length > 0;
+                const auto =
+                  !active && !hasExplicit && card.qualifying_stages.includes(opt);
                 const cls = active
                   ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
                   : auto

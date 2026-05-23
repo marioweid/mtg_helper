@@ -133,10 +133,10 @@ function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const card of cards) {
     const stages =
-      card.qualifying_stages && card.qualifying_stages.length > 0
-        ? card.qualifying_stages
-        : card.categories.length > 0
-          ? card.categories
+      card.categories.length > 0
+        ? card.categories
+        : card.qualifying_stages && card.qualifying_stages.length > 0
+          ? card.qualifying_stages
           : ["other"];
     for (const stage of stages) {
       counts[stage] = (counts[stage] ?? 0) + (card.quantity ?? 1);

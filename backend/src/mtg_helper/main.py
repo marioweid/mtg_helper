@@ -44,7 +44,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         embed_model=settings.embedding_model,
         embed_dim=settings.embedding_dimensions,
     )
-    app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url)
+    # Default qdrant-client timeout is 5s — too short for the batch payload
+    # updates run by the admin sync job (~31k cards). 600s gives individual
+    # requests room to breathe under concurrent load without affecting the
+    # snappy single-call paths (search, get_collection).
+    app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url, timeout=600)
     await ensure_collection(app.state.qdrant_client)
     app.state.admin_jobs = JobRegistry()
 
