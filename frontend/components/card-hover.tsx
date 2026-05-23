@@ -104,6 +104,7 @@ export function CardHover({ name, imageUri, children, className }: CardHoverProp
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLSpanElement>) => {
+      if (!isTouch) return;
       e.stopPropagation();
       e.preventDefault();
       if (open && pinned) {
@@ -114,7 +115,7 @@ export function CardHover({ name, imageUri, children, className }: CardHoverProp
       setPinned(true);
       void reveal();
     },
-    [open, pinned, reveal],
+    [isTouch, open, pinned, reveal],
   );
 
   useEffect(() => {

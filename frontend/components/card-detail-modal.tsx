@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 
 import { CardDetailPanel } from "@/components/card-detail-panel";
 import { ManaCost } from "@/components/mana-cost";
@@ -37,26 +37,39 @@ export function CardDetailModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [card, onClose]);
 
+  const titleId = useId();
   if (!card) return null;
 
   return (
-    <button
-      type="button"
-      onClick={onClose}
-      aria-label="Close card detail"
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] w-full max-w-3xl cursor-default overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-6 text-left shadow-2xl"
-      >
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900 p-6 text-left shadow-2xl">
         <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-semibold text-white">{card.name}</h2>
-          {card.mana_cost ? (
-            <span className="text-sm text-gray-300">
-              <ManaCost cost={card.mana_cost} />
-            </span>
-          ) : null}
+          <h2 id={titleId} className="text-xl font-semibold text-white">
+            {card.name}
+          </h2>
+          <div className="flex items-center gap-3">
+            {card.mana_cost ? (
+              <span className="text-sm text-gray-300">
+                <ManaCost cost={card.mana_cost} />
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close card detail"
+              className="rounded-full px-2 text-lg leading-none text-gray-400 hover:bg-white/10 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <CardDetailPanel
           card={card}
@@ -67,6 +80,6 @@ export function CardDetailModal({
           showImage
         />
       </div>
-    </button>
+    </div>
   );
 }
