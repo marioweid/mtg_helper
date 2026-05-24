@@ -18,7 +18,7 @@ from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services import collection_service
 from mtg_helper.services.ai_service import card_from_retrieved
 from mtg_helper.services.llm_client import LLMClient
-from mtg_helper.services.retrieval_service import RetrievedCard, retrieve_candidates
+from mtg_helper.services.retrieval_service import PriceFilter, RetrievedCard, retrieve_candidates
 
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
@@ -361,12 +361,23 @@ async def suggest_mana_fix(
     qdrant_client: AsyncQdrantClient,
     deck: DeckDetailResponse,
     account_id: UUID | None,
+    *,
+    max_price_cents: int | None = None,
 ) -> ManaFixResponse:
     """Analyze the deck and return both the report and a land-fix shortlist.
 
     Combines the deficit-based suggestion list with the enriched report (land
     count recommendation + turn-N risk). When neither dimension flags an
     issue, suggestions is empty.
+
+    Args:
+        pool: asyncpg connection pool.
+        ai_client: LLM adapter (used by retrieval for query embedding).
+        qdrant_client: Qdrant async client.
+        deck: Deck to analyze.
+        account_id: Caller's account (for ownership annotations).
+        max_price_cents: When set, excludes candidate lands above this EUR
+            cap. ``None`` ⇒ no price ceiling.
     """
     card_tags = await _fetch_card_tags(pool, [c.card_id for c in deck.cards])
     report = analyze_mana_base(deck, card_tags=card_tags)
@@ -378,6 +389,7 @@ async def suggest_mana_fix(
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
     excluded = list({*deck_card_ids, *commander_ids})
 
+    price_filter = PriceFilter(max_cents=max_price_cents, min_cents=0) if max_price_cents else None
     candidates = await retrieve_candidates(
         pool,
         ai_client,
@@ -388,6 +400,7 @@ async def suggest_mana_fix(
         deck_card_ids=excluded,
         limit=40,
         stage="lands",
+        price_filter=price_filter,
         commander_id=deck.commander_id,
         bracket=deck.bracket,
     )

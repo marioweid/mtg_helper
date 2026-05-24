@@ -3,15 +3,19 @@
 The loop:
 
 1. Run a baseline goldfish simulation and compute a weighted health score.
-2. Rank in-deck cards by how badly they hurt that score (stuck in hand,
-   never cast, blocked on mana/colors).
-3. For each weak card in order, ask :mod:`swap_service` for cheaper
-   functional replacements under the caller's price ceiling.
+2. **Mana-fix stage** (when color screw is breached): trim an over-represented
+   basic land and add a dual/check/shock land that covers the deficient color,
+   sourced from :mod:`mana_base_service`. Re-simulate; keep the swap if the
+   score improves. Repeat while color screw stays breached and budget remains.
+3. **Nonland stage**: rank in-deck cards by how badly they hurt the score
+   (stuck in hand, never cast, blocked on mana/colors). For each weak card,
+   ask :mod:`swap_service` for cheaper functional replacements under the price
+   ceiling.
 4. Re-simulate a variant deck with each replacement in place. Pin the RNG
    seed across every variant so the score delta measures the card change,
    not RNG noise.
 5. Keep the replacement with the largest positive delta above an epsilon
-   floor (rejects noise-driven flips). Repeat up to ``max_swaps`` times.
+   floor (rejects noise-driven flips). Stop at ``max_swaps`` total swaps.
 
 No DB writes happen here — the caller applies confirmed swaps via the
 existing add/remove deck endpoints.
@@ -24,17 +28,20 @@ from uuid import UUID, uuid4
 import asyncpg
 from qdrant_client import AsyncQdrantClient
 
+from mtg_helper.models.ai import CardSuggestion
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.models.optimizer import OptimizationProposal, ProposedSwap
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
-from mtg_helper.models.swaps import SwapCandidate
-from mtg_helper.services import playtest_service, swap_service
+from mtg_helper.services import mana_base_service, playtest_service, swap_service
 from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.swap_service import SwapError
 
 _SCORE_EPSILON = 0.01
 _WEAK_CARD_ATTEMPTS = 6
 _CANDIDATE_LIMIT = 5
+# Color screw above this fraction triggers the mana-fix stage.
+_COLOR_SCREW_TRIGGER = 0.05
+_FIVE_COLORS = frozenset("WUBRG")
 
 _SCORE_WEIGHTS = {
     "screw": 1.5,
@@ -134,7 +141,7 @@ def _rank_weak_cards(
 
 
 def _candidate_to_card_item(
-    cand: SwapCandidate, source: DeckCardItem, source_stages: list[str]
+    cand: CardSuggestion, source: DeckCardItem, source_stages: list[str]
 ) -> DeckCardItem:
     """Build an in-memory ``DeckCardItem`` for the replacement so the variant
     deck can be simulated without touching the DB. Identifiers are fresh
@@ -194,7 +201,7 @@ def _apply_swap_in_memory(
     return variant
 
 
-def _price_delta(out_card: DeckCardItem, cand: SwapCandidate) -> int | None:
+def _price_delta(out_card: DeckCardItem, cand: CardSuggestion) -> int | None:
     out_price = out_card.price_eur_cents
     in_price = cand.price_eur_cents
     if out_price is None or in_price is None:
@@ -214,6 +221,98 @@ def _sum_price_deltas(swaps: list[ProposedSwap]) -> int | None:
             return None
         total += s.price_delta_cents
     return total
+
+
+def _pick_overrepresented_basic(
+    deck: DeckDetailResponse, exclude_card_ids: set[UUID]
+) -> DeckCardItem | None:
+    """Pick the basic land whose color is most over-represented, to trim by one.
+
+    Uses ``analyze_mana_base`` source counts: trimming a copy of the most
+    abundant color's basic frees a land slot for a dual without starving that
+    color. Returns ``None`` when no eligible basic remains.
+    """
+    report = mana_base_service.analyze_mana_base(deck)
+    source_by_color = {c.color: c.source_count for c in report.colors}
+    basics = [
+        c
+        for c in deck.cards
+        if _is_basic_land(c) and c.card_id not in exclude_card_ids and c.quantity > 0
+    ]
+    if not basics:
+        return None
+
+    def disposability(card: DeckCardItem) -> int:
+        colors = [x for x in (card.color_identity or []) if x in source_by_color]
+        return max((source_by_color[x] for x in colors), default=0)
+
+    basics.sort(key=disposability, reverse=True)
+    return basics[0]
+
+
+def _mana_fix_reason(pct_color_screw: float, cand: CardSuggestion) -> str:
+    colors = "/".join(c for c in (cand.color_identity or []) if c in _FIVE_COLORS)
+    sources = colors if colors else "color"
+    return f"color screw {pct_color_screw * 100:.0f}% — adding {sources} source"
+
+
+async def _try_mana_fix(
+    pool: asyncpg.Pool,
+    ai_client: LLMClient,
+    qdrant_client: AsyncQdrantClient,
+    deck: DeckDetailResponse,
+    stats: PlaytestStats,
+    pinned_sim: PlaytestSimulateRequest,
+    current_score: float,
+    *,
+    max_price_cents: int | None,
+    account_id: UUID | None,
+    exclude_card_ids: set[UUID],
+    excluded_scryfall_ids: set[UUID],
+) -> tuple[ProposedSwap, PlaytestStats, DeckDetailResponse] | None:
+    """Trim one over-represented basic for the best color-fixing land, or ``None``.
+
+    Sources candidates from ``mana_base_service.suggest_mana_fix`` (already
+    price-filtered server-side; re-checked here defensively) and keeps the
+    dual whose swap improves the score most, above the epsilon floor.
+    """
+    out_basic = _pick_overrepresented_basic(deck, exclude_card_ids)
+    if out_basic is None:
+        return None
+    fix = await mana_base_service.suggest_mana_fix(
+        pool, ai_client, qdrant_client, deck, account_id, max_price_cents=max_price_cents
+    )
+
+    best: tuple[ProposedSwap, PlaytestStats, DeckDetailResponse] | None = None
+    best_delta = _SCORE_EPSILON
+    for cand in fix.suggestions:
+        if cand.scryfall_id in excluded_scryfall_ids:
+            continue
+        if (
+            max_price_cents is not None
+            and cand.price_eur_cents is not None
+            and cand.price_eur_cents > max_price_cents
+        ):
+            continue
+        replacement = _candidate_to_card_item(cand, out_basic, [])
+        variant = _apply_swap_in_memory(deck, out_basic, replacement)
+        variant_stats = playtest_service.simulate(variant, pinned_sim)
+        delta = _health_score(variant_stats) - current_score
+        if delta <= best_delta:
+            continue
+        proposal = ProposedSwap(
+            out_card_id=out_basic.card_id,
+            out_scryfall_id=out_basic.scryfall_id,
+            out_card_name=out_basic.name,
+            in_scryfall_id=cand.scryfall_id,
+            in_card_name=cand.name,
+            reason=_mana_fix_reason(stats.color_screw.pct_color_screw, cand),
+            score_delta=delta,
+            price_delta_cents=_price_delta(out_basic, cand),
+        )
+        best = (proposal, variant_stats, variant)
+        best_delta = delta
+    return best
 
 
 async def _try_swap(
@@ -274,6 +373,57 @@ async def _try_swap(
     return best
 
 
+async def _run_mana_fix_loop(
+    pool: asyncpg.Pool,
+    ai_client: LLMClient,
+    qdrant_client: AsyncQdrantClient,
+    variant_deck: DeckDetailResponse,
+    variant_stats: PlaytestStats,
+    pinned_sim: PlaytestSimulateRequest,
+    current_score: float,
+    swaps: list[ProposedSwap],
+    excluded_scryfall_ids: set[UUID],
+    *,
+    max_price_cents: int | None,
+    account_id: UUID | None,
+    max_swaps: int,
+) -> tuple[DeckDetailResponse, PlaytestStats, float]:
+    """Trim over-represented basics for color-fixing lands while screw is breached.
+
+    Mutates ``swaps`` and ``excluded_scryfall_ids`` in place; returns the
+    updated ``(deck, stats, score)`` so the caller can continue into the
+    nonland stage. Each distinct basic is trimmed at most once per call to
+    keep the apply step's single-copy swap unambiguous.
+    """
+    exclude_basic_ids: set[UUID] = set()
+    while len(swaps) < max_swaps:
+        if variant_stats.color_screw.pct_color_screw <= _COLOR_SCREW_TRIGGER:
+            break
+        outcome = await _try_mana_fix(
+            pool,
+            ai_client,
+            qdrant_client,
+            variant_deck,
+            variant_stats,
+            pinned_sim,
+            current_score,
+            max_price_cents=max_price_cents,
+            account_id=account_id,
+            exclude_card_ids=exclude_basic_ids,
+            excluded_scryfall_ids=excluded_scryfall_ids,
+        )
+        if outcome is None:
+            break
+        proposal, new_stats, new_deck = outcome
+        swaps.append(proposal)
+        current_score += proposal.score_delta
+        variant_stats = new_stats
+        variant_deck = new_deck
+        exclude_basic_ids.add(proposal.out_card_id)
+        excluded_scryfall_ids.add(proposal.in_scryfall_id)
+    return variant_deck, variant_stats, current_score
+
+
 async def propose_optimization(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
@@ -296,8 +446,9 @@ async def propose_optimization(
             variants — derived from the deck id when caller omits it.
         max_price_cents: Per-candidate price ceiling, in cents. ``None``
             falls back to ``swap_service``'s "strictly cheaper than source"
-            default per swap.
-        max_swaps: Upper bound on accepted swaps.
+            default per swap; the mana-fix stage applies no ceiling when None.
+        max_swaps: Upper bound on accepted swaps (shared across the mana-fix
+            and nonland stages).
         account_id: Caller's account id (for ownership annotations from
             ``swap_service``).
 
@@ -315,6 +466,22 @@ async def propose_optimization(
     swaps: list[ProposedSwap] = []
     excluded_names: set[str] = set()
     excluded_scryfall_ids: set[UUID] = set()
+
+    if baseline_stats.color_screw.pct_color_screw > _COLOR_SCREW_TRIGGER:
+        variant_deck, variant_stats, current_score = await _run_mana_fix_loop(
+            pool,
+            ai_client,
+            qdrant_client,
+            variant_deck,
+            variant_stats,
+            pinned_sim,
+            current_score,
+            swaps,
+            excluded_scryfall_ids,
+            max_price_cents=max_price_cents,
+            account_id=account_id,
+            max_swaps=max_swaps,
+        )
 
     while len(swaps) < max_swaps:
         weak_cards = _rank_weak_cards(variant_deck, variant_stats, excluded_names)

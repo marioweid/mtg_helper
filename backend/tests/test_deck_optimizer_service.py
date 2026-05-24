@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from mtg_helper.models.ai import CardSuggestion, ColorStatus, ManaBaseReport, ManaFixResponse
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.models.playtest import (
     ColorScrewStats,
@@ -469,3 +470,201 @@ class TestCandidateToCardItem:
         assert item.categories == ["lands", "ramp"]
         assert item.scryfall_id == cand.scryfall_id
         assert item.cmc == Decimal("2.0")
+
+
+# ─── Mana-fix stage ─────────────────────────────────────────────────────────
+
+
+def _basic(name: str, color: str, *, quantity: int = 10) -> DeckCardItem:
+    return _card(
+        name,
+        quantity=quantity,
+        type_line=f"Basic Land — {name}",
+        price_eur_cents=10,
+        color_identity=[color],
+    )
+
+
+def _land_suggestion(
+    name: str, colors: list[str], *, price_eur_cents: int | None = 800
+) -> CardSuggestion:
+    return CardSuggestion(
+        scryfall_id=uuid4(),
+        name=name,
+        mana_cost=None,
+        type_line="Land",
+        image_uri=None,
+        oracle_text=None,
+        cmc=0.0,
+        color_identity=colors,
+        category="lands",
+        reasoning="fixes color",
+        synergies=[],
+        price_eur_cents=price_eur_cents,
+        qualifying_stages=["lands"],
+    )
+
+
+def _mana_report(source_by_color: dict[str, int]) -> ManaBaseReport:
+    colors = [
+        ColorStatus(
+            color=color,
+            pip_count=1.0,
+            source_count=count,
+            target=count,
+            deficit=0,
+        )
+        for color, count in source_by_color.items()
+    ]
+    return ManaBaseReport(
+        total_lands=sum(source_by_color.values()), total_colored_pips=1.0, colors=colors
+    )
+
+
+def _patch_mana(monkeypatch, report: ManaBaseReport, fix: ManaFixResponse) -> AsyncMock:
+    monkeypatch.setattr(
+        deck_optimizer_service.mana_base_service,
+        "analyze_mana_base",
+        lambda deck, **_: report,
+    )
+    suggest = AsyncMock(return_value=fix)
+    monkeypatch.setattr(deck_optimizer_service.mana_base_service, "suggest_mana_fix", suggest)
+    return suggest
+
+
+class TestManaFixStage:
+    @pytest.mark.asyncio
+    async def test_color_screw_triggers_mana_fix_stage(self, monkeypatch: pytest.MonkeyPatch):
+        forest = _basic("Forest", "G", quantity=10)
+        deck = _deck([forest, _card("GW Creature", color_identity=["G", "W"])])
+        sim_calls = {"n": 0}
+
+        def fake_simulate(d, req):
+            sim_calls["n"] += 1
+            return (
+                _stats(pct_color_screw=0.30)
+                if sim_calls["n"] == 1
+                else _stats(pct_color_screw=0.05)
+            )
+
+        monkeypatch.setattr(deck_optimizer_service.playtest_service, "simulate", fake_simulate)
+        dual = _land_suggestion("Temple Garden", ["G", "W"], price_eur_cents=800)
+        report = _mana_report({"G": 10, "W": 0})
+        _patch_mana(monkeypatch, report, ManaFixResponse(report=report, suggestions=[dual]))
+
+        proposal = await deck_optimizer_service.propose_optimization(
+            pool=MagicMock(),
+            ai_client=MagicMock(),
+            qdrant_client=MagicMock(),
+            deck=deck,
+            sim_request=PlaytestSimulateRequest(),
+            max_price_cents=1000,
+            max_swaps=3,
+            account_id=uuid4(),
+        )
+        assert len(proposal.swaps) == 1
+        swap = proposal.swaps[0]
+        assert swap.out_card_name == "Forest"
+        assert swap.in_card_name == "Temple Garden"
+        assert "color screw" in swap.reason
+
+    @pytest.mark.asyncio
+    async def test_mana_fix_respects_price_cap(self, monkeypatch: pytest.MonkeyPatch):
+        forest = _basic("Forest", "G", quantity=10)
+        deck = _deck([forest, _card("GW Creature", color_identity=["G", "W"])])
+        sim_calls = {"n": 0}
+
+        def fake_simulate(d, req):
+            sim_calls["n"] += 1
+            return (
+                _stats(pct_color_screw=0.30)
+                if sim_calls["n"] == 1
+                else _stats(pct_color_screw=0.05)
+            )
+
+        monkeypatch.setattr(deck_optimizer_service.playtest_service, "simulate", fake_simulate)
+        cheap = _land_suggestion("Command Tower", ["G", "W"], price_eur_cents=200)
+        pricey = _land_suggestion("Savannah", ["G", "W"], price_eur_cents=1500)
+        report = _mana_report({"G": 10, "W": 0})
+        suggest = _patch_mana(
+            monkeypatch, report, ManaFixResponse(report=report, suggestions=[pricey, cheap])
+        )
+
+        proposal = await deck_optimizer_service.propose_optimization(
+            pool=MagicMock(),
+            ai_client=MagicMock(),
+            qdrant_client=MagicMock(),
+            deck=deck,
+            sim_request=PlaytestSimulateRequest(),
+            max_price_cents=500,
+            max_swaps=3,
+            account_id=uuid4(),
+        )
+        assert len(proposal.swaps) == 1
+        assert proposal.swaps[0].in_card_name == "Command Tower"
+        assert suggest.await_args.kwargs["max_price_cents"] == 500
+
+    @pytest.mark.asyncio
+    async def test_mana_fix_falls_through_to_nonland_loop(self, monkeypatch: pytest.MonkeyPatch):
+        forest = _basic("Forest", "G", quantity=10)
+        stuck = _card("Stuck Guy", color_identity=["G"])
+        deck = _deck([forest, stuck])
+        stuck_card = StuckCard(name="Stuck Guy", cost="{2}", pct_stuck=0.5, blocker="mana")
+        sim_calls = {"n": 0}
+
+        def fake_simulate(d, req):
+            sim_calls["n"] += 1
+            if sim_calls["n"] == 1:
+                return _stats(pct_color_screw=0.30, top_stuck=[stuck_card])
+            if sim_calls["n"] == 2:
+                return _stats(pct_color_screw=0.05, top_stuck=[stuck_card])
+            return _stats(pct_color_screw=0.05, pct_screw=0.01)
+
+        monkeypatch.setattr(deck_optimizer_service.playtest_service, "simulate", fake_simulate)
+        dual = _land_suggestion("Temple Garden", ["G", "W"], price_eur_cents=400)
+        report = _mana_report({"G": 10, "W": 0})
+        _patch_mana(monkeypatch, report, ManaFixResponse(report=report, suggestions=[dual]))
+        find_swaps = AsyncMock(
+            return_value=_swap_response(
+                stuck.card_id, [_candidate("Better Guy", price_eur_cents=300)]
+            )
+        )
+        monkeypatch.setattr(deck_optimizer_service.swap_service, "find_budget_swaps", find_swaps)
+
+        proposal = await deck_optimizer_service.propose_optimization(
+            pool=MagicMock(),
+            ai_client=MagicMock(),
+            qdrant_client=MagicMock(),
+            deck=deck,
+            sim_request=PlaytestSimulateRequest(),
+            max_price_cents=1000,
+            max_swaps=3,
+            account_id=uuid4(),
+        )
+        names = [(s.out_card_name, s.in_card_name) for s in proposal.swaps]
+        assert ("Forest", "Temple Garden") in names
+        assert ("Stuck Guy", "Better Guy") in names
+
+    @pytest.mark.asyncio
+    async def test_mana_fix_skipped_when_below_threshold(self, monkeypatch: pytest.MonkeyPatch):
+        deck = _deck([_basic("Forest", "G", quantity=10)])
+
+        def fake_simulate(d, req):
+            return _stats(pct_color_screw=0.02)
+
+        monkeypatch.setattr(deck_optimizer_service.playtest_service, "simulate", fake_simulate)
+        report = _mana_report({"G": 10})
+        suggest = _patch_mana(monkeypatch, report, ManaFixResponse(report=report, suggestions=[]))
+
+        proposal = await deck_optimizer_service.propose_optimization(
+            pool=MagicMock(),
+            ai_client=MagicMock(),
+            qdrant_client=MagicMock(),
+            deck=deck,
+            sim_request=PlaytestSimulateRequest(),
+            max_price_cents=None,
+            max_swaps=3,
+            account_id=uuid4(),
+        )
+        assert proposal.swaps == []
+        suggest.assert_not_awaited()

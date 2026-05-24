@@ -139,10 +139,16 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
         const original = deckCards.find((c) => c.scryfall_id === swap.out_scryfall_id);
         const quantity = original?.quantity ?? 1;
         const categories = original?.categories ?? [];
-        await apiClient.removeCard(deckId, swap.out_scryfall_id);
+        // Swap a single copy: decrement a multi-copy source (e.g. basic lands)
+        // rather than deleting the whole stack, matching the backend sim.
+        if (quantity > 1) {
+          await apiClient.updateCardQuantity(deckId, swap.out_scryfall_id, quantity - 1);
+        } else {
+          await apiClient.removeCard(deckId, swap.out_scryfall_id);
+        }
         await apiClient.addCard(deckId, {
           card_scryfall_id: swap.in_scryfall_id,
-          quantity: Math.max(1, quantity),
+          quantity: 1,
           categories,
           added_by: "ai",
           ai_reasoning: `Optimizer swap: ${swap.reason}`,
