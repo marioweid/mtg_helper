@@ -24,7 +24,7 @@ interface Props {
   } | null;
   /** Target card count for the breakdown bar. Defaults to 100 (Commander). */
   target?: number;
-  /** Declared deck bracket (1-4). Drives the Game Changer cap badge. */
+  /** Declared deck bracket (1-5). Drives the Game Changer cap badge. */
   bracket?: number | null;
   /** When provided, the merged filter+search input can add cards to this deck. */
   deckId?: string;

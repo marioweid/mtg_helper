@@ -33,6 +33,8 @@ import type {
   KeywordExtractRequest,
   KeywordExtractResponse,
   ManaFixResponse,
+  OptimizationProposal,
+  OptimizeRequest,
   PaginationMeta,
   PlaytestSimulateRequest,
   PlaytestStats,
@@ -175,6 +177,12 @@ export const apiClient = {
 
   playtestAnalyze: (deckId: string, body: PlaytestSimulateRequest = {}) =>
     request<SimulationAnalysisResponse>(`/decks/${deckId}/playtest/analyze`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  optimizeDeck: (deckId: string, body: OptimizeRequest) =>
+    request<OptimizationProposal>(`/decks/${deckId}/playtest/optimize`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

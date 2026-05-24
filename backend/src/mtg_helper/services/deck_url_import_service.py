@@ -413,7 +413,7 @@ async def import_from_url(
         name_override: Optional deck name; falls back to the source's name,
             then to a generic placeholder.
         description_override: Optional description; falls back to source's.
-        bracket: Deck bracket (1–4); defaults to 3.
+        bracket: Deck bracket (1–5); defaults to 3.
         client: Optional httpx client (injected by tests).
 
     Returns:

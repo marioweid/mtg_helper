@@ -18,8 +18,8 @@ export function findGameChangers(
 }
 
 /**
- * Allowed Game Changer count per bracket. ``null`` means unlimited (bracket 4).
- * Brackets 1 and 2 disallow all; bracket 3 caps at 3.
+ * Allowed Game Changer count per bracket. ``null`` means unlimited (brackets
+ * 4 and 5). Brackets 1 and 2 disallow all; bracket 3 caps at 3.
  */
 export function gameChangerLimit(bracket: number | null | undefined): number | null {
   if (bracket == null) return null;

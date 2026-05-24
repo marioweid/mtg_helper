@@ -4,11 +4,12 @@ Compares a deck's cards (and active combos) against WotC's Commander
 Bracket criteria — Game Changers, mass land destruction, fast mana, and
 two-card infinite combos — and reports per-rule violations.
 
-Bracket policy used here (Brackets 1–4):
-    1 (Casual):    no Game Changers, no MLD, no fast mana, no 2-card infinites
-    2 (Upgraded):  no Game Changers, no MLD, no 2-card infinites
-    3 (Optimized): up to 3 Game Changers, no MLD
-    4 (cEDH):     anything allowed
+Bracket policy used here (Brackets 1–5):
+    1 (Exhibition): no Game Changers, no MLD, no fast mana, no 2-card infinites
+    2 (Core):       no Game Changers, no MLD, no 2-card infinites
+    3 (Upgraded):   up to 3 Game Changers, no MLD
+    4 (Optimized):  Game Changers unlimited, MLD allowed
+    5 (cEDH):       anything allowed
 """
 
 from mtg_helper.models.brackets import BracketValidationResponse, BracketViolation

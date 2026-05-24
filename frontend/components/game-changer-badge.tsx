@@ -17,7 +17,7 @@ interface Props {
 /**
  * Pill showing ``N / limit`` Game Changers for the deck's bracket. Hovering
  * reveals the matching card names. Brackets 1/2 cap at 0, bracket 3 at 3,
- * bracket 4 is unlimited (shown as ``∞``).
+ * brackets 4 and 5 are unlimited (shown as ``∞``).
  */
 export function GameChangerBadge({ cards, bracket, commander, compact }: Props) {
   const matches = findGameChangers(cards, commander ?? null);

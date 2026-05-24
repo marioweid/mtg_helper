@@ -240,7 +240,7 @@ async def import_parsed_entries(
         non_commanders: Non-commander ParsedCard entries (the mainboard).
         name: Deck name.
         description: Optional deck description.
-        bracket: Deck bracket (1–4).
+        bracket: Deck bracket (1–5).
         email: Authenticated account email — owner of the new deck.
 
     Returns:

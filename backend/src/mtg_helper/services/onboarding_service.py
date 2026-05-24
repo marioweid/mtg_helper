@@ -113,7 +113,7 @@ async def quickstart(
         max_price_cents: Optional per-card price ceiling, persisted on the
             deck so subsequent manual stage rebuilds inherit it.
         min_price_cents: Optional per-card price floor; persisted.
-        bracket: Deck bracket (1–4); default 2 (precon-friendly).
+        bracket: Deck bracket (1–5); default 2 (precon-friendly).
         name: Optional deck name; defaults to "{commander_name} sample deck".
         on_progress: Optional async callback fired after each stage.
 

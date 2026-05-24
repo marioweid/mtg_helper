@@ -21,11 +21,13 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
+from mtg_helper.models.optimizer import OptimizationProposal, OptimizeRequest
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
 from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
     agents,
     ai_service,
+    deck_optimizer_service,
     deck_service,
     mana_base_service,
     playtest_service,
@@ -186,6 +188,35 @@ async def playtest_analyze(
         request.app.state.ai_client,
         deck,
         stats,
+    )
+    return DataResponse(data=result)
+
+
+@router.post(
+    "/{deck_id}/playtest/optimize",
+    response_model=DataResponse[OptimizationProposal],
+)
+async def playtest_optimize(
+    deck_id: UUID,
+    body: OptimizeRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[OptimizationProposal]:
+    """Greedily swap weak cards and re-simulate to propose deck improvements."""
+    email = _require_email(account)
+    _enforce_rate_limit(account, "playtest_optimize", _ANALYZE_LIMIT)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    result = await deck_optimizer_service.propose_optimization(
+        request.app.state.db_pool,
+        request.app.state.ai_client,
+        request.app.state.qdrant_client,
+        deck,
+        body.sim,
+        max_price_cents=body.max_price_cents,
+        max_swaps=body.max_swaps,
+        account_id=account.id,
     )
     return DataResponse(data=result)
 

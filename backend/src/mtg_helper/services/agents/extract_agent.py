@@ -180,7 +180,7 @@ async def extract_turn(
         pool: asyncpg connection pool.
         commander_scryfall_id: Scryfall ID of the commander card.
         partner_scryfall_id: Scryfall ID of the partner commander, if any.
-        bracket: Power level bracket (1–4).
+        bracket: Power level bracket (1–5).
         history: Full conversation history from the client.
         message: Latest user message; empty string means the initial prompt.
 

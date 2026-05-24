@@ -92,7 +92,7 @@ class DescribeRequest(BaseModel):
 
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
-    bracket: int = Field(default=3, ge=1, le=4)
+    bracket: int = Field(default=3, ge=1, le=5)
     history: list[DescribeMessage] = Field(default_factory=list, max_length=24)
     message: str = Field(default="", max_length=2000)
 
@@ -117,7 +117,7 @@ class KeywordExtractRequest(BaseModel):
 
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
-    bracket: int = Field(default=3, ge=1, le=4)
+    bracket: int = Field(default=3, ge=1, le=5)
     history: list[DescribeMessage] = Field(default_factory=list, max_length=24)
     message: str = Field(default="", max_length=2000)
 

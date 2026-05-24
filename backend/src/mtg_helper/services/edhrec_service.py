@@ -229,7 +229,7 @@ def _collect_name_weights(payload: dict[str, Any], *, bracket: int | None) -> di
 
     Args:
         payload: Normalized EDHREC payload.
-        bracket: Deck's bracket (1-4); ``None`` is treated as casual / <3.
+        bracket: Deck's bracket (1-5); ``None`` is treated as casual / <3.
 
     Returns:
         ``{lower(name): weight}`` map. Names are lowercased so the SQL lookup

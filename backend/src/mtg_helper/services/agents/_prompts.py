@@ -9,21 +9,26 @@ SANDBOX_RULES = (
 
 BRACKET_DESCRIPTIONS: dict[int, str] = {
     1: (
-        "casual precon-level. No tutors, no infinite combos, no extra turn spells, "
+        "exhibition / precon-level. No tutors, no infinite combos, no extra turn spells, "
         "no fast mana beyond Sol Ring. Prioritize fun and flavor over efficiency. "
         "Avoid staples that feel repetitive across every deck."
     ),
     2: (
-        "upgraded casual. Light tutors are acceptable, but no infinite combos. "
+        "core casual. Light tutors are acceptable, but no infinite combos. "
         "Staples like Sol Ring and Arcane Signet are fine. "
         "Avoid mass land destruction and hyper-efficient win conditions."
     ),
     3: (
-        "optimized. Efficient synergies and strong staples are expected. "
+        "upgraded. Efficient synergies and strong staples are expected. "
         "Tutors, combo finishers, and tight interaction are appropriate. "
         "Focus on a clear, redundant game plan."
     ),
     4: (
+        "optimized, high power. Game Changers, mass land destruction, and tight combos "
+        "are all on the table. Strong staples and fast mana are expected, but the deck "
+        "still aims for a focused plan rather than tournament-grade win-rate engineering."
+    ),
+    5: (
         "cEDH, maximum power. Prioritize fast mana, free interaction, "
         "compact win conditions, and efficient tutors. "
         "Every card should contribute to winning as quickly and consistently as possible."

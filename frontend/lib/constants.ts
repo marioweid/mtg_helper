@@ -21,10 +21,11 @@ export const STAGE_LABELS: Record<string, string> = {
 };
 
 export const BRACKET_LABELS: Record<number, string> = {
-  1: "Bracket 1 — Casual",
-  2: "Bracket 2 — Upgraded",
-  3: "Bracket 3 — Optimized",
-  4: "Bracket 4 — cEDH",
+  1: "Bracket 1 — Exhibition",
+  2: "Bracket 2 — Core",
+  3: "Bracket 3 — Upgraded",
+  4: "Bracket 4 — Optimized",
+  5: "Bracket 5 — cEDH",
 };
 
 export const CATEGORY_TARGETS: Record<string, [number, number]> = {

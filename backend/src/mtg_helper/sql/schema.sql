@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS decks (
     commander_id    UUID NOT NULL REFERENCES cards(id),
     partner_id      UUID REFERENCES cards(id),
     description     TEXT,
-    bracket         INTEGER CHECK (bracket BETWEEN 1 AND 4),
+    bracket         INTEGER CHECK (bracket BETWEEN 1 AND 5),
     stage           TEXT NOT NULL DEFAULT 'created',
     stage_targets   JSONB NOT NULL DEFAULT '{}',
     archetype_tags  TEXT[] NOT NULL DEFAULT '{}',

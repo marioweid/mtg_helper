@@ -12,7 +12,7 @@ interface Props {
   onBracketChange: (bracket: number) => void;
 }
 
-const BRACKETS = [1, 2, 3, 4] as const;
+const BRACKETS = [1, 2, 3, 4, 5] as const;
 
 export function BracketSelector({ deckId, bracket, onBracketChange }: Props) {
   const [saving, setSaving] = useState(false);

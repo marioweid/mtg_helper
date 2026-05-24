@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react";
 
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
+import { OptimizerPanel } from "@/components/playtest/optimizer-panel";
 import { PlaytestStatsPanel } from "@/components/playtest/stats-panel";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
@@ -119,6 +120,14 @@ export default function SimulatePage({ params }: PageProps) {
       )}
 
       <PlaytestStatsPanel deckId={deckId} />
+
+      {deck && (
+        <OptimizerPanel
+          deckId={deckId}
+          deckCards={deck.cards}
+          onApplied={() => void loadDeck()}
+        />
+      )}
 
       <CardDetailModal
         card={selectedCard}

@@ -550,6 +550,32 @@ export interface SimulationAnalysisResponse {
   tool_call_count: number;
 }
 
+// Optimizer
+export interface OptimizeRequest {
+  sim?: PlaytestSimulateRequest;
+  max_price_cents?: number | null;
+  max_swaps?: number;
+}
+
+export interface ProposedSwap {
+  out_card_id: string;
+  out_scryfall_id: string;
+  out_card_name: string;
+  in_scryfall_id: string;
+  in_card_name: string;
+  reason: string;
+  score_delta: number;
+  price_delta_cents: number | null;
+}
+
+export interface OptimizationProposal {
+  baseline_stats: PlaytestStats;
+  final_stats: PlaytestStats;
+  swaps: ProposedSwap[];
+  total_score_delta: number;
+  total_price_delta_cents: number | null;
+}
+
 // Import
 export interface DeckImportRequest {
   deck_list: string;
