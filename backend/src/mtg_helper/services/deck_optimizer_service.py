@@ -1,26 +1,28 @@
-"""Greedy deck optimizer: iteratively swap weak cards and re-simulate.
+"""Broad deck optimizer: search land + nonland swaps and re-simulate.
 
-The loop:
+The run has three phases, all driven by a goldfish simulation and a single
+weighted health score (:func:`_health_score`):
 
-1. Run a baseline goldfish simulation and compute a weighted health score.
-2. **Mana-fix stage** (when color screw is breached): trim an over-represented
-   basic land and add a dual/check/shock land that covers the deficient color,
-   sourced from :mod:`mana_base_service`. Re-simulate; keep the swap if the
-   score improves. Repeat while color screw stays breached and budget remains.
-3. **Nonland stage**: rank in-deck cards by how badly they hurt the score
-   (stuck in hand, never cast, blocked on mana/colors). For each weak card,
-   ask :mod:`swap_service` for cheaper functional replacements under the price
-   ceiling.
-4. Re-simulate a variant deck with each replacement in place. Pin the RNG
-   seed across every variant so the score delta measures the card change,
-   not RNG noise.
-5. Keep the replacement with the largest positive delta above an epsilon
-   floor (rejects noise-driven flips). Stop at ``max_swaps`` total swaps.
+1. **Land search** — build a large pool of in-color land sources
+   (:func:`mana_base_service.candidate_lands`) and a ranked list of swappable
+   lands (over-represented basics + weak nonbasic lands, e.g. enters-tapped
+   single-color lands). Each round, try every (swap-out land × candidate)
+   pair, simulate, and commit the single best score-improving swap.
+2. **Nonland search** — the existing weak-card loop (:func:`_try_swap` over
+   :mod:`swap_service` candidates) for any remaining swap budget.
+3. **Confirm** — the search runs at reduced trials for speed; afterwards the
+   original and final decks are re-simulated at full trials to produce the
+   reported baseline/final stats.
 
-No DB writes happen here — the caller applies confirmed swaps via the
-existing add/remove deck endpoints.
+Every simulation is offloaded with :func:`asyncio.to_thread` (the simulator is
+sync/CPU-bound) and reports progress through a :class:`_Progress` ticker, so a
+long run keeps the event loop free for status polling.
+
+No DB writes happen here — the caller applies confirmed swaps via the existing
+add/remove deck endpoints.
 """
 
+import asyncio
 from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -30,17 +32,16 @@ from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import CardSuggestion
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
-from mtg_helper.models.optimizer import OptimizationProposal, ProposedSwap
+from mtg_helper.models.optimizer import OptimizationProposal, ProposedSwap, SearchDepth
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
 from mtg_helper.services import mana_base_service, playtest_service, swap_service
 from mtg_helper.services.llm_client import LLMClient
+from mtg_helper.services.optimizer_jobs import ProgressCb, noop_progress
 from mtg_helper.services.swap_service import SwapError
 
 _SCORE_EPSILON = 0.01
 _WEAK_CARD_ATTEMPTS = 6
 _CANDIDATE_LIMIT = 5
-# Color screw above this fraction triggers the mana-fix stage.
-_COLOR_SCREW_TRIGGER = 0.05
 _FIVE_COLORS = frozenset("WUBRG")
 
 _SCORE_WEIGHTS = {
@@ -50,6 +51,23 @@ _SCORE_WEIGHTS = {
     "mulligans": 0.8,
     "kept_at_7": 0.6,
     "commander_cast": 0.4,
+}
+
+
+@dataclass(frozen=True)
+class _DepthPreset:
+    """Search-breadth knobs for one ``search_depth`` preset."""
+
+    pool: int
+    out_targets: int
+    max_land_rounds: int
+    search_trials: int
+
+
+_DEPTH_PRESETS: dict[SearchDepth, _DepthPreset] = {
+    "quick": _DepthPreset(pool=20, out_targets=3, max_land_rounds=2, search_trials=400),
+    "thorough": _DepthPreset(pool=40, out_targets=6, max_land_rounds=3, search_trials=400),
+    "exhaustive": _DepthPreset(pool=80, out_targets=12, max_land_rounds=4, search_trials=500),
 }
 
 
@@ -78,8 +96,30 @@ def _resolve_seed(deck: DeckDetailResponse, sim: PlaytestSimulateRequest) -> int
     return abs(hash(deck.id)) % (2**31)
 
 
-def _pinned(sim: PlaytestSimulateRequest, seed: int) -> PlaytestSimulateRequest:
-    return sim.model_copy(update={"seed": seed})
+def _pinned(
+    sim: PlaytestSimulateRequest, seed: int, *, trials: int | None = None
+) -> PlaytestSimulateRequest:
+    update: dict[str, int] = {"seed": seed}
+    if trials is not None:
+        update["trials"] = trials
+    return sim.model_copy(update=update)
+
+
+@dataclass
+class _Progress:
+    """Counts simulations and reports ticks to the caller's progress sink."""
+
+    cb: ProgressCb
+    total: int
+    done: int = 0
+    phase: str = ""
+
+    async def sim(self, deck: DeckDetailResponse, sim: PlaytestSimulateRequest) -> PlaytestStats:
+        """Run one simulation off the event loop and tick progress."""
+        stats = await asyncio.to_thread(playtest_service.simulate, deck, sim)
+        self.done += 1
+        self.cb(self.phase, self.done, self.total)
+        return stats
 
 
 @dataclass(frozen=True)
@@ -98,18 +138,21 @@ def _is_basic_land(card: DeckCardItem) -> bool:
     return "Basic Land" in (card.type_line or "")
 
 
+def _is_land(card: DeckCardItem) -> bool:
+    return "Land" in (card.type_line or "")
+
+
 def _rank_weak_cards(
     deck: DeckDetailResponse,
     stats: PlaytestStats,
     excluded_names: set[str],
 ) -> list[_WeakCard]:
-    """Order in-deck cards by how much swapping them out is likely to help.
-
-    Combines ``top_stuck_cards`` (with a per-blocker priority) and per-card
-    stuck-in-hand percentages. Basic lands, commanders/partners, and any
-    names in ``excluded_names`` are skipped.
+    """Order in-deck nonland cards by how much swapping them out is likely to
+    help. Combines ``top_stuck_cards`` (per-blocker priority) and per-card
+    stuck-in-hand percentages. Lands, commanders/partners, and ``excluded_names``
+    are skipped.
     """
-    by_name: dict[str, DeckCardItem] = {c.name: c for c in deck.cards if not _is_basic_land(c)}
+    by_name: dict[str, DeckCardItem] = {c.name: c for c in deck.cards if not _is_land(c)}
     weights: dict[str, tuple[float, str]] = {}
 
     for stuck in stats.top_stuck_cards:
@@ -138,6 +181,45 @@ def _rank_weak_cards(
 
     ranked = sorted(weights.items(), key=lambda item: item[1][0], reverse=True)
     return [_WeakCard(card=by_name[name], weight=w, reason=r) for name, (w, r) in ranked]
+
+
+def _land_disposability(card: DeckCardItem, source_by_color: dict[str, int]) -> float:
+    """Score how freely a land can be swapped out. Higher = more disposable.
+
+    Basics are always disposable (abundant-color basics most so). Nonbasic
+    lands earn disposability for entering tapped, producing a single color, or
+    only producing colors the deck is already rich in. Strong untapped
+    multi-color lands score near zero and are tried last (or not at all).
+    """
+    produces = playtest_service._land_produces(card)
+    abundance = float(max((source_by_color.get(c, 0) for c in produces), default=0))
+    if _is_basic_land(card):
+        return abundance + 1.0
+    score = 0.0
+    if playtest_service._is_enters_tapped(card):
+        score += 5.0
+    if len({c for c in produces}) <= 1:
+        score += 3.0
+    score += min(abundance, 10.0) * 0.3
+    return score
+
+
+def _rank_swappable_lands(deck: DeckDetailResponse) -> list[DeckCardItem]:
+    """Rank in-deck lands by disposability (basics + weak nonbasics first).
+
+    Lands scoring zero disposability (strong untapped fixers) are dropped.
+    """
+    report = mana_base_service.analyze_mana_base(deck)
+    source_by_color = {c.color: c.source_count for c in report.colors}
+    scored: list[tuple[float, DeckCardItem]] = []
+    for land in deck.cards:
+        if not _is_land(land) or land.quantity <= 0:
+            continue
+        weight = _land_disposability(land, source_by_color)
+        if weight > 0:
+            scored.append((weight, land))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [land for _, land in scored]
 
 
 def _candidate_to_card_item(
@@ -223,122 +305,150 @@ def _sum_price_deltas(swaps: list[ProposedSwap]) -> int | None:
     return total
 
 
-def _pick_overrepresented_basic(
-    deck: DeckDetailResponse, exclude_card_ids: set[UUID]
-) -> DeckCardItem | None:
-    """Pick the basic land whose color is most over-represented, to trim by one.
-
-    Uses ``analyze_mana_base`` source counts: trimming a copy of the most
-    abundant color's basic frees a land slot for a dual without starving that
-    color. Returns ``None`` when no eligible basic remains.
-    """
-    report = mana_base_service.analyze_mana_base(deck)
-    source_by_color = {c.color: c.source_count for c in report.colors}
-    basics = [
-        c
-        for c in deck.cards
-        if _is_basic_land(c) and c.card_id not in exclude_card_ids and c.quantity > 0
-    ]
-    if not basics:
-        return None
-
-    def disposability(card: DeckCardItem) -> int:
-        colors = [x for x in (card.color_identity or []) if x in source_by_color]
-        return max((source_by_color[x] for x in colors), default=0)
-
-    basics.sort(key=disposability, reverse=True)
-    return basics[0]
-
-
-def _mana_fix_reason(pct_color_screw: float, cand: CardSuggestion) -> str:
-    colors = "/".join(c for c in (cand.color_identity or []) if c in _FIVE_COLORS)
-    sources = colors if colors else "color"
-    return f"color screw {pct_color_screw * 100:.0f}% — adding {sources} source"
-
-
-async def _try_mana_fix(
-    pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
-    deck: DeckDetailResponse,
-    stats: PlaytestStats,
-    pinned_sim: PlaytestSimulateRequest,
-    current_score: float,
-    *,
-    max_price_cents: int | None,
-    account_id: UUID | None,
-    exclude_card_ids: set[UUID],
-    excluded_scryfall_ids: set[UUID],
-) -> tuple[ProposedSwap, PlaytestStats, DeckDetailResponse] | None:
-    """Trim one over-represented basic for the best color-fixing land, or ``None``.
-
-    Sources candidates from ``mana_base_service.suggest_mana_fix`` (already
-    price-filtered server-side; re-checked here defensively) and keeps the
-    dual whose swap improves the score most, above the epsilon floor.
-    """
-    out_basic = _pick_overrepresented_basic(deck, exclude_card_ids)
-    if out_basic is None:
-        return None
-    fix = await mana_base_service.suggest_mana_fix(
-        pool, ai_client, qdrant_client, deck, account_id, max_price_cents=max_price_cents
+def _over_price(cand: CardSuggestion, max_price_cents: int | None) -> bool:
+    return (
+        max_price_cents is not None
+        and cand.price_eur_cents is not None
+        and cand.price_eur_cents > max_price_cents
     )
 
-    best: tuple[ProposedSwap, PlaytestStats, DeckDetailResponse] | None = None
+
+def _land_swap_reason(out_land: DeckCardItem, cand: CardSuggestion, stats: PlaytestStats) -> str:
+    colors = "/".join(c for c in (cand.color_identity or []) if c in _FIVE_COLORS) or "fixing"
+    if _is_basic_land(out_land):
+        screw = stats.color_screw.pct_color_screw * 100
+        return f"color screw {screw:.0f}% — {out_land.name} → {colors} source"
+    return f"upgrading {out_land.name} → better {colors} land"
+
+
+@dataclass
+class _RunState:
+    """Mutable accumulation threaded through the search phases."""
+
+    variant_deck: DeckDetailResponse
+    variant_stats: PlaytestStats
+    current_score: float
+    swaps: list[ProposedSwap]
+    excluded_scryfall_ids: set[UUID]
+
+    def commit(
+        self, proposal: ProposedSwap, stats: PlaytestStats, deck: DeckDetailResponse
+    ) -> None:
+        self.swaps.append(proposal)
+        self.current_score += proposal.score_delta
+        self.variant_stats = stats
+        self.variant_deck = deck
+        self.excluded_scryfall_ids.add(proposal.in_scryfall_id)
+        self.excluded_scryfall_ids.add(proposal.out_scryfall_id)
+
+
+async def _best_land_swap(
+    state: _RunState,
+    prog: _Progress,
+    out_targets: list[DeckCardItem],
+    candidates: list[CardSuggestion],
+    search_sim: PlaytestSimulateRequest,
+    *,
+    max_price_cents: int | None,
+) -> tuple[ProposedSwap, PlaytestStats, DeckDetailResponse, UUID] | None:
+    """Evaluate every (out land × candidate) pair; return the best improver."""
+    best: tuple[ProposedSwap, PlaytestStats, DeckDetailResponse, UUID] | None = None
     best_delta = _SCORE_EPSILON
-    for cand in fix.suggestions:
-        if cand.scryfall_id in excluded_scryfall_ids:
-            continue
-        if (
-            max_price_cents is not None
-            and cand.price_eur_cents is not None
-            and cand.price_eur_cents > max_price_cents
-        ):
-            continue
-        replacement = _candidate_to_card_item(cand, out_basic, [])
-        variant = _apply_swap_in_memory(deck, out_basic, replacement)
-        variant_stats = playtest_service.simulate(variant, pinned_sim)
-        delta = _health_score(variant_stats) - current_score
-        if delta <= best_delta:
-            continue
-        proposal = ProposedSwap(
-            out_card_id=out_basic.card_id,
-            out_scryfall_id=out_basic.scryfall_id,
-            out_card_name=out_basic.name,
-            in_scryfall_id=cand.scryfall_id,
-            in_card_name=cand.name,
-            reason=_mana_fix_reason(stats.color_screw.pct_color_screw, cand),
-            score_delta=delta,
-            price_delta_cents=_price_delta(out_basic, cand),
-        )
-        best = (proposal, variant_stats, variant)
-        best_delta = delta
+    for out_land in out_targets:
+        for cand in candidates:
+            if cand.scryfall_id in state.excluded_scryfall_ids or _over_price(
+                cand, max_price_cents
+            ):
+                continue
+            replacement = _candidate_to_card_item(cand, out_land, [])
+            variant = _apply_swap_in_memory(state.variant_deck, out_land, replacement)
+            stats = await prog.sim(variant, search_sim)
+            delta = _health_score(stats) - state.current_score
+            if delta <= best_delta:
+                continue
+            proposal = ProposedSwap(
+                out_card_id=out_land.card_id,
+                out_scryfall_id=out_land.scryfall_id,
+                out_card_name=out_land.name,
+                in_scryfall_id=cand.scryfall_id,
+                in_card_name=cand.name,
+                reason=_land_swap_reason(out_land, cand, state.variant_stats),
+                score_delta=delta,
+                price_delta_cents=_price_delta(out_land, cand),
+            )
+            best = (proposal, stats, variant, out_land.card_id)
+            best_delta = delta
     return best
 
 
-async def _try_swap(
+async def _run_land_search(
+    state: _RunState,
+    prog: _Progress,
     pool: asyncpg.Pool,
     ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
-    deck: DeckDetailResponse,
+    search_sim: PlaytestSimulateRequest,
+    *,
+    max_price_cents: int | None,
+    max_swaps: int,
+    depth: _DepthPreset,
+) -> None:
+    """Try land swaps (basics + weak nonbasics → better sources) in rounds.
+
+    Each round evaluates every (swap-out land × candidate) pair and commits the
+    single best score-improving swap. Stops at ``max_swaps`` or when a round
+    finds no improvement. Each distinct land is swapped at most once so the
+    apply step's single-copy semantics stay unambiguous.
+    """
+    prog.phase = "searching lands"
+    candidates = await mana_base_service.candidate_lands(
+        pool,
+        ai_client,
+        qdrant_client,
+        state.variant_deck,
+        max_price_cents=max_price_cents,
+        limit=depth.pool,
+    )
+    if not candidates:
+        return
+    used_out_ids: set[UUID] = set()
+    for _round in range(depth.max_land_rounds):
+        if len(state.swaps) >= max_swaps:
+            break
+        out_targets = [
+            land
+            for land in _rank_swappable_lands(state.variant_deck)
+            if land.card_id not in used_out_ids
+        ][: depth.out_targets]
+        best = await _best_land_swap(
+            state, prog, out_targets, candidates, search_sim, max_price_cents=max_price_cents
+        )
+        if best is None:
+            break
+        proposal, stats, variant, out_id = best
+        used_out_ids.add(out_id)
+        state.commit(proposal, stats, variant)
+
+
+async def _try_swap(
+    state: _RunState,
+    prog: _Progress,
+    pool: asyncpg.Pool,
+    ai_client: LLMClient,
+    qdrant_client: AsyncQdrantClient,
     weak: _WeakCard,
-    pinned_sim: PlaytestSimulateRequest,
-    current_score: float,
+    search_sim: PlaytestSimulateRequest,
     *,
     max_price_cents: int | None,
     account_id: UUID | None,
-    excluded_scryfall_ids: set[UUID],
 ) -> tuple[ProposedSwap, PlaytestStats, DeckDetailResponse] | None:
-    """Find the best score-improving replacement for ``weak.card`` or ``None``.
-
-    Returns a tuple of (the swap record, the variant's stats, the variant
-    deck) when at least one candidate clears the epsilon floor.
-    """
+    """Find the best score-improving replacement for ``weak.card`` or ``None``."""
     try:
         swap_resp = await swap_service.find_budget_swaps(
             pool,
             ai_client,
             qdrant_client,
-            deck,
+            state.variant_deck,
             weak.card.card_id,
             max_price_cents=max_price_cents,
             account_id=account_id,
@@ -350,12 +460,12 @@ async def _try_swap(
     best: tuple[ProposedSwap, PlaytestStats, DeckDetailResponse] | None = None
     best_delta = _SCORE_EPSILON
     for cand in swap_resp.candidates:
-        if cand.scryfall_id in excluded_scryfall_ids:
+        if cand.scryfall_id in state.excluded_scryfall_ids:
             continue
         replacement = _candidate_to_card_item(cand, weak.card, weak.card.qualifying_stages or [])
-        variant = _apply_swap_in_memory(deck, weak.card, replacement)
-        variant_stats = playtest_service.simulate(variant, pinned_sim)
-        delta = _health_score(variant_stats) - current_score
+        variant = _apply_swap_in_memory(state.variant_deck, weak.card, replacement)
+        stats = await prog.sim(variant, search_sim)
+        delta = _health_score(stats) - state.current_score
         if delta <= best_delta:
             continue
         proposal = ProposedSwap(
@@ -368,161 +478,147 @@ async def _try_swap(
             score_delta=delta,
             price_delta_cents=_price_delta(weak.card, cand),
         )
-        best = (proposal, variant_stats, variant)
+        best = (proposal, stats, variant)
         best_delta = delta
     return best
 
 
-async def _run_mana_fix_loop(
+async def _run_nonland_search(
+    state: _RunState,
+    prog: _Progress,
     pool: asyncpg.Pool,
     ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
-    variant_deck: DeckDetailResponse,
-    variant_stats: PlaytestStats,
-    pinned_sim: PlaytestSimulateRequest,
-    current_score: float,
-    swaps: list[ProposedSwap],
-    excluded_scryfall_ids: set[UUID],
+    search_sim: PlaytestSimulateRequest,
     *,
     max_price_cents: int | None,
     account_id: UUID | None,
     max_swaps: int,
-) -> tuple[DeckDetailResponse, PlaytestStats, float]:
-    """Trim over-represented basics for color-fixing lands while screw is breached.
+) -> None:
+    """Swap weak nonland cards for cheaper functional replacements."""
+    prog.phase = "searching cards"
+    excluded_names: set[str] = set()
+    while len(state.swaps) < max_swaps:
+        weak_cards = _rank_weak_cards(state.variant_deck, state.variant_stats, excluded_names)
+        if not weak_cards:
+            break
+        committed = False
+        for weak in weak_cards[:_WEAK_CARD_ATTEMPTS]:
+            outcome = await _try_swap(
+                state,
+                prog,
+                pool,
+                ai_client,
+                qdrant_client,
+                weak,
+                search_sim,
+                max_price_cents=max_price_cents,
+                account_id=account_id,
+            )
+            if outcome is None:
+                excluded_names.add(weak.card.name)
+                continue
+            proposal, stats, variant = outcome
+            excluded_names.add(proposal.out_card_name)
+            excluded_names.add(proposal.in_card_name)
+            state.commit(proposal, stats, variant)
+            committed = True
+            break
+        if not committed:
+            break
 
-    Mutates ``swaps`` and ``excluded_scryfall_ids`` in place; returns the
-    updated ``(deck, stats, score)`` so the caller can continue into the
-    nonland stage. Each distinct basic is trimmed at most once per call to
-    keep the apply step's single-copy swap unambiguous.
+
+def _estimate_total(depth: _DepthPreset) -> int:
+    """Upper-bound number of sims for the progress bar (baseline + land grid +
+    one nonland round + 2 confirm). The job clamps ``current`` to ``total`` on
+    finish, so an early stop still completes the bar.
     """
-    exclude_basic_ids: set[UUID] = set()
-    while len(swaps) < max_swaps:
-        if variant_stats.color_screw.pct_color_screw <= _COLOR_SCREW_TRIGGER:
-            break
-        outcome = await _try_mana_fix(
-            pool,
-            ai_client,
-            qdrant_client,
-            variant_deck,
-            variant_stats,
-            pinned_sim,
-            current_score,
-            max_price_cents=max_price_cents,
-            account_id=account_id,
-            exclude_card_ids=exclude_basic_ids,
-            excluded_scryfall_ids=excluded_scryfall_ids,
-        )
-        if outcome is None:
-            break
-        proposal, new_stats, new_deck = outcome
-        swaps.append(proposal)
-        current_score += proposal.score_delta
-        variant_stats = new_stats
-        variant_deck = new_deck
-        exclude_basic_ids.add(proposal.out_card_id)
-        excluded_scryfall_ids.add(proposal.in_scryfall_id)
-    return variant_deck, variant_stats, current_score
+    land = depth.max_land_rounds * depth.out_targets * depth.pool
+    nonland = _WEAK_CARD_ATTEMPTS * _CANDIDATE_LIMIT
+    return 1 + land + nonland + 2
 
 
-async def propose_optimization(
+async def run_search(
     pool: asyncpg.Pool,
     ai_client: LLMClient,
     qdrant_client: AsyncQdrantClient,
     deck: DeckDetailResponse,
     sim_request: PlaytestSimulateRequest,
     *,
+    search_depth: SearchDepth = "thorough",
     max_price_cents: int | None,
     max_swaps: int = 3,
     account_id: UUID | None,
+    progress_cb: ProgressCb = noop_progress,
 ) -> OptimizationProposal:
-    """Run the greedy swap loop and return the proposal.
+    """Run the broad land + nonland search and return the proposal.
 
     Args:
         pool: asyncpg connection pool.
         ai_client: LLM adapter (used by retrieval for query embedding).
         qdrant_client: Qdrant async client.
         deck: The deck to optimize. Not mutated.
-        sim_request: Simulation parameters. ``seed`` is pinned across all
-            variants — derived from the deck id when caller omits it.
-        max_price_cents: Per-candidate price ceiling, in cents. ``None``
-            falls back to ``swap_service``'s "strictly cheaper than source"
-            default per swap; the mana-fix stage applies no ceiling when None.
-        max_swaps: Upper bound on accepted swaps (shared across the mana-fix
-            and nonland stages).
-        account_id: Caller's account id (for ownership annotations from
-            ``swap_service``).
+        sim_request: Full-trial sim parameters; ``seed`` is pinned across every
+            variant (derived from the deck id when omitted) and ``trials`` is
+            used for the final confirm sims.
+        search_depth: Breadth preset — larger presets try more candidates,
+            swap-out targets, and rounds (and take longer).
+        max_price_cents: Price ceiling applied to every candidate.
+        max_swaps: Upper bound on total committed swaps (lands + nonland).
+        account_id: Caller's account id (ownership annotations).
+        progress_cb: Sink called ``(phase, current, total)`` per simulation.
 
     Returns:
-        ``OptimizationProposal`` with baseline + final stats and the
-        accepted swap list.
+        ``OptimizationProposal`` with full-trial baseline/final stats and the
+        accepted swaps.
     """
+    depth = _DEPTH_PRESETS[search_depth]
     seed = _resolve_seed(deck, sim_request)
-    pinned_sim = _pinned(sim_request, seed)
-    baseline_stats = playtest_service.simulate(deck, pinned_sim)
+    search_trials = min(depth.search_trials, sim_request.trials)
+    search_sim = _pinned(sim_request, seed, trials=search_trials)
+    full_sim = _pinned(sim_request, seed)
 
-    variant_deck = deck
-    variant_stats = baseline_stats
-    current_score = _health_score(baseline_stats)
-    swaps: list[ProposedSwap] = []
-    excluded_names: set[str] = set()
-    excluded_scryfall_ids: set[UUID] = set()
+    prog = _Progress(cb=progress_cb, total=_estimate_total(depth), phase="searching lands")
+    baseline_search = await prog.sim(deck, search_sim)
+    state = _RunState(
+        variant_deck=deck,
+        variant_stats=baseline_search,
+        current_score=_health_score(baseline_search),
+        swaps=[],
+        excluded_scryfall_ids=set(),
+    )
 
-    if baseline_stats.color_screw.pct_color_screw > _COLOR_SCREW_TRIGGER:
-        variant_deck, variant_stats, current_score = await _run_mana_fix_loop(
-            pool,
-            ai_client,
-            qdrant_client,
-            variant_deck,
-            variant_stats,
-            pinned_sim,
-            current_score,
-            swaps,
-            excluded_scryfall_ids,
-            max_price_cents=max_price_cents,
-            account_id=account_id,
-            max_swaps=max_swaps,
-        )
+    await _run_land_search(
+        state,
+        prog,
+        pool,
+        ai_client,
+        qdrant_client,
+        search_sim,
+        max_price_cents=max_price_cents,
+        max_swaps=max_swaps,
+        depth=depth,
+    )
+    await _run_nonland_search(
+        state,
+        prog,
+        pool,
+        ai_client,
+        qdrant_client,
+        search_sim,
+        max_price_cents=max_price_cents,
+        account_id=account_id,
+        max_swaps=max_swaps,
+    )
 
-    while len(swaps) < max_swaps:
-        weak_cards = _rank_weak_cards(variant_deck, variant_stats, excluded_names)
-        if not weak_cards:
-            break
-        committed = False
-        for weak in weak_cards[:_WEAK_CARD_ATTEMPTS]:
-            outcome = await _try_swap(
-                pool,
-                ai_client,
-                qdrant_client,
-                variant_deck,
-                weak,
-                pinned_sim,
-                current_score,
-                max_price_cents=max_price_cents,
-                account_id=account_id,
-                excluded_scryfall_ids=excluded_scryfall_ids,
-            )
-            if outcome is None:
-                excluded_names.add(weak.card.name)
-                continue
-            proposal, new_stats, new_deck = outcome
-            swaps.append(proposal)
-            current_score += proposal.score_delta
-            variant_stats = new_stats
-            variant_deck = new_deck
-            excluded_names.add(proposal.out_card_name)
-            excluded_names.add(proposal.in_card_name)
-            excluded_scryfall_ids.add(proposal.out_scryfall_id)
-            excluded_scryfall_ids.add(proposal.in_scryfall_id)
-            committed = True
-            break
-        if not committed:
-            break
-
-    total_delta = sum(s.score_delta for s in swaps)
+    prog.phase = "confirming"
+    baseline_full = await prog.sim(deck, full_sim)
+    final_full = await prog.sim(state.variant_deck, full_sim) if state.swaps else baseline_full
+    total_delta = _health_score(final_full) - _health_score(baseline_full)
     return OptimizationProposal(
-        baseline_stats=baseline_stats,
-        final_stats=variant_stats,
-        swaps=swaps,
+        baseline_stats=baseline_full,
+        final_stats=final_full,
+        swaps=state.swaps,
         total_score_delta=total_delta,
-        total_price_delta_cents=_sum_price_deltas(swaps),
+        total_price_delta_cents=_sum_price_deltas(state.swaps),
     )

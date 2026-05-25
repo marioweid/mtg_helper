@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api";
-import type { DeckCardItem, OptimizationProposal, PlaytestStats } from "@/lib/types";
+import type {
+  DeckCardItem,
+  OptimizationProposal,
+  PlaytestStats,
+  SearchDepth,
+} from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -23,7 +28,26 @@ interface MetricRow {
 }
 
 const SWAPS_MIN = 1;
-const SWAPS_MAX = 5;
+const SWAPS_MAX = 15;
+const POLL_INTERVAL_MS = 1000;
+
+const DEPTH_OPTIONS: { value: SearchDepth; label: string }[] = [
+  { value: "quick", label: "Quick" },
+  { value: "thorough", label: "Thorough" },
+  { value: "exhaustive", label: "Exhaustive" },
+];
+
+interface Progress {
+  phase: string;
+  current: number;
+  total: number;
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  "searching lands": "Searching land swaps",
+  "searching cards": "Searching card swaps",
+  confirming: "Confirming results",
+};
 
 function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
@@ -108,26 +132,85 @@ function priceEurToCents(eur: string): number | null {
 export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
   const [maxPriceEur, setMaxPriceEur] = useState<string>("5.00");
   const [maxSwaps, setMaxSwaps] = useState<number>(3);
+  const [depth, setDepth] = useState<SearchDepth>("thorough");
   const [running, setRunning] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<OptimizationProposal | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef(false);
+
+  function stopPolling() {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      stopPolling();
+    };
+  }, []);
+
+  function poll(jobId: string) {
+    timerRef.current = setTimeout(() => {
+      void (async () => {
+        if (cancelledRef.current) return;
+        try {
+          const status = await apiClient.getOptimizeStatus(deckId, jobId);
+          if (cancelledRef.current) return;
+          setProgress({ phase: status.phase, current: status.current, total: status.total });
+          if (status.status === "ok") {
+            setProposal(status.proposal);
+            setRunning(false);
+            setProgress(null);
+          } else if (status.status === "error") {
+            setError(status.error ?? "Optimization failed");
+            setRunning(false);
+            setProgress(null);
+          } else {
+            poll(jobId);
+          }
+        } catch (err) {
+          if (cancelledRef.current) return;
+          setError(err instanceof ApiError ? err.message : "Optimization failed");
+          setRunning(false);
+          setProgress(null);
+        }
+      })();
+    }, POLL_INTERVAL_MS);
+  }
 
   async function handleRun() {
+    cancelledRef.current = false;
+    stopPolling();
     setRunning(true);
     setError(null);
     setProposal(null);
+    setProgress({ phase: "", current: 0, total: 0 });
     try {
-      const result = await apiClient.optimizeDeck(deckId, {
+      const { job_id } = await apiClient.startOptimizeDeck(deckId, {
         max_price_cents: priceEurToCents(maxPriceEur),
         max_swaps: maxSwaps,
+        search_depth: depth,
       });
-      setProposal(result);
+      poll(job_id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Optimization failed");
-    } finally {
       setRunning(false);
+      setProgress(null);
     }
+  }
+
+  function handleCancel() {
+    cancelledRef.current = true;
+    stopPolling();
+    setRunning(false);
+    setProgress(null);
   }
 
   async function handleApply() {
@@ -168,7 +251,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold text-white">Optimize deck</h2>
         <p className="text-xs text-gray-500">
-          Iteratively swap weak cards under a price ceiling, then resim.
+          Search land + card swaps under a price ceiling, then resim.
         </p>
       </div>
 
@@ -203,14 +286,39 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
             className="w-14 rounded border border-white/15 bg-zinc-900 px-2 py-1 text-gray-100"
           />
         </label>
-        <button
-          type="button"
-          onClick={() => void handleRun()}
-          disabled={running || applying}
-          className="ml-auto rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {running ? "Optimizing…" : "Optimize deck"}
-        </button>
+        <label className="flex items-center gap-1.5 text-gray-300">
+          Depth
+          <select
+            value={depth}
+            disabled={running || applying}
+            onChange={(e) => setDepth(e.target.value as SearchDepth)}
+            className="rounded border border-white/15 bg-zinc-900 px-2 py-1 text-gray-100"
+          >
+            {DEPTH_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {running ? (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="ml-auto rounded-lg border border-white/15 px-4 py-1.5 text-xs font-medium text-gray-200 hover:border-white/30"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleRun()}
+            disabled={applying}
+            className="ml-auto rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          >
+            Optimize deck
+          </button>
+        )}
       </div>
 
       {error && (
@@ -219,11 +327,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
         </p>
       )}
 
-      {running && (
-        <p className="text-xs text-gray-400">
-          Running baseline + variant simulations. This usually takes a few seconds.
-        </p>
-      )}
+      {running && progress && <ProgressBar progress={progress} />}
 
       {proposal && <ProposalView proposal={proposal} />}
 
@@ -247,6 +351,30 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProgressBar({ progress }: { progress: Progress }) {
+  const { phase, current, total } = progress;
+  const fraction = total > 0 ? Math.min(1, current / total) : 0;
+  const label = PHASE_LABELS[phase] ?? (phase || "Starting…");
+  return (
+    <div className="flex flex-col gap-1 text-xs text-gray-400">
+      <div className="flex items-baseline justify-between">
+        <span>{label}</span>
+        <span>{total > 0 ? `${current}/${total} sims` : "preparing…"}</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded bg-white/10">
+        <div
+          className="h-full bg-indigo-500 transition-[width] duration-300"
+          style={{ width: `${Math.round(fraction * 100)}%` }}
+        />
+      </div>
+      <p className="text-[11px] text-gray-500">
+        Running many simulations — this can take a while on deeper settings. You can keep
+        using the rest of the app.
+      </p>
     </div>
   );
 }

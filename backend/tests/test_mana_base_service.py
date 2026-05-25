@@ -2,14 +2,21 @@
 
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
+
+from mtg_helper.models.ai import CardSuggestion
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
+from mtg_helper.services import mana_base_service
 from mtg_helper.services.mana_base_service import (
     _COLORS,
     _karsten_requirement,
     _recommend_land_count,
     analyze_mana_base,
+    candidate_lands,
     parse_pips,
 )
 
@@ -298,3 +305,64 @@ class TestAggregateRecommendations:
         tags = {ramp_card.card_id: ["ramp"]}
         report = analyze_mana_base(_make_deck(cards, ["G"]), card_tags=tags)
         assert report.ramp_count == 1
+
+
+class TestCandidateLands:
+    @pytest.mark.asyncio
+    async def test_filters_to_lands_and_forwards_price_and_limit(self, monkeypatch):
+        land = SimpleNamespace(type_line="Land", scryfall_id=uuid4(), name="Temple Garden")
+        nonland = SimpleNamespace(
+            type_line="Creature — Elf", scryfall_id=uuid4(), name="Llanowar Elves"
+        )
+        captured: dict[str, object] = {}
+
+        async def fake_retrieve(*_args, **kwargs):
+            captured.update(kwargs)
+            return [land, nonland]
+
+        def fake_card_from_retrieved(card, *_a, **_k):
+            return CardSuggestion(
+                scryfall_id=card.scryfall_id,
+                name=card.name,
+                mana_cost=None,
+                type_line=card.type_line,
+                image_uri=None,
+                category="lands",
+                reasoning="",
+                synergies=[],
+            )
+
+        monkeypatch.setattr(mana_base_service, "retrieve_candidates", fake_retrieve)
+        monkeypatch.setattr(mana_base_service, "card_from_retrieved", fake_card_from_retrieved)
+        monkeypatch.setattr(
+            mana_base_service.collection_service,
+            "build_ownership_map",
+            AsyncMock(return_value={}),
+        )
+
+        deck = _make_deck([], ["G", "W"])
+        result = await candidate_lands(
+            MagicMock(), MagicMock(), MagicMock(), deck, max_price_cents=500, limit=40
+        )
+        assert [c.name for c in result] == ["Temple Garden"]
+        assert captured["limit"] == 40
+        assert captured["price_filter"].max_cents == 500
+        assert captured["stage"] == "lands"
+
+    @pytest.mark.asyncio
+    async def test_no_price_filter_when_cap_none(self, monkeypatch):
+        captured: dict[str, object] = {}
+
+        async def fake_retrieve(*_args, **kwargs):
+            captured.update(kwargs)
+            return []
+
+        monkeypatch.setattr(mana_base_service, "retrieve_candidates", fake_retrieve)
+        monkeypatch.setattr(
+            mana_base_service.collection_service,
+            "build_ownership_map",
+            AsyncMock(return_value={}),
+        )
+        deck = _make_deck([], ["G"])
+        await candidate_lands(MagicMock(), MagicMock(), MagicMock(), deck, max_price_cents=None)
+        assert captured["price_filter"] is None

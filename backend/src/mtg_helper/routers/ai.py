@@ -1,6 +1,8 @@
 """AI deck building endpoints."""
 
-from typing import Annotated
+import asyncio
+import logging
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -21,7 +23,11 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
-from mtg_helper.models.optimizer import OptimizationProposal, OptimizeRequest
+from mtg_helper.models.optimizer import (
+    OptimizeJobStatus,
+    OptimizeRequest,
+    OptimizeStartResponse,
+)
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
 from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
@@ -30,6 +36,7 @@ from mtg_helper.services import (
     deck_optimizer_service,
     deck_service,
     mana_base_service,
+    optimizer_jobs,
     playtest_service,
     rate_limit_service,
     simulation_analysis_service,
@@ -41,6 +48,8 @@ from mtg_helper.services.rate_limit_service import RateLimitExceeded
 from mtg_helper.services.swap_service import SwapError
 
 CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
+
+_log = logging.getLogger(__name__)
 
 # Per-key rate limits for LLM-backed endpoints. Both window and count are tuned
 # for interactive use; drop the limit when deploying to a multi-replica setup.
@@ -192,33 +201,97 @@ async def playtest_analyze(
     return DataResponse(data=result)
 
 
+async def _run_optimize_job(
+    job: optimizer_jobs.OptimizerJob,
+    pool: Any,
+    ai_client: Any,
+    qdrant_client: Any,
+    deck: Any,
+    body: OptimizeRequest,
+    account_id: UUID,
+) -> None:
+    """Drive a long-running optimization search and record its outcome on the job."""
+    try:
+        result = await deck_optimizer_service.run_search(
+            pool,
+            ai_client,
+            qdrant_client,
+            deck,
+            body.sim,
+            search_depth=body.search_depth,
+            max_price_cents=body.max_price_cents,
+            max_swaps=body.max_swaps,
+            account_id=account_id,
+            progress_cb=optimizer_jobs.progress_cb(job),
+        )
+        optimizer_jobs.finish_ok(job, result)
+    except Exception as exc:  # noqa: BLE001 — surface any failure on the job
+        _log.exception("Optimize job %s failed", job.job_id)
+        optimizer_jobs.finish_error(job, str(exc))
+
+
 @router.post(
     "/{deck_id}/playtest/optimize",
-    response_model=DataResponse[OptimizationProposal],
+    response_model=DataResponse[OptimizeStartResponse],
+    status_code=202,
 )
 async def playtest_optimize(
     deck_id: UUID,
     body: OptimizeRequest,
     request: Request,
     account: CurrentAccount,
-) -> DataResponse[OptimizationProposal]:
-    """Greedily swap weak cards and re-simulate to propose deck improvements."""
+) -> DataResponse[OptimizeStartResponse]:
+    """Start a long-running optimization search; poll the status endpoint."""
     email = _require_email(account)
     _enforce_rate_limit(account, "playtest_optimize", _ANALYZE_LIMIT)
     deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
     if deck is None:
         raise _deck_not_found(deck_id)
-    result = await deck_optimizer_service.propose_optimization(
-        request.app.state.db_pool,
-        request.app.state.ai_client,
-        request.app.state.qdrant_client,
-        deck,
-        body.sim,
-        max_price_cents=body.max_price_cents,
-        max_swaps=body.max_swaps,
-        account_id=account.id,
+    registry = request.app.state.optimizer_jobs
+    job = optimizer_jobs.create(registry, account.id, deck_id)
+    asyncio.create_task(
+        _run_optimize_job(
+            job,
+            request.app.state.db_pool,
+            request.app.state.ai_client,
+            request.app.state.qdrant_client,
+            deck,
+            body,
+            account.id,
+        )
     )
-    return DataResponse(data=result)
+    return DataResponse(data=OptimizeStartResponse(job_id=job.job_id))
+
+
+@router.get(
+    "/{deck_id}/playtest/optimize/{job_id}",
+    response_model=DataResponse[OptimizeJobStatus],
+)
+async def playtest_optimize_status(
+    deck_id: UUID,
+    job_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[OptimizeJobStatus]:
+    """Return progress + result for a running optimization job."""
+    _require_email(account)
+    registry = request.app.state.optimizer_jobs
+    job = registry.get(job_id)
+    if job is None or job.account_id != account.id or job.deck_id != deck_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "JOB_NOT_FOUND", "message": f"Optimize job {job_id} not found"},
+        )
+    return DataResponse(
+        data=OptimizeJobStatus(
+            status=job.status,
+            phase=job.phase,
+            current=job.current,
+            total=job.total,
+            proposal=job.result,
+            error=job.error,
+        )
+    )
 
 
 @router.post("/{deck_id}/mana-fix", response_model=DataResponse[ManaFixResponse])

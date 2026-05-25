@@ -33,8 +33,9 @@ import type {
   KeywordExtractRequest,
   KeywordExtractResponse,
   ManaFixResponse,
-  OptimizationProposal,
+  OptimizeJobStatus,
   OptimizeRequest,
+  OptimizeStartResponse,
   PaginationMeta,
   PlaytestSimulateRequest,
   PlaytestStats,
@@ -181,11 +182,14 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  optimizeDeck: (deckId: string, body: OptimizeRequest) =>
-    request<OptimizationProposal>(`/decks/${deckId}/playtest/optimize`, {
+  startOptimizeDeck: (deckId: string, body: OptimizeRequest) =>
+    request<OptimizeStartResponse>(`/decks/${deckId}/playtest/optimize`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  getOptimizeStatus: (deckId: string, jobId: string) =>
+    request<OptimizeJobStatus>(`/decks/${deckId}/playtest/optimize/${jobId}`),
 
   findSwaps: (deckId: string, cardId: string, body: SwapRequest = {}) =>
     request<SwapResponse>(`/decks/${deckId}/cards/${cardId}/swap`, {

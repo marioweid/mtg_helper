@@ -13,7 +13,13 @@ from uuid import UUID
 import asyncpg
 from qdrant_client import AsyncQdrantClient
 
-from mtg_helper.models.ai import ColorStatus, ManaBaseReport, ManaFixResponse, RiskyCard
+from mtg_helper.models.ai import (
+    CardSuggestion,
+    ColorStatus,
+    ManaBaseReport,
+    ManaFixResponse,
+    RiskyCard,
+)
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services import collection_service
 from mtg_helper.services.ai_service import card_from_retrieved
@@ -412,3 +418,57 @@ async def suggest_mana_fix(
     )
     suggestions = [card_from_retrieved(c, "lands", ["lands"], ownership_map) for c in picked]
     return ManaFixResponse(report=report, suggestions=suggestions, unresolved=[])
+
+
+async def candidate_lands(
+    pool: asyncpg.Pool,
+    ai_client: LLMClient,
+    qdrant_client: AsyncQdrantClient,
+    deck: DeckDetailResponse,
+    *,
+    max_price_cents: int | None = None,
+    limit: int = 40,
+) -> list[CardSuggestion]:
+    """Return a broad pool of in-color land sources for the optimizer search.
+
+    Unlike :func:`suggest_mana_fix`, this does not bucket by deficient color or
+    cap at ``_LAND_SUGGEST_LIMIT`` — it returns up to ``limit`` ranked land
+    candidates (duals, fixers, utility lands) in the deck's color identity, so
+    the optimizer can try many land swaps. Cards already in the deck (and the
+    commanders) are excluded.
+
+    Args:
+        pool: asyncpg connection pool.
+        ai_client: LLM adapter (used by retrieval for query embedding).
+        qdrant_client: Qdrant async client.
+        deck: Deck to optimize.
+        max_price_cents: When set, excludes candidate lands above this EUR cap.
+        limit: Maximum number of land candidates to return.
+
+    Returns:
+        Land ``CardSuggestion``s ranked by retrieval score, longest list first.
+    """
+    deck_card_ids = [c.card_id for c in deck.cards]
+    commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
+    excluded = list({*deck_card_ids, *commander_ids})
+    price_filter = PriceFilter(max_cents=max_price_cents, min_cents=0) if max_price_cents else None
+
+    candidates = await retrieve_candidates(
+        pool,
+        ai_client,
+        qdrant_client,
+        query_text="mana fixing dual lands color sources",
+        query_tags=["lands"],
+        commander_color_identity=deck.commander_color_identity,
+        deck_card_ids=excluded,
+        limit=limit,
+        stage="lands",
+        price_filter=price_filter,
+        commander_id=deck.commander_id,
+        bracket=deck.bracket,
+    )
+    lands = [c for c in candidates if "Land" in (c.type_line or "")]
+    ownership_map = await collection_service.build_ownership_map(
+        pool, account_id=None, scryfall_ids=[c.scryfall_id for c in lands]
+    )
+    return [card_from_retrieved(c, "lands", ["lands"], ownership_map) for c in lands]

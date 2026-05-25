@@ -551,10 +551,13 @@ export interface SimulationAnalysisResponse {
 }
 
 // Optimizer
+export type SearchDepth = "quick" | "thorough" | "exhaustive";
+
 export interface OptimizeRequest {
   sim?: PlaytestSimulateRequest;
   max_price_cents?: number | null;
   max_swaps?: number;
+  search_depth?: SearchDepth;
 }
 
 export interface ProposedSwap {
@@ -574,6 +577,19 @@ export interface OptimizationProposal {
   swaps: ProposedSwap[];
   total_score_delta: number;
   total_price_delta_cents: number | null;
+}
+
+export interface OptimizeStartResponse {
+  job_id: string;
+}
+
+export interface OptimizeJobStatus {
+  status: "running" | "ok" | "error";
+  phase: string;
+  current: number;
+  total: number;
+  proposal: OptimizationProposal | null;
+  error: string | null;
 }
 
 // Import

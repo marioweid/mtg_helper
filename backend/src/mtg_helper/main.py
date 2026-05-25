@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url, timeout=600)
     await ensure_collection(app.state.qdrant_client)
     app.state.admin_jobs = JobRegistry()
+    app.state.optimizer_jobs = {}
 
     card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
     if card_count == 0:
