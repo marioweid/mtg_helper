@@ -275,17 +275,11 @@ ALTER TABLE decks
 CREATE INDEX IF NOT EXISTS idx_decks_suggestion_collections
     ON decks USING GIN (suggestion_collection_ids);
 
--- Price cap (EUR cents, nonfoil). NULL = no cap.
-ALTER TABLE decks ADD COLUMN IF NOT EXISTS max_price_cents INTEGER;
+-- Deck-level price range removed; price is now a per-request build filter only.
 ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_max_price_cents_check;
-ALTER TABLE decks ADD CONSTRAINT decks_max_price_cents_check
-    CHECK (max_price_cents IS NULL OR max_price_cents > 0);
-
--- Price floor (EUR cents, nonfoil). NULL = no floor.
-ALTER TABLE decks ADD COLUMN IF NOT EXISTS min_price_cents INTEGER;
 ALTER TABLE decks DROP CONSTRAINT IF EXISTS decks_min_price_cents_check;
-ALTER TABLE decks ADD CONSTRAINT decks_min_price_cents_check
-    CHECK (min_price_cents IS NULL OR min_price_cents >= 0);
+ALTER TABLE decks DROP COLUMN IF EXISTS max_price_cents;
+ALTER TABLE decks DROP COLUMN IF EXISTS min_price_cents;
 
 -- deck_cards: replace single `category TEXT` with `categories TEXT[]` so a card
 -- can belong to multiple buckets (e.g. ramp + draw) the way the wizard already

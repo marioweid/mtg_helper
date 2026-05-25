@@ -67,8 +67,6 @@ export interface DeckResponse {
   updated_at: string;
   stage_targets: Record<string, number>;
   suggestion_collection_ids: string[];
-  max_price_cents: number | null;
-  min_price_cents: number | null;
   archetype_tags: string[];
 }
 
@@ -122,8 +120,6 @@ export interface DeckDetailResponse {
   updated_at: string;
   stage_targets: Record<string, number>;
   suggestion_collection_ids: string[];
-  max_price_cents: number | null;
-  min_price_cents: number | null;
   archetype_tags: string[];
   cards: DeckCardItem[];
 }
@@ -136,8 +132,6 @@ export interface DeckCreate {
   bracket?: number;
   stage_targets?: Record<string, number> | null;
   suggestion_collection_ids?: string[];
-  max_price_cents?: number | null;
-  min_price_cents?: number | null;
   archetype_tags?: string[];
 }
 
@@ -146,8 +140,6 @@ export interface DeckUpdate {
   description?: string | null;
   bracket?: number;
   suggestion_collection_ids?: string[];
-  max_price_cents?: number | null;
-  min_price_cents?: number | null;
   archetype_tags?: string[];
 }
 
@@ -620,8 +612,6 @@ export interface QuickstartRequest {
   commander_scryfall_id: string;
   partner_scryfall_id?: string | null;
   bracket?: number;
-  max_price_cents?: number | null;
-  min_price_cents?: number | null;
   name?: string | null;
 }
 

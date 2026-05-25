@@ -460,26 +460,16 @@ def _merge_type_filters(
     )
 
 
-def _resolve_price_filter(
-    deck: DeckDetailResponse,
-    max_override: int | None,
-    min_override: int | None = None,
-) -> PriceFilter | None:
-    """Resolve the price filter (cap and/or floor) for a request.
+def _resolve_price_filter(max_cents: int | None, min_cents: int | None) -> PriceFilter | None:
+    """Resolve the per-request price filter (cap and/or floor).
 
-    Per-request overrides replace the deck's stored values individually.
     Returns None when neither a cap nor a positive floor is active.
     """
-    max_cents = max_override if max_override is not None else deck.max_price_cents
-    min_cents = min_override if min_override is not None else deck.min_price_cents
-    max_active = max_cents is not None and max_cents > 0
-    min_active = min_cents is not None and min_cents > 0
-    if not max_active and not min_active:
+    cap = max_cents if max_cents is not None and max_cents > 0 else None
+    floor = min_cents if min_cents is not None and min_cents > 0 else 0
+    if cap is None and floor == 0:
         return None
-    return PriceFilter(
-        max_cents=max_cents if max_active else None,
-        min_cents=min_cents if min_active else 0,
-    )
+    return PriceFilter(max_cents=cap, min_cents=floor)
 
 
 async def build_stage(
@@ -568,7 +558,7 @@ async def build_stage(
     ranking_weights = await _load_ranking_weights(pool, account_id)
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
-    price_filter = _resolve_price_filter(deck, max_price_cents, min_price_cents)
+    price_filter = _resolve_price_filter(max_price_cents, min_price_cents)
     type_filter = _resolve_structured_type_filter(card_types, subtypes)
 
     limit = target if target is not None else 20
@@ -674,7 +664,7 @@ async def suggest_cards(
     )
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
-    price_filter = _resolve_price_filter(deck, max_price_cents, min_price_cents)
+    price_filter = _resolve_price_filter(max_price_cents, min_price_cents)
 
     candidates = await retrieve_candidates(
         pool,

@@ -360,7 +360,6 @@ export default function BuildPage() {
   const [pricePanelOpen, setPricePanelOpen] = useState(false);
   const [pricePanelDraft, setPricePanelDraft] = useState("");
   const [pricePanelMinDraft, setPricePanelMinDraft] = useState("");
-  const [savingPriceCap, setSavingPriceCap] = useState(false);
   const [cardTypeFilters, setCardTypeFilters] = useState<string[]>([]);
   const [subtypeFilters, setSubtypeFilters] = useState<string[]>([]);
   const [typePanelOpen, setTypePanelOpen] = useState(false);
@@ -433,12 +432,6 @@ export default function BuildPage() {
         setDeckCommander(deck.commander_card ?? null);
         setDeckBracket(deck.bracket ?? null);
         setSelectedCollectionIds(deck.suggestion_collection_ids);
-        setMaxPriceCents(deck.max_price_cents ?? null);
-        setPricePanelDraft(deck.max_price_cents ? (deck.max_price_cents / 100).toFixed(2) : "");
-        setMinPriceCents(deck.min_price_cents ?? null);
-        setPricePanelMinDraft(
-          deck.min_price_cents ? (deck.min_price_cents / 100).toFixed(2) : "",
-        );
         // Apply AI-suggested stage targets if present
         if (deck.stage_targets && Object.keys(deck.stage_targets).length > 0) {
           for (const [stage, target] of Object.entries(deck.stage_targets)) {
@@ -467,6 +460,8 @@ export default function BuildPage() {
           ...(exclude ? { exclude } : {}),
           card_types: cardTypeFilters,
           subtypes: subtypeFilters,
+          max_price_cents: maxPriceCents,
+          min_price_cents: minPriceCents,
         });
         dispatch({
           type: "LOAD_SUCCESS",
@@ -483,7 +478,7 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId, cardTypeFilters, subtypeFilters, globalRejectedNames],
+    [deckId, cardTypeFilters, subtypeFilters, globalRejectedNames, maxPriceCents, minPriceCents],
   );
 
   const loadMore = useCallback(
@@ -499,6 +494,8 @@ export default function BuildPage() {
           ...(exclude ? { exclude } : {}),
           card_types: cardTypeFilters,
           subtypes: subtypeFilters,
+          max_price_cents: maxPriceCents,
+          min_price_cents: minPriceCents,
         });
         dispatch({
           type: "LOAD_MORE_SUCCESS",
@@ -515,7 +512,7 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId, globalRejectedNames, cardTypeFilters, subtypeFilters],
+    [deckId, globalRejectedNames, cardTypeFilters, subtypeFilters, maxPriceCents, minPriceCents],
   );
 
   function switchStage(stage: string) {
@@ -545,6 +542,17 @@ export default function BuildPage() {
     dispatch({ type: "INVALIDATE_ALL" });
     void loadStage(state.activeStage);
   }, [cardTypeFilters, subtypeFilters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refetch when the session-local price filter changes (skip the initial render)
+  const priceFilterMounted = useRef(false);
+  useEffect(() => {
+    if (!priceFilterMounted.current) {
+      priceFilterMounted.current = true;
+      return;
+    }
+    dispatch({ type: "INVALIDATE_ALL" });
+    void loadStage(state.activeStage);
+  }, [maxPriceCents, minPriceCents]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function persistSelectedCollections(next: string[]) {
     setSelectedCollectionIds(next);
@@ -602,7 +610,7 @@ export default function BuildPage() {
     return eur > 0 ? Math.round(eur * 100) : null;
   }
 
-  async function handleSavePriceCap() {
+  function handleSavePriceCap() {
     const nextMax = parsePriceInput(pricePanelDraft);
     const nextMin = parsePriceInput(pricePanelMinDraft);
     if (nextMax === "invalid" || nextMin === "invalid") {
@@ -613,39 +621,16 @@ export default function BuildPage() {
       alert("Minimum price must not exceed the maximum.");
       return;
     }
-    setSavingPriceCap(true);
-    try {
-      await apiClient.updateDeck(deckId, {
-        max_price_cents: nextMax ?? 0,
-        min_price_cents: nextMin ?? 0,
-      });
-      setMaxPriceCents(nextMax);
-      setMinPriceCents(nextMin);
-      reloadAllSuggestions();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save price filter");
-    } finally {
-      setSavingPriceCap(false);
-    }
+    setMaxPriceCents(nextMax);
+    setMinPriceCents(nextMin);
   }
 
   function clearPriceCap() {
     if (maxPriceCents == null && minPriceCents == null) return;
     setPricePanelDraft("");
     setPricePanelMinDraft("");
-    void (async () => {
-      setSavingPriceCap(true);
-      try {
-        await apiClient.updateDeck(deckId, { max_price_cents: 0, min_price_cents: 0 });
-        setMaxPriceCents(null);
-        setMinPriceCents(null);
-        reloadAllSuggestions();
-      } catch (err) {
-        alert(err instanceof Error ? err.message : "Failed to clear price filter");
-      } finally {
-        setSavingPriceCap(false);
-      }
-    })();
+    setMaxPriceCents(null);
+    setMinPriceCents(null);
   }
 
   async function handleAccept(stage: string, suggestion: CardSuggestion) {
@@ -919,7 +904,8 @@ export default function BuildPage() {
           <p className="mb-3 text-xs text-gray-400">
             Restrict suggestions to a nonfoil Scryfall EUR price range. Leave either side blank to
             omit that bound (min blank = €0, max blank = no cap). Cards without a EUR price are
-            excluded. Saving reloads all stages.
+            excluded. Applies to this session only and reloads all stages; it resets when you
+            reopen the page.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1 text-xs text-gray-400">
@@ -948,18 +934,16 @@ export default function BuildPage() {
             </label>
             <button
               type="button"
-              onClick={() => void handleSavePriceCap()}
-              disabled={savingPriceCap}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+              onClick={handleSavePriceCap}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition-colors"
             >
-              {savingPriceCap ? "Saving…" : "Save & reload"}
+              Apply
             </button>
             {(maxPriceCents != null || minPriceCents != null) && (
               <button
                 type="button"
                 onClick={clearPriceCap}
-                disabled={savingPriceCap}
-                className="text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                className="text-xs text-gray-400 hover:text-white transition-colors"
               >
                 Clear range
               </button>

@@ -92,8 +92,6 @@ def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
         updated_at=row["updated_at"],
         stage_targets=_parse_stage_targets(row["stage_targets"]),
         suggestion_collection_ids=list(row["suggestion_collection_ids"] or []),
-        max_price_cents=row["max_price_cents"],
-        min_price_cents=row["min_price_cents"],
         archetype_tags=list(row["archetype_tags"] or []),
     )
 
@@ -220,9 +218,8 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
         row = await conn.fetchrow(
             """
             INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_email,
-                               stage_targets, suggestion_collection_ids, max_price_cents,
-                               min_price_cents, archetype_tags)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                               stage_targets, suggestion_collection_ids, archetype_tags)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
             """,
             data.name,
@@ -233,8 +230,6 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             _normalize_email(email),
             json.dumps(data.stage_targets or {}),
             list(data.suggestion_collection_ids),
-            data.max_price_cents,
-            data.min_price_cents,
             list(data.archetype_tags),
         )
     deck = _row_to_deck(row)
@@ -386,8 +381,6 @@ async def get_deck(
         updated_at=deck_row["updated_at"],
         stage_targets=_parse_stage_targets(deck_row["stage_targets"]),
         suggestion_collection_ids=list(deck_row["suggestion_collection_ids"] or []),
-        max_price_cents=deck_row["max_price_cents"],
-        min_price_cents=deck_row["min_price_cents"],
         archetype_tags=list(deck_row["archetype_tags"] or []),
         cards=cards,
     )
@@ -445,13 +438,6 @@ async def update_deck(
     # Serialize JSONB fields for asyncpg
     if "stage_targets" in updates:
         updates["stage_targets"] = json.dumps(updates["stage_targets"])
-
-    # Sentinel: 0 clears the price cap back to NULL (positive check constraint).
-    if updates.get("max_price_cents") == 0:
-        updates["max_price_cents"] = None
-    # Min floor: 0 is equivalent to no floor; store NULL for consistency.
-    if updates.get("min_price_cents") == 0:
-        updates["min_price_cents"] = None
 
     fields = ", ".join(f"{k} = ${i + 2}" for i, k in enumerate(updates))
     values = list(updates.values())

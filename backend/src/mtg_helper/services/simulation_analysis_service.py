@@ -176,7 +176,6 @@ def _brief_payload(deck: DeckDetailResponse, stats: PlaytestStats) -> dict[str, 
         "partner": deck.partner_card.name if deck.partner_card else None,
         "bracket": deck.bracket,
         "archetype_tags": list(deck.archetype_tags or []),
-        "max_price_cents": deck.max_price_cents,
         "card_count": sum(c.quantity for c in deck.cards),
         "land_count": sum(c.quantity for c in deck.cards if "Land" in (c.type_line or "")),
     }

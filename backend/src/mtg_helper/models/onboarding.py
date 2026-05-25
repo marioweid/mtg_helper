@@ -13,8 +13,6 @@ class QuickstartRequest(BaseModel):
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
     bracket: int = Field(default=2, ge=1, le=5)
-    max_price_cents: int | None = Field(default=None, gt=0)
-    min_price_cents: int | None = Field(default=None, ge=0)
     name: str | None = Field(default=None, max_length=200)
 
 

@@ -8,14 +8,6 @@ import { apiClient, ApiError } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { CardResponse } from "@/lib/types";
 
-type PricePreset = "budget" | "mid" | "high";
-
-const PRICE_PRESETS: Record<PricePreset, { label: string; cents: number; hint: string }> = {
-  budget: { label: "Budget", cents: 50, hint: "≤ €0.50 per card" },
-  mid: { label: "Mid", cents: 500, hint: "≤ €5 per card" },
-  high: { label: "High", cents: 5000, hint: "≤ €50 per card" },
-};
-
 const SPINNER_MESSAGES = [
   "Reading the commander's text…",
   "Picking the synergy spine…",
@@ -30,7 +22,6 @@ export default function OnboardingPage() {
   const [commander, setCommander] = useState<CardResponse | null>(null);
   const [partnerOpen, setPartnerOpen] = useState(false);
   const [partner, setPartner] = useState<CardResponse | null>(null);
-  const [pricePreset, setPricePreset] = useState<PricePreset>("mid");
   const [bracket, setBracket] = useState(2);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +49,6 @@ export default function OnboardingPage() {
         commander_scryfall_id: commander.scryfall_id,
         partner_scryfall_id: partner?.scryfall_id ?? null,
         bracket,
-        max_price_cents: PRICE_PRESETS[pricePreset].cents,
       });
       router.push(`/decks/${res.deck.id}/build`);
     } catch (err) {
@@ -126,33 +116,6 @@ export default function OnboardingPage() {
                 />
               </>
             )}
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-1 font-semibold text-white">Budget</h2>
-          <p className="mb-4 text-xs text-gray-500">
-            Caps the price per card. Persists on the deck so manual stage rebuilds inherit it.
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(PRICE_PRESETS) as PricePreset[]).map((key) => {
-              const preset = PRICE_PRESETS[key];
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setPricePreset(key)}
-                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-                    pricePreset === key
-                      ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
-                      : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
-                  }`}
-                >
-                  <div className="text-sm font-medium">{preset.label}</div>
-                  <div className="text-xs text-gray-500">{preset.hint}</div>
-                </button>
-              );
-            })}
           </div>
         </section>
 

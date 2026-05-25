@@ -72,8 +72,6 @@ async def quickstart(
             account_id=account.id,
             commander_scryfall_id=body.commander_scryfall_id,
             partner_scryfall_id=body.partner_scryfall_id,
-            max_price_cents=body.max_price_cents,
-            min_price_cents=body.min_price_cents,
             bracket=body.bracket,
             name=body.name,
         )

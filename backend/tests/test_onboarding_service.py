@@ -130,37 +130,6 @@ async def test_quickstart_calls_all_six_stages_in_order(
     assert len(results) == 6
 
 
-async def test_quickstart_persists_price_caps_on_deck(
-    hazel_pool: asyncpg.Pool,
-    client: AsyncClient,
-) -> None:
-    """max_price_cents and min_price_cents propagate to the deck row + build_stage."""
-    record: list[dict[str, Any]] = []
-    mock_build = _make_mock_build_stage({}, record=record)
-
-    async with hazel_pool.acquire() as conn:
-        account_row = await conn.fetchrow(
-            "SELECT id FROM accounts WHERE email = $1", "default@test.local"
-        )
-
-    with patch.object(ai_service, "build_stage", mock_build):
-        deck, _ = await quickstart(
-            hazel_pool,
-            cast("LLMClient", make_mock_llm_client()),
-            None,  # type: ignore[arg-type]  # qdrant unused — build_stage is mocked
-            email="default@test.local",
-            account_id=account_row["id"],
-            commander_scryfall_id=HAZEL_SCRYFALL_ID,
-            max_price_cents=5000,
-            min_price_cents=10,
-        )
-
-    assert deck.max_price_cents == 5000
-    assert deck.min_price_cents == 10
-    assert all(r["max_price_cents"] == 5000 for r in record)
-    assert all(r["min_price_cents"] == 10 for r in record)
-
-
 async def test_quickstart_skips_color_violations(
     hazel_pool: asyncpg.Pool,
     client: AsyncClient,
@@ -206,15 +175,11 @@ async def test_quickstart_endpoint_returns_201(client: AsyncClient) -> None:
     with patch.object(ai_service, "build_stage", mock_build):
         resp = await client.post(
             "/api/v1/onboarding/quickstart",
-            json={
-                "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
-                "max_price_cents": 5000,
-            },
+            json={"commander_scryfall_id": str(HAZEL_SCRYFALL_ID)},
         )
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["deck"]["stage"] == "theme"
-    assert data["deck"]["max_price_cents"] == 5000
     assert len(data["stages"]) == 6
     assert {s["stage"] for s in data["stages"]} == set(QUICKSTART_STAGE_ORDER)
 

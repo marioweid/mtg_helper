@@ -93,8 +93,6 @@ async def quickstart(
     account_id: UUID,
     commander_scryfall_id: UUID,
     partner_scryfall_id: UUID | None = None,
-    max_price_cents: int | None = None,
-    min_price_cents: int | None = None,
     bracket: int = 2,
     name: str | None = None,
     on_progress: ProgressCb | None = None,
@@ -110,9 +108,6 @@ async def quickstart(
             preference and feedback weights are honored.
         commander_scryfall_id: Commander to build around.
         partner_scryfall_id: Optional partner commander.
-        max_price_cents: Optional per-card price ceiling, persisted on the
-            deck so subsequent manual stage rebuilds inherit it.
-        min_price_cents: Optional per-card price floor; persisted.
         bracket: Deck bracket (1–5); default 2 (precon-friendly).
         name: Optional deck name; defaults to "{commander_name} sample deck".
         on_progress: Optional async callback fired after each stage.
@@ -141,8 +136,6 @@ async def quickstart(
             description=None,
             bracket=bracket,
             stage_targets=dict(QUICKSTART_TARGETS),
-            max_price_cents=max_price_cents,
-            min_price_cents=min_price_cents,
         ),
         email,
     )
@@ -172,8 +165,6 @@ async def quickstart(
                 email=email,
                 stage=stage,
                 target=QUICKSTART_TARGETS[stage],
-                max_price_cents=max_price_cents,
-                min_price_cents=min_price_cents,
                 stage_counts=stage_counts,
             )
         results.append(result)
@@ -312,8 +303,6 @@ async def _build_and_accept_stage(
     email: str,
     stage: str,
     target: int,
-    max_price_cents: int | None,
-    min_price_cents: int | None,
     stage_counts: dict[str, int],
 ) -> QuickstartStageResult:
     """Run one stage of build_stage and accept cards until ``target`` is met.
@@ -333,8 +322,6 @@ async def _build_and_accept_stage(
         email,
         stage=stage,
         target=target * _OVERFETCH_MULTIPLIER,
-        max_price_cents=max_price_cents,
-        min_price_cents=min_price_cents,
     )
     accepted = 0
     for suggestion in response.suggestions:
