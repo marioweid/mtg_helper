@@ -95,9 +95,9 @@ export function CardSuggestionCard({
               </span>
             )}
           </div>
-          {/* Top-right: price */}
+          {/* Bottom-right: price (kept clear of the card's printed mana cost) */}
           <span
-            className="absolute top-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur"
+            className="absolute bottom-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur"
             title="Scryfall EUR, nonfoil"
           >
             {formatEur(suggestion.price_eur_cents)}

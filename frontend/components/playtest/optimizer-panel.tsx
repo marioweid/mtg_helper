@@ -2,13 +2,44 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { CardHover } from "@/components/card-hover";
 import { apiClient, ApiError } from "@/lib/api";
 import type {
   DeckCardItem,
   OptimizationProposal,
   PlaytestStats,
+  ProposedSwap,
   SearchDepth,
 } from "@/lib/types";
+
+function jobStorageKey(deckId: string): string {
+  return `optimize-job:${deckId}`;
+}
+
+function readActiveJob(deckId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(jobStorageKey(deckId));
+  } catch {
+    return null;
+  }
+}
+
+function writeActiveJob(deckId: string, jobId: string): void {
+  try {
+    window.sessionStorage.setItem(jobStorageKey(deckId), jobId);
+  } catch {
+    /* private mode — non-critical */
+  }
+}
+
+function clearActiveJob(deckId: string): void {
+  try {
+    window.sessionStorage.removeItem(jobStorageKey(deckId));
+  } catch {
+    /* private mode — non-critical */
+  }
+}
 
 interface Props {
   deckId: string;
@@ -138,6 +169,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<OptimizationProposal | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [applyingKey, setApplyingKey] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
@@ -148,13 +180,6 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
       timerRef.current = null;
     }
   }
-
-  useEffect(() => {
-    return () => {
-      cancelledRef.current = true;
-      stopPolling();
-    };
-  }, []);
 
   function poll(jobId: string) {
     timerRef.current = setTimeout(() => {
@@ -168,10 +193,12 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
             setProposal(status.proposal);
             setRunning(false);
             setProgress(null);
+            clearActiveJob(deckId);
           } else if (status.status === "error") {
             setError(status.error ?? "Optimization failed");
             setRunning(false);
             setProgress(null);
+            clearActiveJob(deckId);
           } else {
             poll(jobId);
           }
@@ -180,10 +207,28 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
           setError(err instanceof ApiError ? err.message : "Optimization failed");
           setRunning(false);
           setProgress(null);
+          clearActiveJob(deckId);
         }
       })();
     }, POLL_INTERVAL_MS);
   }
+
+  // Resume polling a job that's still running server-side after the user
+  // navigated away and back. The unmount cleanup only cancels the local timer;
+  // it leaves the sessionStorage token so the job can be picked back up.
+  useEffect(() => {
+    cancelledRef.current = false;
+    const jobId = readActiveJob(deckId);
+    if (jobId) {
+      setRunning(true);
+      setProgress({ phase: "", current: 0, total: 0 });
+      poll(jobId);
+    }
+    return () => {
+      cancelledRef.current = true;
+      stopPolling();
+    };
+  }, [deckId]);
 
   async function handleRun() {
     cancelledRef.current = false;
@@ -198,6 +243,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
         max_swaps: maxSwaps,
         search_depth: depth,
       });
+      writeActiveJob(deckId, job_id);
       poll(job_id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Optimization failed");
@@ -209,8 +255,29 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
   function handleCancel() {
     cancelledRef.current = true;
     stopPolling();
+    clearActiveJob(deckId);
     setRunning(false);
     setProgress(null);
+  }
+
+  async function applyOneSwap(swap: ProposedSwap) {
+    const original = deckCards.find((c) => c.scryfall_id === swap.out_scryfall_id);
+    const quantity = original?.quantity ?? 1;
+    const categories = original?.categories ?? [];
+    // Swap a single copy: decrement a multi-copy source (e.g. basic lands)
+    // rather than deleting the whole stack, matching the backend sim.
+    if (quantity > 1) {
+      await apiClient.updateCardQuantity(deckId, swap.out_scryfall_id, quantity - 1);
+    } else {
+      await apiClient.removeCard(deckId, swap.out_scryfall_id);
+    }
+    await apiClient.addCard(deckId, {
+      card_scryfall_id: swap.in_scryfall_id,
+      quantity: 1,
+      categories,
+      added_by: "ai",
+      ai_reasoning: `Optimizer swap: ${swap.reason}`,
+    });
   }
 
   async function handleApply() {
@@ -219,23 +286,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
     setError(null);
     try {
       for (const swap of proposal.swaps) {
-        const original = deckCards.find((c) => c.scryfall_id === swap.out_scryfall_id);
-        const quantity = original?.quantity ?? 1;
-        const categories = original?.categories ?? [];
-        // Swap a single copy: decrement a multi-copy source (e.g. basic lands)
-        // rather than deleting the whole stack, matching the backend sim.
-        if (quantity > 1) {
-          await apiClient.updateCardQuantity(deckId, swap.out_scryfall_id, quantity - 1);
-        } else {
-          await apiClient.removeCard(deckId, swap.out_scryfall_id);
-        }
-        await apiClient.addCard(deckId, {
-          card_scryfall_id: swap.in_scryfall_id,
-          quantity: 1,
-          categories,
-          added_by: "ai",
-          ai_reasoning: `Optimizer swap: ${swap.reason}`,
-        });
+        await applyOneSwap(swap);
       }
       setProposal(null);
       onApplied?.();
@@ -243,6 +294,24 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
       setError(err instanceof ApiError ? err.message : "Failed to apply swaps");
     } finally {
       setApplying(false);
+    }
+  }
+
+  async function handleApplySwap(swap: ProposedSwap) {
+    if (!proposal) return;
+    setApplyingKey(swap.out_scryfall_id);
+    setError(null);
+    try {
+      await applyOneSwap(swap);
+      const remaining = proposal.swaps.filter(
+        (s) => s.out_scryfall_id !== swap.out_scryfall_id,
+      );
+      setProposal(remaining.length === 0 ? null : { ...proposal, swaps: remaining });
+      onApplied?.();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to apply swap");
+    } finally {
+      setApplyingKey(null);
     }
   }
 
@@ -329,22 +398,29 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
 
       {running && progress && <ProgressBar progress={progress} />}
 
-      {proposal && <ProposalView proposal={proposal} />}
+      {proposal && (
+        <ProposalView
+          proposal={proposal}
+          applyingKey={applyingKey}
+          busy={applying}
+          onApplySwap={(swap) => void handleApplySwap(swap)}
+        />
+      )}
 
       {proposal && proposal.swaps.length > 0 && (
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={() => void handleApply()}
-            disabled={applying}
+            disabled={applying || applyingKey !== null}
             className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {applying ? "Applying…" : `Apply ${proposal.swaps.length} swap(s)`}
+            {applying ? "Applying…" : `Apply all ${proposal.swaps.length}`}
           </button>
           <button
             type="button"
             onClick={() => setProposal(null)}
-            disabled={applying}
+            disabled={applying || applyingKey !== null}
             className="rounded-lg border border-white/15 px-4 py-1.5 text-xs font-medium text-gray-200 hover:border-white/30 disabled:opacity-50"
           >
             Discard
@@ -379,7 +455,17 @@ function ProgressBar({ progress }: { progress: Progress }) {
   );
 }
 
-function ProposalView({ proposal }: { proposal: OptimizationProposal }) {
+function ProposalView({
+  proposal,
+  applyingKey,
+  busy,
+  onApplySwap,
+}: {
+  proposal: OptimizationProposal;
+  applyingKey: string | null;
+  busy: boolean;
+  onApplySwap: (swap: ProposedSwap) => void;
+}) {
   const rows = metricRows(proposal.baseline_stats, proposal.final_stats);
   if (proposal.swaps.length === 0) {
     return (
@@ -452,23 +538,31 @@ function ProposalView({ proposal }: { proposal: OptimizationProposal }) {
             <li key={swap.out_scryfall_id} className="px-3 py-2">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-gray-200">
-                  <span className="text-red-300 line-through">{swap.out_card_name}</span>
+                  <CardHover name={swap.out_card_name}>
+                    <span className="text-red-300 line-through">{swap.out_card_name}</span>
+                  </CardHover>
                   <span className="mx-1.5 text-gray-500">→</span>
-                  <span className="text-emerald-300">{swap.in_card_name}</span>
+                  <CardHover name={swap.in_card_name}>
+                    <span className="text-emerald-300">{swap.in_card_name}</span>
+                  </CardHover>
                 </span>
                 {swap.price_delta_cents !== null && (
                   <span
-                    className={
-                      swap.price_delta_cents < 0 ? "text-emerald-400" : "text-red-300"
-                    }
+                    className={swap.price_delta_cents < 0 ? "text-emerald-400" : "text-red-300"}
                   >
                     {swap.price_delta_cents < 0 ? "-" : "+"}€
                     {priceCentsToEur(Math.abs(swap.price_delta_cents))}
                   </span>
                 )}
-                <span className="ml-auto text-gray-500">
-                  +{swap.score_delta.toFixed(3)} score
-                </span>
+                <span className="text-gray-500">+{swap.score_delta.toFixed(3)} score</span>
+                <button
+                  type="button"
+                  onClick={() => onApplySwap(swap)}
+                  disabled={busy || applyingKey !== null}
+                  className="ml-auto rounded border border-emerald-400/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-50"
+                >
+                  {applyingKey === swap.out_scryfall_id ? "Applying…" : "Apply"}
+                </button>
               </div>
               <p className="mt-1 text-gray-400">{swap.reason}</p>
             </li>

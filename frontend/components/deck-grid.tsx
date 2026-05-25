@@ -15,10 +15,10 @@ function isBasicLand(card: DeckCardItem): boolean {
 }
 
 /**
- * Moxfield-style visual deck view. Cards are grouped by primary type and
- * stacked vertically within each column, overlapping so only the title strip
- * of every card behind the top one is visible. Hover keeps the existing
- * floating popover; click opens a detail modal at the page level.
+ * Visual deck view: cards grouped under a heading per primary type, laid out
+ * as a non-overlapping responsive grid so each full card (and its printed
+ * text) is readable. Hover keeps the existing floating popover; click opens a
+ * detail modal at the page level.
  */
 export function DeckGrid({ cards, onCardClick, comboCardIds, onSetQuantity }: Props) {
   const groups = groupByPrimaryType(cards);
@@ -27,9 +27,9 @@ export function DeckGrid({ cards, onCardClick, comboCardIds, onSetQuantity }: Pr
   if (cards.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+    <div className="flex flex-col gap-6">
       {types.map((type) => (
-        <DeckGridColumn
+        <DeckGridSection
           key={type}
           type={type}
           cards={groups[type] ?? []}
@@ -42,7 +42,7 @@ export function DeckGrid({ cards, onCardClick, comboCardIds, onSetQuantity }: Pr
   );
 }
 
-interface ColumnProps {
+interface SectionProps {
   type: string;
   cards: DeckCardItem[];
   onCardClick: (deckCardId: string) => void;
@@ -50,20 +50,17 @@ interface ColumnProps {
   onSetQuantity?: ((scryfallId: string, quantity: number) => void | Promise<void>) | undefined;
 }
 
-function DeckGridColumn({ type, cards, onCardClick, comboCardIds, onSetQuantity }: ColumnProps) {
+function DeckGridSection({ type, cards, onCardClick, comboCardIds, onSetQuantity }: SectionProps) {
+  if (cards.length === 0) return null;
   return (
     <section className="flex flex-col">
-      <header className="mb-2 flex items-baseline justify-between px-1">
+      <header className="mb-2 flex items-baseline justify-between border-b border-white/10 pb-1">
         <h3 className="text-sm font-semibold text-white">{type}</h3>
         <span className="text-xs text-gray-500">{totalCardCount(cards)}</span>
       </header>
-      <ul className="flex flex-col">
-        {cards.map((card, idx) => (
-          <li
-            key={card.deck_card_id}
-            style={idx === 0 ? undefined : { marginTop: "-78%" }}
-            className="relative"
-          >
+      <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        {cards.map((card) => (
+          <li key={card.deck_card_id} className="relative">
             <button
               type="button"
               onClick={() => onCardClick(card.deck_card_id)}
@@ -88,7 +85,7 @@ function DeckGridColumn({ type, cards, onCardClick, comboCardIds, onSetQuantity 
                 </span>
               ) : null}
               {card.price_eur_cents != null ? (
-                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-emerald-300 backdrop-blur tabular-nums">
+                <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-emerald-300 backdrop-blur tabular-nums">
                   €{(card.price_eur_cents / 100).toFixed(2)}
                 </span>
               ) : null}

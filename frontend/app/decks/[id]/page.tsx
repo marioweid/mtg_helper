@@ -19,7 +19,14 @@ import {
   applyDeckFilter,
   DeckFilterBar,
   type DeckFilter,
+  type SortMode,
 } from "@/components/deck-filter-bar";
+import {
+  getDeckSort,
+  getDeckView,
+  setDeckSort,
+  setDeckView,
+} from "@/lib/deck-view-prefs";
 import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
 import { DeckScorecard } from "@/components/deck-scorecard";
@@ -40,6 +47,7 @@ type ViewMode = "tags" | "types" | "grid";
 type DeckTab = "cards" | "combos" | "history";
 
 const VIEW_MODES: readonly ViewMode[] = ["tags", "types", "grid"];
+const SORT_MODES: readonly SortMode[] = ["default", "name", "cmc", "price"];
 
 function colorIdentityFromCards(cards: DeckCardItem[]): string[] {
   const colors: string[] = [];
@@ -86,6 +94,28 @@ export default function DeckDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Restore the per-deck view mode + sort the user last chose.
+  useEffect(() => {
+    const storedView = getDeckView(deckId);
+    if (storedView && (VIEW_MODES as readonly string[]).includes(storedView)) {
+      setViewMode(storedView as ViewMode);
+    }
+    const storedSort = getDeckSort(deckId);
+    if (storedSort && (SORT_MODES as readonly string[]).includes(storedSort)) {
+      setFilter((prev) => ({ ...prev, sort: storedSort as SortMode }));
+    }
+  }, [deckId]);
+
+  function handleViewModeChange(mode: ViewMode) {
+    setViewMode(mode);
+    setDeckView(deckId, mode);
+  }
+
+  function handleFilterChange(next: DeckFilter) {
+    setFilter(next);
+    setDeckSort(deckId, next.sort);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -283,7 +313,7 @@ export default function DeckDetailPage() {
                     return (
                       <button
                         key={mode}
-                        onClick={() => setViewMode(mode)}
+                        onClick={() => handleViewModeChange(mode)}
                         aria-pressed={active}
                         className={`px-3 py-1.5 capitalize transition-colors ${
                           active
@@ -315,7 +345,7 @@ export default function DeckDetailPage() {
               {deck.cards.length > 0 && (
                 <DeckFilterBar
                   value={filter}
-                  onChange={setFilter}
+                  onChange={handleFilterChange}
                   resultCount={totalCardCount(visibleCards)}
                   totalCount={deckTotal(deck)}
                   availableColors={deck.commander_color_identity}
