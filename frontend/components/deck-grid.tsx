@@ -58,7 +58,7 @@ function DeckGridSection({ type, cards, onCardClick, comboCardIds, onSetQuantity
         <h3 className="text-sm font-semibold text-white">{type}</h3>
         <span className="text-xs text-gray-500">{totalCardCount(cards)}</span>
       </header>
-      <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {cards.map((card) => (
           <li key={card.deck_card_id} className="relative">
             <button
