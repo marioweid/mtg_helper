@@ -136,8 +136,11 @@ def _moxfield_category(card_type: str | None) -> str | None:
     """Map a Moxfield ``card.type`` field onto an internal section category."""
     if not card_type:
         return None
-    first = card_type.strip().split()[0].lower() if card_type.strip() else ""
-    return _MOXFIELD_TYPE_TO_CATEGORY.get(first)
+    for token in card_type.strip().lower().split():
+        category = _MOXFIELD_TYPE_TO_CATEGORY.get(token)
+        if category is not None:
+            return category
+    return None
 
 
 def _moxfield_card_name(entry: dict[str, Any]) -> str | None:

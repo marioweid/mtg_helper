@@ -575,6 +575,10 @@ export interface OptimizeStartResponse {
   job_id: string;
 }
 
+export interface Capabilities {
+  optimizer: boolean;
+}
+
 export interface OptimizeJobStatus {
   status: "running" | "ok" | "error";
   phase: string;

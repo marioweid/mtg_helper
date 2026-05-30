@@ -1,25 +1,27 @@
 """Tests for per-account rate limiting on LLM-backed AI endpoints."""
 
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from pydantic_ai.models.test import TestModel
 
 from mtg_helper.main import app
 from mtg_helper.services import rate_limit_service
+from mtg_helper.services.agents import describe_agent
 from tests.conftest import HAZEL_SCRYFALL_ID, create_test_account, set_current_account
 
 
-def _stub_ai_client() -> MagicMock:
-    ai = MagicMock()
-    ai.chat = AsyncMock(return_value="What's your win condition?")
-    return ai
+def _override_describe() -> Any:
+    """Swap the describe agent's model for a fixed TestModel."""
+    return describe_agent.get_agent().override(
+        model=TestModel(custom_output_args={"reply": "What's your win condition?", "done": False})
+    )
 
 
 @pytest.mark.asyncio
 async def test_describe_rate_limit_trips_after_threshold(client: AsyncClient) -> None:
     """31st describe call within the window returns 429 with RATE_LIMITED."""
-    app.state.ai_client = _stub_ai_client()
     await create_test_account(client, "Rate Describe")
     payload = {
         "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
@@ -28,11 +30,11 @@ async def test_describe_rate_limit_trips_after_threshold(client: AsyncClient) ->
         "message": "hi",
     }
 
-    for _ in range(30):
+    with _override_describe():
+        for _ in range(30):
+            resp = await client.post("/api/v1/decks/describe", json=payload)
+            assert resp.status_code == 200
         resp = await client.post("/api/v1/decks/describe", json=payload)
-        assert resp.status_code == 200
-
-    resp = await client.post("/api/v1/decks/describe", json=payload)
     assert resp.status_code == 429
     assert resp.json()["detail"]["code"] == "RATE_LIMITED"
 
@@ -40,7 +42,6 @@ async def test_describe_rate_limit_trips_after_threshold(client: AsyncClient) ->
 @pytest.mark.asyncio
 async def test_rate_limit_keys_are_per_account(client: AsyncClient) -> None:
     """Different authenticated accounts get independent rate-limit buckets."""
-    app.state.ai_client = _stub_ai_client()
     payload = {
         "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
         "bracket": 3,
@@ -75,16 +76,17 @@ async def test_rate_limit_keys_are_per_account(client: AsyncClient) -> None:
         created_at=row_b["created_at"],
     )
 
-    set_current_account(acct_a)
-    for _ in range(30):
+    with _override_describe():
+        set_current_account(acct_a)
+        for _ in range(30):
+            resp = await client.post("/api/v1/decks/describe", json=payload)
+            assert resp.status_code == 200
+        resp = await client.post("/api/v1/decks/describe", json=payload)
+        assert resp.status_code == 429
+
+        set_current_account(acct_b)
         resp = await client.post("/api/v1/decks/describe", json=payload)
         assert resp.status_code == 200
-    resp = await client.post("/api/v1/decks/describe", json=payload)
-    assert resp.status_code == 429
-
-    set_current_account(acct_b)
-    resp = await client.post("/api/v1/decks/describe", json=payload)
-    assert resp.status_code == 200
 
 
 def test_rate_limit_service_raises_when_exceeded() -> None:

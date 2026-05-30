@@ -605,7 +605,8 @@ def test_tribal_no_match_when_card_is_subtype_only() -> None:
 
 def test_tribal_emitted_via_classify_card() -> None:
     tags = _classify(
-        "Other Squirrels you control get +1/+1. Whenever a creature dies, create a 1/1 Squirrel.",
+        "Other Squirrels you control get +1/+1. "
+        "Whenever a creature dies, create a 1/1 Squirrel creature token.",
         type_line="Legendary Creature — Squirrel",
     )
     assert "squirrel_tribal" in tags

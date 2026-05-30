@@ -44,7 +44,7 @@ def _build_response(stage: str, suggestions: list[CardSuggestion]) -> BuildRespo
     return BuildResponse(
         stage=stage,
         stage_number=1,
-        total_stages=6,
+        total_stages=len(QUICKSTART_STAGE_ORDER),
         suggestions=suggestions,
         unresolved=[],
     )
@@ -97,11 +97,11 @@ def hazel_pool(db_pool: asyncpg.Pool) -> asyncpg.Pool:
 # ── happy path ───────────────────────────────────────────────────────────────
 
 
-async def test_quickstart_calls_all_six_stages_in_order(
+async def test_quickstart_calls_nonland_stages_in_order(
     hazel_pool: asyncpg.Pool,
     client: AsyncClient,
 ) -> None:
-    """All six stages are invoked in QUICKSTART_STAGE_ORDER with correct targets."""
+    """Nonland stages invoke build_stage in order with correct targets."""
     record: list[dict[str, Any]] = []
     per_stage = {s: [_suggestion(SOL_RING_SCRYFALL_ID, "Sol Ring")] for s in QUICKSTART_STAGE_ORDER}
     mock_build = _make_mock_build_stage(per_stage, record=record)
@@ -122,12 +122,12 @@ async def test_quickstart_calls_all_six_stages_in_order(
         )
 
     stages_called = [r["stage"] for r in record]
-    assert stages_called == list(QUICKSTART_STAGE_ORDER)
+    assert stages_called == list(QUICKSTART_STAGE_ORDER[:-1])
     # Over-fetch multiplier: target = QUICKSTART_TARGETS[stage] * 2
     for r in record:
         assert r["target"] == QUICKSTART_TARGETS[r["stage"]] * 2
     assert deck.stage == QUICKSTART_STAGE_ORDER[0]
-    assert len(results) == 6
+    assert len(results) == len(QUICKSTART_STAGE_ORDER)
 
 
 async def test_quickstart_skips_color_violations(
@@ -180,7 +180,7 @@ async def test_quickstart_endpoint_returns_201(client: AsyncClient) -> None:
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["deck"]["stage"] == "theme"
-    assert len(data["stages"]) == 6
+    assert len(data["stages"]) == len(QUICKSTART_STAGE_ORDER)
     assert {s["stage"] for s in data["stages"]} == set(QUICKSTART_STAGE_ORDER)
 
 

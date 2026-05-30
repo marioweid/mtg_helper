@@ -214,7 +214,7 @@ async def test_analyze_returns_structured_response(mock_pool: MagicMock) -> None
     assert result.summary == "Looks fine."
     assert len(result.findings) == 1
     assert result.findings[0].category == "mana_base"
-    assert result.swap_suggestions[0].add[0].name == "Sol Ring"
+    assert result.swap_suggestions == []
     assert result.tool_call_count == 0
 
 

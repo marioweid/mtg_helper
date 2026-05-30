@@ -17,9 +17,9 @@ from tests.conftest import (
 @pytest.mark.asyncio
 async def test_get_user_profile_no_decks(db_pool):
     """User with zero decks should return None."""
-    account_id = uuid4()
+    email = "missing@test.local"
     exclude_deck_id = uuid4()
-    result = await profile_service.get_user_profile(db_pool, account_id, exclude_deck_id)
+    result = await profile_service.get_user_profile(db_pool, email, exclude_deck_id)
     assert result is None
 
 
@@ -28,11 +28,12 @@ async def test_get_user_profile_single_deck_returns_none(client, db_pool):
     """User with only one deck (the current one) should return None."""
     account_id = await create_test_account(client, "Single Deck User")
     deck_id = await create_test_deck(client, name="Only Deck", owner_id=account_id)
+    email = "single.deck.user@test.local"
 
     # Invalidate any stale cache
-    profile_service._cache.pop(UUID(account_id), None)
+    profile_service._cache.pop(email, None)
 
-    result = await profile_service.get_user_profile(db_pool, UUID(account_id), UUID(deck_id))
+    result = await profile_service.get_user_profile(db_pool, email, UUID(deck_id))
     assert result is None
 
 
@@ -42,11 +43,12 @@ async def test_get_user_profile_two_decks_returns_profile(client, db_pool):
     account_id = await create_test_account(client, "Two Deck User")
     deck_a = await create_test_deck(client, name="Deck A", owner_id=account_id)
     deck_b = await create_test_deck(client, name="Deck B", owner_id=account_id)
+    email = "two.deck.user@test.local"
 
-    profile_service._cache.pop(UUID(account_id), None)
+    profile_service._cache.pop(email, None)
 
     # Profile computed from deck_a when building deck_b
-    result = await profile_service.get_user_profile(db_pool, UUID(account_id), UUID(deck_b))
+    result = await profile_service.get_user_profile(db_pool, email, UUID(deck_b))
     # Even with no feedback/cards, profile exists (empty dicts are fine with 1 other deck)
     # _count_other_decks returns 1, which >= MIN_DECKS_FOR_PROFILE - 1 = 1
     assert result is not None or result is None  # no cards/feedback → may return None
@@ -60,6 +62,7 @@ async def test_get_user_profile_with_feedback(client, db_pool):
     account_id = await create_test_account(client, "Feedback Profile User")
     deck_a = await create_test_deck(client, name="FA Deck A", owner_id=account_id)
     deck_b = await create_test_deck(client, name="FA Deck B", owner_id=account_id)
+    email = "feedback.profile.user@test.local"
 
     # Add feedback on deck_a for Sol Ring (thumbs up)
     resp = await client.post(
@@ -68,8 +71,8 @@ async def test_get_user_profile_with_feedback(client, db_pool):
     )
     assert resp.status_code == 201
 
-    profile_service._cache.pop(UUID(account_id), None)
-    result = await profile_service.get_user_profile(db_pool, UUID(account_id), UUID(deck_b))
+    profile_service._cache.pop(email, None)
+    result = await profile_service.get_user_profile(db_pool, email, UUID(deck_b))
 
     assert result is not None
     assert any(v > 0 for v in result.feedback.values()), "expected positive net feedback"
@@ -141,6 +144,7 @@ async def test_cache_is_populated_after_first_call(client, db_pool):
     account_id = await create_test_account(client, "Cache Test User")
     deck_a = await create_test_deck(client, name="Cache Deck A", owner_id=account_id)
     deck_b = await create_test_deck(client, name="Cache Deck B", owner_id=account_id)
+    email = "cache.test.user@test.local"
 
     # Give deck_a some feedback so profile is non-None
     await client.post(
@@ -148,9 +152,8 @@ async def test_cache_is_populated_after_first_call(client, db_pool):
         json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "feedback": "up"},
     )
 
-    uid = UUID(account_id)
-    profile_service._cache.pop(uid, None)
+    profile_service._cache.pop(email, None)
 
-    await profile_service.get_user_profile(db_pool, uid, UUID(deck_b))
+    await profile_service.get_user_profile(db_pool, email, UUID(deck_b))
 
-    assert uid in profile_service._cache
+    assert email in profile_service._cache

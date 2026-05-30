@@ -122,6 +122,34 @@ _TEST_CARDS = [
         # Null EUR: card has no EUR price data.
         "prices": {"usd": "60.00"},
     },
+    {
+        "scryfall_id": "6d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "6d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
+        "name": "Forest",
+        "color_identity": ["G"],
+        "oracle_text": "{T}: Add {G}.",
+        "type_line": "Basic Land — Forest",
+        "cmc": 0,
+        "mana_cost": None,
+        "rarity": "common",
+        "set_code": "lea",
+        "legalities": {"commander": "legal"},
+        "prices": {"eur": "0.10"},
+    },
+    {
+        "scryfall_id": "7d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+        "oracle_id": "7d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
+        "name": "Plains",
+        "color_identity": ["W"],
+        "oracle_text": "{T}: Add {W}.",
+        "type_line": "Basic Land — Plains",
+        "cmc": 0,
+        "mana_cost": None,
+        "rarity": "common",
+        "set_code": "lea",
+        "legalities": {"commander": "legal"},
+        "prices": {"eur": "0.10"},
+    },
 ]
 
 
@@ -169,6 +197,34 @@ def _init_db() -> None:
     asyncio.run(_setup_schema())
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_db(_init_db: None) -> None:
+    """Reset mutable database state before every test."""
+    conn = await asyncpg.connect(dsn=TEST_DB_URL)
+    try:
+        await conn.execute(
+            """
+            TRUNCATE feature_flags, edhrec_commander_recs, moxfield_commander_recs,
+                collection_cards, collections, account_ranking_weights,
+                deck_snapshot_cards, deck_snapshots, deck_feedback, preferences,
+                deck_cards, decks, accounts CASCADE
+            """
+        )
+        await conn.execute(
+            """
+            DELETE FROM cards
+            WHERE scryfall_id <> ALL($1::uuid[])
+            """,
+            [str(card["scryfall_id"]) for card in _TEST_CARDS],
+        )
+        await conn.execute("UPDATE cards SET tags = ARRAY[]::text[]")
+    finally:
+        await conn.close()
+    from mtg_helper.services import profile_service
+
+    profile_service._cache.clear()
+
+
 @pytest.fixture(autouse=True)
 def _reset_rate_limits() -> None:
     """Clear the in-memory rate-limit buckets before each test."""
@@ -186,7 +242,9 @@ async def db_pool(_init_db: None) -> AsyncGenerator[asyncpg.Pool]:
 
 
 @pytest_asyncio.fixture
-async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
+async def client(
+    db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> AsyncGenerator[AsyncClient]:
     """HTTP test client with the real FastAPI app and test DB pool.
 
     Installs a default `get_current_account` override returning a freshly
@@ -202,18 +260,33 @@ async def client(db_pool: asyncpg.Pool) -> AsyncGenerator[AsyncClient]:
         require_admin_or_internal,
     )
     from mtg_helper.models.accounts import AccountResponse
+    from mtg_helper.services import deck_service
     from mtg_helper.services.admin_jobs import JobRegistry
+
+    async def _skip_recommendation_refresh(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr(deck_service, "_safe_edhrec_refresh", _skip_recommendation_refresh)
+    monkeypatch.setattr(deck_service, "_safe_moxfield_refresh", _skip_recommendation_refresh)
 
     app.state.db_pool = db_pool
 
     mock_qdrant = MagicMock()
     mock_qdrant.search = AsyncMock(return_value=[])
     app.state.qdrant_client = mock_qdrant
+    app.state.ai_client = make_mock_llm_client()
     app.state.admin_jobs = JobRegistry()
+    app.state.optimizer_jobs = {}
 
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO accounts (display_name, email) VALUES ($1, $2) RETURNING *",
+            """
+            INSERT INTO accounts (display_name, email)
+            VALUES ($1, $2)
+            ON CONFLICT (lower(email)) WHERE email IS NOT NULL
+            DO UPDATE SET display_name = EXCLUDED.display_name
+            RETURNING *
+            """,
             "Default Test User",
             "default@test.local",
         )

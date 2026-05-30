@@ -386,6 +386,41 @@ ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS trusted_quota REAL NOT NULL DEFAULT 1.0;
 
 -- ============================================================
+-- FEATURE FLAGS (runtime toggles; admin-set overrides)
+-- ============================================================
+-- account_id NULL = global scope. A primary key cannot span a nullable
+-- column, so uniqueness is enforced by two partial indexes instead.
+CREATE TABLE IF NOT EXISTS feature_flags (
+    flag       TEXT NOT NULL,
+    account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
+    enabled    BOOLEAN NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE feature_flags
+    ALTER COLUMN account_id TYPE UUID USING account_id::UUID;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'feature_flags'::regclass
+          AND conname = 'feature_flags_account_id_fkey'
+    ) THEN
+        ALTER TABLE feature_flags
+            ADD CONSTRAINT feature_flags_account_id_fkey
+            FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS feature_flags_global_idx
+    ON feature_flags (flag) WHERE account_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS feature_flags_account_idx
+    ON feature_flags (flag, account_id) WHERE account_id IS NOT NULL;
+
+-- ============================================================
 -- VIEW: deck detail with full card info
 -- ============================================================
 CREATE OR REPLACE VIEW deck_detail_view AS

@@ -34,7 +34,7 @@ from mtg_helper.models.playtest import (
 
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G", "C")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
-_DRAW_RE = re.compile(r"draw (a|one|two|three|four|five|\d+) cards?", re.IGNORECASE)
+_DRAW_RE = re.compile(r"draws? (a|one|two|three|four|five|six|seven|\d+) cards?", re.IGNORECASE)
 _DRAW_MAX = 5
 _WORD_TO_INT: dict[str, int] = {
     "a": 1,
@@ -43,6 +43,8 @@ _WORD_TO_INT: dict[str, int] = {
     "three": 3,
     "four": 4,
     "five": 5,
+    "six": 6,
+    "seven": 7,
 }
 
 _BASIC_LAND_PRODUCES: dict[str, str] = {
@@ -96,9 +98,9 @@ _WORD_TO_NUM: dict[str, int] = {
     "five": 5,
 }
 
-# Flood: hit a turn ≥ 4 with at least 2 more lands than the turn number AND
-# used less than half the mana that turn. Screw: a turn ≥ 3 where the deck
-# fell at least 2 lands behind on the curve. Thresholds tuned for Commander.
+# Flood: hit a turn ≥ 4 with at least 2 lands stranded in hand AND use less
+# than half the mana that turn. Screw: a turn ≥ 3 where the deck fell at least
+# 2 lands behind on the curve. Thresholds tuned for Commander.
 _FLOOD_TURN_FLOOR = 4
 _FLOOD_LAND_EXCESS = 2
 _FLOOD_UTILIZATION_CEIL = 0.5
@@ -300,7 +302,7 @@ def _parse_draw_count(oracle_text: str | None) -> int:
     token = match.group(1).lower()
     if token.isdigit():
         return min(int(token), _DRAW_MAX)
-    return _WORD_TO_INT.get(token, 1)
+    return min(_WORD_TO_INT.get(token, 1), _DRAW_MAX)
 
 
 def _parse_add_clause(body: str) -> tuple[int, set[str]] | None:
@@ -930,7 +932,6 @@ def _run_trial(
         _do_turn_draw(turn, on_the_play, hand, library, result)
         if _play_land(hand, battlefield_lands, mana_sources, turn):
             result.land_play_turns.append(turn)
-        active = sum(1 for s in mana_sources if s.available_from_turn <= turn)
         drawn_sink: list[SimCard] = []
         counts, resolved_zone = _cast_turn(
             hand, library, mana_sources, turn, command_zone, drawn_sink, result.cast_log
@@ -959,6 +960,7 @@ def _run_trial(
         if first_missed is None and lands_now == prev_lands:
             first_missed = turn
         prev_lands = lands_now
+        active = sum(1 for source in mana_sources if source.available_from_turn <= turn)
         _record_turn(result, turn, active, counts, hs, lands_now, total_cast, len(hand))
         _record_hand_buckets(result, hand)
     result.first_missed_land_turn = first_missed
@@ -1030,8 +1032,8 @@ def _record_hand_buckets(result: TrialResult, hand: list[SimCard]) -> None:
 def _classify_flood_screw(trial: TrialResult) -> str:
     """Return ``"flood"``, ``"screw"``, or ``"ok"`` for a trial.
 
-    Flood: a turn ≥ ``_FLOOD_TURN_FLOOR`` had at least ``_FLOOD_LAND_EXCESS`` more
-    lands than the turn number AND mana utilization below ``_FLOOD_UTILIZATION_CEIL``.
+    Flood: a turn ≥ ``_FLOOD_TURN_FLOOR`` had at least ``_FLOOD_LAND_EXCESS``
+    lands stranded in hand AND mana utilization below ``_FLOOD_UTILIZATION_CEIL``.
     Screw: a turn ≥ ``_SCREW_TURN_FLOOR`` had at least ``_SCREW_LAND_DEFICIT``
     fewer lands than the turn number. Screw takes priority if both apply.
     """
@@ -1039,9 +1041,9 @@ def _classify_flood_screw(trial: TrialResult) -> str:
         turn = idx + 1
         if turn >= _SCREW_TURN_FLOOR and lands <= turn - _SCREW_LAND_DEFICIT:
             return "screw"
-    for idx, lands in enumerate(trial.lands_in_play_by_turn):
+    for idx, lands in enumerate(trial.hand_lands_by_turn):
         turn = idx + 1
-        if turn < _FLOOD_TURN_FLOOR or lands < turn + _FLOOD_LAND_EXCESS:
+        if turn < _FLOOD_TURN_FLOOR or lands < _FLOOD_LAND_EXCESS:
             continue
         available = trial.mana_available_by_turn[idx]
         spent = trial.mana_spent_by_turn[idx]

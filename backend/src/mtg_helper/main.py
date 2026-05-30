@@ -15,6 +15,7 @@ from mtg_helper.db import apply_schema, close_pool, create_pool
 from mtg_helper.routers import (
     admin,
     ai,
+    capabilities,
     cards,
     collections,
     decks,
@@ -91,6 +92,7 @@ _admin = [Depends(require_admin_or_internal)]
 
 app.include_router(health.router)
 app.include_router(me.router, prefix="/api/v1")
+app.include_router(capabilities.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(cards.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)

@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # hitting admin endpoints). Empty disables internal-token auth.
     internal_api_token: str = ""
 
+    # Feature flags: env default; admins override per-global/per-account at
+    # runtime via the admin API. The optimizer ships off — its search runs
+    # hundreds of CPU-bound simulations, too heavy for the small prod VM to
+    # serve concurrently. See services/feature_flag_service.py.
+    enable_optimizer: bool = False
+
     @field_validator("admin_emails", mode="before")
     @classmethod
     def _split_admin_emails(cls, v: object) -> object:

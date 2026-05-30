@@ -3,6 +3,7 @@ import type {
   AccountUpdate,
   BracketValidationResponse,
   BuildResponse,
+  Capabilities,
   CardResponse,
   CardSuggestion,
   ComboListResponse,
@@ -101,6 +102,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const apiClient = {
   // Account (authenticated)
   getMe: () => request<AccountResponse>("/me"),
+
+  getCapabilities: () => request<Capabilities>("/capabilities"),
 
   updateMe: (body: AccountUpdate) =>
     request<AccountResponse>("/me", {

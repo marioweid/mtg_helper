@@ -113,7 +113,7 @@ def test_is_precon_normal_deck() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_top_decks_drops_precons_and_caps_at_five() -> None:
+async def test_fetch_top_decks_drops_precons_and_caps_at_ten() -> None:
     body = {
         "data": [
             {
@@ -122,7 +122,7 @@ async def test_fetch_top_decks_drops_precons_and_caps_at_five() -> None:
                 "createdByUser": {"userName": "Player"},
                 "hubs": [],
             }
-            for i in range(8)
+            for i in range(12)
         ]
         + [
             {
@@ -135,7 +135,7 @@ async def test_fetch_top_decks_drops_precons_and_caps_at_five() -> None:
     }
     client = _stub_client(_stub_response(200, body))
     decks = await fetch_top_decks("MOX_ID", client=client)
-    assert [d["id"] for d in decks] == [f"deck{i}" for i in range(5)]
+    assert [d["id"] for d in decks] == [f"deck{i}" for i in range(10)]
     assert all(d["likes"] > 0 for d in decks)
 
 

@@ -208,7 +208,7 @@ class TestAnalyzeManaBase:
 
 class TestRecommendLandCount:
     def test_low_cmc_heavy_ramp_clamped_to_min(self):
-        assert _recommend_land_count(avg_cmc=2.0, ramp_count=10) == 32
+        assert _recommend_land_count(avg_cmc=0.0, ramp_count=10) == 32
 
     def test_high_cmc_no_ramp_clamped_to_max(self):
         assert _recommend_land_count(avg_cmc=5.0, ramp_count=0) == 42

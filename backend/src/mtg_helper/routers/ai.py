@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from mtg_helper.auth import get_current_account
+from mtg_helper.config import settings
 from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
@@ -35,6 +36,7 @@ from mtg_helper.services import (
     ai_service,
     deck_optimizer_service,
     deck_service,
+    feature_flag_service,
     mana_base_service,
     optimizer_jobs,
     playtest_service,
@@ -44,6 +46,7 @@ from mtg_helper.services import (
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
 from mtg_helper.services.ai_service import DeckNotFoundError
+from mtg_helper.services.feature_flag_service import FLAG_OPTIMIZER
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
 from mtg_helper.services.swap_service import SwapError
 
@@ -56,6 +59,11 @@ _log = logging.getLogger(__name__)
 _DESCRIBE_LIMIT = (30, 60)  # 30 calls / 60 seconds
 _PLAYTEST_LIMIT = (20, 60)  # 20 sim runs / 60 seconds — CPU-bound, cap abuse
 _ANALYZE_LIMIT = (5, 60)  # 5 analyses / 60 seconds — LLM + multiple tool calls
+
+# Process-wide cap: only one optimization search runs at a time. Each search is
+# hundreds of CPU-bound simulations; a second concurrent run would saturate the
+# small prod VM and lag every request. A queued caller is rejected, not stacked.
+_OPTIMIZE_SEMAPHORE = asyncio.Semaphore(1)
 
 
 def _require_email(account: AccountResponse) -> str:
@@ -211,23 +219,29 @@ async def _run_optimize_job(
     account_id: UUID,
 ) -> None:
     """Drive a long-running optimization search and record its outcome on the job."""
-    try:
-        result = await deck_optimizer_service.run_search(
-            pool,
-            ai_client,
-            qdrant_client,
-            deck,
-            body.sim,
-            search_depth=body.search_depth,
-            max_price_cents=body.max_price_cents,
-            max_swaps=body.max_swaps,
-            account_id=account_id,
-            progress_cb=optimizer_jobs.progress_cb(job),
+    if _OPTIMIZE_SEMAPHORE.locked():
+        optimizer_jobs.finish_error(
+            job, "Another optimization is already running; try again shortly."
         )
-        optimizer_jobs.finish_ok(job, result)
-    except Exception as exc:  # noqa: BLE001 — surface any failure on the job
-        _log.exception("Optimize job %s failed", job.job_id)
-        optimizer_jobs.finish_error(job, str(exc))
+        return
+    async with _OPTIMIZE_SEMAPHORE:
+        try:
+            result = await deck_optimizer_service.run_search(
+                pool,
+                ai_client,
+                qdrant_client,
+                deck,
+                body.sim,
+                search_depth=body.search_depth,
+                max_price_cents=body.max_price_cents,
+                max_swaps=body.max_swaps,
+                account_id=account_id,
+                progress_cb=optimizer_jobs.progress_cb(job),
+            )
+            optimizer_jobs.finish_ok(job, result)
+        except Exception as exc:  # noqa: BLE001 — surface any failure on the job
+            _log.exception("Optimize job %s failed", job.job_id)
+            optimizer_jobs.finish_error(job, str(exc))
 
 
 @router.post(
@@ -243,6 +257,16 @@ async def playtest_optimize(
 ) -> DataResponse[OptimizeStartResponse]:
     """Start a long-running optimization search; poll the status endpoint."""
     email = _require_email(account)
+    if not await feature_flag_service.is_enabled(
+        request.app.state.db_pool, FLAG_OPTIMIZER, account.id, settings.enable_optimizer
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "FEATURE_DISABLED",
+                "message": "Deck optimization is currently disabled",
+            },
+        )
     _enforce_rate_limit(account, "playtest_optimize", _ANALYZE_LIMIT)
     deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
     if deck is None:

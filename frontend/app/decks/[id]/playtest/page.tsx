@@ -21,6 +21,7 @@ export default function SimulatePage({ params }: PageProps) {
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [optimizerEnabled, setOptimizerEnabled] = useState(false);
 
   const loadDeck = async () => {
     try {
@@ -47,6 +48,21 @@ export default function SimulatePage({ params }: PageProps) {
       cancelled = true;
     };
   }, [deckId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const caps = await apiClient.getCapabilities();
+        if (!cancelled) setOptimizerEnabled(caps.optimizer);
+      } catch {
+        if (!cancelled) setOptimizerEnabled(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleRemoveCard(scryfallId: string) {
     try {
@@ -121,7 +137,7 @@ export default function SimulatePage({ params }: PageProps) {
 
       <PlaytestStatsPanel deckId={deckId} />
 
-      {deck && (
+      {deck && optimizerEnabled && (
         <OptimizerPanel
           deckId={deckId}
           deckCards={deck.cards}

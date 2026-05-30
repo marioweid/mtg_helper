@@ -1,7 +1,7 @@
 """Moxfield top-decks recommendations: fetch + cache + score.
 
 Mirrors :mod:`mtg_helper.services.edhrec_service`. For each commander we fetch
-the top 5 most-liked Moxfield decks, resolve every mainboard printing to its
+the top 10 most-liked Moxfield decks, resolve every mainboard printing to its
 oracle_id via Scryfall, and aggregate the oracle_ids. Cards appearing in more
 of the top decks score higher. Resolving to oracle_id (vs. printing-level
 scryfall_id) is what lets alternate-art / reprint references match our local

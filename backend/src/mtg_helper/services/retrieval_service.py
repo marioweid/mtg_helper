@@ -1442,6 +1442,8 @@ async def retrieve_candidates(
     """
     exclude_lands = stage is not None and stage != "lands"
     owned_ids = collection_filter.owned_card_ids if collection_filter else None
+    if owned_ids == frozenset():
+        return []
     query_vector = await embed_single(ai_client, query_text)
 
     # Build a deep enough ranked list to satisfy ``offset + limit`` (Load More
@@ -1504,6 +1506,7 @@ async def retrieve_candidates(
         and uid not in tag_overlaps
         and uid not in fts_set
         and uid not in deck_exclude
+        and (owned_ids is None or uid in owned_ids)
     ]
     all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set, *extra_ids})
     if not all_ids:

@@ -10,10 +10,13 @@ import asyncio
 import logging
 from dataclasses import asdict
 from typing import Any
+from uuid import UUID
 
+import asyncpg
 from fastapi import APIRouter, FastAPI, HTTPException, Request
+from pydantic import BaseModel
 
-from mtg_helper.services import scryfall
+from mtg_helper.services import feature_flag_service, scryfall
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
     JobState,
@@ -142,3 +145,45 @@ async def status(request: Request) -> dict[str, Any]:
         "embed": asdict(registry.embed),
         "refresh_all": asdict(registry.refresh_all),
     }
+
+
+class FeatureFlagUpdate(BaseModel):
+    """Body for setting a feature flag. Omit ``account_id`` for the global scope."""
+
+    enabled: bool
+    account_id: UUID | None = None
+
+
+@router.get("/admin/feature-flags")
+async def list_feature_flags(request: Request) -> dict[str, Any]:
+    """List all feature-flag override rows (global rows first)."""
+    return {"flags": await feature_flag_service.list_flags(request.app.state.db_pool)}
+
+
+@router.put("/admin/feature-flags/{flag}")
+async def set_feature_flag(
+    flag: feature_flag_service.FeatureFlag, body: FeatureFlagUpdate, request: Request
+) -> dict[str, Any]:
+    """Set a global or per-account override for ``flag``."""
+    try:
+        await feature_flag_service.set_flag(
+            request.app.state.db_pool, flag, body.enabled, body.account_id
+        )
+    except asyncpg.ForeignKeyViolationError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "ACCOUNT_NOT_FOUND",
+                "message": f"Account {body.account_id} does not exist",
+            },
+        ) from exc
+    return {"flag": flag, "enabled": body.enabled, "account_id": body.account_id}
+
+
+@router.delete("/admin/feature-flags/{flag}")
+async def clear_feature_flag(
+    flag: feature_flag_service.FeatureFlag, request: Request, account_id: UUID | None = None
+) -> dict[str, Any]:
+    """Clear a global (default) or per-account override, reverting to env default."""
+    await feature_flag_service.clear_flag(request.app.state.db_pool, flag, account_id)
+    return {"flag": flag, "cleared": True, "account_id": account_id}
