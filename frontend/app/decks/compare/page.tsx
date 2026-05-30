@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ManaCost } from "@/components/mana-cost";
 import { ManaCurve } from "@/components/mana-curve";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
+import { OwnedBadge } from "@/components/owned-badge";
 import { apiClient, ApiError } from "@/lib/api";
 import type {
   ComparisonKind,
@@ -21,6 +22,10 @@ interface SideCard {
   type_line: string | null;
   cmc: number | null;
   quantity: number;
+}
+
+function formatEur(cents: number | null): string {
+  return cents == null ? "No EUR price" : `€${(cents / 100).toFixed(2)}`;
 }
 
 function reconstructSide(diff: DeckDiff, side: "left" | "right"): SideCard[] {
@@ -151,6 +156,12 @@ function DiffRow({ entry, side }: { entry: DiffEntry; side: "added" | "removed" 
         {entry.card.type_line && (
           <span className="truncate text-xs text-gray-500">{entry.card.type_line}</span>
         )}
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-gray-300">
+            {formatEur(entry.card.price_eur_cents)}
+          </span>
+          <OwnedBadge owned={entry.card.owned_in} />
+        </div>
       </div>
       <div className="shrink-0 text-xs text-gray-300">
         {side === "qty"

@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from mtg_helper.models.ai import CollectionMembership
+
 
 class SnapshotCardItem(BaseModel):
     """A single card within a snapshot, with the card fields needed to render."""
@@ -87,6 +89,8 @@ class DiffCardInfo(BaseModel):
     type_line: str | None = None
     image_uri: str | None = None
     color_identity: list[str] = Field(default_factory=list)
+    price_eur_cents: int | None = None
+    owned_in: list[CollectionMembership] = Field(default_factory=list)
 
 
 class DiffEntry(BaseModel):

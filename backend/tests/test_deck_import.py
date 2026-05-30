@@ -156,6 +156,22 @@ async def test_import_basic_deck(client: AsyncClient) -> None:
     assert data["color_violations"] == []
 
 
+async def test_import_sums_repeated_basic_land_entries(client: AsyncClient) -> None:
+    text = "1 Hazel of the Rootbloom *CMDR*\n6 Forest\n5 Forest"
+    resp = await client.post(
+        "/api/v1/decks/import",
+        json={"deck_list": text, "name": "Many Forests"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    assert data["imported_count"] == 11
+
+    deck_id = data["deck"]["id"]
+    detail_resp = await client.get(f"/api/v1/decks/{deck_id}")
+    forest = next(c for c in detail_resp.json()["data"]["cards"] if c["name"] == "Forest")
+    assert forest["quantity"] == 11
+
+
 async def test_import_stage_is_complete(client: AsyncClient) -> None:
     text = "1 Hazel of the Rootbloom *CMDR*\n1 Sol Ring"
     resp = await client.post(

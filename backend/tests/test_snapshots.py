@@ -170,6 +170,33 @@ async def test_compare_two_decks(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_compare_includes_price_and_collection_ownership(client: AsyncClient) -> None:
+    create_collection = await client.post("/api/v1/me/collections", json={"name": "Binder"})
+    collection_id = create_collection.json()["data"]["id"]
+    await client.post(
+        f"/api/v1/collections/{collection_id}/cards",
+        json={"scryfall_id": str(DOUBLING_SEASON_SCRYFALL_ID)},
+    )
+
+    deck_a = await create_test_deck(client, name="No Double")
+    deck_b = await create_test_deck(client, name="With Double")
+    await client.post(
+        f"/api/v1/decks/{deck_b}/cards",
+        json={"card_scryfall_id": str(DOUBLING_SEASON_SCRYFALL_ID)},
+    )
+
+    resp = await client.get(
+        "/api/v1/decks/compare",
+        params={"left": deck_a, "right": deck_b},
+    )
+    assert resp.status_code == 200
+    added = resp.json()["data"]["diff"]["added"][0]["card"]
+    assert added["name"] == "Doubling Season"
+    assert added["price_eur_cents"] == 4500
+    assert [c["name"] for c in added["owned_in"]] == ["Binder"]
+
+
+@pytest.mark.asyncio
 async def test_compare_cross_account_404(client: AsyncClient) -> None:
     await create_test_account(client, "Owner Cmp")
     deck_id = await create_test_deck(client, name="Mine")
@@ -181,6 +208,40 @@ async def test_compare_cross_account_404(client: AsyncClient) -> None:
         params={"left": deck_id, "right": other_deck},
     )
     assert resp.status_code == 404
+
+
+def test_diff_compositions_treats_same_name_different_printing_as_common() -> None:
+    import uuid
+
+    left_id = uuid.uuid4()
+    right_id = uuid.uuid4()
+    left = {
+        left_id: {
+            "card_id": left_id,
+            "scryfall_id": uuid.uuid4(),
+            "name": "Forest",
+            "quantity": 6,
+            "categories": ["lands"],
+            "color_identity": ["G"],
+        }
+    }
+    right = {
+        right_id: {
+            "card_id": right_id,
+            "scryfall_id": uuid.uuid4(),
+            "name": "Forest",
+            "quantity": 6,
+            "categories": ["lands"],
+            "color_identity": ["G"],
+        }
+    }
+
+    diff = diff_compositions(left, right)
+    assert diff.added == []
+    assert diff.removed == []
+    assert [(e.card.name, e.left_quantity, e.right_quantity) for e in diff.common] == [
+        ("Forest", 6, 6)
+    ]
 
 
 def test_diff_compositions_pure() -> None:

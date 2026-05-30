@@ -291,7 +291,7 @@ async def import_parsed_entries(
         "Imported deck '%s' (%s): %d cards, %d unresolved, %d color violations",
         name,
         deck.id,
-        len(resolved_cards),
+        sum(quantity for _, quantity, _ in resolved_cards),
         len(unresolved),
         len(color_violations),
     )
@@ -301,7 +301,7 @@ async def import_parsed_entries(
 
     return DeckImportResponse(
         deck=updated_deck,  # type: ignore[arg-type]
-        imported_count=len(resolved_cards),
+        imported_count=sum(quantity for _, quantity, _ in resolved_cards),
         unresolved=unresolved,
         color_violations=color_violations,
         suggested_archetype_tags=suggested_tags,
@@ -364,6 +364,28 @@ async def _aggregate_archetype_tags(
     ]
 
 
+def _aggregate_resolved_cards(
+    cards: list[tuple[str, int, str | None]],
+) -> list[tuple[str, int, list[str]]]:
+    """Collapse repeated resolved names/printings into one row per local card.
+
+    Moxfield may emit separate entries for different basic-land printings. Those
+    entries resolve to the same local card, so quantities must be added before
+    hitting the ``UNIQUE(deck_id, card_id)`` constraint.
+    """
+    order: list[str] = []
+    totals: dict[str, tuple[int, list[str]]] = {}
+    for scryfall_id_str, quantity, category in cards:
+        if scryfall_id_str not in totals:
+            order.append(scryfall_id_str)
+            totals[scryfall_id_str] = (0, [])
+        current_quantity, categories = totals[scryfall_id_str]
+        if category and category not in categories:
+            categories.append(category)
+        totals[scryfall_id_str] = (current_quantity + quantity, categories)
+    return [(sid, totals[sid][0], totals[sid][1]) for sid in order]
+
+
 async def _bulk_insert_cards(
     pool: asyncpg.Pool,
     deck_id: object,
@@ -378,7 +400,8 @@ async def _bulk_insert_cards(
     """
     async with pool.acquire() as conn:
         # Resolve scryfall_ids to internal card UUIDs in bulk.
-        scryfall_ids = [row[0] for row in cards]
+        aggregated_cards = _aggregate_resolved_cards(cards)
+        scryfall_ids = [row[0] for row in aggregated_cards]
         id_rows = await conn.fetch(
             "SELECT id, scryfall_id FROM cards WHERE scryfall_id = ANY($1::uuid[])",
             scryfall_ids,
@@ -386,11 +409,10 @@ async def _bulk_insert_cards(
         scryfall_to_id = {str(r["scryfall_id"]): r["id"] for r in id_rows}
 
         inserts: list[tuple] = []
-        for scryfall_id_str, quantity, category in cards:
+        for scryfall_id_str, quantity, categories in aggregated_cards:
             card_id = scryfall_to_id.get(scryfall_id_str)
             if card_id is None:
                 continue
-            categories = [category] if category else []
             inserts.append((deck_id, card_id, quantity, categories))
 
         if inserts:

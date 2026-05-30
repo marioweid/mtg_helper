@@ -140,6 +140,7 @@ async def compare(
             right_kind=right_kind,
             right_id=right,
             email=email,
+            account_id=account.id,
         )
     except SnapshotNotFoundError as e:
         raise _not_found(str(e))
