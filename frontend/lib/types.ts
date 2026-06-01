@@ -807,6 +807,8 @@ export interface DiffCardInfo {
   type_line: string | null;
   image_uri: string | null;
   color_identity: string[];
+  price_eur_cents: number | null;
+  owned_in: CollectionMembership[];
 }
 
 export interface DiffEntry {

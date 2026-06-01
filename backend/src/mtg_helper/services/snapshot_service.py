@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
@@ -18,6 +19,7 @@ from mtg_helper.models.snapshots import (
     SnapshotResponse,
     SnapshotSummary,
 )
+from mtg_helper.services import collection_service
 
 _log = logging.getLogger(__name__)
 
@@ -343,7 +345,11 @@ async def _load_deck_composition(
         """
         SELECT dc.card_id, dc.quantity, dc.categories,
                c.scryfall_id, c.name, c.mana_cost, c.cmc, c.type_line,
-               c.image_uri, c.color_identity
+               c.image_uri, c.color_identity,
+               CASE
+                   WHEN (c.prices->>'eur') IS NULL THEN NULL
+                   ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
+               END AS price_eur_cents
         FROM deck_cards dc
         JOIN cards c ON c.id = dc.card_id
         WHERE dc.deck_id = $1
@@ -382,7 +388,11 @@ async def _load_snapshot_composition(
         """
         SELECT sc.card_id, sc.quantity, sc.categories,
                c.scryfall_id, c.name, c.mana_cost, c.cmc, c.type_line,
-               c.image_uri, c.color_identity
+               c.image_uri, c.color_identity,
+               CASE
+                   WHEN (c.prices->>'eur') IS NULL THEN NULL
+                   ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
+               END AS price_eur_cents
         FROM deck_snapshot_cards sc
         JOIN cards c ON c.id = sc.card_id
         WHERE sc.snapshot_id = $1
@@ -412,26 +422,67 @@ def _card_info(row: dict[str, Any]) -> DiffCardInfo:
         type_line=row.get("type_line"),
         image_uri=row.get("image_uri"),
         color_identity=list(row.get("color_identity") or []),
+        price_eur_cents=row.get("price_eur_cents"),
+        owned_in=list(row.get("owned_in") or []),
     )
+
+
+_SPACE_RE = re.compile(r"\s+")
+
+
+def _card_identity_key(row: dict[str, Any]) -> str:
+    """Return the gameplay identity used for diffs, not the printing id."""
+    name = _SPACE_RE.sub(" ", str(row.get("name") or "")).strip().lower()
+    return f"name:{name}" if name else f"card:{row['card_id']}"
+
+
+def _merge_categories(*category_lists: list[str]) -> list[str]:
+    merged: list[str] = []
+    for categories in category_lists:
+        for category in categories:
+            if category not in merged:
+                merged.append(category)
+    return merged
+
+
+def _aggregate_by_card_name(cards: dict[UUID, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Collapse alternate printings into one comparable row per card name."""
+    grouped: dict[str, dict[str, Any]] = {}
+    for row in cards.values():
+        key = _card_identity_key(row)
+        if key not in grouped:
+            grouped[key] = dict(row)
+            continue
+        existing = grouped[key]
+        existing["quantity"] = int(existing.get("quantity") or 0) + int(row.get("quantity") or 0)
+        existing["categories"] = _merge_categories(
+            list(existing.get("categories") or []), list(row.get("categories") or [])
+        )
+    return grouped
 
 
 def diff_compositions(
     left: dict[UUID, dict[str, Any]],
     right: dict[UUID, dict[str, Any]],
 ) -> DeckDiff:
-    """Compare two card-id-keyed compositions and bucket the differences.
+    """Compare two compositions and bucket differences by card name.
 
-    Each value must have at least: card_id, scryfall_id, name, quantity, categories.
+    Decks can contain different printings of the same card (especially basic
+    lands). Those must compare as the same gameplay card instead of as separate
+    removed/added rows. Each value must have at least: card_id, scryfall_id,
+    name, quantity, categories.
     """
     added: list[DiffEntry] = []
     removed: list[DiffEntry] = []
     quantity_changed: list[DiffEntry] = []
     common: list[DiffEntry] = []
+    left_cards = _aggregate_by_card_name(left)
+    right_cards = _aggregate_by_card_name(right)
 
-    all_ids = set(left.keys()) | set(right.keys())
-    for cid in sorted(all_ids, key=lambda x: str(x)):
-        lrow = left.get(cid)
-        rrow = right.get(cid)
+    all_keys = set(left_cards.keys()) | set(right_cards.keys())
+    for key in sorted(all_keys):
+        lrow = left_cards.get(key)
+        rrow = right_cards.get(key)
         source_row = rrow if rrow is not None else lrow
         assert source_row is not None  # at least one side has the card
         info = _card_info(source_row)
@@ -464,6 +515,20 @@ def diff_compositions(
     )
 
 
+def _diff_entries(diff: DeckDiff) -> list[DiffEntry]:
+    return [*diff.added, *diff.removed, *diff.quantity_changed, *diff.common]
+
+
+async def _attach_ownership(
+    pool: asyncpg.Pool, diff: DeckDiff, account_id: UUID | None
+) -> None:
+    entries = _diff_entries(diff)
+    scryfall_ids = [entry.card.scryfall_id for entry in entries]
+    ownership = await collection_service.build_ownership_map(pool, account_id, scryfall_ids)
+    for entry in entries:
+        entry.card.owned_in = ownership.get(entry.card.scryfall_id, [])
+
+
 async def compare(
     pool: asyncpg.Pool,
     *,
@@ -472,6 +537,7 @@ async def compare(
     right_kind: str,
     right_id: UUID,
     email: str,
+    account_id: UUID | None = None,
 ) -> DeckCompareResponse:
     """Diff two compositions. Each side may be a live deck or a snapshot."""
     async with pool.acquire() as conn:
@@ -485,4 +551,5 @@ async def compare(
             right = await _load_deck_composition(conn, right_id, email)
 
     diff = diff_compositions(left.cards, right.cards)
+    await _attach_ownership(pool, diff, account_id)
     return DeckCompareResponse(left=left.meta(), right=right.meta(), diff=diff)

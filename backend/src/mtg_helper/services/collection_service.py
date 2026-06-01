@@ -579,14 +579,20 @@ async def build_ownership_map(
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT DISTINCT cards.scryfall_id AS scryfall_id,
+            WITH input_cards AS (
+                SELECT scryfall_id, COALESCE(oracle_id, id) AS oracle_key
+                FROM cards
+                WHERE scryfall_id = ANY($2::uuid[])
+            )
+            SELECT DISTINCT ic.scryfall_id AS scryfall_id,
                    c.id AS collection_id,
                    c.name AS collection_name
-            FROM collection_cards cc
+            FROM input_cards ic
+            JOIN cards owned_cards
+              ON COALESCE(owned_cards.oracle_id, owned_cards.id) = ic.oracle_key
+            JOIN collection_cards cc ON cc.card_id = owned_cards.id
             JOIN collections c ON c.id = cc.collection_id
-            JOIN cards ON cards.id = cc.card_id
             WHERE c.account_id = $1
-              AND cards.scryfall_id = ANY($2::uuid[])
             """,
             account_id,
             scryfall_ids,
