@@ -71,6 +71,7 @@ services:
       context: ./frontend
       target: runner
     restart: unless-stopped
+    command: ["sh", "-c", "pnpm start -- -p $${PORT:-3001}"]
     ports:
       - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3001}:${PORT:-3001}"
     environment:
