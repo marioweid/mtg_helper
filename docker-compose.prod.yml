@@ -8,7 +8,7 @@
 #   2. Set the environment variables listed in portainer.env.example in the
 #      Portainer stack UI (or via an env file managed outside git).
 #   3. Point your existing reverse proxy / Cloudflare Tunnel at the frontend
-#      host port (defaults to http://127.0.0.1:3000).
+#      host port (defaults to http://127.0.0.1:3001).
 #   4. Enable GitOps automatic updates, or use the stack webhook from your
 #      repository's push webhook.
 
@@ -72,8 +72,9 @@ services:
       target: runner
     restart: unless-stopped
     ports:
-      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3001}:${PORT:-3001}"
     environment:
+      PORT: ${PORT:-3001}
       BACKEND_ORIGIN: http://backend:8000
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:?AUTH_GOOGLE_ID must be set}
