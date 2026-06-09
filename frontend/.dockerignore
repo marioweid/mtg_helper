@@ -1,0 +1,8 @@
+node_modules
+.next
+.pytest_cache
+.ruff_cache
+tsconfig.tsbuildinfo
+.env*
+Dockerfile
+.dockerignore

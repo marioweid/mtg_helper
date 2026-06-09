@@ -6,9 +6,8 @@
 # Tail logs:   docker compose logs -f backend frontend
 # Stop:        docker compose down
 #
-# Production layers an overlay on top to bind data to /srv/mtg-helper/data,
-# strip host ports, swap env files, and add the Cloudflare Tunnel + weekly
-# Scryfall sync. See docker-compose.prod.yml.
+# Production uses a standalone Portainer-friendly stack with host-bound data,
+# a production frontend build, and weekly Scryfall sync. See docker-compose.prod.yml.
 
 services:
   qdrant:
@@ -57,7 +56,12 @@ services:
       - ./backend/src:/app/src
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: dev
+    env_file:
+      - path: ./frontend/.env.local
+        required: false
     ports:
       - "3000:3000"
     environment:

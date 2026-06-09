@@ -4,14 +4,30 @@ Copy-paste commands for the things you do more than once a year. For project con
 
 ## Compose layout
 
-Two files. The base one is the local-dev stack; the prod overlay layers on top.
+Two files. The base file is local-dev only; the prod file is a standalone Portainer stack.
 
 | File | Purpose |
 |---|---|
 | `docker-compose.yml` | Local dev. Postgres + Qdrant + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in Docker-managed named volumes. |
-| `docker-compose.prod.yml` | Additive overlay for the GCP VM. Binds `pgdata` / `qdrantdata` to `/srv/mtg-helper/data/*`, strips host ports, swaps to `.env.prod`, adds `cloudflared` and the weekly `scryfall-sync` cron. Never run standalone. |
+| `docker-compose.prod.yml` | Standalone production/Portainer stack. Uses host data under `${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}`, production frontend build, and weekly `scryfall-sync`. |
 
-The `scryfall-sync` cron and Cloudflare Tunnel are prod-only; locally you trigger card sync from the Admin page when you want fresh data.
+The production file intentionally does **not** use Compose merge tags (`!reset`, `!override`) so it works with current Portainer Git stacks. It publishes only the frontend to `127.0.0.1:${FRONTEND_PORT:-3000}` by default; point the homeserver's existing reverse proxy / Cloudflare Tunnel there. The `scryfall-sync` cron is prod-only; locally you trigger card sync from the Admin page when you want fresh data.
+
+## Portainer setup summary
+
+1. Create persistent data directories on the homeserver:
+
+```bash
+sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
+```
+
+2. In Portainer, create a Git stack using:
+   - Repository URL: this repo
+   - Compose path: `docker-compose.prod.yml`
+   - Branch: `main`
+3. Add environment variables from `portainer.env.example` in the Portainer stack UI.
+4. Enable automatic Git updates for the stack.
+5. For immediate deploys on push, add the Portainer stack webhook URL as a repository `push` webhook.
 
 ## Local boot
 
@@ -34,20 +50,29 @@ Ports: backend `:8000`, frontend `:3000`, postgres `:5432`, qdrant `:6333`.
 
 > No root `.env` is needed locally — `INTERNAL_API_TOKEN` only matters if you call `/api/v1/admin/*` endpoints, and the backend reads it from `backend/.env`.
 
-## Prod boot (on the VM)
+## Prod boot with Portainer
+
+1. On the homeserver, install Portainer Agent/CE and make sure the Docker host can build images.
+2. Create the data directories once:
 
 ```bash
-gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap
-
-# from inside the VM
-cd /opt/mtg-helper
-sudo docker compose \
-  -f docker-compose.yml -f docker-compose.prod.yml \
-  --env-file .env.prod \
-  up -d --build
+sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
 ```
 
-`.env.prod` lives at `/opt/mtg-helper/.env.prod` and supplies both the env vars consumed inside containers (Gemini key, NextAuth secrets, etc.) and the values interpolated into the compose file itself (`INTERNAL_API_TOKEN` for the sync cron, `CF_TUNNEL_TOKEN` for cloudflared).
+3. In Portainer: **Stacks → Add stack → Git repository**.
+   - Repository URL: this repo
+   - Branch: `main`
+   - Compose path: `docker-compose.prod.yml`
+   - Environment variables: copy keys from `portainer.env.example` and fill secrets.
+   - Leave `FRONTEND_BIND_ADDR=127.0.0.1` unless the tunnel/proxy runs on another host.
+4. Deploy the stack.
+5. Point the existing homeserver tunnel/proxy at `http://127.0.0.1:${FRONTEND_PORT}`.
+
+CLI equivalent for testing on the server:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+```
 
 ## Database
 
@@ -66,27 +91,24 @@ docker compose down -v && docker compose up -d
 
 ### Production schema apply
 
-Schema runs on container start. For a one-off forced re-apply on the VM:
+Schema runs on container start. For a one-off forced re-apply in Portainer, restart the `backend` service. CLI fallback:
 
 ```bash
-gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap --command="
-  sudo docker compose -f /opt/mtg-helper/docker-compose.yml \
-    -f /opt/mtg-helper/docker-compose.prod.yml \
-    --env-file /opt/mtg-helper/.env.prod restart backend
-"
+cd /opt/mtg-helper
+docker compose -f docker-compose.prod.yml --env-file .env.prod restart backend
 ```
 
 ## Card data sync
 
 Easiest: sign in as an admin user, click **Admin** in the nav (only visible to addresses listed in `ADMIN_EMAILS`), use the buttons. The page calls the same endpoints below.
 
-Required env (frontend, in `.env.local` for dev / `.env.prod` for VM):
+Required env (frontend, in `.env.local` for dev / Portainer stack env for prod):
 
 ```
 ADMIN_EMAILS="you@example.com,other@example.com"
 ```
 
-Backend's `admin_emails` (in `backend/.env` / `.env.prod`) must contain the same set — frontend just hides the button, backend enforces.
+Backend's `ADMIN_EMAILS` (in `backend/.env` / Portainer stack env) must contain the same set — frontend just hides the button, backend enforces.
 
 Three admin endpoints, in order, do a full refresh: pull Scryfall → tag → embed into Qdrant.
 
@@ -103,18 +125,20 @@ Weekly auto-sync runs **only in prod** via the `scryfall-sync` service defined i
 
 ## Deploy pipeline
 
-Push to `main` triggers `.github/workflows/deploy.yml`. Path filter: `backend/**`, `frontend/**`, compose files, the workflow itself.
+Use Portainer GitOps so the homeserver redeploys itself from this repo.
 
-```bash
-# trigger manually (no source change)
-gh workflow run deploy.yml
+Recommended setup:
 
-# watch the run
-gh run watch
+1. In the Portainer Git stack, enable **Automatic updates**.
+2. Choose either polling or webhook updates. For immediate deploys on push, copy the Portainer stack webhook URL.
+3. In GitHub/Gitea/etc., add a repository webhook:
+   - Event: `push`
+   - Branch: `main`
+   - URL: the Portainer webhook URL
+   - Content type: `application/json`
+4. On each push to `main`, Portainer pulls the repo and runs the production compose stack again.
 
-# inspect last run
-gh run view --log
-```
+If your Portainer install offers a “force rebuild/redeploy” option for Git updates, enable it so local images are rebuilt from the new commit.
 
 ## VM lifecycle
 
@@ -138,23 +162,20 @@ gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap
 gcloud scheduler jobs run mtg-helper-auto-restart --location=europe-west1
 ```
 
-## Production stack on the VM
+## Production stack CLI fallback
+
+Prefer Portainer for normal deploys. If you need to manage the stack by SSH:
 
 ```bash
-gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap
-
-# from inside the VM
 cd /opt/mtg-helper
-COMPOSE="sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod"
+COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.prod"
 
 $COMPOSE ps
 $COMPOSE logs -f backend
 $COMPOSE restart backend
-$COMPOSE up -d --force-recreate backend frontend
-$COMPOSE down            # stops everything (data persists on /srv/mtg-helper/data)
+$COMPOSE up -d --build --force-recreate backend frontend
+$COMPOSE down            # stops everything; data persists under MTG_HELPER_DATA_DIR
 ```
-
-`/opt/mtg-helper` is a symlink to `/srv/mtg-helper/data/repo` so the repo survives VM replacement. `.env.prod` lives in that dir.
 
 ## Snapshots & restore
 

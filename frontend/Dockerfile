@@ -11,3 +11,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 3000
 CMD ["pnpm", "dev"]
+
+FROM deps AS build
+COPY . .
+RUN pnpm build
+
+FROM base AS runner
+ENV NODE_ENV=production
+COPY --from=build /app ./
+EXPOSE 3000
+CMD ["pnpm", "start"]
