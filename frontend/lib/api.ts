@@ -31,6 +31,9 @@ import type {
   DescribeResponse,
   FeedbackCreate,
   FeedbackResponse,
+  CommanderCoachRequest,
+  CommanderCoachResponse,
+  CommanderCoachStartResponse,
   KeywordExtractRequest,
   KeywordExtractResponse,
   ManaFixResponse,
@@ -312,6 +315,18 @@ export const apiClient = {
         card_types: opts?.card_types && opts.card_types.length > 0 ? opts.card_types : null,
         subtypes: opts?.subtypes && opts.subtypes.length > 0 ? opts.subtypes : null,
       }),
+    }),
+
+  coachDeck: (deckId: string, body: CommanderCoachRequest) =>
+    request<CommanderCoachResponse>(`/decks/${deckId}/coach`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  startCoachDeck: (deckId: string, body: CommanderCoachRequest) =>
+    request<CommanderCoachStartResponse>(`/decks/${deckId}/coach/start`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   suggestCards: (

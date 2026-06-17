@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
 import { ManaCurve } from "@/components/mana-curve";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
@@ -146,7 +147,9 @@ function DiffRow({ entry, side }: { entry: DiffEntry; side: "added" | "removed" 
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm text-white">{entry.card.name}</span>
+          <CardHover name={entry.card.name} imageUri={entry.card.image_uri}>
+            <span className="truncate text-sm text-white">{entry.card.name}</span>
+          </CardHover>
           {entry.card.mana_cost && (
             <span className="text-xs">
               <ManaCost cost={entry.card.mana_cost} />
@@ -326,13 +329,13 @@ export default function ComparePage() {
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <DeckTypeBreakdown cards={leftCards} />
                   <div className="mt-3">
-                    <ManaCurve cards={leftCards} />
+                    <ManaCurve cards={leftCards} curve={result.left.mana_curve} />
                   </div>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <DeckTypeBreakdown cards={rightCards} />
                   <div className="mt-3">
-                    <ManaCurve cards={rightCards} />
+                    <ManaCurve cards={rightCards} curve={result.right.mana_curve} />
                   </div>
                 </div>
               </section>

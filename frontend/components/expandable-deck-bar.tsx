@@ -5,9 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DeckBrowserPanel } from "@/components/deck-browser-panel";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import { GameChangerBadge } from "@/components/game-changer-badge";
+import { ManaCurve } from "@/components/mana-curve";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
-import type { CardResponse, DeckCardItem } from "@/lib/types";
+import { CATEGORY_ORDER, STAGE_DEFAULTS, STAGE_LABELS } from "@/lib/constants";
+import type { CardResponse, DeckCardItem, DeckManaCurve } from "@/lib/types";
 
 interface Props {
   cards: DeckCardItem[];
@@ -30,6 +32,43 @@ interface Props {
   deckId?: string;
   /** Called after a card is added via the merged search. */
   onCardAdded?: () => void;
+  stageCounts?: Record<string, number>;
+  stageTargets?: Record<string, number>;
+  manaCurve?: DeckManaCurve | null;
+}
+
+function StageTargetChips({
+  counts,
+  targets,
+  dense = false,
+}: {
+  counts: Record<string, number>;
+  targets: Record<string, number>;
+  dense?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {CATEGORY_ORDER.map((stage) => {
+        const count = counts[stage] ?? 0;
+        const target = targets[stage] ?? STAGE_DEFAULTS[stage] ?? 10;
+        const done = count >= target;
+        return (
+          <span
+            key={stage}
+            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums ${
+              done
+                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+                : "border-white/10 bg-white/5 text-gray-300"
+            }`}
+          >
+            {!dense && <span className="mr-1 text-gray-400">{STAGE_LABELS[stage] ?? stage}</span>}
+            {dense ? `${STAGE_LABELS[stage] ?? stage} ` : ""}
+            {count}/{target}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -52,6 +91,9 @@ export function ExpandableDeckBar({
   bracket,
   deckId,
   onCardAdded,
+  stageCounts,
+  stageTargets,
+  manaCurve,
 }: Props) {
   const [open, setOpenState] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -114,17 +156,38 @@ export function ExpandableDeckBar({
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {open && (
-        <div className="mx-auto max-w-5xl border-b border-white/10 px-4 pt-3">
-          <div className="h-[70vh] max-h-[640px]">
-            <DeckBrowserPanel
-              cards={cards}
-              onRemove={onRemove}
-              {...(onUndoCut && { onUndoCut })}
-              {...(onCardClick && { onCardClick })}
-              {...(onSetQuantity && { onSetQuantity })}
-              {...(petCardNames && { petCardNames })}
-              {...(deckId ? { onAddCard: handleAddCard, commanderLegal: true } : {})}
-            />
+        <div className="mx-auto h-[calc(100vh-5.5rem)] max-w-5xl border-b border-white/10 px-4 pt-3">
+          <div className="flex h-full flex-col gap-3">
+            <div className="grid shrink-0 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
+              <div className="space-y-2">
+                {stageCounts && stageTargets && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Theme targets
+                    </div>
+                    <StageTargetChips counts={stageCounts} targets={stageTargets} />
+                  </div>
+                )}
+                <div>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    Type counts
+                  </div>
+                  <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
+                </div>
+              </div>
+              {manaCurve && <ManaCurve cards={cards} curve={manaCurve} compact />}
+            </div>
+            <div className="min-h-0 flex-1">
+              <DeckBrowserPanel
+                cards={cards}
+                onRemove={onRemove}
+                {...(onUndoCut && { onUndoCut })}
+                {...(onCardClick && { onCardClick })}
+                {...(onSetQuantity && { onSetQuantity })}
+                {...(petCardNames && { petCardNames })}
+                {...(deckId ? { onAddCard: handleAddCard, commanderLegal: true } : {})}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -143,7 +206,12 @@ export function ExpandableDeckBar({
         className="w-full cursor-pointer hover:bg-white/5 transition-colors"
       >
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 text-left">
-          <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            {stageCounts && stageTargets && (
+              <StageTargetChips counts={stageCounts} targets={stageTargets} dense />
+            )}
+            <DeckTypeBreakdown cards={cards} target={target} commander={commander ?? null} />
+          </div>
           <GameChangerBadge
             cards={cards}
             bracket={bracket ?? null}

@@ -98,7 +98,7 @@ async def search_cards(
     limit = min(inp.limit, _MAX_LIMIT)
     where, args = _build_filters(inp, deck_color_identity, exclude_names)
     sql = (
-        "SELECT name, mana_cost, cmc, type_line, color_identity, tags, "
+        "SELECT scryfall_id, name, mana_cost, cmc, type_line, color_identity, tags, "
         "ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents "
         f"FROM cards WHERE {' AND '.join(where)} "
         "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST "
@@ -108,6 +108,7 @@ async def search_cards(
         rows = await conn.fetch(sql, *args)
     return [
         CardSearchHit(
+            scryfall_id=row["scryfall_id"],
             name=row["name"],
             mana_cost=row["mana_cost"],
             cmc=float(row["cmc"]) if row["cmc"] is not None else None,

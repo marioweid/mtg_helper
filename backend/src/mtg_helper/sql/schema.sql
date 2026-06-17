@@ -386,6 +386,17 @@ ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS trusted_quota REAL NOT NULL DEFAULT 1.0;
 
 -- ============================================================
+-- EDHREC THEME / ARCHETYPE INDEX
+-- ============================================================
+CREATE TABLE IF NOT EXISTS edhrec_theme_index (
+    slug         TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    source_type  TEXT NOT NULL DEFAULT 'theme',
+    payload      JSONB NOT NULL,
+    fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
 -- FEATURE FLAGS (runtime toggles; admin-set overrides)
 -- ============================================================
 -- account_id NULL = global scope. A primary key cannot span a nullable

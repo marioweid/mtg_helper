@@ -392,7 +392,7 @@ export default function DeckDetailPage() {
         {/* Sidebar */}
         <div className="flex flex-col gap-6">
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <ManaCurve cards={deck.cards} />
+            <ManaCurve cards={deck.cards} curve={deck.mana_curve} />
           </div>
           <ManaFixPanel deckId={deck.id} onAddCard={handleAddCard} />
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -419,13 +419,14 @@ export default function DeckDetailPage() {
         }}
       />
 
-      <StatsModal open={statsOpen} onClose={() => setStatsOpen(false)} cards={deck.cards} />
-
-      <CommandBar
-        deckId={deck.id}
-        buildLabel={buildLabel}
-        onOpenStats={() => setStatsOpen(true)}
+      <StatsModal
+        open={statsOpen}
+        onClose={() => setStatsOpen(false)}
+        cards={deck.cards}
+        manaCurve={deck.mana_curve}
       />
+
+      <CommandBar deckId={deck.id} buildLabel={buildLabel} />
     </div>
   );
 }

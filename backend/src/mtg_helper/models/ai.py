@@ -192,6 +192,7 @@ class CardSearchHit(BaseModel):
     against the deck's color identity.
     """
 
+    scryfall_id: UUID | None = None
     name: str
     mana_cost: str | None = None
     cmc: float | None = None
@@ -228,6 +229,67 @@ class SimulationAnalysisResponse(BaseModel):
     findings: list[AnalysisFinding] = Field(default_factory=list)
     swap_suggestions: list[SwapSuggestion] = Field(default_factory=list)
     tool_call_count: int = 0
+
+
+class DoctorCut(BaseModel):
+    """A card the deck doctor recommends cutting."""
+
+    card_name: str
+    reason: str
+    confidence: Literal["low", "medium", "high"] = "medium"
+
+
+class DoctorAdd(BaseModel):
+    """A card the deck doctor recommends adding."""
+
+    card: CardSearchHit
+    reason: str
+    confidence: Literal["low", "medium", "high"] = "medium"
+
+
+class DoctorSwap(BaseModel):
+    """A concrete cut/add package produced by the deck doctor."""
+
+    remove: list[str] = Field(default_factory=list)
+    add: list[CardSearchHit] = Field(default_factory=list)
+    reason: str
+
+
+class DeckDoctorResponse(BaseModel):
+    """Structured output of the Commander deck doctor agent."""
+
+    summary: str
+    game_plan: str
+    findings: list[AnalysisFinding] = Field(default_factory=list)
+    cuts: list[DoctorCut] = Field(default_factory=list)
+    adds: list[DoctorAdd] = Field(default_factory=list)
+    swaps: list[DoctorSwap] = Field(default_factory=list)
+    tool_call_count: int = 0
+
+
+CoachMode = Literal["auto", "doctor", "builder", "mana", "meta"]
+CoachResolvedMode = Literal["doctor", "builder", "mana", "meta"]
+
+
+class CommanderCoachRequest(BaseModel):
+    """Request body for the Commander Coach orchestrator."""
+
+    message: str = Field(default="Doctor this deck", max_length=4000)
+    mode: CoachMode = "auto"
+
+
+class CommanderCoachResponse(BaseModel):
+    """Response from the Commander Coach orchestrator."""
+
+    mode: CoachResolvedMode
+    reply: str
+    doctor: DeckDoctorResponse | None = None
+
+
+class CommanderCoachStartResponse(BaseModel):
+    """Response after starting a streaming Coach job."""
+
+    job_id: UUID
 
 
 class KeywordExtractResponse(BaseModel):

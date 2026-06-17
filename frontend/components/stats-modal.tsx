@@ -4,12 +4,13 @@ import { useEffect } from "react";
 
 import { DeckStats } from "@/components/deck-stats";
 import { ManaCurve } from "@/components/mana-curve";
-import type { DeckCardItem } from "@/lib/types";
+import type { DeckCardItem, DeckManaCurve } from "@/lib/types";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   cards: DeckCardItem[];
+  manaCurve?: DeckManaCurve | null;
 }
 
 /**
@@ -17,7 +18,7 @@ interface Props {
  * ``DeckStats`` components so users on mobile (where the sidebar drops below
  * the fold) can access stats without scrolling.
  */
-export function StatsModal({ open, onClose, cards }: Props) {
+export function StatsModal({ open, onClose, cards, manaCurve = null }: Props) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -43,7 +44,7 @@ export function StatsModal({ open, onClose, cards }: Props) {
         <h2 className="mb-4 text-xl font-semibold text-white">Deck Stats</h2>
         <div className="flex flex-col gap-6">
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <ManaCurve cards={cards} />
+            <ManaCurve cards={cards} curve={manaCurve} />
           </div>
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <DeckStats cards={cards} />

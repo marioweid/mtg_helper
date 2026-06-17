@@ -61,7 +61,9 @@ function RiskyCardItem({ card }: { card: RiskyCard }) {
   const cost = card.mana_cost ? <ManaCost cost={card.mana_cost} /> : null;
   return (
     <li className="text-xs text-gray-300">
-      <span className="text-white">{card.name}</span>
+      <CardHover name={card.name} className="text-white">
+        {card.name}
+      </CardHover>
       {cost && <span className="ml-1 text-gray-400">({cost})</span>}
       <span className="ml-1 text-gray-500">
         — turn {card.cmc} needs {card.sources_required} {card.color} sources, you have{" "}

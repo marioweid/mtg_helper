@@ -12,6 +12,7 @@ import {
   type CardSuggestion,
   type CollectionResponse,
   type DeckCardItem,
+  type DeckManaCurve,
 } from "@/lib/types";
 import { CATEGORY_ORDER, STAGE_LABELS, STAGE_DEFAULTS, CATEGORY_TARGETS } from "@/lib/constants";
 
@@ -342,6 +343,7 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
+  const [manaCurve, setManaCurve] = useState<DeckManaCurve | null>(null);
   const [deckCommander, setDeckCommander] = useState<{
     type_line: string | null;
     name: string | null;
@@ -412,6 +414,7 @@ export default function BuildPage() {
       const deck = await apiClient.getDeck(deckId);
       setDeckCategoryCounts(computeStageCounts(deck.cards));
       setDeckCards(deck.cards);
+      setManaCurve(deck.mana_curve);
       setDeckCommander(deck.commander_card ?? null);
       setDeckBracket(deck.bracket ?? null);
     } catch {
@@ -429,6 +432,7 @@ export default function BuildPage() {
         setDeckColorIdentity(deck.commander_color_identity.join(","));
         setDeckCategoryCounts(computeStageCounts(deck.cards));
         setDeckCards(deck.cards);
+        setManaCurve(deck.mana_curve);
         setDeckCommander(deck.commander_card ?? null);
         setDeckBracket(deck.bracket ?? null);
         setSelectedCollectionIds(deck.suggestion_collection_ids);
@@ -782,6 +786,16 @@ export default function BuildPage() {
   }
 
   const activeStageState = state.stages[state.activeStage];
+  const stageTargetSummary = useMemo(
+    () =>
+      Object.fromEntries(
+        CATEGORY_ORDER.map((stage) => [
+          stage,
+          state.stages[stage]?.target ?? STAGE_DEFAULTS[stage] ?? 10,
+        ]),
+      ),
+    [state.stages],
+  );
 
   function isHiddenCrossStage(s: CardSuggestion, status: SuggestionStatus): boolean {
     if (globalRejectedIds.has(s.scryfall_id) && status !== "rejected") return true;
@@ -797,7 +811,7 @@ export default function BuildPage() {
       })
     : [];
   return (
-    <div className="pb-24">
+    <div className="pb-36">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Build Deck</h1>
@@ -1336,6 +1350,9 @@ export default function BuildPage() {
         bracket={deckBracket}
         deckId={deckId}
         onCardAdded={() => void refreshDeck()}
+        stageCounts={deckCategoryCounts}
+        stageTargets={stageTargetSummary}
+        manaCurve={manaCurve}
       />
     </div>
   );

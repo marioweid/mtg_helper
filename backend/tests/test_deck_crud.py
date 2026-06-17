@@ -70,6 +70,7 @@ async def test_get_deck_detail(client: AsyncClient) -> None:
     deck = resp.json()["data"]
     assert deck["id"] == deck_id
     assert deck["cards"] == []
+    assert deck["mana_curve"]["recommended"]["source"] == "fallback"
 
 
 @pytest.mark.asyncio

@@ -18,7 +18,7 @@ from mtg_helper.models.decks import (
     DeckSummary,
     DeckUpdate,
 )
-from mtg_helper.services import collection_service
+from mtg_helper.services import collection_service, mana_curve_service
 from mtg_helper.services.retrieval_service import card_qualifying_stages
 
 _log = logging.getLogger(__name__)
@@ -365,6 +365,8 @@ async def get_deck(
         for card in cards:
             card.owned_in = ownership_map.get(card.scryfall_id, [])
 
+    mana_curve = await mana_curve_service.deck_curve(pool, deck_row["commander_id"], cards)
+
     return DeckDetailResponse(
         id=deck_row["id"],
         name=deck_row["name"],
@@ -382,6 +384,7 @@ async def get_deck(
         stage_targets=_parse_stage_targets(deck_row["stage_targets"]),
         suggestion_collection_ids=list(deck_row["suggestion_collection_ids"] or []),
         archetype_tags=list(deck_row["archetype_tags"] or []),
+        mana_curve=mana_curve,
         cards=cards,
     )
 

@@ -59,6 +59,7 @@ _SOURCE_LABELS: dict[str, str] = {
     "tag": "Keywords",
     "fts": "Text",
     "edhrec": "EDHREC",
+    "edhrec_theme": "EDHREC Theme",
     "moxfield": "Moxfield",
     "type": "Type",
 }

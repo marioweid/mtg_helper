@@ -1,12 +1,14 @@
 """AI deck building endpoints."""
 
 import asyncio
+import json
 import logging
+from collections.abc import AsyncGenerator
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.config import settings
@@ -14,6 +16,10 @@ from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
     BuildResponse,
+    CommanderCoachRequest,
+    CommanderCoachResponse,
+    CommanderCoachStartResponse,
+    DeckDoctorResponse,
     DescribeRequest,
     DescribeResponse,
     KeywordExtractRequest,
@@ -34,6 +40,7 @@ from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
     agents,
     ai_service,
+    commander_coach,
     deck_optimizer_service,
     deck_service,
     feature_flag_service,
@@ -45,6 +52,7 @@ from mtg_helper.services import (
     swap_service,
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
+from mtg_helper.services.commander_coach import jobs as coach_jobs
 from mtg_helper.services.ai_service import DeckNotFoundError
 from mtg_helper.services.feature_flag_service import FLAG_OPTIMIZER
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
@@ -181,6 +189,114 @@ async def playtest_simulate(
         raise _deck_not_found(deck_id)
     stats = playtest_service.simulate(deck, body)
     return DataResponse(data=stats)
+
+
+@router.post("/{deck_id}/coach", response_model=DataResponse[CommanderCoachResponse])
+async def coach_deck(
+    deck_id: UUID,
+    body: CommanderCoachRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CommanderCoachResponse]:
+    """Run the Commander Coach orchestrator for an existing deck."""
+    email = _require_email(account)
+    _enforce_rate_limit(account, "coach_deck", _ANALYZE_LIMIT)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    result = await commander_coach.run_coach(request.app.state.db_pool, deck, body)
+    return DataResponse(data=result)
+
+
+async def _run_coach_job(
+    job: coach_jobs.CoachJob,
+    pool: Any,
+    deck: Any,
+    body: CommanderCoachRequest,
+) -> None:
+    """Run a Coach request in the background and publish progress events."""
+
+    async def progress(event: str, message: str) -> None:
+        await coach_jobs.emit(job, event, message)
+
+    try:
+        result = await commander_coach.run_coach(pool, deck, body, progress=progress)
+        await coach_jobs.finish_ok(job, result)
+    except Exception as exc:  # noqa: BLE001 - surface job failures to stream clients
+        _log.exception("Coach job %s failed", job.job_id)
+        await coach_jobs.finish_error(job, str(exc))
+
+
+@router.post("/{deck_id}/coach/start", response_model=DataResponse[CommanderCoachStartResponse])
+async def coach_deck_start(
+    deck_id: UUID,
+    body: CommanderCoachRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CommanderCoachStartResponse]:
+    """Start a streaming Commander Coach job."""
+    email = _require_email(account)
+    _enforce_rate_limit(account, "coach_deck", _ANALYZE_LIMIT)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    registry = request.app.state.coach_jobs
+    job = coach_jobs.create(registry, account.id, deck_id)
+    asyncio.create_task(_run_coach_job(job, request.app.state.db_pool, deck, body))
+    return DataResponse(data=CommanderCoachStartResponse(job_id=job.job_id))
+
+
+def _sse(event: str, data: Any) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+async def _coach_event_stream(job: coach_jobs.CoachJob) -> AsyncGenerator[str]:
+    """Yield Server-Sent Events for one Coach job until it finishes."""
+    yield _sse("status", {"event": "connected", "message": "Connected"})
+    while True:
+        item = await job.queue.get()
+        if item.event == "done" and job.result is not None:
+            yield _sse("progress", {"event": item.event, "message": item.message})
+            yield _sse("done", job.result.model_dump(mode="json"))
+            break
+        if item.event == "error":
+            yield _sse("failed", {"message": item.message})
+            break
+        yield _sse("progress", {"event": item.event, "message": item.message})
+
+
+@router.get("/{deck_id}/coach/{job_id}/stream")
+async def coach_deck_stream(
+    deck_id: UUID,
+    job_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> StreamingResponse:
+    """Stream progress and final result for a Commander Coach job."""
+    registry = request.app.state.coach_jobs
+    job = registry.get(job_id)
+    if job is None or job.account_id != account.id or job.deck_id != deck_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "JOB_NOT_FOUND", "message": f"Coach job {job_id} not found"},
+        )
+    return StreamingResponse(_coach_event_stream(job), media_type="text/event-stream")
+
+
+@router.post("/{deck_id}/doctor", response_model=DataResponse[DeckDoctorResponse])
+async def doctor_deck(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[DeckDoctorResponse]:
+    """Run the Commander deck doctor agent for an existing deck."""
+    email = _require_email(account)
+    _enforce_rate_limit(account, "doctor_deck", _ANALYZE_LIMIT)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    result = await agents.doctor_deck(request.app.state.db_pool, deck)
+    return DataResponse(data=result)
 
 
 @router.post(
