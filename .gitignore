@@ -228,3 +228,4 @@ infra/terraform/*.tfstate.*
 infra/terraform/terraform.tfvars
 infra/terraform/tfplan
 **/.env.prod
+docs/superpowers
