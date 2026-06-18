@@ -21,24 +21,14 @@ from mtg_helper.services.commander_coach.specialists import deck_doctor
 
 
 def _resolve_mode(request: CommanderCoachRequest) -> str:
-    """Route the request to a specialist mode.
-
-    The first slice intentionally supports only doctor behavior. Unsupported
-    explicit modes fall back to doctor with a user-facing note in the response.
-    """
-    if request.mode == "auto":
-        text = request.message.lower()
-        if any(word in text for word in ("mana", "land", "color screw")):
-            return "doctor"
-        if any(word in text for word in ("cut", "add", "swap", "doctor", "fix")):
-            return "doctor"
-        return "doctor"
-    if request.mode == "doctor":
+    """Resolve specialist mode after the Coach router has selected specialist work."""
+    if request.mode in {"auto", "doctor"}:
         return "doctor"
     return "doctor"
 
 
 ProgressCb = Callable[[str, str], Awaitable[None]]
+MemoryLearnCb = Callable[[str], Awaitable[None]]
 
 
 async def _noop_progress(_event: str, _message: str) -> None:
@@ -50,11 +40,13 @@ async def run_coach(
     deck: DeckDetailResponse,
     request: CommanderCoachRequest,
     progress: ProgressCb | None = None,
+    memory_learn: MemoryLearnCb | None = None,
 ) -> CommanderCoachResponse:
     """Run the Commander Coach against a deck using the selected specialist."""
     emit = progress or _noop_progress
-    await emit("started", "Reading deck and routing request")
+    await emit("routing", "Reading deck and routing request")
     mode = _resolve_mode(request)
+    await emit("routed", f"Routed request to {mode.title()} specialist")
     span = (
         logfire.span("Commander Coach run {deck_id} {mode}", deck_id=str(deck.id), mode=mode)
         if logfire is not None
@@ -68,21 +60,50 @@ async def run_coach(
             else nullcontext()
         )
         with draft_span:
-            doctor = await deck_doctor.doctor_deck(pool, deck)
+            doctor = await deck_doctor.doctor_deck(
+                pool,
+                deck,
+                coach_memory_notes=request.coach_memory_notes,
+            )
+        await emit(
+            "doctor_complete",
+            "Deck Doctor drafted "
+            f"{len(doctor.findings)} finding(s), {len(doctor.swaps)} swap(s), "
+            f"{len(doctor.adds)} add(s), and {len(doctor.cuts)} cut(s)",
+        )
 
-        await emit("validating_theme", "Validating swaps against commander and theme")
+        await emit("validation_routing", "Routing Deck Doctor output to Theme Guardian")
+        await emit("validation_routed", "Routed output to Theme Guardian validator")
+        await emit("validating_theme", "Theme Guardian is checking commander, theme, and memory")
         validate_span = (
-            logfire.span("Validate doctor output {deck_id}", deck_id=str(deck.id))
+            logfire.span("Theme Guardian validation {deck_id}", deck_id=str(deck.id))
             if logfire is not None
             else nullcontext()
         )
         with validate_span:
-            issues = validators.validate_doctor_output(deck, doctor)
+            issues = validators.validate_doctor_output(
+                deck,
+                doctor,
+                coach_memory_notes=request.coach_memory_notes,
+            )
+            await emit(
+                "validation_complete",
+                f"Theme Guardian found {len(issues)} issue(s)",
+            )
             if logfire is not None:
-                logfire.info("Doctor validation found {issue_count} issues", issue_count=len(issues))
+                logfire.info(
+                    "Doctor validation found {issue_count} issues",
+                    issue_count=len(issues),
+                )
 
         revised = False
         if issues:
+            if memory_learn is not None:
+                learned = "; ".join(
+                    f"avoid {', '.join(issue.names)}: {issue.reason}" for issue in issues[:3]
+                )
+                await emit("memory_learning", "Writing Theme Guardian learning to Coach memory")
+                await memory_learn(f"Theme Guardian learned: {learned}")
             await emit("revising", "Revising recommendations after theme validation")
             revision_span = (
                 logfire.span("Deck Doctor revision {deck_id}", deck_id=str(deck.id))
@@ -90,16 +111,38 @@ async def run_coach(
                 else nullcontext()
             )
             with revision_span:
-                feedback = validators.feedback_for_doctor(issues)
-                doctor = await deck_doctor.doctor_deck(pool, deck, feedback)
-            await emit("validating_theme", "Running final validation")
+                feedback = validators.feedback_for_doctor(
+                    issues,
+                    coach_memory_notes=request.coach_memory_notes,
+                )
+                doctor = await deck_doctor.doctor_deck(
+                    pool,
+                    deck,
+                    feedback,
+                    coach_memory_notes=request.coach_memory_notes,
+                )
+            await emit(
+                "revision_complete",
+                "Deck Doctor revised recommendations after validation feedback",
+            )
+            await emit("validation_routing", "Routing revised output to Theme Guardian")
+            await emit("validation_routed", "Routed revised output to Theme Guardian validator")
+            await emit("validating_theme", "Theme Guardian is running final validation")
             final_span = (
-                logfire.span("Final doctor validation {deck_id}", deck_id=str(deck.id))
+                logfire.span("Final Theme Guardian validation {deck_id}", deck_id=str(deck.id))
                 if logfire is not None
                 else nullcontext()
             )
             with final_span:
-                final_issues = validators.filter_invalid_doctor_output(deck, doctor)
+                final_issues = validators.filter_invalid_doctor_output(
+                    deck,
+                    doctor,
+                    coach_memory_notes=request.coach_memory_notes,
+                )
+                await emit(
+                    "final_validation_complete",
+                    f"Final validation removed {len(final_issues)} recommendation(s)",
+                )
                 if logfire is not None:
                     logfire.info(
                         "Final validation removed {issue_count} issues",

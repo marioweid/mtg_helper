@@ -24,6 +24,59 @@ type CoachMessage =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; result: CommanderCoachResponse };
 
+function ProgressTimeline({ events }: { events: CommanderCoachProgressEvent[] }) {
+  const latestIndex = events.length - 1;
+  return (
+    <div className="space-y-2">
+      {events.length === 0 && (
+        <div className="flex items-center gap-2 text-xs text-gray-300">
+          <span className="h-2 w-2 animate-ping rounded-full bg-indigo-300" />
+          Starting…
+        </div>
+      )}
+      {events.map((item, index) => {
+        const active = index === latestIndex;
+        return (
+          <div key={`${item.event}-${index}`} className="flex items-start gap-3 text-xs">
+            <span className="relative mt-1 flex h-3 w-3 shrink-0 items-center justify-center">
+              {active ? (
+                <span className="absolute h-3 w-3 animate-ping rounded-full bg-indigo-300/70" />
+              ) : null}
+              <span
+                className={
+                  active
+                    ? "h-2 w-2 rounded-full bg-indigo-300"
+                    : "h-2 w-2 rounded-full bg-emerald-400"
+                }
+              />
+            </span>
+            <div>
+              <div className={active ? "font-medium text-indigo-100" : "text-gray-300"}>
+                {item.message}
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-gray-600">
+                {item.event.replace(/_/g, " ")}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CardHitLine({ card }: { card: AnalysisCardHit }) {
+  return (
+    <span>
+      <CardHover name={card.name} className="font-medium text-white">
+        {card.name}
+      </CardHover>
+      {card.mana_cost && <span className="ml-1 text-gray-500">{card.mana_cost}</span>}
+      {card.type_line && <span className="ml-1 text-gray-500">— {card.type_line}</span>}
+    </span>
+  );
+}
+
 function CardSuggestionTile({
   card,
   onAdd,
@@ -141,6 +194,127 @@ function SwapCard({
   );
 }
 
+function CoachMemoryModal({
+  open,
+  notes,
+  savedAt,
+  saving,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  notes: string;
+  savedAt: string | null;
+  saving: boolean;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Edit Coach memory</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              These persistent notes are passed to the Coach, Deck Doctor, and validators.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
+            ✕
+          </button>
+        </div>
+        <textarea
+          value={notes}
+          onChange={(event) => onChange(event.target.value)}
+          rows={10}
+          maxLength={8000}
+          className="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+          placeholder="Ask the Coach what it remembers, or write memory notes here manually."
+        />
+        <div className="mt-2 flex justify-between text-xs text-gray-500">
+          <span>{savedAt ? `Saved ${new Date(savedAt).toLocaleString()}` : "Not saved yet"}</span>
+          <span>{notes.length}/8000</span>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save memory"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReplacementMessage({
+  result,
+  busy,
+  onAdd,
+}: {
+  result: CommanderCoachResponse;
+  busy: string | null;
+  onAdd: (card: AnalysisCardHit) => void;
+}) {
+  const replacement = result.replacement;
+  if (!replacement) return null;
+  return (
+    <div className="max-w-4xl space-y-4 rounded-xl border border-white/10 bg-white/5 p-5">
+      <section>
+        <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
+          Replacement advice · {replacement.target_card_name}
+        </div>
+        <p className="text-gray-200">{replacement.summary}</p>
+        {replacement.keep_reason && (
+          <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-950/20 p-3 text-sm text-amber-100">
+            {replacement.keep_reason}
+          </p>
+        )}
+      </section>
+
+      {replacement.best_pick && (
+        <section className="rounded-xl border border-emerald-400/20 bg-emerald-950/20 p-4">
+          <div className="mb-1 text-xs uppercase tracking-wide text-emerald-300">Best pick</div>
+          <CardHitLine card={replacement.best_pick} />
+        </section>
+      )}
+
+      {replacement.options.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-white">Replacement options</h2>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {replacement.options.map((option) => (
+              <div key={option.card.scryfall_id ?? option.card.name}>
+                <CardSuggestionTile
+                  card={option.card}
+                  busy={busy === `add:${option.card.scryfall_id}`}
+                  onAdd={() => void onAdd(option.card)}
+                />
+                <p className="mt-2 text-sm text-gray-300">{option.reason}</p>
+                {option.tradeoff && <p className="mt-1 text-xs text-gray-500">{option.tradeoff}</p>}
+                <div className="mt-1 text-[11px] uppercase tracking-wide text-gray-600">
+                  {option.role_match.replace(/_/g, " ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="text-xs text-gray-500">Tool calls: {replacement.tool_call_count}</div>
+    </div>
+  );
+}
+
 function AssistantMessage({
   result,
   busy,
@@ -155,6 +329,9 @@ function AssistantMessage({
   onApply: (swap: DoctorSwap) => void;
 }) {
   const doctor = result.doctor;
+  if (result.replacement) {
+    return <ReplacementMessage result={result} busy={busy} onAdd={onAdd} />;
+  }
   if (!doctor) {
     return <div className="max-w-3xl rounded-xl border border-white/10 bg-white/5 p-4">{result.reply}</div>;
   }
@@ -264,10 +441,20 @@ export default function CoachPage() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<CommanderCoachProgressEvent[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [memoryNotes, setMemoryNotes] = useState("");
+  const [memorySavedAt, setMemorySavedAt] = useState<string | null>(null);
+  const [memorySaving, setMemorySaving] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setDeck(await apiClient.getDeck(deckId));
+      const [deckResult, memory] = await Promise.all([
+        apiClient.getDeck(deckId),
+        apiClient.getCoachMemory(deckId),
+      ]);
+      setDeck(deckResult);
+      setMemoryNotes(memory.notes);
+      setMemorySavedAt(memory.updated_at);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load deck");
     }
@@ -316,6 +503,10 @@ export default function CoachPage() {
       });
       events.addEventListener("done", (event) => {
         const response = JSON.parse((event as MessageEvent).data) as CommanderCoachResponse;
+        if (response.coach_memory) {
+          setMemoryNotes(response.coach_memory.notes);
+          setMemorySavedAt(response.coach_memory.updated_at);
+        }
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: response.reply, result: response },
@@ -338,6 +529,21 @@ export default function CoachPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Commander Coach failed");
       setLoading(false);
+    }
+  }
+
+  async function saveMemory() {
+    setMemorySaving(true);
+    try {
+      const memory = await apiClient.updateCoachMemory(deckId, { notes: memoryNotes });
+      setMemoryNotes(memory.notes);
+      setMemorySavedAt(memory.updated_at);
+      setMemoryOpen(false);
+      toast.push("Coach memory saved", "success");
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Failed to save Coach memory", "error");
+    } finally {
+      setMemorySaving(false);
     }
   }
 
@@ -417,12 +623,29 @@ export default function CoachPage() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 top-[53px] z-30 flex flex-col overflow-hidden bg-zinc-950">
+      <CoachMemoryModal
+        open={memoryOpen}
+        notes={memoryNotes}
+        savedAt={memorySavedAt}
+        saving={memorySaving}
+        onChange={setMemoryNotes}
+        onClose={() => setMemoryOpen(false)}
+        onSave={() => void saveMemory()}
+      />
+
       <div className="shrink-0 px-2 py-2 sm:px-3 lg:px-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-bold text-white">Commander Coach</h1>
           <Link href={`/decks/${deck.id}`} className="truncate text-sm text-gray-400 hover:text-white">
             {deck.name}
           </Link>
+          <button
+            type="button"
+            onClick={() => setMemoryOpen(true)}
+            className="ml-auto text-xs text-indigo-300 hover:text-indigo-100"
+          >
+            Edit memory
+          </button>
         </div>
       </div>
 
@@ -458,13 +681,7 @@ export default function CoachPage() {
             {loading && (
               <div className="max-w-2xl rounded-2xl border border-indigo-400/20 bg-indigo-950/20 p-4 text-sm">
                 <div className="mb-2 font-medium text-indigo-100">Coach is working…</div>
-                <div className="space-y-1 text-xs text-gray-300">
-                  {progress.length === 0 ? (
-                    <div>Starting…</div>
-                  ) : (
-                    progress.map((item, index) => <div key={index}>• {item.message}</div>)
-                  )}
-                </div>
+                <ProgressTimeline events={progress} />
               </div>
             )}
 
@@ -502,7 +719,7 @@ export default function CoachPage() {
           </div>
         </main>
 
-        <aside className="hidden min-h-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-950/60 p-3 lg:block">
+        <aside className="hidden min-h-0 overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/60 p-3 lg:block">
           <CoachDeckWorkspace
             cards={deck.cards}
             commander={deck.commander_card}

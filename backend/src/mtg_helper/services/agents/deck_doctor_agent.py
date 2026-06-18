@@ -15,7 +15,7 @@ import asyncpg
 from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
 
 from mtg_helper.models.ai import CardSearchHit, CardSearchInput, DeckDoctorResponse
-from mtg_helper.models.decks import DeckDetailResponse, DeckCardItem
+from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services.agents._model import make_google_model
 from mtg_helper.services.card_search_tool import search_cards
 from mtg_helper.services.retrieval_service import card_qualifying_stages
@@ -29,23 +29,33 @@ _TEMPERATURE = 0.45
 _MAX_OUTPUT_TOKENS = 8192
 
 _SYSTEM_PROMPT = """You are a peak Commander deck doctor for Magic: The Gathering.
-Your job is to deeply analyze an existing Commander deck and recommend precise,
-evidence-backed improvements. Be opinionated, but never invent cards or facts.
+Your job is to deeply analyze an existing Commander deck as a whole and recommend
+precise, evidence-backed improvements. Be opinionated, but never invent cards or
+facts. You are not the single-card replacement specialist; do not answer narrow
+"what replaces this one card" requests.
 
 WORKFLOW DISCIPLINE:
 1. First inspect the deck profile: commander, bracket, tags, role counts, curve,
-   type counts, protected theme-engine cards, and notable cards.
+   type counts, protected theme-engine cards, Coach memory, and notable cards.
 2. Identify the deck's real game plan from the commander first, then the deck tags.
 3. Before recommending additions, use `card_search` to find grounded candidates.
 4. Use `weak_cards` to inspect low-synergy/off-role cards before naming cuts.
 5. Pair cuts and adds only when the roles line up. Do not swap a land for a
    nonland unless the finding is explicitly about land count.
-6. Preserve the deck's engine. Theme-engine cards are cuttable, but only when
-   the replacement preserves or improves the same engine role.
-7. For every cut, read the card's oracle text and give a card-specific reason.
+6. Preserve the deck's engine and honor Coach memory. Theme-engine cards are
+   cuttable, but only when the replacement preserves or improves the same
+   engine role and does not contradict remembered user preferences. Value
+   flexible/modal cards highly: in Commander, cards that make relevant tokens
+   while also offering graveyard, draw, removal, recursion, or late-game utility
+   are often excellent because board states are unpredictable.
+7. Recommend cuts only for cards that are clearly off-theme, too slow for the
+   bracket, anti-synergistic, role-overfilled, or meaningfully outclassed by a
+   suggested replacement. Do not cut pet/theme cards merely because they are
+   low raw power.
+8. For every cut, read the card's oracle text and give a card-specific reason.
    Do not call a card low-impact unless you can explain why its actual text is
-   weak for this commander.
-8. Prefer a small number of high-conviction recommendations over a giant list.
+   weak for this commander or current deck plan.
+9. Prefer a small number of high-conviction recommendations over a giant list.
 
 COMMANDER FUNDAMENTALS TO CHECK:
 - mana base and curve pressure
@@ -60,13 +70,16 @@ OUTPUT RULES:
 - Summary: 2-4 sentences.
 - Game plan: one concise paragraph.
 - Findings: concrete issues with evidence from the profile.
-- Cuts: only cards in the deck. If cutting a theme-engine card, explain why the
-  replacement preserves or upgrades that engine role.
+- Cuts: only cards in the deck, and only when they support a whole-deck
+  diagnosis. If cutting a theme-engine card, explain why the replacement
+  preserves or upgrades that engine role.
 - Adds: only exact cards returned by tools.
 - Swaps: strongest practical packages, normally 3-8. Avoid broad multi-cut
   bundles unless each removed card is individually justified.
 - Every swap must be validated against the commander text: if the cut card
   enables the commander, the add must preserve or upgrade that interaction.
+  A replacement can be valid when it preserves the core theme and adds useful
+  optional text, even if not every line of text is directly on-theme.
 - If evidence is weak, mark confidence low/medium instead of overstating.
 - Do not mention hidden chain-of-thought. Show evidence, not private reasoning."""
 
@@ -257,7 +270,10 @@ def _curve(deck: DeckDetailResponse) -> dict[str, int]:
     return counts
 
 
-def _brief_payload(deck: DeckDetailResponse) -> dict[str, Any]:
+def _brief_payload(
+    deck: DeckDetailResponse,
+    coach_memory_notes: str | None = None,
+) -> dict[str, Any]:
     commander = deck.commander_card
     cards = sorted(deck.cards, key=lambda c: (c.cmc or 0, c.name))
     return {
@@ -266,6 +282,7 @@ def _brief_payload(deck: DeckDetailResponse) -> dict[str, Any]:
         "bracket": deck.bracket,
         "archetype_tags": list(deck.archetype_tags or []),
         "commander_engine_words": _engine_words(commander.oracle_text if commander else None),
+        "coach_memory_notes": coach_memory_notes or "",
         "stage_targets": dict(deck.stage_targets or {}),
         "role_counts": _role_counts(deck),
         "type_counts": _type_counts(deck),
@@ -294,7 +311,10 @@ def _fallback_response(message: str) -> DeckDoctorResponse:
 
 
 async def doctor_deck(
-    pool: asyncpg.Pool, deck: DeckDetailResponse, validator_feedback: str | None = None
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    validator_feedback: str | None = None,
+    coach_memory_notes: str | None = None,
 ) -> DeckDoctorResponse:
     """Run the Commander deck doctor agent against an existing deck."""
     deps = DoctorDeps(
@@ -303,9 +323,13 @@ async def doctor_deck(
         deck_color_identity=_deck_colors(deck),
         deck_card_names=[c.name for c in deck.cards],
     )
-    payload = json.dumps(_brief_payload(deck), default=str)
+    memory = (coach_memory_notes or "").strip()
+    payload = json.dumps(_brief_payload(deck, memory), default=str)
     try:
         instruction = "Doctor this Commander deck. Use tools before recommending additions.\n"
+        if memory:
+            instruction += "Persistent Coach memory to obey for this deck:\n"
+            instruction += memory + "\n"
         if validator_feedback:
             instruction += "Validator feedback to obey in this revision:\n"
             instruction += validator_feedback + "\n"

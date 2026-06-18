@@ -33,13 +33,17 @@ def configure_logfire(app: FastAPI) -> None:
 
     try:
         configure_kwargs: dict[str, Any] = {"send_to_logfire": "if-token-present"}
+        if hasattr(logfire, "MetricsOptions"):
+            configure_kwargs["metrics"] = logfire.MetricsOptions(collect_in_spans=True)
         try:
             logfire.configure(service_name="mtg-helper-backend", **configure_kwargs)
         except TypeError:
+            configure_kwargs.pop("metrics", None)
             logfire.configure(**configure_kwargs)
         logfire.instrument_fastapi(app)
         logfire.instrument_httpx()
-        logfire.instrument_asyncpg()
+        # Do not instrument asyncpg/Postgres: per-query spans are too dense for
+        # normal Coach/API traces and drown out the higher-level operations.
         logfire.instrument_pydantic_ai()
         _CONFIGURED = True
     except Exception:  # noqa: BLE001 - observability must not stop app startup

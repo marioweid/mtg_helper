@@ -15,6 +15,18 @@ _MAX_LIMIT = 20
 
 # Basic lands — agent may suggest these even if already in the deck, because
 # decks legitimately run many copies. Snow-Covered variants share the names.
+_SEARCH_STOP_WORDS: frozenset[str] = frozenset(
+    {
+        "and",
+        "card",
+        "cards",
+        "for",
+        "that",
+        "the",
+        "with",
+    }
+)
+
 _BASIC_LANDS: frozenset[str] = frozenset(
     {
         "Plains",
@@ -32,10 +44,34 @@ _BASIC_LANDS: frozenset[str] = frozenset(
 )
 
 
-def _apply_optional_filters(inp: CardSearchInput, where: list[str], args: list[object]) -> None:
-    """Append the LLM-supplied filter clauses (types, tags, cmc, price, text)
-    onto ``where`` / ``args``. Each filter is independent and additive.
+def _text_terms(query: str | None) -> list[str]:
+    """Split a natural-language card search query into useful SQL terms."""
+    if not query:
+        return []
+    terms = [term.strip().lower() for term in query.replace(",", " ").split()]
+    return [term for term in terms if len(term) >= 3 and term not in _SEARCH_STOP_WORDS][:6]
+
+
+def _apply_text_filter(query: str | None, where: list[str], args: list[object]) -> None:
+    """Append a multi-term name/oracle search.
+
+    A single ``ILIKE '%squirrel token%'`` misses oracle text like "create a 1/1
+    Squirrel creature token". Searching each meaningful term is more useful for
+    LLM tool calls such as "squirrel token", "food graveyard", or "etb draw".
     """
+    terms = _text_terms(query)
+    if not terms:
+        return
+    clauses: list[str] = []
+    for term in terms:
+        args.append(f"%{term}%")
+        placeholder = f"${len(args)}"
+        clauses.append(f"(name ILIKE {placeholder} OR oracle_text ILIKE {placeholder})")
+    where.append("(" + " AND ".join(clauses) + ")")
+
+
+def _apply_optional_filters(inp: CardSearchInput, where: list[str], args: list[object]) -> None:
+    """Append the LLM-supplied filters onto ``where`` / ``args``."""
 
     def _add(clause: str, value: object) -> None:
         args.append(value)
@@ -51,15 +87,11 @@ def _apply_optional_filters(inp: CardSearchInput, where: list[str], args: list[o
             "COALESCE(ROUND((prices->>'eur')::numeric * 100)::integer, 0) <= $$N",
             inp.max_price_eur_cents,
         ),
-        (
-            bool(inp.text_query),
-            "(name ILIKE $$N OR oracle_text ILIKE $$N)",
-            f"%{inp.text_query}%",
-        ),
     )
     for active, clause, value in filters:
         if active:
             _add(clause, value)
+    _apply_text_filter(inp.text_query, where, args)
 
 
 def _build_filters(
@@ -98,7 +130,7 @@ async def search_cards(
     limit = min(inp.limit, _MAX_LIMIT)
     where, args = _build_filters(inp, deck_color_identity, exclude_names)
     sql = (
-        "SELECT scryfall_id, name, mana_cost, cmc, type_line, color_identity, tags, "
+        "SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text, color_identity, tags, "
         "ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents "
         f"FROM cards WHERE {' AND '.join(where)} "
         "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST "
@@ -113,6 +145,7 @@ async def search_cards(
             mana_cost=row["mana_cost"],
             cmc=float(row["cmc"]) if row["cmc"] is not None else None,
             type_line=row["type_line"],
+            oracle_text=row["oracle_text"],
             color_identity=list(row["color_identity"] or []),
             tags=list(row["tags"] or []),
             price_eur_cents=row["price_eur_cents"],

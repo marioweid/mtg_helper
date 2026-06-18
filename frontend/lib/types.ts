@@ -540,6 +540,7 @@ export interface AnalysisCardHit {
   mana_cost?: string | null;
   cmc?: number | null;
   type_line?: string | null;
+  oracle_text?: string | null;
   color_identity?: string[];
   tags?: string[];
   price_eur_cents?: number | null;
@@ -559,7 +560,14 @@ export interface SimulationAnalysisResponse {
 }
 
 export type CommanderCoachMode = "auto" | "doctor" | "builder" | "mana" | "meta";
-export type CommanderCoachResolvedMode = "doctor" | "builder" | "mana" | "meta";
+export type CommanderCoachResolvedMode =
+  | "doctor"
+  | "builder"
+  | "mana"
+  | "meta"
+  | "memory"
+  | "chat"
+  | "replacement";
 
 export interface DoctorCut {
   card_name: string;
@@ -589,15 +597,47 @@ export interface DeckDoctorResponse {
   tool_call_count: number;
 }
 
+export interface ReplacementOption {
+  card: AnalysisCardHit;
+  reason: string;
+  role_match: "same_role" | "role_upgrade" | "theme_upgrade" | "role_change";
+  tradeoff: string | null;
+}
+
+export interface TargetedReplacementResponse {
+  target_card_name: string;
+  summary: string;
+  keep_reason: string | null;
+  best_pick: AnalysisCardHit | null;
+  options: ReplacementOption[];
+  tool_call_count: number;
+}
+
 export interface CommanderCoachRequest {
   message: string;
   mode?: CommanderCoachMode;
+  coach_memory_notes?: string | null;
+}
+
+export interface CoachMemoryResponse {
+  deck_id: string;
+  account_id: string;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CoachMemoryUpdate {
+  notes: string;
 }
 
 export interface CommanderCoachResponse {
   mode: CommanderCoachResolvedMode;
   reply: string;
   doctor: DeckDoctorResponse | null;
+  replacement: TargetedReplacementResponse | null;
+  coach_memory: CoachMemoryResponse | null;
+  memory_updated: boolean;
 }
 
 export interface CommanderCoachStartResponse {

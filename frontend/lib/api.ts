@@ -6,6 +6,8 @@ import type {
   Capabilities,
   CardResponse,
   CardSuggestion,
+  CoachMemoryResponse,
+  CoachMemoryUpdate,
   ComboListResponse,
   CollectionCardAdd,
   CollectionCardItem,
@@ -326,6 +328,15 @@ export const apiClient = {
   startCoachDeck: (deckId: string, body: CommanderCoachRequest) =>
     request<CommanderCoachStartResponse>(`/decks/${deckId}/coach/start`, {
       method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  getCoachMemory: (deckId: string) =>
+    request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`),
+
+  updateCoachMemory: (deckId: string, body: CoachMemoryUpdate) =>
+    request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`, {
+      method: "PUT",
       body: JSON.stringify(body),
     }),
 

@@ -1,5 +1,6 @@
 """Pydantic models for AI deck building endpoints."""
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -197,6 +198,7 @@ class CardSearchHit(BaseModel):
     mana_cost: str | None = None
     cmc: float | None = None
     type_line: str | None = None
+    oracle_text: str | None = None
     color_identity: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     price_eur_cents: int | None = None
@@ -267,8 +269,36 @@ class DeckDoctorResponse(BaseModel):
     tool_call_count: int = 0
 
 
+class ReplacementOption(BaseModel):
+    """One candidate for replacing a specific card."""
+
+    card: CardSearchHit
+    reason: str
+    role_match: Literal["same_role", "role_upgrade", "theme_upgrade", "role_change"]
+    tradeoff: str | None = None
+
+
+class TargetedReplacementResponse(BaseModel):
+    """Focused replacement advice for one card already in the deck."""
+
+    target_card_name: str
+    summary: str
+    keep_reason: str | None = None
+    best_pick: CardSearchHit | None = None
+    options: list[ReplacementOption] = Field(default_factory=list)
+    tool_call_count: int = 0
+
+
 CoachMode = Literal["auto", "doctor", "builder", "mana", "meta"]
-CoachResolvedMode = Literal["doctor", "builder", "mana", "meta"]
+CoachResolvedMode = Literal[
+    "doctor",
+    "builder",
+    "mana",
+    "meta",
+    "memory",
+    "chat",
+    "replacement",
+]
 
 
 class CommanderCoachRequest(BaseModel):
@@ -276,6 +306,23 @@ class CommanderCoachRequest(BaseModel):
 
     message: str = Field(default="Doctor this deck", max_length=4000)
     mode: CoachMode = "auto"
+    coach_memory_notes: str | None = Field(default=None, max_length=8000)
+
+
+class CoachMemoryUpdate(BaseModel):
+    """User-editable persistent notes for one deck's Coach context."""
+
+    notes: str = Field(default="", max_length=8000)
+
+
+class CoachMemoryResponse(BaseModel):
+    """Persistent Commander Coach memory for a deck/account pair."""
+
+    deck_id: UUID
+    account_id: UUID
+    notes: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class CommanderCoachResponse(BaseModel):
@@ -284,6 +331,9 @@ class CommanderCoachResponse(BaseModel):
     mode: CoachResolvedMode
     reply: str
     doctor: DeckDoctorResponse | None = None
+    replacement: TargetedReplacementResponse | None = None
+    coach_memory: CoachMemoryResponse | None = None
+    memory_updated: bool = False
 
 
 class CommanderCoachStartResponse(BaseModel):

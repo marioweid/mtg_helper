@@ -166,6 +166,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_feedback_deck_card
 
 CREATE INDEX IF NOT EXISTS idx_deck_feedback_deck_id ON deck_feedback (deck_id);
 
+-- ============================================================
+-- DECK COACH MEMORY (per-account, per-deck notes for Commander Coach)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS deck_coach_memory (
+    deck_id     UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id  UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    notes       TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (deck_id, account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deck_coach_memory_account
+    ON deck_coach_memory (account_id, updated_at DESC);
+
 -- Deck chat feature was removed; drop the legacy conversation_turns table on
 -- existing databases. Safe no-op if the table was never created.
 DROP TABLE IF EXISTS conversation_turns;
