@@ -6,7 +6,7 @@
 # Portainer setup:
 #   1. Create a Git stack that points at this repo and this compose path.
 #   2. Set the environment variables listed in portainer.env.example in the
-#      Portainer stack UI (or via an env file managed outside git).
+#      Portainer stack UI (or via the root .env file managed outside git).
 #   3. Point your existing reverse proxy / Cloudflare Tunnel at the frontend
 #      host port (defaults to http://127.0.0.1:3001).
 #   4. Enable GitOps automatic updates, or use the stack webhook from your
@@ -25,6 +25,9 @@ services:
   postgres:
     image: postgres:16
     restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mtg_helper}
       POSTGRES_USER: ${POSTGRES_USER:-mtg}
@@ -41,6 +44,9 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
     command:
       [
         "uv",
@@ -58,6 +64,7 @@ services:
       GOOGLE_OAUTH_CLIENT_ID: ${AUTH_GOOGLE_ID:?AUTH_GOOGLE_ID must be set}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN:-}
       QDRANT_URL: http://qdrant:6333
       ENABLE_OPTIMIZER: ${ENABLE_OPTIMIZER:-false}
     depends_on:
@@ -71,6 +78,9 @@ services:
       context: ./frontend
       target: runner
     restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
     command: ["sh", "-c", "pnpm exec next start -p $${PORT:-3001}"]
     ports:
       - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3001}:${PORT:-3001}"
@@ -91,6 +101,9 @@ services:
   scryfall-sync:
     image: alpine/curl:latest
     restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
     environment:
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
     entrypoint: >

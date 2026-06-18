@@ -47,10 +47,14 @@ _SCRYFALL_COLLECTION_BATCH = 75
 _SCRYFALL_HEADERS = {"User-Agent": "mtg-helper/1.0", "Accept": "application/json"}
 _SCRYFALL_INTER_BATCH_DELAY = 0.1
 
+_CURVE_BUCKETS: tuple[str, ...] = ("0", "1", "2", "3", "4", "5", "6", "7+")
+_MIN_CURVE_DECKS = 5
+
 _SENTINEL_PAYLOAD: dict[str, Any] = {
     "moxfield_card_id": None,
     "decks": [],
     "by_oracle": {},
+    "curve": None,
 }
 
 # Heuristic precon filter: only drop decks authored by the official accounts.
@@ -181,17 +185,20 @@ async def fetch_deck_cards(
     *,
     client: Any,
 ) -> list[str]:
-    """Fetch the mainboard scryfall ids for a Moxfield deck.
+    """Fetch mainboard scryfall ids for a Moxfield deck."""
+    entries = await fetch_deck_card_entries(deck_id, client=client)
+    return [entry["scryfall_id"] for entry in entries]
+
+
+async def fetch_deck_card_entries(
+    deck_id: str,
+    *,
+    client: Any,
+) -> list[dict[str, Any]]:
+    """Fetch mainboard cards with fields needed for inclusion and curve data.
 
     Commanders, sideboard, and other zones are intentionally excluded — only
     mainboard cards represent actual deck composition.
-
-    Args:
-        deck_id: Moxfield public deck id.
-        client: Injected httpx client.
-
-    Returns:
-        List of scryfall id strings (one per unique mainboard card).
     """
     url = f"{settings.moxfield_base_url}/v3/decks/all/{deck_id}"
     response = await client.get(url)
@@ -201,13 +208,21 @@ async def fetch_deck_cards(
     response.raise_for_status()
     boards = response.json().get("boards") or {}
     mainboard = (boards.get("mainboard") or {}).get("cards") or {}
-    scryfall_ids: list[str] = []
+    cards: list[dict[str, Any]] = []
     for entry in mainboard.values():
         card = entry.get("card") or {}
         sf_id = card.get("scryfall_id")
-        if sf_id:
-            scryfall_ids.append(sf_id)
-    return scryfall_ids
+        if not sf_id:
+            continue
+        cards.append(
+            {
+                "scryfall_id": sf_id,
+                "cmc": card.get("cmc") or card.get("mana_value"),
+                "type_line": card.get("type_line") or card.get("type"),
+                "quantity": int(entry.get("quantity") or 1),
+            }
+        )
+    return cards
 
 
 async def _resolve_oracle_ids(
@@ -264,6 +279,7 @@ def _aggregate_payload(
     deck_summaries: list[dict[str, Any]],
     deck_cards: list[list[str]],
     oracle_by_scryfall: dict[str, str],
+    deck_card_entries: list[list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Combine deck summaries + per-deck card lists into a cached payload.
 
@@ -284,7 +300,44 @@ def _aggregate_payload(
         "moxfield_card_id": moxfield_card_id,
         "decks": deck_summaries,
         "by_oracle": by_oracle,
+        "curve": _aggregate_curve(deck_card_entries or []),
     }
+
+
+def _aggregate_curve(deck_card_entries: list[list[dict[str, Any]]]) -> dict[str, Any] | None:
+    """Average non-land mana-value buckets across usable Moxfield decks."""
+    per_deck = [_curve_for_deck(cards) for cards in deck_card_entries]
+    usable = [curve for curve in per_deck if sum(curve.values()) > 0]
+    if len(usable) < _MIN_CURVE_DECKS:
+        return None
+    averaged = {
+        bucket: round(sum(curve[bucket] for curve in usable) / len(usable))
+        for bucket in _CURVE_BUCKETS
+    }
+    return {
+        "source": "moxfield",
+        "deck_count": len(usable),
+        "confidence": "high",
+        "buckets": averaged,
+    }
+
+
+def _curve_for_deck(cards: list[dict[str, Any]]) -> dict[str, int]:
+    buckets = {bucket: 0 for bucket in _CURVE_BUCKETS}
+    for card in cards:
+        if "Land" in str(card.get("type_line") or ""):
+            continue
+        bucket = _bucket_for_cmc(card.get("cmc"))
+        buckets[bucket] += int(card.get("quantity") or 1)
+    return buckets
+
+
+def _bucket_for_cmc(raw: Any) -> str:
+    try:
+        value = int(float(raw or 0))
+    except (TypeError, ValueError):
+        value = 0
+    return "7+" if value >= 7 else str(max(0, value))
 
 
 async def get_or_refresh(
@@ -325,7 +378,12 @@ async def get_or_refresh(
         _log.warning("Commander %s not found; returning empty Moxfield payload", commander_id)
         return _SENTINEL_PAYLOAD
 
-    if row is not None and _row_age(row) < max_age and not _is_empty_payload(row["payload"]):
+    if (
+        row is not None
+        and _row_age(row) < max_age
+        and not _is_empty_payload(row["payload"])
+        and _has_curve_data(row["payload"])
+    ):
         return _parse(row["payload"])
 
     owned_client = client is None
@@ -380,19 +438,23 @@ async def _refresh_payload(
         return _aggregate_payload(moxfield_card_id, [], [], {})
 
     deck_cards: list[list[str]] = []
+    deck_card_entries: list[list[dict[str, Any]]] = []
     for summary in deck_summaries:
         try:
-            cards = await fetch_deck_cards(summary["id"], client=client)
+            entries = await fetch_deck_card_entries(summary["id"], client=client)
         except (httpx.HTTPError, RequestsError) as exc:
             _log.warning("Skipping Moxfield deck %s due to error: %s", summary["id"], exc)
             continue
-        deck_cards.append(cards)
+        deck_card_entries.append(entries)
+        deck_cards.append([entry["scryfall_id"] for entry in entries])
 
     unique_sf_ids = sorted({sf.lower() for cards in deck_cards for sf in cards})
     async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT) as scryfall_client:
         oracle_by_scryfall = await _resolve_oracle_ids(unique_sf_ids, client=scryfall_client)
 
-    return _aggregate_payload(moxfield_card_id, deck_summaries, deck_cards, oracle_by_scryfall)
+    return _aggregate_payload(
+        moxfield_card_id, deck_summaries, deck_cards, oracle_by_scryfall, deck_card_entries
+    )
 
 
 async def _close_client(client: Any) -> None:
@@ -471,6 +533,12 @@ def _parse(payload: Any) -> dict[str, Any]:
     if isinstance(payload, str):
         return json.loads(payload)
     return _SENTINEL_PAYLOAD
+
+
+def _has_curve_data(payload: Any) -> bool:
+    """Return True when a payload was produced by the curve-aware pipeline."""
+    parsed = _parse(payload)
+    return "curve" in parsed
 
 
 def _is_empty_payload(payload: Any) -> bool:

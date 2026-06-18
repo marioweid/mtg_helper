@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from mtg_helper.models.ai import CollectionMembership
+from mtg_helper.models.mana_curve import DeckManaCurve
 
 
 class SnapshotCardItem(BaseModel):
@@ -123,6 +124,7 @@ class ComparisonSideMeta(BaseModel):
     stage: str
     bracket: int | None = None
     card_count: int
+    mana_curve: DeckManaCurve | None = None
 
 
 class DeckCompareResponse(BaseModel):

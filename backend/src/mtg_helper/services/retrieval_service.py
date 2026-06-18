@@ -20,7 +20,12 @@ from qdrant_client.models import (
 
 from mtg_helper.config import settings
 from mtg_helper.models.ranking_weights import RankingWeights
-from mtg_helper.services import edhrec_service, moxfield_recs_service, profile_service
+from mtg_helper.services import (
+    edhrec_service,
+    edhrec_theme_index_service,
+    moxfield_recs_service,
+    profile_service,
+)
 from mtg_helper.services.embedding_service import embed_single
 from mtg_helper.services.llm_client import LLMClient
 
@@ -1190,6 +1195,17 @@ def _annotate_type_signals(
                 entry.append("type")
 
 
+def _merge_inclusion_scores(
+    primary: dict[UUID, float], secondary: dict[UUID, float]
+) -> dict[UUID, float]:
+    """Merge trusted inclusion maps by keeping each card's strongest score."""
+    merged = dict(primary)
+    for uid, score in secondary.items():
+        if score > merged.get(uid, 0.0):
+            merged[uid] = score
+    return merged
+
+
 def _annotate_edhrec_signals(
     signal_map: dict[UUID, list[str]],
     edhrec_inclusion: dict[UUID, float],
@@ -1209,27 +1225,49 @@ async def _fetch_inclusion_signals(
     commander_id: UUID | None,
     commander_color_identity: list[str],
     bracket: int | None,
-) -> tuple[dict[UUID, float], dict[UUID, float]]:
-    """Fetch EDHREC + Moxfield inclusion scores; swallow per-source failures."""
+    query_tags: list[str],
+) -> tuple[dict[UUID, float], dict[UUID, float], dict[UUID, float]]:
+    """Fetch EDHREC, EDHREC-theme, and Moxfield scores; swallow source failures."""
     edhrec_inclusion: dict[UUID, float] = {}
+    theme_inclusion: dict[UUID, float] = {}
     moxfield_inclusion: dict[UUID, float] = {}
-    if commander_id is None:
-        return edhrec_inclusion, moxfield_inclusion
+    if commander_id is not None:
+        try:
+            payload = await edhrec_service.get_or_refresh(pool, commander_id)
+            edhrec_inclusion = await edhrec_service.score_inclusion(
+                pool, payload, commander_color_identity, bracket=bracket
+            )
+        except Exception:
+            _log.exception("EDHREC inclusion lookup failed; continuing without boost")
     try:
-        payload = await edhrec_service.get_or_refresh(pool, commander_id)
-        edhrec_inclusion = await edhrec_service.score_inclusion(
-            pool, payload, commander_color_identity, bracket=bracket
+        theme_inclusion = await edhrec_theme_index_service.score_themes(
+            pool, query_tags, commander_color_identity
         )
     except Exception:
-        _log.exception("EDHREC inclusion lookup failed; continuing without boost")
-    try:
-        mox_payload = await moxfield_recs_service.get_or_refresh(pool, commander_id)
-        moxfield_inclusion = await moxfield_recs_service.score_inclusion(
-            pool, mox_payload, commander_color_identity
-        )
-    except Exception:
-        _log.exception("Moxfield inclusion lookup failed; continuing without boost")
-    return edhrec_inclusion, moxfield_inclusion
+        _log.exception("EDHREC theme inclusion lookup failed; continuing without boost")
+    if commander_id is not None:
+        try:
+            mox_payload = await moxfield_recs_service.get_or_refresh(pool, commander_id)
+            moxfield_inclusion = await moxfield_recs_service.score_inclusion(
+                pool, mox_payload, commander_color_identity
+            )
+        except Exception:
+            _log.exception("Moxfield inclusion lookup failed; continuing without boost")
+    return edhrec_inclusion, theme_inclusion, moxfield_inclusion
+
+
+def _annotate_theme_signals(
+    signal_map: dict[UUID, list[str]],
+    theme_inclusion: dict[UUID, float],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+) -> None:
+    """Add 'edhrec_theme' for cards present in indexed EDHREC theme pages."""
+    for uid, weight in theme_inclusion.items():
+        if weight <= 0.0 or uid not in cards_by_id:
+            continue
+        entry = signal_map.setdefault(uid, [])
+        if "edhrec_theme" not in entry:
+            entry.append("edhrec_theme")
 
 
 def _annotate_moxfield_signals(
@@ -1489,9 +1527,10 @@ async def retrieve_candidates(
         semantic_results, tag_results, fts_ids
     )
 
-    edhrec_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
-        pool, commander_id, commander_color_identity, bracket
+    edhrec_inclusion, theme_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
+        pool, commander_id, commander_color_identity, bracket, query_tags
     )
+    combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
 
     # Include EDHREC- and Moxfield-only matches as candidates so a high-synergy
     # card not surfaced by semantic/tag/FTS still has a path into the result set.
@@ -1501,7 +1540,7 @@ async def retrieve_candidates(
     deck_exclude = set(deck_card_ids)
     extra_ids = [
         uid
-        for uid in {*edhrec_inclusion, *moxfield_inclusion}
+        for uid in {*combined_edhrec, *moxfield_inclusion}
         if uid not in qdrant_scores
         and uid not in tag_overlaps
         and uid not in fts_set
@@ -1520,6 +1559,8 @@ async def retrieve_candidates(
     # Trusted-card boost only fires when the card actually fits the stage —
     # otherwise Sol Ring keeps showing up under "interaction" etc.
     edhrec_inclusion = _filter_inclusion_by_stage(edhrec_inclusion, cards_by_id, stage)
+    theme_inclusion = _filter_inclusion_by_stage(theme_inclusion, cards_by_id, stage)
+    combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
     moxfield_inclusion = _filter_inclusion_by_stage(moxfield_inclusion, cards_by_id, stage)
 
     scores = _compute_weighted_scores(
@@ -1535,18 +1576,19 @@ async def retrieve_candidates(
         type_filter,
         stage=stage,
         ranking_weights=ranking_weights,
-        edhrec_inclusion=edhrec_inclusion,
+        edhrec_inclusion=combined_edhrec,
         moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=prefer_keywords,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
+    _annotate_theme_signals(signal_map, theme_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
     trusted_quota = ranking_weights.trusted_quota if ranking_weights is not None else 1.0
     full_ranked = _apply_trusted_quota(
         scores,
-        edhrec_inclusion,
+        combined_edhrec,
         moxfield_inclusion,
         cards_by_id,
         page_end,
@@ -1587,7 +1629,7 @@ async def retrieve_candidates(
                 price_eur_cents=row["price_eur_cents"],
                 score=scores[uid],
                 signals=signal_map.get(uid, []),
-                edhrec_weight=edhrec_inclusion.get(uid, 0.0),
+                edhrec_weight=combined_edhrec.get(uid, 0.0),
                 moxfield_weight=moxfield_inclusion.get(uid, 0.0),
             )
         )

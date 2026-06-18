@@ -93,6 +93,20 @@ export interface DeckCardItem {
   game_changer: boolean;
 }
 
+export interface ManaCurveRecommendation {
+  source: "moxfield" | "fallback";
+  deck_count: number;
+  confidence: "high" | "fallback";
+  buckets: Record<string, number>;
+}
+
+export interface DeckManaCurve {
+  current: Record<string, number>;
+  recommended: ManaCurveRecommendation;
+  delta: Record<string, number>;
+  progress_delta: Record<string, number>;
+}
+
 export interface CommanderCardSummary {
   id: string;
   name: string;
@@ -121,6 +135,7 @@ export interface DeckDetailResponse {
   stage_targets: Record<string, number>;
   suggestion_collection_ids: string[];
   archetype_tags: string[];
+  mana_curve: DeckManaCurve | null;
   cards: DeckCardItem[];
 }
 
@@ -520,10 +535,12 @@ export interface AnalysisFinding {
 }
 
 export interface AnalysisCardHit {
+  scryfall_id?: string | null;
   name: string;
   mana_cost?: string | null;
   cmc?: number | null;
   type_line?: string | null;
+  oracle_text?: string | null;
   color_identity?: string[];
   tags?: string[];
   price_eur_cents?: number | null;
@@ -540,6 +557,96 @@ export interface SimulationAnalysisResponse {
   findings: AnalysisFinding[];
   swap_suggestions: AnalysisSwapSuggestion[];
   tool_call_count: number;
+}
+
+export type CommanderCoachMode = "auto" | "doctor" | "builder" | "mana" | "meta";
+export type CommanderCoachResolvedMode =
+  | "doctor"
+  | "builder"
+  | "mana"
+  | "meta"
+  | "memory"
+  | "chat"
+  | "replacement";
+
+export interface DoctorCut {
+  card_name: string;
+  reason: string;
+  confidence: "low" | "medium" | "high";
+}
+
+export interface DoctorAdd {
+  card: AnalysisCardHit;
+  reason: string;
+  confidence: "low" | "medium" | "high";
+}
+
+export interface DoctorSwap {
+  remove: string[];
+  add: AnalysisCardHit[];
+  reason: string;
+}
+
+export interface DeckDoctorResponse {
+  summary: string;
+  game_plan: string;
+  findings: AnalysisFinding[];
+  cuts: DoctorCut[];
+  adds: DoctorAdd[];
+  swaps: DoctorSwap[];
+  tool_call_count: number;
+}
+
+export interface ReplacementOption {
+  card: AnalysisCardHit;
+  reason: string;
+  role_match: "same_role" | "role_upgrade" | "theme_upgrade" | "role_change";
+  tradeoff: string | null;
+}
+
+export interface TargetedReplacementResponse {
+  target_card_name: string;
+  summary: string;
+  keep_reason: string | null;
+  best_pick: AnalysisCardHit | null;
+  options: ReplacementOption[];
+  tool_call_count: number;
+}
+
+export interface CommanderCoachRequest {
+  message: string;
+  mode?: CommanderCoachMode;
+  coach_memory_notes?: string | null;
+}
+
+export interface CoachMemoryResponse {
+  deck_id: string;
+  account_id: string;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CoachMemoryUpdate {
+  notes: string;
+}
+
+export interface CommanderCoachResponse {
+  mode: CommanderCoachResolvedMode;
+  reply: string;
+  doctor: DeckDoctorResponse | null;
+  replacement: TargetedReplacementResponse | null;
+  coach_memory: CoachMemoryResponse | null;
+  memory_updated: boolean;
+}
+
+export interface CommanderCoachStartResponse {
+  job_id: string;
+}
+
+export interface CommanderCoachProgressEvent {
+  event: string;
+  message: string;
 }
 
 // Optimizer
@@ -837,6 +944,7 @@ export interface ComparisonSideMeta {
   stage: string;
   bracket: number | null;
   card_count: number;
+  mana_curve: DeckManaCurve | null;
 }
 
 export interface DeckCompareResponse {

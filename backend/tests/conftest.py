@@ -206,8 +206,8 @@ async def _reset_db(_init_db: None) -> None:
             """
             TRUNCATE feature_flags, edhrec_commander_recs, moxfield_commander_recs,
                 collection_cards, collections, account_ranking_weights,
-                deck_snapshot_cards, deck_snapshots, deck_feedback, preferences,
-                deck_cards, decks, accounts CASCADE
+                deck_snapshot_cards, deck_snapshots, deck_coach_memory,
+                deck_feedback, preferences, deck_cards, decks, accounts CASCADE
             """
         )
         await conn.execute(
@@ -277,6 +277,7 @@ async def client(
     app.state.ai_client = make_mock_llm_client()
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
+    app.state.coach_jobs = {}
 
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(

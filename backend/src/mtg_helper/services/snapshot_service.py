@@ -8,6 +8,7 @@ from uuid import UUID
 
 import asyncpg
 
+from mtg_helper.models.mana_curve import DeckManaCurve
 from mtg_helper.models.snapshots import (
     ComparisonSideMeta,
     DeckCompareResponse,
@@ -19,7 +20,7 @@ from mtg_helper.models.snapshots import (
     SnapshotResponse,
     SnapshotSummary,
 )
-from mtg_helper.services import collection_service
+from mtg_helper.services import collection_service, mana_curve_service
 
 _log = logging.getLogger(__name__)
 
@@ -305,6 +306,7 @@ class _Composition:
         label: str | None,
         stage: str,
         bracket: int | None,
+        commander_id: UUID,
         cards: dict[UUID, dict[str, Any]],
     ) -> None:
         self.kind = kind
@@ -314,7 +316,9 @@ class _Composition:
         self.label = label
         self.stage = stage
         self.bracket = bracket
+        self.commander_id = commander_id
         self.cards = cards
+        self.mana_curve: DeckManaCurve | None = None
 
     def card_count(self) -> int:
         return sum(int(v["quantity"]) for v in self.cards.values())
@@ -329,6 +333,7 @@ class _Composition:
             stage=self.stage,
             bracket=self.bracket,
             card_count=self.card_count(),
+            mana_curve=self.mana_curve,
         )
 
 
@@ -336,7 +341,8 @@ async def _load_deck_composition(
     conn: asyncpg.Connection, deck_id: UUID, email: str
 ) -> _Composition:
     deck_row = await conn.fetchrow(
-        "SELECT id, name, stage, bracket, lower(owner_email) AS owner FROM decks WHERE id = $1",
+        "SELECT id, name, stage, bracket, commander_id, lower(owner_email) AS owner "
+        "FROM decks WHERE id = $1",
         deck_id,
     )
     if deck_row is None or deck_row["owner"] != _normalize_email(email):
@@ -365,6 +371,7 @@ async def _load_deck_composition(
         label=None,
         stage=deck_row["stage"],
         bracket=deck_row["bracket"],
+        commander_id=deck_row["commander_id"],
         cards=cards,
     )
 
@@ -375,7 +382,7 @@ async def _load_snapshot_composition(
     snapshot_row = await conn.fetchrow(
         """
         SELECT s.id, s.deck_id, s.label, s.stage, s.deck_name, s.bracket,
-               lower(d.owner_email) AS owner
+               d.commander_id, lower(d.owner_email) AS owner
         FROM deck_snapshots s
         JOIN decks d ON d.id = s.deck_id
         WHERE s.id = $1
@@ -408,6 +415,7 @@ async def _load_snapshot_composition(
         label=snapshot_row["label"],
         stage=snapshot_row["stage"],
         bracket=snapshot_row["bracket"],
+        commander_id=snapshot_row["commander_id"],
         cards=cards,
     )
 
@@ -551,5 +559,11 @@ async def compare(
             right = await _load_deck_composition(conn, right_id, email)
 
     diff = diff_compositions(left.cards, right.cards)
+    left.mana_curve = await mana_curve_service.deck_curve(
+        pool, left.commander_id, list(left.cards.values())
+    )
+    right.mana_curve = await mana_curve_service.deck_curve(
+        pool, right.commander_id, list(right.cards.values())
+    )
     await _attach_ownership(pool, diff, account_id)
     return DeckCompareResponse(left=left.meta(), right=right.meta(), diff=diff)

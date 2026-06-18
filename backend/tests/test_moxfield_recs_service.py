@@ -208,6 +208,32 @@ def test_aggregate_payload_drops_unresolved_scryfall_ids() -> None:
     assert payload["by_oracle"] == {"oracle-1": 1}
 
 
+def test_aggregate_payload_adds_curve_when_five_decks_are_usable() -> None:
+    deck_summaries = [{"id": str(i), "likes": 10} for i in range(5)]
+    deck_cards = [[f"sf-{i}"] for i in range(5)]
+    oracle_by_scryfall = {f"sf-{i}": f"oracle-{i}" for i in range(5)}
+    entries = [
+        [
+            {"scryfall_id": f"sf-{i}", "cmc": 2, "type_line": "Artifact"},
+            {"scryfall_id": f"land-{i}", "cmc": 0, "type_line": "Land"},
+            {"scryfall_id": f"big-{i}", "cmc": 7, "type_line": "Creature"},
+        ]
+        for i in range(5)
+    ]
+    payload = _aggregate_payload("MOX", deck_summaries, deck_cards, oracle_by_scryfall, entries)
+    assert payload["curve"]["source"] == "moxfield"
+    assert payload["curve"]["deck_count"] == 5
+    assert payload["curve"]["buckets"]["2"] == 1
+    assert payload["curve"]["buckets"]["7+"] == 1
+    assert payload["curve"]["buckets"]["0"] == 0
+
+
+def test_aggregate_payload_skips_curve_with_fewer_than_five_decks() -> None:
+    entries = [[{"scryfall_id": "sf", "cmc": 2, "type_line": "Artifact"}] for _ in range(4)]
+    payload = _aggregate_payload("MOX", [], [], {}, entries)
+    assert payload["curve"] is None
+
+
 # ── score_inclusion (DB integration) ──────────────────────────────────────────
 
 
@@ -325,6 +351,7 @@ async def test_get_or_refresh_uses_cache_within_max_age(db_pool: asyncpg.Pool) -
                     "moxfield_card_id": "CACHED",
                     "decks": [],
                     "by_oracle": {str(SOL_RING_ORACLE_ID): 3},
+                    "curve": None,
                 }
             ),
         )
@@ -347,7 +374,7 @@ async def test_get_or_refresh_writes_sentinel_on_404(db_pool: asyncpg.Pool) -> N
 
     payload = await moxfield_recs_service.get_or_refresh(db_pool, commander_id, client=client)
 
-    assert payload == {"moxfield_card_id": None, "decks": [], "by_oracle": {}}
+    assert payload == {"moxfield_card_id": None, "decks": [], "by_oracle": {}, "curve": None}
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT moxfield_card_id, payload FROM moxfield_commander_recs WHERE commander_id = $1",

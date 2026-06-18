@@ -12,6 +12,7 @@ from qdrant_client import AsyncQdrantClient
 from mtg_helper.auth import get_current_account, require_admin_or_internal
 from mtg_helper.config import settings
 from mtg_helper.db import apply_schema, close_pool, create_pool
+from mtg_helper.observability import configure_logfire
 from mtg_helper.routers import (
     admin,
     ai,
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await ensure_collection(app.state.qdrant_client)
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
+    app.state.coach_jobs = {}
 
     card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
     if card_count == 0:
@@ -69,6 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(title="MTG Helper API", version="0.1.0", lifespan=lifespan)
+configure_logfire(app)
 
 app.add_middleware(
     CORSMiddleware,

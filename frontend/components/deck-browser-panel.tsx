@@ -171,7 +171,10 @@ export function DeckBrowserPanel({
         {lastCut && (
           <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs">
             <span className="truncate text-gray-300">
-              Cut <span className="text-white">{lastCut.name}</span>
+              Cut{" "}
+              <CardHover name={lastCut.name} imageUri={lastCut.image_uri} className="text-white">
+                {lastCut.name}
+              </CardHover>
             </span>
             <button
               type="button"

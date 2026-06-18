@@ -1,12 +1,14 @@
 """AI deck building endpoints."""
 
 import asyncio
+import json
 import logging
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.config import settings
@@ -14,6 +16,12 @@ from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
     BuildResponse,
+    CoachMemoryResponse,
+    CoachMemoryUpdate,
+    CommanderCoachRequest,
+    CommanderCoachResponse,
+    CommanderCoachStartResponse,
+    DeckDoctorResponse,
     DescribeRequest,
     DescribeResponse,
     KeywordExtractRequest,
@@ -24,6 +32,7 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.common import DataResponse
+from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.optimizer import (
     OptimizeJobStatus,
     OptimizeRequest,
@@ -34,6 +43,8 @@ from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
     agents,
     ai_service,
+    coach_memory_service,
+    commander_coach,
     deck_optimizer_service,
     deck_service,
     feature_flag_service,
@@ -46,11 +57,15 @@ from mtg_helper.services import (
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
 from mtg_helper.services.ai_service import DeckNotFoundError
+from mtg_helper.services.commander_coach import jobs as coach_jobs
+from mtg_helper.services.commander_coach import router_agent
+from mtg_helper.services.commander_coach.specialists import replacement
 from mtg_helper.services.feature_flag_service import FLAG_OPTIMIZER
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
 from mtg_helper.services.swap_service import SwapError
 
 CurrentAccount = Annotated[AccountResponse, Depends(get_current_account)]
+ProgressCb = Callable[[str, str], Awaitable[None]]
 
 _log = logging.getLogger(__name__)
 
@@ -100,6 +115,124 @@ def _deck_not_found(deck_id: UUID) -> HTTPException:
         status_code=404,
         detail={"code": "DECK_NOT_FOUND", "message": f"Deck {deck_id} not found"},
     )
+
+
+async def _require_deck(
+    request: Request,
+    deck_id: UUID,
+    account: AccountResponse,
+) -> DeckDetailResponse:
+    email = _require_email(account)
+    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    if deck is None:
+        raise _deck_not_found(deck_id)
+    return deck
+
+
+async def _request_with_memory(
+    pool: Any,
+    deck_id: UUID,
+    account_id: UUID,
+    body: CommanderCoachRequest,
+) -> CommanderCoachRequest:
+    memory = await coach_memory_service.get_memory(pool, deck_id, account_id)
+    notes = memory.notes.strip() or None
+    return body.model_copy(update={"coach_memory_notes": notes})
+
+
+async def _execute_coach_route(
+    pool: Any,
+    deck: DeckDetailResponse,
+    account_id: UUID,
+    body: CommanderCoachRequest,
+    route: router_agent.CoachRoute,
+    progress: ProgressCb | None = None,
+) -> CommanderCoachResponse | None:
+    if route.route == "doctor":
+        return None
+    if route.route == "memory_read":
+        memory = await coach_memory_service.get_memory(pool, deck.id, account_id)
+        reply = "I don't have any memory notes for this deck yet."
+        if memory.notes:
+            reply = f"Here is what I have in memory for this deck:\n\n{memory.notes}"
+        return CommanderCoachResponse(mode="memory", reply=reply, coach_memory=memory)
+    if route.route == "memory_write" and route.memory_note:
+        memory = await coach_memory_service.append_memory_note(
+            pool,
+            deck.id,
+            account_id,
+            route.memory_note,
+        )
+        return CommanderCoachResponse(
+            mode="memory",
+            reply=f"Saved that to this deck's Coach memory.\n\nCurrent memory:\n{memory.notes}",
+            coach_memory=memory,
+            memory_updated=True,
+        )
+    if route.route == "memory_delete" and route.delete_query:
+        memory = await coach_memory_service.get_memory(pool, deck.id, account_id)
+        updated_notes, removed = coach_memory_service.remove_memory_by_query(
+            memory.notes,
+            route.delete_query,
+        )
+        if not removed:
+            return CommanderCoachResponse(
+                mode="memory",
+                reply="I couldn't find a matching memory note to remove.",
+                coach_memory=memory,
+            )
+        updated = await coach_memory_service.upsert_memory(pool, deck.id, account_id, updated_notes)
+        removed_text = "\n".join(f"- {line}" for line in removed)
+        reply = f"Removed this from memory:\n{removed_text}"
+        if updated.notes:
+            reply += f"\n\nCurrent memory:\n{updated.notes}"
+        else:
+            reply += "\n\nMemory is now empty."
+        return CommanderCoachResponse(
+            mode="memory",
+            reply=reply,
+            coach_memory=updated,
+            memory_updated=True,
+        )
+    if route.route == "targeted_replacement" and route.target_card_name:
+        if progress is not None:
+            await progress("replacement_drafting", "Replacement specialist is comparing roles")
+        result = await replacement.recommend_replacements(
+            pool,
+            deck,
+            route.target_card_name,
+            body.coach_memory_notes,
+            complaint=body.message,
+        )
+        if progress is not None:
+            await progress(
+                "replacement_complete",
+                f"Replacement specialist found {len(result.options)} option(s)",
+            )
+        return CommanderCoachResponse(
+            mode="replacement",
+            reply=result.summary,
+            replacement=result,
+        )
+    return CommanderCoachResponse(
+        mode="chat",
+        reply=(
+            route.chat_reply
+            or "I can help with memory or deck recommendations. What should I do?"
+        ),
+    )
+
+
+async def _route_coach_message(
+    pool: Any,
+    deck: DeckDetailResponse,
+    account_id: UUID,
+    body: CommanderCoachRequest,
+) -> CommanderCoachResponse | None:
+    if body.mode != "auto":
+        return None
+    route = await router_agent.route_message(deck, body)
+    return await _execute_coach_route(pool, deck, account_id, body, route)
 
 
 @router.post("/{deck_id}/build", response_model=DataResponse[BuildResponse])
@@ -181,6 +314,227 @@ async def playtest_simulate(
         raise _deck_not_found(deck_id)
     stats = playtest_service.simulate(deck, body)
     return DataResponse(data=stats)
+
+
+@router.post("/{deck_id}/coach", response_model=DataResponse[CommanderCoachResponse])
+async def coach_deck(
+    deck_id: UUID,
+    body: CommanderCoachRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CommanderCoachResponse]:
+    """Run the Commander Coach orchestrator for an existing deck."""
+    _enforce_rate_limit(account, "coach_deck", _ANALYZE_LIMIT)
+    deck = await _require_deck(request, deck_id, account)
+    body = await _request_with_memory(request.app.state.db_pool, deck_id, account.id, body)
+    routed_response = await _route_coach_message(
+        request.app.state.db_pool,
+        deck,
+        account.id,
+        body,
+    )
+    if routed_response is not None:
+        return DataResponse(data=routed_response)
+    async def learn(note: str) -> None:
+        await coach_memory_service.append_memory_note(
+            request.app.state.db_pool,
+            deck_id,
+            account.id,
+            note,
+        )
+
+    result = await commander_coach.run_coach(
+        request.app.state.db_pool,
+        deck,
+        body,
+        memory_learn=learn,
+    )
+    return DataResponse(data=result)
+
+
+async def _run_coach_job(
+    job: coach_jobs.CoachJob,
+    pool: Any,
+    deck: Any,
+    body: CommanderCoachRequest,
+) -> None:
+    """Run a Coach request in the background and publish progress events."""
+
+    async def progress(event: str, message: str) -> None:
+        await coach_jobs.emit(job, event, message)
+
+    try:
+        async def learn(note: str) -> None:
+            await coach_memory_service.append_memory_note(pool, job.deck_id, job.account_id, note)
+
+        result = await commander_coach.run_coach(
+            pool,
+            deck,
+            body,
+            progress=progress,
+            memory_learn=learn,
+        )
+        await coach_jobs.finish_ok(job, result)
+    except Exception as exc:  # noqa: BLE001 - surface job failures to stream clients
+        _log.exception("Coach job %s failed", job.job_id)
+        await coach_jobs.finish_error(job, str(exc))
+
+
+async def _run_route_action_job(
+    job: coach_jobs.CoachJob,
+    pool: Any,
+    deck: DeckDetailResponse,
+    body: CommanderCoachRequest,
+    route: router_agent.CoachRoute,
+) -> None:
+    """Run a routed non-Doctor action and publish progress events."""
+
+    async def progress(event: str, message: str) -> None:
+        await coach_jobs.emit(job, event, message)
+
+    try:
+        result = await _execute_coach_route(
+            pool,
+            deck,
+            job.account_id,
+            body,
+            route,
+            progress=progress,
+        )
+        if result is None:
+            raise RuntimeError("Route action unexpectedly returned no response")
+        await _finish_routed_job(job, result)
+    except Exception as exc:  # noqa: BLE001 - surface job failures to stream clients
+        _log.exception("Coach route action job %s failed", job.job_id)
+        await coach_jobs.finish_error(job, str(exc))
+
+
+async def _finish_routed_job(
+    job: coach_jobs.CoachJob,
+    result: CommanderCoachResponse,
+) -> None:
+    """Publish routed non-specialist progress events and complete the stream."""
+    if result.mode == "memory" and result.memory_updated:
+        await coach_jobs.emit(job, "memory_writing", "Writing updated Coach memory")
+        await coach_jobs.emit(job, "memory_written", "Coach memory updated")
+    elif result.mode == "memory":
+        await coach_jobs.emit(job, "memory_read", "Reading Coach memory")
+    else:
+        await coach_jobs.emit(job, "chat_reply", "Coach answered without specialist routing")
+    await coach_jobs.finish_ok(job, result)
+
+
+@router.post("/{deck_id}/coach/start", response_model=DataResponse[CommanderCoachStartResponse])
+async def coach_deck_start(
+    deck_id: UUID,
+    body: CommanderCoachRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CommanderCoachStartResponse]:
+    """Start a streaming Commander Coach job."""
+    _enforce_rate_limit(account, "coach_deck", _ANALYZE_LIMIT)
+    deck = await _require_deck(request, deck_id, account)
+    registry = request.app.state.coach_jobs
+    job = coach_jobs.create(registry, account.id, deck_id)
+    await coach_jobs.emit(job, "memory_check", "Checking Coach memory")
+    body = await _request_with_memory(request.app.state.db_pool, deck_id, account.id, body)
+    await coach_jobs.emit(job, "memory_loaded", "Loaded deck memory into Coach context")
+    await coach_jobs.emit(job, "coach_routing", "Commander Coach is deciding what to do")
+    route = await router_agent.route_message(deck, body)
+    if route.route != "doctor":
+        await coach_jobs.emit(job, "coach_routed", f"Coach routed to {route.route}")
+        asyncio.create_task(
+            _run_route_action_job(job, request.app.state.db_pool, deck, body, route)
+        )
+        return DataResponse(data=CommanderCoachStartResponse(job_id=job.job_id))
+    await coach_jobs.emit(job, "coach_routed", "Coach routed to Deck Doctor")
+    asyncio.create_task(_run_coach_job(job, request.app.state.db_pool, deck, body))
+    return DataResponse(data=CommanderCoachStartResponse(job_id=job.job_id))
+
+
+@router.get("/{deck_id}/coach/memory", response_model=DataResponse[CoachMemoryResponse])
+async def get_coach_memory(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CoachMemoryResponse]:
+    """Return editable persistent memory notes for this deck's Coach."""
+    await _require_deck(request, deck_id, account)
+    memory = await coach_memory_service.get_memory(request.app.state.db_pool, deck_id, account.id)
+    return DataResponse(data=memory)
+
+
+@router.put("/{deck_id}/coach/memory", response_model=DataResponse[CoachMemoryResponse])
+async def update_coach_memory(
+    deck_id: UUID,
+    body: CoachMemoryUpdate,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CoachMemoryResponse]:
+    """Replace editable persistent memory notes for this deck's Coach."""
+    await _require_deck(request, deck_id, account)
+    memory = await coach_memory_service.upsert_memory(
+        request.app.state.db_pool,
+        deck_id,
+        account.id,
+        body.notes,
+    )
+    return DataResponse(data=memory)
+
+
+def _sse(event: str, data: Any) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+async def _coach_event_stream(job: coach_jobs.CoachJob) -> AsyncGenerator[str]:
+    """Yield Server-Sent Events for one Coach job until it finishes."""
+    yield _sse("status", {"event": "connected", "message": "Connected"})
+    while True:
+        item = await job.queue.get()
+        if item.event == "done" and job.result is not None:
+            yield _sse("progress", {"event": item.event, "message": item.message})
+            yield _sse("done", job.result.model_dump(mode="json"))
+            break
+        if item.event == "error":
+            yield _sse("failed", {"message": item.message})
+            break
+        yield _sse("progress", {"event": item.event, "message": item.message})
+
+
+@router.get("/{deck_id}/coach/{job_id}/stream")
+async def coach_deck_stream(
+    deck_id: UUID,
+    job_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> StreamingResponse:
+    """Stream progress and final result for a Commander Coach job."""
+    registry = request.app.state.coach_jobs
+    job = registry.get(job_id)
+    if job is None or job.account_id != account.id or job.deck_id != deck_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "JOB_NOT_FOUND", "message": f"Coach job {job_id} not found"},
+        )
+    return StreamingResponse(_coach_event_stream(job), media_type="text/event-stream")
+
+
+@router.post("/{deck_id}/doctor", response_model=DataResponse[DeckDoctorResponse])
+async def doctor_deck(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[DeckDoctorResponse]:
+    """Run the Commander deck doctor agent for an existing deck."""
+    _enforce_rate_limit(account, "doctor_deck", _ANALYZE_LIMIT)
+    deck = await _require_deck(request, deck_id, account)
+    memory = await coach_memory_service.get_memory(request.app.state.db_pool, deck_id, account.id)
+    result = await agents.doctor_deck(
+        request.app.state.db_pool,
+        deck,
+        coach_memory_notes=memory.notes.strip() or None,
+    )
+    return DataResponse(data=result)
 
 
 @router.post(

@@ -167,6 +167,8 @@ async def test_compare_two_decks(client: AsyncClient) -> None:
     added = [e["card"]["name"] for e in diff["added"]]
     assert "Sol Ring" in common
     assert "Doubling Season" in added
+    assert resp.json()["data"]["left"]["mana_curve"]["recommended"]["source"] == "fallback"
+    assert resp.json()["data"]["right"]["mana_curve"]["recommended"]["source"] == "fallback"
 
 
 @pytest.mark.asyncio

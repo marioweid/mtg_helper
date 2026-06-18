@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import AnyHttpUrl, BaseModel, Field
 
 from mtg_helper.models.ai import CollectionMembership
+from mtg_helper.models.mana_curve import DeckManaCurve
 
 
 class DeckCreate(BaseModel):
@@ -130,6 +131,7 @@ class DeckDetailResponse(BaseModel):
     stage_targets: dict[str, int] = Field(default_factory=dict)
     suggestion_collection_ids: list[UUID] = Field(default_factory=list)
     archetype_tags: list[str] = Field(default_factory=list)
+    mana_curve: DeckManaCurve | None = None
     cards: list[DeckCardItem]
 
 

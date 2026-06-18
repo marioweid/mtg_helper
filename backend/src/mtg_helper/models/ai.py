@@ -1,5 +1,6 @@
 """Pydantic models for AI deck building endpoints."""
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -192,10 +193,12 @@ class CardSearchHit(BaseModel):
     against the deck's color identity.
     """
 
+    scryfall_id: UUID | None = None
     name: str
     mana_cost: str | None = None
     cmc: float | None = None
     type_line: str | None = None
+    oracle_text: str | None = None
     color_identity: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     price_eur_cents: int | None = None
@@ -228,6 +231,115 @@ class SimulationAnalysisResponse(BaseModel):
     findings: list[AnalysisFinding] = Field(default_factory=list)
     swap_suggestions: list[SwapSuggestion] = Field(default_factory=list)
     tool_call_count: int = 0
+
+
+class DoctorCut(BaseModel):
+    """A card the deck doctor recommends cutting."""
+
+    card_name: str
+    reason: str
+    confidence: Literal["low", "medium", "high"] = "medium"
+
+
+class DoctorAdd(BaseModel):
+    """A card the deck doctor recommends adding."""
+
+    card: CardSearchHit
+    reason: str
+    confidence: Literal["low", "medium", "high"] = "medium"
+
+
+class DoctorSwap(BaseModel):
+    """A concrete cut/add package produced by the deck doctor."""
+
+    remove: list[str] = Field(default_factory=list)
+    add: list[CardSearchHit] = Field(default_factory=list)
+    reason: str
+
+
+class DeckDoctorResponse(BaseModel):
+    """Structured output of the Commander deck doctor agent."""
+
+    summary: str
+    game_plan: str
+    findings: list[AnalysisFinding] = Field(default_factory=list)
+    cuts: list[DoctorCut] = Field(default_factory=list)
+    adds: list[DoctorAdd] = Field(default_factory=list)
+    swaps: list[DoctorSwap] = Field(default_factory=list)
+    tool_call_count: int = 0
+
+
+class ReplacementOption(BaseModel):
+    """One candidate for replacing a specific card."""
+
+    card: CardSearchHit
+    reason: str
+    role_match: Literal["same_role", "role_upgrade", "theme_upgrade", "role_change"]
+    tradeoff: str | None = None
+
+
+class TargetedReplacementResponse(BaseModel):
+    """Focused replacement advice for one card already in the deck."""
+
+    target_card_name: str
+    summary: str
+    keep_reason: str | None = None
+    best_pick: CardSearchHit | None = None
+    options: list[ReplacementOption] = Field(default_factory=list)
+    tool_call_count: int = 0
+
+
+CoachMode = Literal["auto", "doctor", "builder", "mana", "meta"]
+CoachResolvedMode = Literal[
+    "doctor",
+    "builder",
+    "mana",
+    "meta",
+    "memory",
+    "chat",
+    "replacement",
+]
+
+
+class CommanderCoachRequest(BaseModel):
+    """Request body for the Commander Coach orchestrator."""
+
+    message: str = Field(default="Doctor this deck", max_length=4000)
+    mode: CoachMode = "auto"
+    coach_memory_notes: str | None = Field(default=None, max_length=8000)
+
+
+class CoachMemoryUpdate(BaseModel):
+    """User-editable persistent notes for one deck's Coach context."""
+
+    notes: str = Field(default="", max_length=8000)
+
+
+class CoachMemoryResponse(BaseModel):
+    """Persistent Commander Coach memory for a deck/account pair."""
+
+    deck_id: UUID
+    account_id: UUID
+    notes: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class CommanderCoachResponse(BaseModel):
+    """Response from the Commander Coach orchestrator."""
+
+    mode: CoachResolvedMode
+    reply: str
+    doctor: DeckDoctorResponse | None = None
+    replacement: TargetedReplacementResponse | None = None
+    coach_memory: CoachMemoryResponse | None = None
+    memory_updated: bool = False
+
+
+class CommanderCoachStartResponse(BaseModel):
+    """Response after starting a streaming Coach job."""
+
+    job_id: UUID
 
 
 class KeywordExtractResponse(BaseModel):

@@ -9,14 +9,13 @@ import { apiClient, ApiError } from "@/lib/api";
 interface Props {
   deckId: string;
   buildLabel: string;
-  onOpenStats: () => void;
 }
 
 /**
  * Sticky command bar pinned to the viewport bottom. Holds the primary deck
  * actions so they stay reachable while the user scrolls a long card list.
  */
-export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
+export function CommandBar({ deckId, buildLabel }: Props) {
   const toast = useToast();
   const [exporting, setExporting] = useState(false);
   const [copyingBuylist, setCopyingBuylist] = useState(false);
@@ -75,13 +74,12 @@ export function CommandBar({ deckId, buildLabel, onOpenStats }: Props) {
         >
           Simulate
         </Link>
-        <button
-          type="button"
-          onClick={onOpenStats}
-          className="flex-1 rounded-lg border border-white/20 px-4 py-2 text-sm text-gray-200 transition-colors hover:border-white/40 hover:text-white sm:flex-none"
+        <Link
+          href={`/decks/${deckId}/coach`}
+          className="flex-1 rounded-lg border border-indigo-400/40 px-4 py-2 text-center text-sm text-indigo-100 transition-colors hover:border-indigo-300 hover:text-white sm:flex-none"
         >
-          Stats
-        </button>
+          Coach
+        </Link>
         <button
           type="button"
           onClick={() => void handleBuylist()}
