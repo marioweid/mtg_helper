@@ -5,7 +5,7 @@ AI-assisted Commander deck building for Magic: The Gathering.
 **Live app:** [https://mtg.marioweid.com](https://mtg.marioweid.com)  
 _Requires Cloudflare whitelist access._
 
-MTG Helper helps Commander players turn a deck idea into a playable list. Pick a commander, describe the strategy you want in natural language, search and add cards, refine the list with AI assistance, and test opening hands and early turns with the built-in goldfishing tools.
+MTG Helper helps Commander players turn a deck idea into a playable list. Pick a commander, describe the strategy you want in natural language, search and add cards, refine the list with AI assistance, account for cards you already own, create Cardmarket buy lists for missing cards, and test opening hands and early turns with the built-in goldfishing tools.
 
 ## Screenshots
 
@@ -38,7 +38,9 @@ The application combines a local Scryfall-backed card database, deck management 
 - **Deck refinement tools** — Review suggestions, compare changes, manage swaps, and keep the deck moving toward a coherent plan.
 - **Goldfishing / playtesting** — Draw hands and simulate early turns to check whether the deck actually functions.
 - **Mana and curve insights** — Inspect mana curve, color requirements, land balance, and deck composition.
-- **Collection-aware workflows** — Track owned cards and use that information while evaluating deck options.
+- **Card collections** — Track owned cards so the app knows what is already available in your collection.
+- **Collection-aware deck building** — Build and refine decks with ownership information in mind, including whether suggested cards are already owned.
+- **Cardmarket buy lists** — Generate a buy list for missing deck cards that are not currently in your collection.
 - **Moxfield-oriented workflows** — Import, export, and work with deck lists from existing Magic deck-building tools.
 - **Fresh card data** — Scryfall bulk data is imported into PostgreSQL so card search and validation work locally.
 
