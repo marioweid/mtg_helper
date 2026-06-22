@@ -269,6 +269,72 @@ class DeckDoctorResponse(BaseModel):
     tool_call_count: int = 0
 
 
+class DeckIdentityReport(BaseModel):
+    """Identity anchor for the multi-step Commander Coach pipeline."""
+
+    archetype: str
+    main_plan: str
+    secondary_plan: str | None = None
+    power_target: str
+    deck_tension: list[str] = Field(default_factory=list)
+    must_preserve_themes: list[str] = Field(default_factory=list)
+
+
+class CoachManaReport(BaseModel):
+    """Coach-facing mana-base diagnosis derived from deterministic analysis."""
+
+    summary: str
+    total_lands: int = Field(ge=0)
+    recommended_lands: int = Field(ge=0)
+    land_delta: int
+    color_issues: list[str] = Field(default_factory=list)
+    risky_cards: list[str] = Field(default_factory=list)
+    ramp_count: int = Field(ge=0)
+
+
+class CoachCurveReport(BaseModel):
+    """Coach-facing curve and tempo diagnosis."""
+
+    summary: str
+    curve: dict[str, int] = Field(default_factory=dict)
+    overloaded_buckets: list[str] = Field(default_factory=list)
+    underfilled_buckets: list[str] = Field(default_factory=list)
+    tempo_issues: list[str] = Field(default_factory=list)
+
+
+class CoachCutCandidate(BaseModel):
+    """Ranked cut candidate from the cut specialist."""
+
+    card_name: str
+    cut_score: float = Field(ge=0.0, le=10.0)
+    reason: str
+    tags: list[str] = Field(default_factory=list)
+
+
+class CoachCutReport(BaseModel):
+    """Structured output from the cut specialist."""
+
+    summary: str
+    candidates: list[CoachCutCandidate] = Field(default_factory=list)
+
+
+class CoachUpgradeCandidate(BaseModel):
+    """Grounded upgrade candidate returned by the upgrade specialist."""
+
+    card: CardSearchHit
+    reason: str
+    role: str
+    replaces: list[str] = Field(default_factory=list)
+
+
+class CoachUpgradeReport(BaseModel):
+    """Structured output from the upgrade specialist."""
+
+    summary: str
+    candidates: list[CoachUpgradeCandidate] = Field(default_factory=list)
+    tool_call_count: int = 0
+
+
 class ReplacementOption(BaseModel):
     """One candidate for replacing a specific card."""
 

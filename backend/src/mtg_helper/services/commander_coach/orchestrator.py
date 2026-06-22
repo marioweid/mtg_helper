@@ -1,7 +1,8 @@
 """Commander Coach orchestration layer.
 
-The coach is the stable entrypoint for user-facing Commander help. It routes a
-request to the best specialist agent, starting with the deck-doctor specialist.
+The coach is the stable entrypoint for user-facing Commander help. Whole-deck
+advice now runs a small specialist pipeline: identity, mana, curve, cuts,
+upgrades, validation, and final response composition.
 """
 
 from collections.abc import Awaitable, Callable
@@ -14,17 +15,11 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - depends on optional runtime package
     logfire = None
 
-from mtg_helper.models.ai import CommanderCoachRequest, CommanderCoachResponse
+from mtg_helper.models.ai import CommanderCoachRequest, CommanderCoachResponse, DeckDoctorResponse
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.commander_coach import validators
-from mtg_helper.services.commander_coach.specialists import deck_doctor
-
-
-def _resolve_mode(request: CommanderCoachRequest) -> str:
-    """Resolve specialist mode after the Coach router has selected specialist work."""
-    if request.mode in {"auto", "doctor"}:
-        return "doctor"
-    return "doctor"
+from mtg_helper.services.commander_coach import final_response, pipeline, validators
+from mtg_helper.services.commander_coach.validators import ValidationIssue
+from mtg_helper.services.commander_coach.specialists import cuts, identity, upgrades
 
 
 ProgressCb = Callable[[str, str], Awaitable[None]]
@@ -35,6 +30,13 @@ async def _noop_progress(_event: str, _message: str) -> None:
     return None
 
 
+def _resolve_mode(request: CommanderCoachRequest) -> str:
+    """Resolve specialist mode after the Coach router has selected whole-deck work."""
+    if request.mode in {"auto", "doctor", "mana"}:
+        return "doctor"
+    return "doctor"
+
+
 async def run_coach(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
@@ -42,122 +44,110 @@ async def run_coach(
     progress: ProgressCb | None = None,
     memory_learn: MemoryLearnCb | None = None,
 ) -> CommanderCoachResponse:
-    """Run the Commander Coach against a deck using the selected specialist."""
+    """Run the Commander Coach specialist pipeline against a deck."""
     emit = progress or _noop_progress
-    await emit("routing", "Reading deck and routing request")
     mode = _resolve_mode(request)
-    await emit("routed", f"Routed request to {mode.title()} specialist")
-    span = (
-        logfire.span("Commander Coach run {deck_id} {mode}", deck_id=str(deck.id), mode=mode)
-        if logfire is not None
-        else nullcontext()
-    )
+    await emit("routing", "Reading deck and routing request")
+    await emit("routed", "Routed request to Commander Coach pipeline")
+    span = _span("Commander Coach pipeline {deck_id} {mode}", deck_id=str(deck.id), mode=mode)
     with span:
-        await emit("doctor_drafting", "Deck Doctor is drafting recommendations")
-        draft_span = (
-            logfire.span("Deck Doctor draft {deck_id}", deck_id=str(deck.id))
-            if logfire is not None
-            else nullcontext()
-        )
-        with draft_span:
-            doctor = await deck_doctor.doctor_deck(
-                pool,
-                deck,
-                coach_memory_notes=request.coach_memory_notes,
-            )
-        await emit(
-            "doctor_complete",
-            "Deck Doctor drafted "
-            f"{len(doctor.findings)} finding(s), {len(doctor.swaps)} swap(s), "
-            f"{len(doctor.adds)} add(s), and {len(doctor.cuts)} cut(s)",
-        )
-
-        await emit("validation_routing", "Routing Deck Doctor output to Theme Guardian")
-        await emit("validation_routed", "Routed output to Theme Guardian validator")
-        await emit("validating_theme", "Theme Guardian is checking commander, theme, and memory")
-        validate_span = (
-            logfire.span("Theme Guardian validation {deck_id}", deck_id=str(deck.id))
-            if logfire is not None
-            else nullcontext()
-        )
-        with validate_span:
-            issues = validators.validate_doctor_output(
-                deck,
-                doctor,
-                coach_memory_notes=request.coach_memory_notes,
-            )
-            await emit(
-                "validation_complete",
-                f"Theme Guardian found {len(issues)} issue(s)",
-            )
-            if logfire is not None:
-                logfire.info(
-                    "Doctor validation found {issue_count} issues",
-                    issue_count=len(issues),
-                )
-
-        revised = False
-        if issues:
-            if memory_learn is not None:
-                learned = "; ".join(
-                    f"avoid {', '.join(issue.names)}: {issue.reason}" for issue in issues[:3]
-                )
-                await emit("memory_learning", "Writing Theme Guardian learning to Coach memory")
-                await memory_learn(f"Theme Guardian learned: {learned}")
-            await emit("revising", "Revising recommendations after theme validation")
-            revision_span = (
-                logfire.span("Deck Doctor revision {deck_id}", deck_id=str(deck.id))
-                if logfire is not None
-                else nullcontext()
-            )
-            with revision_span:
-                feedback = validators.feedback_for_doctor(
-                    issues,
-                    coach_memory_notes=request.coach_memory_notes,
-                )
-                doctor = await deck_doctor.doctor_deck(
-                    pool,
-                    deck,
-                    feedback,
-                    coach_memory_notes=request.coach_memory_notes,
-                )
-            await emit(
-                "revision_complete",
-                "Deck Doctor revised recommendations after validation feedback",
-            )
-            await emit("validation_routing", "Routing revised output to Theme Guardian")
-            await emit("validation_routed", "Routed revised output to Theme Guardian validator")
-            await emit("validating_theme", "Theme Guardian is running final validation")
-            final_span = (
-                logfire.span("Final Theme Guardian validation {deck_id}", deck_id=str(deck.id))
-                if logfire is not None
-                else nullcontext()
-            )
-            with final_span:
-                final_issues = validators.filter_invalid_doctor_output(
-                    deck,
-                    doctor,
-                    coach_memory_notes=request.coach_memory_notes,
-                )
-                await emit(
-                    "final_validation_complete",
-                    f"Final validation removed {len(final_issues)} recommendation(s)",
-                )
-                if logfire is not None:
-                    logfire.info(
-                        "Final validation removed {issue_count} issues",
-                        issue_count=len(final_issues),
-                    )
-            revised = True
-        else:
-            final_issues = []
-
+        doctor = await _run_pipeline(pool, deck, request, emit)
+        doctor = await _validate_output(deck, doctor, request, emit, memory_learn)
         await emit("finalizing", "Finalizing Coach response")
-    prefix = "Deck Doctor complete."
-    if revised:
-        prefix = "Deck Doctor revised after theme validation."
-    if final_issues:
-        prefix += f" Removed {len(final_issues)} theme-breaking recommendation(s)."
-    if request.mode not in {"auto", "doctor"}:
-        prefix = f"{request.mode.title()} specialist is not implemented yet; used Deck Doctor."
+    prefix = "Commander Coach pipeline complete."
+    if request.mode not in {"auto", "doctor", "mana"}:
+        prefix = f"{request.mode.title()} specialist is not implemented yet; used Coach pipeline."
     return CommanderCoachResponse(mode=mode, reply=f"{prefix} {doctor.summary}", doctor=doctor)
+
+
+async def _run_pipeline(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    request: CommanderCoachRequest,
+    emit: ProgressCb,
+) -> DeckDoctorResponse:
+    """Run specialist steps and compose their output."""
+    await emit("identity_analyzing", "Deck Identity Agent is identifying the game plan")
+    identity_report = await identity.identify_deck(
+        deck,
+        coach_memory_notes=request.coach_memory_notes,
+        user_goal=request.message,
+    )
+    await emit("identity_complete", f"Identified deck as {identity_report.archetype}")
+    await emit("mana_analyzing", "Mana Base step is checking sources and land count")
+    mana_report = pipeline.analyze_mana(deck)
+    await emit("mana_complete", mana_report.summary)
+    await emit("curve_analyzing", "Curve & Tempo step is checking early plays")
+    curve_report = pipeline.analyze_curve(deck)
+    await emit("curve_complete", curve_report.summary)
+    await emit("cuts_analyzing", "Cut Recommendation Agent is ranking weak fits")
+    cut_report = await cuts.recommend_cuts(deck, identity_report, mana_report, curve_report)
+    await emit("cuts_complete", f"Ranked {len(cut_report.candidates)} cut candidate(s)")
+    await emit("upgrades_searching", "Upgrade Finder Agent is searching grounded additions")
+    upgrade_report = await upgrades.recommend_upgrades(
+        pool,
+        deck,
+        identity_report,
+        mana_report,
+        curve_report,
+        cut_report,
+    )
+    await emit("upgrades_complete", f"Found {len(upgrade_report.candidates)} upgrade(s)")
+    return final_response.compose_doctor_response(
+        identity_report,
+        mana_report,
+        curve_report,
+        cut_report,
+        upgrade_report,
+    )
+
+
+async def _validate_output(
+    deck: DeckDetailResponse,
+    doctor: DeckDoctorResponse,
+    request: CommanderCoachRequest,
+    emit: ProgressCb,
+    memory_learn: MemoryLearnCb | None,
+) -> DeckDoctorResponse:
+    """Run existing Theme Guardian checks and filter invalid recommendations."""
+    await emit("validation_routing", "Routing pipeline output to Theme Guardian")
+    await emit("validating_theme", "Theme Guardian is checking commander, theme, and memory")
+    with _span("Theme Guardian validation {deck_id}", deck_id=str(deck.id)):
+        issues = validators.validate_doctor_output(
+            deck,
+            doctor,
+            coach_memory_notes=request.coach_memory_notes,
+        )
+    await emit("validation_complete", f"Theme Guardian found {len(issues)} issue(s)")
+    if issues and memory_learn is not None:
+        await _learn_validation_issues(issues, emit, memory_learn)
+    if not issues:
+        return doctor
+    await emit("final_validation", "Removing theme-breaking recommendations")
+    removed = validators.filter_invalid_doctor_output(
+        deck,
+        doctor,
+        coach_memory_notes=request.coach_memory_notes,
+    )
+    await emit("final_validation_complete", f"Removed {len(removed)} recommendation(s)")
+    if removed:
+        doctor.summary += f" Removed {len(removed)} theme-breaking recommendation(s)."
+    return doctor
+
+
+async def _learn_validation_issues(
+    issues: list[ValidationIssue],
+    emit: ProgressCb,
+    memory_learn: MemoryLearnCb,
+) -> None:
+    learned = "; ".join(
+        f"avoid {', '.join(issue.names)}: {issue.reason}" for issue in issues[:3]
+    )
+    await emit("memory_learning", "Writing Theme Guardian learning to Coach memory")
+    await memory_learn(f"Theme Guardian learned: {learned}")
+
+
+def _span(message: str, **kwargs: str):
+    if logfire is None:
+        return nullcontext()
+    return logfire.span(message, **kwargs)
