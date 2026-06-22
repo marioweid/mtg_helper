@@ -58,10 +58,10 @@ async def discover_scored_upgrades(
 ) -> list[ScoredUpgrade]:
     """Discover and rank local upgrade candidates by package overlap."""
     specs = _ordered_specs(_package_specs(identity, deck), synergy, roles)
-    raw = await _fetch_candidates(pool, deck, specs)
+    raw = await _fetch_broad_candidates(pool, deck, specs)
     scored = [score_card(card, deck, identity, roles, specs) for card in raw]
     keep = [item for item in scored if item.status != "weak"]
-    keep.sort(key=lambda item: item.score, reverse=True)
+    keep.sort(key=lambda item: _rank_key(item), reverse=True)
     return keep[:limit]
 
 
@@ -105,6 +105,25 @@ def reason_for_score(item: ScoredUpgrade) -> str:
     return f"Synergy score {item.score:.1f}: " + "; ".join(bits) + "."
 
 
+async def _fetch_broad_candidates(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    specs: list[PackageSpec],
+) -> list[CardSearchHit]:
+    """Fetch all legal local cards that mention at least one package term."""
+    terms = sorted({term for spec in specs for term in spec.terms if len(term) >= 4})
+    if not terms:
+        return await _fetch_candidates(pool, deck, specs)
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            _candidate_sql(len(terms)),
+            pipeline.deck_colors(deck),
+            _existing_names(deck),
+            *[f"%{term}%" for term in terms],
+        )
+    return [_hit_from_row(row) for row in rows if not _is_land_row(row)]
+
+
 async def _fetch_candidates(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
@@ -126,6 +145,47 @@ async def _fetch_candidates(
                     seen.add(hit.name)
                     out.append(hit)
     return out
+
+
+def _candidate_sql(term_count: int) -> str:
+    clauses = []
+    for index in range(term_count):
+        placeholder = f"${index + 3}"
+        clauses.append(
+            f"(name ILIKE {placeholder} OR type_line ILIKE {placeholder} "
+            f"OR oracle_text ILIKE {placeholder})"
+        )
+    return (
+        "SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text, "
+        "color_identity, tags, ROUND((prices->>'eur')::numeric * 100)::integer "
+        "AS price_eur_cents FROM cards WHERE color_identity <@ $1::text[] "
+        "AND name <> ALL($2::text[]) AND legalities->>'commander' = 'legal' "
+        "AND type_line NOT ILIKE '%Land%' AND (" + " OR ".join(clauses) + ") "
+        "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST LIMIT 400"
+    )
+
+
+def _hit_from_row(row: asyncpg.Record) -> CardSearchHit:
+    return CardSearchHit(
+        scryfall_id=row["scryfall_id"],
+        name=row["name"],
+        mana_cost=row["mana_cost"],
+        cmc=float(row["cmc"]) if row["cmc"] is not None else None,
+        type_line=row["type_line"],
+        oracle_text=row["oracle_text"],
+        color_identity=list(row["color_identity"] or []),
+        tags=list(row["tags"] or []),
+        price_eur_cents=row["price_eur_cents"],
+    )
+
+
+def _is_land_row(row: asyncpg.Record) -> bool:
+    return "land" in (row["type_line"] or "").lower()
+
+
+def _rank_key(item: ScoredUpgrade) -> tuple[float, int, float]:
+    cmc = item.card.cmc or 0.0
+    return (item.score, len(item.packages), -cmc)
 
 
 def _package_specs(identity: DeckIdentityReport, deck: DeckDetailResponse) -> list[PackageSpec]:
