@@ -120,7 +120,7 @@ async def recommend_upgrades(
         pool=pool,
         deck=deck,
         deck_color_identity=pipeline.deck_colors(deck),
-        deck_card_names=[card.name for card in deck.cards],
+        deck_card_names=_existing_names(deck),
     )
     try:
         report = await _run_agent(deps, deck, identity, mana, curve, cuts, roles, synergy)
@@ -180,7 +180,7 @@ def _payload(
 
 
 def _filter_report(deck: DeckDetailResponse, report: CoachUpgradeReport) -> CoachUpgradeReport:
-    names = {card.name for card in deck.cards}
+    names = set(_existing_names(deck))
     seen: set[str] = set()
     candidates = []
     for candidate in report.candidates:
@@ -238,7 +238,7 @@ async def _general_search_candidates(
             pool,
             deck_color_identity=pipeline.deck_colors(deck),
             inp=CardSearchInput(text_query=query, max_cmc=6, limit=6),
-            exclude_names=[card.name for card in deck.cards],
+            exclude_names=_existing_names(deck),
         )
         out.extend(_hits_to_candidates(hits, role, cuts, seen))
         if len(out) >= 12:
@@ -368,7 +368,7 @@ def _merge_candidates(
     first: list[CoachUpgradeCandidate],
     second: list[CoachUpgradeCandidate],
 ) -> list[CoachUpgradeCandidate]:
-    seen = {card.name for card in deck.cards}
+    seen = set(_existing_names(deck))
     merged: list[CoachUpgradeCandidate] = []
     for candidate in [*first, *second]:
         if candidate.card.name in seen:
@@ -376,6 +376,15 @@ def _merge_candidates(
         seen.add(candidate.card.name)
         merged.append(candidate)
     return merged
+
+
+def _existing_names(deck: DeckDetailResponse) -> list[str]:
+    names = [card.name for card in deck.cards]
+    if deck.commander_card is not None:
+        names.append(deck.commander_card.name)
+    if deck.partner_card is not None:
+        names.append(deck.partner_card.name)
+    return names
 
 
 def _search_reason(hit: CardSearchHit, role: str) -> str:
