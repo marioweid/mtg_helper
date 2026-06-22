@@ -16,9 +16,10 @@ import asyncpg
 import httpx
 from curl_cffi.requests import AsyncSession as CurlAsyncSession
 
-from mtg_helper.models.ai import CommanderCoachRequest
+from mtg_helper.models.ai import CommanderCoachRequest, DeckIdentityReport
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.services import moxfield_recs_service
+from mtg_helper.services.commander_coach import synergy_scoring
 from mtg_helper.services.commander_coach.orchestrator import run_coach
 
 _DEFAULT_DB = "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper"
@@ -74,14 +75,17 @@ async def run_eval(config: EvalConfig) -> dict[str, object]:
                 await _eval_one(pool, commander, commander_cfg, deck_summary, config, index)
             )
         total_hits = sum(run["hit_count"] for run in runs)
+        total_good = sum(run["good_count"] for run in runs)
         total_removed = sum(len(run["removed"]) for run in runs)
         return {
             "commander": commander_cfg["name"],
             "top_decks": len(runs),
             "remove_count": config.remove_count,
             "total_hits": total_hits,
+            "total_good_suggestions": total_good,
             "total_removed": total_removed,
             "exact_hit_rate": total_hits / total_removed if total_removed else 0.0,
+            "runs_with_4_good_suggestions": sum(run["good_count"] >= 4 for run in runs),
             "runs": runs,
         }
     finally:
@@ -110,13 +114,17 @@ async def _eval_one(
         deck,
         CommanderCoachRequest(message=str(commander_cfg["message"]), mode="doctor"),
     )
-    recommended = _recommended_names(response.doctor)
+    recommended_cards = _recommended_cards(response.doctor)
+    recommended = [card.name for card in recommended_cards]
+    scored = _score_recommendations(recommended_cards, deck, commander_cfg)
     hits = sorted(removed_names & set(recommended))
     return {
         "deck_id": deck_summary["id"],
         "likes": deck_summary["likes"],
         "removed": sorted(removed_names),
         "recommended": recommended,
+        "good_suggestions": scored,
+        "good_count": len(scored),
         "hits": hits,
         "hit_count": len(hits),
     }
@@ -238,13 +246,45 @@ def _deck_response(
     )
 
 
-def _recommended_names(doctor: object) -> list[str]:
+def _recommended_cards(doctor: object) -> list[object]:
     if doctor is None:
         return []
-    names = [add.card.name for add in doctor.adds]
+    cards = [add.card for add in doctor.adds]
     for swap in doctor.swaps:
-        names.extend(card.name for card in swap.add)
-    return list(dict.fromkeys(names))
+        cards.extend(swap.add)
+    seen: set[str] = set()
+    out = []
+    for card in cards:
+        if card.name in seen:
+            continue
+        seen.add(card.name)
+        out.append(card)
+    return out
+
+
+def _score_recommendations(
+    cards: list[object],
+    deck: DeckDetailResponse,
+    commander_cfg: dict[str, object],
+) -> list[dict[str, object]]:
+    identity = DeckIdentityReport(
+        archetype=" ".join(str(tag) for tag in commander_cfg["tags"]),
+        main_plan=str(commander_cfg["message"]),
+        power_target="Bracket 3",
+        must_preserve_themes=list(commander_cfg["tags"]),
+    )
+    scored = [synergy_scoring.score_card(card, deck, identity, roles=None) for card in cards]
+    good = [item for item in scored if item.status in {"strong", "playable"}]
+    return [
+        {
+            "card": item.card.name,
+            "score": item.score,
+            "status": item.status,
+            "packages": item.packages,
+            "penalties": item.penalties,
+        }
+        for item in good
+    ]
 
 
 def _parse_args() -> argparse.Namespace:

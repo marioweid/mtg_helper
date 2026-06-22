@@ -78,7 +78,7 @@ def score_card(
     packages = _matched_packages(text, specs)
     role_matches = sorted({spec.role for spec in specs if spec.name in packages})
     commander_matches = _commander_matches(text, deck)
-    penalties = _penalties(card, roles)
+    penalties = _penalties(card, roles) + _package_penalties(packages, identity, deck)
     score = _score(packages, role_matches, commander_matches, penalties)
     return ScoredUpgrade(
         card=card,
@@ -161,7 +161,7 @@ def _candidate_sql(term_count: int) -> str:
         "AS price_eur_cents FROM cards WHERE color_identity <@ $1::text[] "
         "AND name <> ALL($2::text[]) AND legalities->>'commander' = 'legal' "
         "AND type_line NOT ILIKE '%Land%' AND (" + " OR ".join(clauses) + ") "
-        "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST LIMIT 400"
+        "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST LIMIT 1200"
     )
 
 
@@ -199,8 +199,18 @@ def _package_specs(identity: DeckIdentityReport, deck: DeckDetailResponse) -> li
 
 def _camellia_specs() -> list[PackageSpec]:
     return [
-        PackageSpec("food_generation", ("Food token", "create Food"), ("food",), "engine"),
-        PackageSpec("squirrel_generation", ("Squirrel token",), ("squirrel",), "engine"),
+        PackageSpec(
+            "food_generation",
+            ("Food token", "create Food", "Food artifact"),
+            ("food",),
+            "engine",
+        ),
+        PackageSpec(
+            "squirrel_generation",
+            ("Squirrel token", "Squirrel creature"),
+            ("squirrel",),
+            "engine",
+        ),
         PackageSpec(
             "sacrifice", ("sacrifice creature", "sacrifice artifact"), ("sacrifice",), "engine"
         ),
@@ -209,6 +219,12 @@ def _camellia_specs() -> list[PackageSpec]:
         ),
         PackageSpec(
             "token_payoff", ("tokens creatures you control",), ("token", "tokens"), "payoff"
+        ),
+        PackageSpec(
+            "token_doubler",
+            ("double tokens", "twice tokens", "additional token"),
+            ("twice", "additional token", "tokens instead"),
+            "payoff",
         ),
         PackageSpec(
             "graveyard_value", ("return creature graveyard",), ("graveyard", "return"), "draw"
@@ -262,29 +278,83 @@ def _penalties(card: CardSearchHit, roles: CoachRoleBudgetReport | None) -> list
     return penalties
 
 
+def _package_penalties(
+    packages: list[str],
+    identity: DeckIdentityReport,
+    deck: DeckDetailResponse,
+) -> list[str]:
+    if not _is_camellia_like(identity, deck):
+        return []
+    core = {"food_generation", "squirrel_generation", "token_payoff", "token_doubler"}
+    generic = {"sacrifice", "graveyard_value", "death_payoff"}
+    if not core & set(packages) and generic & set(packages):
+        return ["generic_aristocrats_without_food_squirrel"]
+    if packages == ["graveyard_value"] or packages == ["sacrifice"]:
+        return ["single_generic_package"]
+    return []
+
+
 def _score(
     packages: list[str],
     roles: list[str],
     commander_matches: list[str],
     penalties: list[str],
 ) -> float:
-    score = len(packages) * 2.6 + len(roles) * 0.8 + len(commander_matches) * 1.1
-    score -= len(penalties) * 1.3
+    score = sum(_package_weight(package) for package in packages)
+    score += len(roles) * 0.55 + len(commander_matches) * 1.1
+    score -= sum(_penalty_weight(penalty) for penalty in penalties)
     if len(packages) >= 2:
-        score += 1.5
+        score += 1.4
+    if len(packages) >= 3:
+        score += 1.1
     return round(max(0.0, score), 2)
 
 
+def _package_weight(package: str) -> float:
+    weights = {
+        "food_generation": 5.2,
+        "squirrel_generation": 5.2,
+        "token_doubler": 4.6,
+        "token_payoff": 3.8,
+        "death_payoff": 2.4,
+        "sacrifice": 2.2,
+        "graveyard_value": 1.8,
+        "x_spells": 5.0,
+        "hydras": 4.8,
+        "counter_scaling": 3.6,
+        "card_advantage": 2.6,
+        "interaction": 2.4,
+    }
+    return weights.get(package, 2.0)
+
+
+def _penalty_weight(penalty: str) -> float:
+    weights = {
+        "generic_aristocrats_without_food_squirrel": 4.2,
+        "single_generic_package": 2.8,
+        "ramp_not_needed": 2.0,
+        "expensive": 0.8,
+        "low_text_density": 1.0,
+        "land": 10.0,
+    }
+    return weights.get(penalty, 1.3)
+
+
 def _status(score: float) -> PackageStatus:
-    if score >= 6.0:
+    if score >= 7.0:
         return "strong"
-    if score >= 3.2:
+    if score >= 4.4:
         return "playable"
     return "weak"
 
 
 def _matches_terms(text: str, terms: tuple[str, ...]) -> bool:
     return any(term.lower() in text for term in terms)
+
+
+def _is_camellia_like(identity: DeckIdentityReport, deck: DeckDetailResponse) -> bool:
+    blob = _identity_blob(identity, deck)
+    return "food" in blob or "squirrel" in blob
 
 
 def _identity_blob(identity: DeckIdentityReport, deck: DeckDetailResponse) -> str:
