@@ -318,6 +318,43 @@ class CoachCutReport(BaseModel):
     candidates: list[CoachCutCandidate] = Field(default_factory=list)
 
 
+class CoachRoleStatus(BaseModel):
+    """One deck-construction role budget status."""
+
+    role: str
+    count: int = Field(ge=0)
+    target_min: int = Field(ge=0)
+    target_max: int = Field(ge=0)
+    status: Literal["low", "ok", "high"]
+    action: Literal["add", "hold", "trim"]
+
+
+class CoachRoleBudgetReport(BaseModel):
+    """Role-budget guardrails for recommendation agents."""
+
+    summary: str
+    roles: list[CoachRoleStatus] = Field(default_factory=list)
+    blocked_roles: list[str] = Field(default_factory=list)
+    priority_roles: list[str] = Field(default_factory=list)
+
+
+class CoachSynergyPackage(BaseModel):
+    """Theme package density for a deck identity."""
+
+    package: str
+    count: int = Field(ge=0)
+    examples: list[str] = Field(default_factory=list)
+    status: Literal["low", "ok", "high"]
+
+
+class CoachSynergyReport(BaseModel):
+    """Synergy package report used to keep upgrades on-theme."""
+
+    summary: str
+    packages: list[CoachSynergyPackage] = Field(default_factory=list)
+    weak_packages: list[str] = Field(default_factory=list)
+
+
 class CoachUpgradeCandidate(BaseModel):
     """Grounded upgrade candidate returned by the upgrade specialist."""
 

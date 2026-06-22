@@ -82,6 +82,10 @@ async def _run_pipeline(
     await emit("cuts_analyzing", "Cut Recommendation Agent is ranking weak fits")
     cut_report = await cuts.recommend_cuts(deck, identity_report, mana_report, curve_report)
     await emit("cuts_complete", f"Ranked {len(cut_report.candidates)} cut candidate(s)")
+    await emit("roles_analyzing", "Role Budget step is checking deck composition")
+    role_report = pipeline.analyze_role_budget(deck)
+    synergy_report = pipeline.analyze_synergy(deck)
+    await emit("roles_complete", role_report.summary)
     await emit("upgrades_searching", "Upgrade Finder Agent is searching grounded additions")
     upgrade_report = await upgrades.recommend_upgrades(
         pool,
@@ -90,6 +94,8 @@ async def _run_pipeline(
         mana_report,
         curve_report,
         cut_report,
+        role_report,
+        synergy_report,
     )
     await emit("upgrades_complete", f"Found {len(upgrade_report.candidates)} upgrade(s)")
     return final_response.compose_doctor_response(
@@ -98,6 +104,8 @@ async def _run_pipeline(
         curve_report,
         cut_report,
         upgrade_report,
+        role_report,
+        synergy_report,
     )
 
 

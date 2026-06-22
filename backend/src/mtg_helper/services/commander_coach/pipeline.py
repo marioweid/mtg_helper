@@ -2,7 +2,15 @@
 
 from typing import Any
 
-from mtg_helper.models.ai import AnalysisFinding, CoachCurveReport, CoachManaReport
+from mtg_helper.models.ai import (
+    AnalysisFinding,
+    CoachCurveReport,
+    CoachManaReport,
+    CoachRoleBudgetReport,
+    CoachRoleStatus,
+    CoachSynergyPackage,
+    CoachSynergyReport,
+)
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services import mana_base_service, mana_curve_service
 from mtg_helper.services.agents.deck_doctor_agent import _weak_card_rows
@@ -82,6 +90,40 @@ def analyze_curve(deck: DeckDetailResponse) -> CoachCurveReport:
     )
 
 
+def analyze_role_budget(deck: DeckDetailResponse) -> CoachRoleBudgetReport:
+    """Count core Commander roles and decide which roles upgrades may target."""
+    counts = _role_budget_counts(deck)
+    targets = {
+        "ramp": (8, 12),
+        "draw": (8, 12),
+        "interaction": (8, 12),
+        "protection": (2, 5),
+        "engines": (10, 18),
+        "payoffs": (6, 12),
+    }
+    roles = [_role_status(role, counts.get(role, 0), bounds) for role, bounds in targets.items()]
+    blocked = [role.role for role in roles if role.action != "add"]
+    priority = [role.role for role in roles if role.action == "add"]
+    summary = "; ".join(
+        f"{role.role} {role.count}/{role.target_min}-{role.target_max}" for role in roles
+    )
+    return CoachRoleBudgetReport(
+        summary=summary,
+        roles=roles,
+        blocked_roles=blocked,
+        priority_roles=priority,
+    )
+
+
+def analyze_synergy(deck: DeckDetailResponse) -> CoachSynergyReport:
+    """Build deterministic package density for common Commander archetypes."""
+    packages = _package_specs(deck)
+    reports = [_package_report(deck, name, terms, target) for name, terms, target in packages]
+    weak = [item.package for item in reports if item.status == "low"]
+    summary = "; ".join(f"{item.package}={item.count}" for item in reports)
+    return CoachSynergyReport(summary=summary, packages=reports, weak_packages=weak)
+
+
 def mana_findings(report: CoachManaReport) -> list[AnalysisFinding]:
     """Map mana report issues into existing Deck Doctor finding shape."""
     findings: list[AnalysisFinding] = []
@@ -116,6 +158,108 @@ def curve_findings(report: CoachCurveReport) -> list[AnalysisFinding]:
 def weak_cards(deck: DeckDetailResponse, limit: int = 16) -> list[dict[str, Any]]:
     """Return heuristic cut rows from the existing Deck Doctor helper."""
     return _weak_card_rows(deck, limit)
+
+
+def _role_budget_counts(deck: DeckDetailResponse) -> dict[str, int]:
+    counts = {"ramp": 0, "draw": 0, "interaction": 0, "protection": 0, "engines": 0, "payoffs": 0}
+    for card in deck.cards:
+        if "Land" in (card.type_line or ""):
+            continue
+        text = _search_blob(card)
+        qty = max(1, card.quantity)
+        for role in _roles_for_text(text):
+            counts[role] += qty
+    return counts
+
+
+def _role_status(role: str, count: int, bounds: tuple[int, int]) -> CoachRoleStatus:
+    low, high = bounds
+    if count < low:
+        status, action = "low", "add"
+    elif count > high:
+        status, action = "high", "trim"
+    else:
+        status, action = "ok", "hold"
+    return CoachRoleStatus(
+        role=role,
+        count=count,
+        target_min=low,
+        target_max=high,
+        status=status,
+        action=action,
+    )
+
+
+def _roles_for_text(text: str) -> set[str]:
+    roles: set[str] = set()
+    if _has_any(text, ("ramp", "add {", "add one mana", "search your library for a land")):
+        roles.add("ramp")
+    if _has_any(text, ("draw", "return target", "from your graveyard", "regrowth")):
+        roles.add("draw")
+    if _has_any(text, ("destroy", "exile", "counter target", "fight", "-x/-x")):
+        roles.add("interaction")
+    if _has_any(text, ("hexproof", "indestructible", "protection", "phase out")):
+        roles.add("protection")
+    if _has_any(text, ("whenever", "token", "tokens", "sacrifice", "x spell", "hydra")):
+        roles.add("engines")
+    if _has_any(text, ("double", "drain", "loses", "trample", "can't be blocked", "win")):
+        roles.add("payoffs")
+    return roles
+
+
+def _package_specs(deck: DeckDetailResponse) -> list[tuple[str, tuple[str, ...], int]]:
+    blob = " ".join(deck.archetype_tags or []).lower()
+    if "food" in blob or "squirrel" in blob:
+        return [
+            ("food_generation", ("food",), 8),
+            ("squirrel_generation", ("squirrel",), 6),
+            ("sacrifice", ("sacrifice",), 6),
+            ("death_payoffs", ("dies", "loses life", "drain"), 5),
+            ("token_payoffs", ("token", "tokens", "creatures you control"), 5),
+        ]
+    if "hydra" in blob or "x_spells" in blob:
+        return [
+            ("x_spells", ("{x}", "x spell", "mana value x"), 10),
+            ("hydras", ("hydra",), 6),
+            ("counter_scaling", ("+1/+1 counter", "counters"), 5),
+            ("card_advantage", ("draw", "return", "graveyard"), 7),
+            ("interaction", ("destroy", "exile", "counter target"), 7),
+        ]
+    return [("theme_cards", tuple(deck.archetype_tags or []), 12)]
+
+
+def _package_report(
+    deck: DeckDetailResponse,
+    name: str,
+    terms: tuple[str, ...],
+    target: int,
+) -> CoachSynergyPackage:
+    examples: list[str] = []
+    count = 0
+    for card in deck.cards:
+        if "Land" in (card.type_line or ""):
+            continue
+        if _has_any(_search_blob(card), terms):
+            count += max(1, card.quantity)
+            examples.append(card.name)
+    status = "low" if count < target else "high" if count > target * 2 else "ok"
+    return CoachSynergyPackage(package=name, count=count, examples=examples[:5], status=status)
+
+
+def _search_blob(card: DeckCardItem) -> str:
+    return " ".join(
+        [
+            card.name,
+            card.type_line or "",
+            card.oracle_text or "",
+            " ".join(card.tags or []),
+            " ".join(card.categories or []),
+        ]
+    ).lower()
+
+
+def _has_any(text: str, terms: tuple[str, ...]) -> bool:
+    return any(term and term.lower() in text for term in terms)
 
 
 def _card_row(card: DeckCardItem) -> dict[str, Any]:

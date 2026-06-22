@@ -16,6 +16,8 @@ from mtg_helper.models.ai import (
     CoachCurveReport,
     CoachCutReport,
     CoachManaReport,
+    CoachRoleBudgetReport,
+    CoachSynergyReport,
     CoachUpgradeCandidate,
     CoachUpgradeReport,
     DeckIdentityReport,
@@ -110,6 +112,8 @@ async def recommend_upgrades(
     mana: CoachManaReport,
     curve: CoachCurveReport,
     cuts: CoachCutReport,
+    roles: CoachRoleBudgetReport | None = None,
+    synergy: CoachSynergyReport | None = None,
 ) -> CoachUpgradeReport:
     """Run the tool-using upgrade specialist, with non-decklist fallback searches."""
     deps = UpgradeDeps(
@@ -119,14 +123,16 @@ async def recommend_upgrades(
         deck_card_names=[card.name for card in deck.cards],
     )
     try:
-        report = await _run_agent(deps, deck, identity, mana, curve, cuts)
+        report = await _run_agent(deps, deck, identity, mana, curve, cuts, roles, synergy)
     except (UsageLimitExceeded, TimeoutError):
         _log.warning("Upgrade Finder Agent exceeded limits")
         report = CoachUpgradeReport(summary="Upgrade agent exceeded limits.")
     except Exception:  # noqa: BLE001 - Coach should still return grounded search results
         _log.exception("Upgrade Finder Agent failed")
         report = CoachUpgradeReport(summary="Upgrade agent failed; using grounded search.")
-    return await _with_general_search_candidates(pool, deck, identity, cuts, report)
+    return await _with_general_search_candidates(
+        pool, deck, identity, cuts, report, roles, synergy
+    )
 
 
 async def _run_agent(
@@ -136,10 +142,12 @@ async def _run_agent(
     mana: CoachManaReport,
     curve: CoachCurveReport,
     cuts: CoachCutReport,
+    roles: CoachRoleBudgetReport | None,
+    synergy: CoachSynergyReport | None,
 ) -> CoachUpgradeReport:
     result = await asyncio.wait_for(
         _get_agent().run(
-            json.dumps(_payload(deck, identity, mana, curve, cuts), default=str),
+            json.dumps(_payload(deck, identity, mana, curve, cuts, roles, synergy), default=str),
             deps=deps,
             usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT),
         ),
@@ -156,6 +164,8 @@ def _payload(
     mana: CoachManaReport,
     curve: CoachCurveReport,
     cuts: CoachCutReport,
+    roles: CoachRoleBudgetReport | None,
+    synergy: CoachSynergyReport | None,
 ) -> dict[str, Any]:
     return {
         "identity": identity.model_dump(),
@@ -164,6 +174,8 @@ def _payload(
         "cut_report": cuts.model_dump(),
         "deck_bracket": deck.bracket,
         "archetype_tags": list(deck.archetype_tags or []),
+        "role_budget": roles.model_dump() if roles else None,
+        "synergy_report": synergy.model_dump() if synergy else None,
     }
 
 
@@ -173,7 +185,7 @@ def _filter_report(deck: DeckDetailResponse, report: CoachUpgradeReport) -> Coac
     candidates = []
     for candidate in report.candidates:
         name = candidate.card.name
-        if name in names or name in seen:
+        if name in names or name in seen or _is_land(candidate.card):
             continue
         seen.add(name)
         candidates.append(candidate)
@@ -190,12 +202,15 @@ async def _with_general_search_candidates(
     identity: DeckIdentityReport,
     cuts: CoachCutReport,
     report: CoachUpgradeReport,
+    roles: CoachRoleBudgetReport | None,
+    synergy: CoachSynergyReport | None,
 ) -> CoachUpgradeReport:
     """Add local-card-search candidates without using external decklists."""
+    report = report.model_copy(update={"candidates": _govern_candidates(report.candidates, roles)})
     if len(report.candidates) >= _MIN_CANDIDATES:
         return report
-    candidates = await _general_search_candidates(pool, deck, identity, cuts)
-    merged = _merge_candidates(deck, report.candidates, candidates)
+    candidates = await _general_search_candidates(pool, deck, identity, cuts, roles, synergy)
+    merged = _govern_candidates(_merge_candidates(deck, report.candidates, candidates), roles)
     if not candidates:
         return report
     summary = report.summary
@@ -212,8 +227,10 @@ async def _general_search_candidates(
     deck: DeckDetailResponse,
     identity: DeckIdentityReport,
     cuts: CoachCutReport,
+    roles: CoachRoleBudgetReport | None,
+    synergy: CoachSynergyReport | None,
 ) -> list[CoachUpgradeCandidate]:
-    queries = _identity_queries(identity, deck)
+    queries = _identity_queries(identity, deck, roles, synergy)
     out: list[CoachUpgradeCandidate] = []
     seen: set[str] = set()
     for query, role in queries:
@@ -232,6 +249,8 @@ async def _general_search_candidates(
 def _identity_queries(
     identity: DeckIdentityReport,
     deck: DeckDetailResponse,
+    roles: CoachRoleBudgetReport | None,
+    synergy: CoachSynergyReport | None,
 ) -> list[tuple[str, str]]:
     text = " ".join(
         [
@@ -241,25 +260,48 @@ def _identity_queries(
             " ".join(deck.archetype_tags or []),
         ]
     ).lower()
+    weak = set(synergy.weak_packages if synergy else [])
+    priority = set(roles.priority_roles if roles else [])
     if "x" in text and ("hydra" in text or "zaxara" in text):
-        return [
+        queries = [
             ("X spell hydra", "x_spell_payoff"),
             ("mana value X draw", "x_spell_card_advantage"),
             ("counter hydra", "hydra_scaling"),
-            ("untap add mana", "commander_mana_engine"),
+            ("destroy exile removal", "interaction"),
+            ("creature draw", "card_advantage"),
         ]
+        return _prioritize_queries(queries, weak, priority)
     if {"food", "squirrel", "aristocrat", "sacrifice"} & set(text.split()):
-        return [
+        queries = [
             ("Food token sacrifice", "food_engine"),
             ("Squirrel token", "squirrel_engine"),
             ("creature dies drain", "aristocrats_payoff"),
             ("sacrifice draw", "sacrifice_value"),
+            ("destroy exile removal", "interaction"),
         ]
-    return [
-        (identity.archetype, "theme_upgrade"),
-        (identity.main_plan, "plan_upgrade"),
-        ("card draw ramp removal", "generic_commander_role"),
-    ]
+        return _prioritize_queries(queries, weak, priority)
+    return _prioritize_queries(
+        [
+            (identity.archetype, "theme_upgrade"),
+            (identity.main_plan, "plan_upgrade"),
+            ("card draw removal", "generic_commander_role"),
+        ],
+        weak,
+        priority,
+    )
+
+
+def _prioritize_queries(
+    queries: list[tuple[str, str]],
+    weak_packages: set[str],
+    priority_roles: set[str],
+) -> list[tuple[str, str]]:
+    def score(item: tuple[str, str]) -> int:
+        query, role = item
+        blob = f"{query} {role}".lower()
+        return sum(term in blob for term in weak_packages | priority_roles)
+
+    return sorted(queries, key=score, reverse=True)
 
 
 def _hits_to_candidates(
@@ -271,7 +313,7 @@ def _hits_to_candidates(
     cut_names = [candidate.card_name for candidate in cuts.candidates[:4]]
     out: list[CoachUpgradeCandidate] = []
     for hit in hits:
-        if hit.name in seen:
+        if hit.name in seen or _should_skip_hit(hit, role):
             continue
         seen.add(hit.name)
         out.append(
@@ -283,6 +325,42 @@ def _hits_to_candidates(
             )
         )
     return out
+
+
+def _should_skip_hit(hit: CardSearchHit, role: str) -> bool:
+    text = " ".join([hit.type_line or "", hit.oracle_text or ""]).lower()
+    if _is_land(hit):
+        return True
+    if role not in {"ramp", "commander_mana_engine"} and "add one mana" in text:
+        return True
+    return False
+
+
+def _govern_candidates(
+    candidates: list[CoachUpgradeCandidate],
+    roles: CoachRoleBudgetReport | None,
+) -> list[CoachUpgradeCandidate]:
+    ramp_allowed = 0 if roles and "ramp" in roles.blocked_roles else 1
+    ramp_seen = 0
+    out: list[CoachUpgradeCandidate] = []
+    for candidate in candidates:
+        if _is_land(candidate.card):
+            continue
+        if _is_ramp(candidate.card):
+            if ramp_seen >= ramp_allowed:
+                continue
+            ramp_seen += 1
+        out.append(candidate)
+    return out
+
+
+def _is_land(card: CardSearchHit) -> bool:
+    return "land" in (card.type_line or "").lower()
+
+
+def _is_ramp(card: CardSearchHit) -> bool:
+    text = " ".join([card.oracle_text or "", " ".join(card.tags or [])]).lower()
+    return "add one mana" in text or "search your library for a land" in text or "ramp" in text
 
 
 def _merge_candidates(
