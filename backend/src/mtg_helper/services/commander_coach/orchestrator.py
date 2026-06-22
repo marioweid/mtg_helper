@@ -18,9 +18,8 @@ except ModuleNotFoundError:  # pragma: no cover - depends on optional runtime pa
 from mtg_helper.models.ai import CommanderCoachRequest, CommanderCoachResponse, DeckDoctorResponse
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services.commander_coach import final_response, pipeline, validators
-from mtg_helper.services.commander_coach.validators import ValidationIssue
 from mtg_helper.services.commander_coach.specialists import cuts, identity, upgrades
-
+from mtg_helper.services.commander_coach.validators import ValidationIssue
 
 ProgressCb = Callable[[str, str], Awaitable[None]]
 MemoryLearnCb = Callable[[str], Awaitable[None]]

@@ -9,9 +9,9 @@ from typing import Any
 from pydantic_ai import Agent
 
 from mtg_helper.models.ai import (
+    CoachCurveReport,
     CoachCutCandidate,
     CoachCutReport,
-    CoachCurveReport,
     CoachManaReport,
     DeckIdentityReport,
 )
