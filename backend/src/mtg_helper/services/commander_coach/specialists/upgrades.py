@@ -25,7 +25,7 @@ from mtg_helper.models.ai import (
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services.agents._model import make_google_model
 from mtg_helper.services.card_search_tool import search_cards
-from mtg_helper.services.commander_coach import pipeline
+from mtg_helper.services.commander_coach import pipeline, synergy_scoring
 
 _log = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ async def _with_general_search_candidates(
     if len(report.candidates) >= _MIN_CANDIDATES:
         return report
     candidates = await _general_search_candidates(pool, deck, identity, cuts, roles, synergy)
-    merged = _govern_candidates(_merge_candidates(deck, report.candidates, candidates), roles)
+    merged = _govern_candidates(_merge_candidates(deck, candidates, report.candidates), roles)
     if not candidates:
         return report
     summary = report.summary
@@ -223,6 +223,29 @@ async def _with_general_search_candidates(
 
 
 async def _general_search_candidates(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    identity: DeckIdentityReport,
+    cuts: CoachCutReport,
+    roles: CoachRoleBudgetReport | None,
+    synergy: CoachSynergyReport | None,
+) -> list[CoachUpgradeCandidate]:
+    scored = await synergy_scoring.discover_scored_upgrades(
+        pool,
+        deck,
+        identity,
+        roles,
+        synergy,
+        limit=16,
+    )
+    candidates = [_scored_to_candidate(item, cuts) for item in scored]
+    if len(candidates) >= 8:
+        return candidates
+    fallback = await _query_search_candidates(pool, deck, identity, cuts, roles, synergy)
+    return _merge_candidate_lists(candidates, fallback)
+
+
+async def _query_search_candidates(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
     identity: DeckIdentityReport,
@@ -243,6 +266,33 @@ async def _general_search_candidates(
         out.extend(_hits_to_candidates(hits, role, cuts, seen))
         if len(out) >= 12:
             break
+    return out
+
+
+def _scored_to_candidate(
+    item: synergy_scoring.ScoredUpgrade,
+    cuts: CoachCutReport,
+) -> CoachUpgradeCandidate:
+    cut_names = [candidate.card_name for candidate in cuts.candidates[:4]]
+    return CoachUpgradeCandidate(
+        card=item.card,
+        reason=synergy_scoring.reason_for_score(item),
+        role=item.role_matches[0] if item.role_matches else "synergy_upgrade",
+        replaces=cut_names[:1],
+    )
+
+
+def _merge_candidate_lists(
+    first: list[CoachUpgradeCandidate],
+    second: list[CoachUpgradeCandidate],
+) -> list[CoachUpgradeCandidate]:
+    seen: set[str] = set()
+    out: list[CoachUpgradeCandidate] = []
+    for candidate in [*first, *second]:
+        if candidate.card.name in seen:
+            continue
+        seen.add(candidate.card.name)
+        out.append(candidate)
     return out
 
 
