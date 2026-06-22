@@ -8,8 +8,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import asyncpg
-import httpx
-from curl_cffi.requests import AsyncSession as CurlAsyncSession
 from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
 
 from mtg_helper.models.ai import (
@@ -23,7 +21,6 @@ from mtg_helper.models.ai import (
     DeckIdentityReport,
 )
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services import moxfield_recs_service
 from mtg_helper.services.agents._model import make_google_model
 from mtg_helper.services.card_search_tool import search_cards
 from mtg_helper.services.commander_coach import pipeline
@@ -33,9 +30,10 @@ _log = logging.getLogger(__name__)
 _MAX_TOOL_CALLS = 10
 _REQUEST_LIMIT = _MAX_TOOL_CALLS + 3
 _TIMEOUT_SECONDS = 55.0
+_MIN_CANDIDATES = 8
 _SYSTEM_PROMPT = """You are the Upgrade Finder Agent for a Commander deck coach.
-Find grounded cards to add, constrained by identity, mana, curve, cuts, bracket,
-and current deck contents.
+Find strong, generally good cards to add, constrained by identity, mana, curve,
+cuts, bracket, and current deck contents.
 
 Rules:
 - Use card_search before recommending additions.
@@ -44,6 +42,7 @@ Rules:
 - Respect commander color identity; the tool enforces this.
 - Avoid cards already in the deck; the tool enforces this except basic lands.
 - For each upgrade, state the role and likely cut(s) it replaces.
+- Do not use Moxfield, EDHREC top-deck lists, or any decklist-copying source.
 - For casual Bracket 2-3 decks, avoid pushing into tutor/combo/staple soup unless requested.
 """
 
@@ -112,7 +111,7 @@ async def recommend_upgrades(
     curve: CoachCurveReport,
     cuts: CoachCutReport,
 ) -> CoachUpgradeReport:
-    """Run the tool-using upgrade specialist."""
+    """Run the tool-using upgrade specialist, with non-decklist fallback searches."""
     deps = UpgradeDeps(
         pool=pool,
         deck=deck,
@@ -120,24 +119,35 @@ async def recommend_upgrades(
         deck_card_names=[card.name for card in deck.cards],
     )
     try:
-        result = await asyncio.wait_for(
-            _get_agent().run(
-                json.dumps(_payload(deck, identity, mana, curve, cuts), default=str),
-                deps=deps,
-                usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT),
-            ),
-            timeout=_TIMEOUT_SECONDS,
-        )
-        report = result.output
-        report.tool_call_count = deps.tool_call_count[0]
-        filtered = _filter_report(deck, report)
-        return await _with_moxfield_candidates(pool, deck, identity, cuts, filtered)
+        report = await _run_agent(deps, deck, identity, mana, curve, cuts)
     except (UsageLimitExceeded, TimeoutError):
         _log.warning("Upgrade Finder Agent exceeded limits")
-    except Exception:  # noqa: BLE001 - Coach should still return analysis
+        report = CoachUpgradeReport(summary="Upgrade agent exceeded limits.")
+    except Exception:  # noqa: BLE001 - Coach should still return grounded search results
         _log.exception("Upgrade Finder Agent failed")
-    fallback = CoachUpgradeReport(summary="No grounded upgrades were found in this run.")
-    return await _with_moxfield_candidates(pool, deck, identity, cuts, fallback)
+        report = CoachUpgradeReport(summary="Upgrade agent failed; using grounded search.")
+    return await _with_general_search_candidates(pool, deck, identity, cuts, report)
+
+
+async def _run_agent(
+    deps: UpgradeDeps,
+    deck: DeckDetailResponse,
+    identity: DeckIdentityReport,
+    mana: CoachManaReport,
+    curve: CoachCurveReport,
+    cuts: CoachCutReport,
+) -> CoachUpgradeReport:
+    result = await asyncio.wait_for(
+        _get_agent().run(
+            json.dumps(_payload(deck, identity, mana, curve, cuts), default=str),
+            deps=deps,
+            usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT),
+        ),
+        timeout=_TIMEOUT_SECONDS,
+    )
+    report = result.output
+    report.tool_call_count = deps.tool_call_count[0]
+    return _filter_report(deck, report)
 
 
 def _payload(
@@ -174,219 +184,123 @@ def _filter_report(deck: DeckDetailResponse, report: CoachUpgradeReport) -> Coac
     )
 
 
-async def _with_moxfield_candidates(
+async def _with_general_search_candidates(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
     identity: DeckIdentityReport,
     cuts: CoachCutReport,
     report: CoachUpgradeReport,
 ) -> CoachUpgradeReport:
-    """Blend top Moxfield inclusions into upgrade output as grounded candidates."""
-    candidates = await _moxfield_candidates(pool, deck, identity, cuts)
+    """Add local-card-search candidates without using external decklists."""
+    if len(report.candidates) >= _MIN_CANDIDATES:
+        return report
+    candidates = await _general_search_candidates(pool, deck, identity, cuts)
+    merged = _merge_candidates(deck, report.candidates, candidates)
     if not candidates:
         return report
-    deck_names = {card.name for card in deck.cards}
-    seen = set(deck_names)
-    merged = []
-    for candidate in [*candidates, *report.candidates]:
-        if candidate.card.name in seen:
-            continue
-        seen.add(candidate.card.name)
-        merged.append(candidate)
     summary = report.summary
-    if report.candidates:
-        summary += " Also checked top Moxfield lists for commander-specific staples."
-    else:
-        summary = "Used top Moxfield Camellia-style lists for grounded upgrade candidates."
+    summary += " Added local card-search candidates based on deck identity, not Moxfield."
     return CoachUpgradeReport(
-        summary=summary,
-        candidates=merged[:16],
+        summary=summary.strip(),
+        candidates=merged[:12],
         tool_call_count=report.tool_call_count,
     )
 
 
-async def _moxfield_candidates(
+async def _general_search_candidates(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
     identity: DeckIdentityReport,
     cuts: CoachCutReport,
 ) -> list[CoachUpgradeCandidate]:
-    payload = await moxfield_recs_service.get_or_refresh(pool, deck.commander_id)
-    scores = await moxfield_recs_service.score_inclusion(
-        pool,
-        payload,
-        deck.commander_color_identity,
-    )
-    if not scores:
-        return []
-    top_deck_candidates = await _top_deck_missing_candidates(pool, deck, payload, cuts)
-    deck_card_ids = {card.card_id for card in deck.cards}
-    candidate_ids = [card_id for card_id in scores if card_id not in deck_card_ids]
-    if not candidate_ids:
-        return []
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
-                   color_identity, tags,
-                   ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents,
-                   id
-            FROM cards
-            WHERE id = ANY($1::uuid[])
-            """,
-            candidate_ids,
+    queries = _identity_queries(identity, deck)
+    out: list[CoachUpgradeCandidate] = []
+    seen: set[str] = set()
+    for query, role in queries:
+        hits = await search_cards(
+            pool,
+            deck_color_identity=pipeline.deck_colors(deck),
+            inp=CardSearchInput(text_query=query, max_cmc=6, limit=6),
+            exclude_names=[card.name for card in deck.cards],
         )
-    rows = sorted(rows, key=lambda row: _moxfield_rank(row, scores, identity), reverse=True)
-    cut_names = [candidate.card_name for candidate in cuts.candidates[:8]]
-    aggregate = [_candidate_from_row(row, scores[row["id"]], cut_names) for row in rows[:12]]
-    return [*top_deck_candidates, *aggregate]
+        out.extend(_hits_to_candidates(hits, role, cuts, seen))
+        if len(out) >= 12:
+            break
+    return out
 
 
-async def _top_deck_missing_candidates(
-    pool: asyncpg.Pool,
-    deck: DeckDetailResponse,
-    payload: dict[str, Any],
-    cuts: CoachCutReport,
-) -> list[CoachUpgradeCandidate]:
-    """Return cards missing from the most-liked Moxfield list for this commander."""
-    deck_id = _top_payload_deck_id(payload)
-    if not deck_id:
-        return []
-    oracle_order = await _top_deck_oracle_order(deck_id)
-    if not oracle_order:
-        return []
-    deck_oracles = await _deck_oracle_ids(pool, deck)
-    missing = [oracle_id for oracle_id in oracle_order if oracle_id not in deck_oracles]
-    rows = await _rows_by_oracle(pool, missing, deck.commander_color_identity)
-    return _top_deck_candidates_from_rows(missing, rows, cuts)
-
-
-def _top_payload_deck_id(payload: dict[str, Any]) -> str | None:
-    decks = payload.get("decks") or []
-    if not decks:
-        return None
-    deck_id = decks[0].get("id")
-    return deck_id if isinstance(deck_id, str) else None
-
-
-async def _top_deck_oracle_order(deck_id: str) -> list[str]:
-    try:
-        async with CurlAsyncSession(impersonate="chrome", timeout=30) as client:
-            entries = await moxfield_recs_service.fetch_deck_card_entries(deck_id, client=client)
-        async with httpx.AsyncClient(timeout=30) as client:
-            mapping = await moxfield_recs_service._resolve_oracle_ids(
-                [entry["scryfall_id"] for entry in entries],
-                client=client,
-            )
-    except Exception:  # noqa: BLE001 - aggregate Moxfield candidates still work
-        _log.exception("Failed to fetch top Moxfield deck candidates")
-        return []
-    oracle_order: list[str] = []
-    for entry in entries:
-        oracle_id = mapping.get(entry["scryfall_id"].lower())
-        if oracle_id and oracle_id not in oracle_order:
-            oracle_order.append(oracle_id)
-    return oracle_order
-
-
-def _top_deck_candidates_from_rows(
-    missing: list[str],
-    rows: list[asyncpg.Record],
-    cuts: CoachCutReport,
-) -> list[CoachUpgradeCandidate]:
-    by_oracle = {str(row["oracle_id"]).lower(): row for row in rows}
-    cut_names = [candidate.card_name for candidate in cuts.candidates[:8]]
-    out = []
-    for oracle_id in missing:
-        row = by_oracle.get(oracle_id)
-        if row is not None:
-            out.append(_top_deck_candidate_from_row(row, cut_names))
-    return out[:12]
-
-
-async def _deck_oracle_ids(pool: asyncpg.Pool, deck: DeckDetailResponse) -> set[str]:
-    ids = [card.card_id for card in deck.cards]
-    if not ids:
-        return set()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT oracle_id::text AS oid FROM cards WHERE id = ANY($1::uuid[])",
-            ids,
-        )
-    return {row["oid"].lower() for row in rows}
-
-
-async def _rows_by_oracle(
-    pool: asyncpg.Pool,
-    oracle_ids: list[str],
-    color_identity: list[str],
-) -> list[asyncpg.Record]:
-    async with pool.acquire() as conn:
-        return await conn.fetch(
-            """
-            SELECT scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
-                   color_identity, tags,
-                   ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents,
-                   id
-            FROM cards
-            WHERE oracle_id::text = ANY($1::text[])
-              AND color_identity <@ $2::text[]
-              AND legalities->>'commander' = 'legal'
-            """,
-            oracle_ids,
-            color_identity,
-        )
-
-
-def _top_deck_candidate_from_row(
-    row: asyncpg.Record,
-    cut_names: list[str],
-) -> CoachUpgradeCandidate:
-    candidate = _candidate_from_row(row, 1.0, cut_names)
-    candidate.reason = "Missing from the most-liked Moxfield list for this commander."
-    candidate.role = "top_moxfield_deck_restore"
-    return candidate
-
-
-def _moxfield_rank(
-    row: asyncpg.Record,
-    scores: dict[object, float],
+def _identity_queries(
     identity: DeckIdentityReport,
-) -> tuple[float, int, float]:
+    deck: DeckDetailResponse,
+) -> list[tuple[str, str]]:
     text = " ".join(
         [
-            row["name"] or "",
-            row["type_line"] or "",
-            row["oracle_text"] or "",
-            " ".join(row["tags"] or []),
+            identity.archetype,
+            identity.main_plan,
+            " ".join(identity.must_preserve_themes),
+            " ".join(deck.archetype_tags or []),
         ]
     ).lower()
-    identity_terms = set(" ".join(identity.must_preserve_themes).replace("_", " ").split())
-    overlap = sum(1 for term in identity_terms if term and term in text)
-    cmc = float(row["cmc"] or 0)
-    return (scores[row["id"]], overlap, -cmc)
+    if "x" in text and ("hydra" in text or "zaxara" in text):
+        return [
+            ("X spell hydra", "x_spell_payoff"),
+            ("mana value X draw", "x_spell_card_advantage"),
+            ("counter hydra", "hydra_scaling"),
+            ("untap add mana", "commander_mana_engine"),
+        ]
+    if {"food", "squirrel", "aristocrat", "sacrifice"} & set(text.split()):
+        return [
+            ("Food token sacrifice", "food_engine"),
+            ("Squirrel token", "squirrel_engine"),
+            ("creature dies drain", "aristocrats_payoff"),
+            ("sacrifice draw", "sacrifice_value"),
+        ]
+    return [
+        (identity.archetype, "theme_upgrade"),
+        (identity.main_plan, "plan_upgrade"),
+        ("card draw ramp removal", "generic_commander_role"),
+    ]
 
 
-def _candidate_from_row(
-    row: asyncpg.Record,
-    score: float,
-    cut_names: list[str],
-) -> CoachUpgradeCandidate:
-    card = CardSearchHit(
-        scryfall_id=row["scryfall_id"],
-        name=row["name"],
-        mana_cost=row["mana_cost"],
-        cmc=float(row["cmc"]) if row["cmc"] is not None else None,
-        type_line=row["type_line"],
-        oracle_text=row["oracle_text"],
-        color_identity=list(row["color_identity"] or []),
-        tags=list(row["tags"] or []),
-        price_eur_cents=row["price_eur_cents"],
-    )
-    percent = round(score * 100)
-    return CoachUpgradeCandidate(
-        card=card,
-        reason=f"Appears in about {percent}% of top Moxfield lists for this commander.",
-        role="commander_popular_upgrade",
-        replaces=cut_names[:1],
-    )
+def _hits_to_candidates(
+    hits: list[CardSearchHit],
+    role: str,
+    cuts: CoachCutReport,
+    seen: set[str],
+) -> list[CoachUpgradeCandidate]:
+    cut_names = [candidate.card_name for candidate in cuts.candidates[:4]]
+    out: list[CoachUpgradeCandidate] = []
+    for hit in hits:
+        if hit.name in seen:
+            continue
+        seen.add(hit.name)
+        out.append(
+            CoachUpgradeCandidate(
+                card=hit,
+                reason=_search_reason(hit, role),
+                role=role,
+                replaces=cut_names[:1],
+            )
+        )
+    return out
+
+
+def _merge_candidates(
+    deck: DeckDetailResponse,
+    first: list[CoachUpgradeCandidate],
+    second: list[CoachUpgradeCandidate],
+) -> list[CoachUpgradeCandidate]:
+    seen = {card.name for card in deck.cards}
+    merged: list[CoachUpgradeCandidate] = []
+    for candidate in [*first, *second]:
+        if candidate.card.name in seen:
+            continue
+        seen.add(candidate.card.name)
+        merged.append(candidate)
+    return merged
+
+
+def _search_reason(hit: CardSearchHit, role: str) -> str:
+    text = hit.oracle_text or hit.type_line or ""
+    snippet = " ".join(text.split())[:180]
+    return f"Fits the {role.replace('_', ' ')} role from local card search. {snippet}"
