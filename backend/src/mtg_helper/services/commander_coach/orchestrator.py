@@ -17,8 +17,8 @@ except ModuleNotFoundError:  # pragma: no cover - depends on optional runtime pa
 
 from mtg_helper.models.ai import CommanderCoachRequest, CommanderCoachResponse, DeckDoctorResponse
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.commander_coach import final_response, pipeline, validators
-from mtg_helper.services.commander_coach.specialists import cuts, identity, upgrades
+from mtg_helper.services.commander_coach import final_response, pipeline, signal_lanes, validators
+from mtg_helper.services.commander_coach.specialists import challenger, cuts, identity, upgrades
 from mtg_helper.services.commander_coach.validators import ValidationIssue
 
 ProgressCb = Callable[[str, str], Awaitable[None]]
@@ -66,26 +66,43 @@ async def _run_pipeline(
     emit: ProgressCb,
 ) -> DeckDoctorResponse:
     """Run specialist steps and compose their output."""
-    await emit("identity_analyzing", "Deck Identity Agent is identifying the game plan")
-    identity_report = await identity.identify_deck(
-        deck,
-        coach_memory_notes=request.coach_memory_notes,
-        user_goal=request.message,
-    )
-    await emit("identity_complete", f"Identified deck as {identity_report.archetype}")
     await emit("mana_analyzing", "Mana Base step is checking sources and land count")
     mana_report = pipeline.analyze_mana(deck)
     await emit("mana_complete", mana_report.summary)
     await emit("curve_analyzing", "Curve & Tempo step is checking early plays")
     curve_report = pipeline.analyze_curve(deck)
     await emit("curve_complete", curve_report.summary)
-    await emit("cuts_analyzing", "Cut Recommendation Agent is ranking weak fits")
-    cut_report = await cuts.recommend_cuts(deck, identity_report, mana_report, curve_report)
-    await emit("cuts_complete", f"Ranked {len(cut_report.candidates)} cut candidate(s)")
     await emit("roles_analyzing", "Role Budget step is checking deck composition")
     role_report = pipeline.analyze_role_budget(deck)
     synergy_report = pipeline.analyze_synergy(deck)
     await emit("roles_complete", role_report.summary)
+    await emit("signals_analyzing", "Signal Lane step is mapping commander and deck lanes")
+    signal_report = signal_lanes.analyze_signals(
+        deck,
+        memory=request.coach_memory_notes,
+        roles=role_report,
+        synergy=synergy_report,
+    )
+    await emit("signals_complete", signal_report.summary)
+    await emit("identity_analyzing", "Deck Identity Agent is identifying the game plan")
+    identity_report = await identity.identify_deck(
+        deck,
+        coach_memory_notes=request.coach_memory_notes,
+        user_goal=request.message,
+        signals=signal_report,
+    )
+    await emit("identity_complete", f"Identified deck as {identity_report.archetype}")
+    await emit("cuts_analyzing", "Cut Recommendation Agent is ranking weak fits")
+    cut_report = await cuts.recommend_cuts(
+        deck,
+        identity_report,
+        mana_report,
+        curve_report,
+        role_report,
+        synergy_report,
+        signal_report,
+    )
+    await emit("cuts_complete", f"Ranked {len(cut_report.candidates)} cut candidate(s)")
     await emit("upgrades_searching", "Upgrade Finder Agent is searching grounded additions")
     upgrade_report = await upgrades.recommend_upgrades(
         pool,
@@ -96,8 +113,20 @@ async def _run_pipeline(
         cut_report,
         role_report,
         synergy_report,
+        signal_report,
     )
     await emit("upgrades_complete", f"Found {len(upgrade_report.candidates)} upgrade(s)")
+    await emit("challenger_reviewing", "Challenger Agent is reviewing recommendation fit")
+    review = await challenger.review_plan(
+        deck,
+        identity_report,
+        cut_report,
+        upgrade_report,
+        signal_report,
+        role_report,
+    )
+    cut_report, upgrade_report = challenger.apply_review(cut_report, upgrade_report, review)
+    await emit("challenger_complete", review.summary)
     return final_response.compose_doctor_response(
         identity_report,
         mana_report,

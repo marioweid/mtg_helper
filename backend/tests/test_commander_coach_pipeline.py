@@ -18,8 +18,8 @@ from mtg_helper.models.ai import (
     DeckIdentityReport,
 )
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
-from mtg_helper.services.commander_coach import orchestrator
-from mtg_helper.services.commander_coach.specialists import cuts, identity, upgrades
+from mtg_helper.services.commander_coach import orchestrator, signal_lanes
+from mtg_helper.services.commander_coach.specialists import challenger, cuts, identity, upgrades
 
 pytestmark = pytest.mark.asyncio
 
@@ -112,9 +112,20 @@ async def test_run_coach_uses_specialist_pipeline(monkeypatch: pytest.MonkeyPatc
             tool_call_count=1,
         )
 
+    async def fake_review(*_args: object, **_kwargs: object):
+        from mtg_helper.models.ai import CoachReviewReport
+
+        return CoachReviewReport(summary="ok", approved=True)
+
     monkeypatch.setattr(identity, "identify_deck", fake_identity)
     monkeypatch.setattr(cuts, "recommend_cuts", fake_cuts)
     monkeypatch.setattr(upgrades, "recommend_upgrades", fake_upgrades)
+    monkeypatch.setattr(challenger, "review_plan", fake_review)
+    monkeypatch.setattr(
+        challenger,
+        "apply_review",
+        lambda cut_report, up_report, _review: (cut_report, up_report),
+    )
     monkeypatch.setattr(
         orchestrator.pipeline,
         "analyze_mana",
@@ -140,3 +151,11 @@ async def test_run_coach_uses_specialist_pipeline(monkeypatch: pytest.MonkeyPatc
     assert result.doctor.cuts[0].card_name == "Medium Value Card"
     assert result.doctor.adds[0].card.name == "Experimental Confectioner"
     assert result.doctor.tool_call_count == 1
+
+
+async def test_signal_lanes_detect_core_commander_packages() -> None:
+    report = signal_lanes.analyze_signals(_deck())
+
+    assert "food_generation" in report.core_lanes
+    assert "squirrel_generation" in signal_lanes.lane_names(report)
+    assert "Food Engine" in report.protected_cards

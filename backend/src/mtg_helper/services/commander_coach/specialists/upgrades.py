@@ -17,6 +17,7 @@ from mtg_helper.models.ai import (
     CoachCutReport,
     CoachManaReport,
     CoachRoleBudgetReport,
+    CoachSignalReport,
     CoachSynergyReport,
     CoachUpgradeCandidate,
     CoachUpgradeReport,
@@ -25,7 +26,7 @@ from mtg_helper.models.ai import (
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services.agents._model import make_google_model
 from mtg_helper.services.card_search_tool import search_cards
-from mtg_helper.services.commander_coach import pipeline, synergy_scoring
+from mtg_helper.services.commander_coach import pipeline, signal_lanes, synergy_scoring
 
 _log = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ Rules:
 - For each upgrade, state the role and likely cut(s) it replaces.
 - Do not use Moxfield, EDHREC top-deck lists, or any decklist-copying source.
 - For casual Bracket 2-3 decks, avoid pushing into tutor/combo/staple soup unless requested.
+- Prefer cards that connect to core signal lanes or repair thin lanes.
+- Return a diverse package mix: do not fill every candidate slot from one lane.
 """
 
 
@@ -114,8 +117,10 @@ async def recommend_upgrades(
     cuts: CoachCutReport,
     roles: CoachRoleBudgetReport | None = None,
     synergy: CoachSynergyReport | None = None,
+    signals: CoachSignalReport | None = None,
 ) -> CoachUpgradeReport:
     """Run the tool-using upgrade specialist, with non-decklist fallback searches."""
+    signals = signals or signal_lanes.analyze_signals(deck, roles=roles, synergy=synergy)
     deps = UpgradeDeps(
         pool=pool,
         deck=deck,
@@ -123,7 +128,7 @@ async def recommend_upgrades(
         deck_card_names=_existing_names(deck),
     )
     try:
-        report = await _run_agent(deps, deck, identity, mana, curve, cuts, roles, synergy)
+        report = await _run_agent(deps, deck, identity, mana, curve, cuts, roles, synergy, signals)
     except (UsageLimitExceeded, TimeoutError):
         _log.warning("Upgrade Finder Agent exceeded limits")
         report = CoachUpgradeReport(summary="Upgrade agent exceeded limits.")
@@ -131,7 +136,7 @@ async def recommend_upgrades(
         _log.exception("Upgrade Finder Agent failed")
         report = CoachUpgradeReport(summary="Upgrade agent failed; using grounded search.")
     return await _with_general_search_candidates(
-        pool, deck, identity, cuts, report, roles, synergy
+        pool, deck, identity, cuts, report, roles, synergy, signals
     )
 
 
@@ -144,10 +149,14 @@ async def _run_agent(
     cuts: CoachCutReport,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
+    signals: CoachSignalReport,
 ) -> CoachUpgradeReport:
     result = await asyncio.wait_for(
         _get_agent().run(
-            json.dumps(_payload(deck, identity, mana, curve, cuts, roles, synergy), default=str),
+            json.dumps(
+                _payload(deck, identity, mana, curve, cuts, roles, synergy, signals),
+                default=str,
+            ),
             deps=deps,
             usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT),
         ),
@@ -166,6 +175,7 @@ def _payload(
     cuts: CoachCutReport,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
+    signals: CoachSignalReport,
 ) -> dict[str, Any]:
     return {
         "identity": identity.model_dump(),
@@ -176,6 +186,7 @@ def _payload(
         "archetype_tags": list(deck.archetype_tags or []),
         "role_budget": roles.model_dump() if roles else None,
         "synergy_report": synergy.model_dump() if synergy else None,
+        "signal_lanes": signals.model_dump(),
     }
 
 
@@ -204,13 +215,28 @@ async def _with_general_search_candidates(
     report: CoachUpgradeReport,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
+    signals: CoachSignalReport,
 ) -> CoachUpgradeReport:
     """Add local-card-search candidates without using external decklists."""
-    report = report.model_copy(update={"candidates": _govern_candidates(report.candidates, roles)})
+    report = report.model_copy(
+        update={"candidates": _govern_candidates(report.candidates, roles, signals)}
+    )
     if len(report.candidates) >= _MIN_CANDIDATES:
         return report
-    candidates = await _general_search_candidates(pool, deck, identity, cuts, roles, synergy)
-    merged = _govern_candidates(_merge_candidates(deck, candidates, report.candidates), roles)
+    candidates = await _general_search_candidates(
+        pool,
+        deck,
+        identity,
+        cuts,
+        roles,
+        synergy,
+        signals,
+    )
+    merged = _govern_candidates(
+        _merge_candidates(deck, candidates, report.candidates),
+        roles,
+        signals,
+    )
     if not candidates:
         return report
     summary = report.summary
@@ -229,6 +255,7 @@ async def _general_search_candidates(
     cuts: CoachCutReport,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
+    signals: CoachSignalReport,
 ) -> list[CoachUpgradeCandidate]:
     scored = await synergy_scoring.discover_scored_upgrades(
         pool,
@@ -241,7 +268,7 @@ async def _general_search_candidates(
     candidates = [_scored_to_candidate(item, cuts) for item in scored]
     if len(candidates) >= 8:
         return candidates
-    fallback = await _query_search_candidates(pool, deck, identity, cuts, roles, synergy)
+    fallback = await _query_search_candidates(pool, deck, identity, cuts, roles, synergy, signals)
     return _merge_candidate_lists(candidates, fallback)
 
 
@@ -252,8 +279,9 @@ async def _query_search_candidates(
     cuts: CoachCutReport,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
+    signals: CoachSignalReport,
 ) -> list[CoachUpgradeCandidate]:
-    queries = _identity_queries(identity, deck, roles, synergy)
+    queries = _identity_queries(identity, deck, roles, synergy, signals)
     out: list[CoachUpgradeCandidate] = []
     seen: set[str] = set()
     for query, role in queries:
@@ -301,6 +329,7 @@ def _identity_queries(
     deck: DeckDetailResponse,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
+    signals: CoachSignalReport | None = None,
 ) -> list[tuple[str, str]]:
     text = " ".join(
         [
@@ -312,6 +341,7 @@ def _identity_queries(
     ).lower()
     weak = set(synergy.weak_packages if synergy else [])
     priority = set(roles.priority_roles if roles else [])
+    signal_queries = _signal_queries(signals)
     if "x" in text and ("hydra" in text or "zaxara" in text):
         queries = [
             ("X spell hydra", "x_spell_payoff"),
@@ -320,7 +350,7 @@ def _identity_queries(
             ("destroy exile removal", "interaction"),
             ("creature draw", "card_advantage"),
         ]
-        return _prioritize_queries(queries, weak, priority)
+        return _prioritize_queries(signal_queries + queries, weak, priority)
     if {"food", "squirrel", "aristocrat", "sacrifice"} & set(text.split()):
         queries = [
             ("Food token sacrifice", "food_engine"),
@@ -329,9 +359,10 @@ def _identity_queries(
             ("sacrifice draw", "sacrifice_value"),
             ("destroy exile removal", "interaction"),
         ]
-        return _prioritize_queries(queries, weak, priority)
+        return _prioritize_queries(signal_queries + queries, weak, priority)
     return _prioritize_queries(
-        [
+        signal_queries
+        + [
             (identity.archetype, "theme_upgrade"),
             (identity.main_plan, "plan_upgrade"),
             ("card draw removal", "generic_commander_role"),
@@ -352,6 +383,18 @@ def _prioritize_queries(
         return sum(term in blob for term in weak_packages | priority_roles)
 
     return sorted(queries, key=score, reverse=True)
+
+
+def _signal_queries(signals: CoachSignalReport | None) -> list[tuple[str, str]]:
+    if signals is None:
+        return []
+    queries: list[tuple[str, str]] = []
+    for lane in signals.lanes:
+        if lane.strength == "present":
+            continue
+        query = " ".join(lane.terms[:3]) or lane.name.replace("_", " ")
+        queries.append((query, lane.name))
+    return queries[:8]
 
 
 def _hits_to_candidates(
@@ -389,9 +432,12 @@ def _should_skip_hit(hit: CardSearchHit, role: str) -> bool:
 def _govern_candidates(
     candidates: list[CoachUpgradeCandidate],
     roles: CoachRoleBudgetReport | None,
+    signals: CoachSignalReport | None = None,
 ) -> list[CoachUpgradeCandidate]:
     ramp_allowed = 0 if roles and "ramp" in roles.blocked_roles else 1
     ramp_seen = 0
+    lane_counts: dict[str, int] = {}
+    core = set(signals.core_lanes if signals else [])
     out: list[CoachUpgradeCandidate] = []
     for candidate in candidates:
         if _is_land(candidate.card):
@@ -400,8 +446,27 @@ def _govern_candidates(
             if ramp_seen >= ramp_allowed:
                 continue
             ramp_seen += 1
+        lane = _candidate_lane(candidate, signals)
+        max_for_lane = 3 if lane in core else 2
+        if lane and lane_counts.get(lane, 0) >= max_for_lane:
+            continue
+        if lane:
+            lane_counts[lane] = lane_counts.get(lane, 0) + 1
         out.append(candidate)
     return out
+
+
+def _candidate_lane(
+    candidate: CoachUpgradeCandidate,
+    signals: CoachSignalReport | None,
+) -> str | None:
+    if signals is None:
+        return candidate.role
+    text = _card_text(candidate.card)
+    for lane in signals.lanes:
+        if any(term.lower() in text for term in lane.terms):
+            return lane.name
+    return candidate.role
 
 
 def _is_land(card: CardSearchHit) -> bool:
@@ -409,8 +474,14 @@ def _is_land(card: CardSearchHit) -> bool:
 
 
 def _is_ramp(card: CardSearchHit) -> bool:
-    text = " ".join([card.oracle_text or "", " ".join(card.tags or [])]).lower()
+    text = _card_text(card)
     return "add one mana" in text or "search your library for a land" in text or "ramp" in text
+
+
+def _card_text(card: CardSearchHit) -> str:
+    return " ".join(
+        [card.type_line or "", card.oracle_text or "", " ".join(card.tags or [])]
+    ).lower()
 
 
 def _merge_candidates(

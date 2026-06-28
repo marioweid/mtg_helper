@@ -355,6 +355,28 @@ class CoachSynergyReport(BaseModel):
     weak_packages: list[str] = Field(default_factory=list)
 
 
+class CoachSignalLane(BaseModel):
+    """One commander/deck signal lane that recommendations should respect."""
+
+    name: str
+    role: Literal["engine", "payoff", "support", "interaction", "mana", "risk"]
+    strength: Literal["core", "present", "thin"]
+    source: Literal["commander", "tags", "cards", "memory", "role_budget", "synergy"]
+    terms: list[str] = Field(default_factory=list)
+    examples: list[str] = Field(default_factory=list)
+    protect: bool = False
+
+
+class CoachSignalReport(BaseModel):
+    """Deterministic signal-lane map for Commander Coach specialists."""
+
+    summary: str
+    lanes: list[CoachSignalLane] = Field(default_factory=list)
+    core_lanes: list[str] = Field(default_factory=list)
+    weak_lanes: list[str] = Field(default_factory=list)
+    protected_cards: list[str] = Field(default_factory=list)
+
+
 class CoachUpgradeCandidate(BaseModel):
     """Grounded upgrade candidate returned by the upgrade specialist."""
 
@@ -370,6 +392,24 @@ class CoachUpgradeReport(BaseModel):
     summary: str
     candidates: list[CoachUpgradeCandidate] = Field(default_factory=list)
     tool_call_count: int = 0
+
+
+class CoachReviewIssue(BaseModel):
+    """One challenger objection to a proposed Coach recommendation."""
+
+    severity: Literal["info", "warn", "block"]
+    item_type: Literal["cut", "upgrade", "swap", "package"]
+    names: list[str] = Field(default_factory=list)
+    reason: str
+    suggested_fix: str | None = None
+
+
+class CoachReviewReport(BaseModel):
+    """Challenger pass over cuts, upgrades, and final swap fit."""
+
+    summary: str
+    issues: list[CoachReviewIssue] = Field(default_factory=list)
+    approved: bool = True
 
 
 class ReplacementOption(BaseModel):
