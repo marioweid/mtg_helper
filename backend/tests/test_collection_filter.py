@@ -49,6 +49,32 @@ async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> N
         )
 
 
+async def _insert_alternate_printing(
+    pool: asyncpg.Pool,
+    *,
+    scryfall_id: UUID,
+    oracle_id: UUID,
+    source_scryfall_id: UUID,
+) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO cards (
+                scryfall_id, oracle_id, name, color_identity, oracle_text, type_line,
+                cmc, mana_cost, rarity, set_code, legalities, prices, tags
+            )
+            SELECT $1, $2, name, color_identity, oracle_text, type_line,
+                   cmc, mana_cost, rarity, 'alt', legalities, prices, tags
+            FROM cards
+            WHERE scryfall_id = $3
+            ON CONFLICT (scryfall_id) DO NOTHING
+            """,
+            scryfall_id,
+            oracle_id,
+            source_scryfall_id,
+        )
+
+
 async def _add_to_collection(
     client: AsyncClient,
     cid: str,
@@ -224,3 +250,35 @@ async def test_build_with_collection_ids_filters_stage(
     assert "Doubling Season" not in names
     if names:
         assert names == {"Sol Ring"}
+
+
+async def test_build_excludes_alternate_printing_already_in_deck(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    app.state.ai_client = _make_ai_client()
+    _set_qdrant_empty()
+
+    alternate_sol_ring = UUID("33333333-36f5-40e7-91de-9c8c1b44da67")
+    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
+    await _insert_alternate_printing(
+        db_pool,
+        scryfall_id=alternate_sol_ring,
+        oracle_id=UUID("33333333-aaaa-40e7-91de-9c8c1b44da67"),
+        source_scryfall_id=SOL_RING_SCRYFALL_ID,
+    )
+
+    deck_id = await create_test_deck(client, name="Alternate Printing Deck")
+    add = await client.post(
+        f"/api/v1/decks/{deck_id}/cards",
+        json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "added_by": "user"},
+    )
+    assert add.status_code == 201
+
+    resp = await client.post(
+        f"/api/v1/decks/{deck_id}/build",
+        json={"stage": "ramp", "target": 10},
+    )
+
+    assert resp.status_code == 200
+    names = {s["name"] for s in resp.json()["data"]["suggestions"]}
+    assert "Sol Ring" not in names

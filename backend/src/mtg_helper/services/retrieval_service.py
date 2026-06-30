@@ -686,6 +686,27 @@ def _excluded_colors(commander_color_identity: list[str]) -> list[str]:
     return list(_ALL_COLORS - set(commander_color_identity))
 
 
+def _normalize_card_name(name: str) -> str:
+    return " ".join(name.split()).casefold()
+
+
+async def _excluded_nonbasic_names(pool: asyncpg.Pool, ids: list[UUID]) -> set[str]:
+    """Return singleton card names represented by excluded internal card IDs."""
+    if not ids:
+        return set()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT DISTINCT name
+            FROM cards
+            WHERE id = ANY($1::uuid[])
+              AND COALESCE(type_line, '') NOT LIKE 'Basic Land%'
+            """,
+            ids,
+        )
+    return {_normalize_card_name(r["name"]) for r in rows}
+
+
 def _is_land_card(type_line: str | None) -> bool:
     """Return True if the card's type line indicates it is a land."""
     return "Land" in (type_line or "")
@@ -1483,6 +1504,7 @@ async def retrieve_candidates(
     if owned_ids == frozenset():
         return []
     query_vector = await embed_single(ai_client, query_text)
+    excluded_names = await _excluded_nonbasic_names(pool, deck_card_ids)
 
     # Build a deep enough ranked list to satisfy ``offset + limit`` (Load More
     # paginates through positions, not via a growing exclude list). The pool
@@ -1554,6 +1576,8 @@ async def retrieve_candidates(
     rows = await _fetch_candidates(
         pool, all_ids, exclude_lands=exclude_lands, price_filter=price_filter
     )
+    if excluded_names:
+        rows = [r for r in rows if _normalize_card_name(r["name"]) not in excluded_names]
     cards_by_id = {r["id"]: r for r in rows}
 
     # Trusted-card boost only fires when the card actually fits the stage —
