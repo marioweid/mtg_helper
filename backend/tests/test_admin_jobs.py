@@ -24,7 +24,7 @@ from mtg_helper.services.admin_jobs import (
 
 def test_registry_initial_state() -> None:
     reg = JobRegistry()
-    for job in (reg.sync, reg.tag, reg.embed, reg.refresh_all):
+    for job in (reg.sync, reg.mtgjson, reg.tag, reg.embed, reg.refresh_all):
         assert job.status == "idle"
         assert job.current == 0
         assert job.total == 0
@@ -72,14 +72,14 @@ def test_finish_error_records_message() -> None:
 
 
 @pytest.mark.asyncio
-async def test_status_endpoint_returns_all_four_slots(client: AsyncClient) -> None:
+async def test_status_endpoint_returns_all_job_slots(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/admin/status")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"sync", "tag", "embed", "refresh_all"}
+    assert set(body.keys()) == {"sync", "mtgjson", "tag", "embed", "refresh_all"}
     for key, slot in body.items():
         assert slot["status"] == "idle"
-        assert slot["key"] in {"sync", "tag", "embed", "refresh-all"}
+        assert slot["key"] in {"sync", "mtgjson", "tag", "embed", "refresh-all"}
         del key  # keys checked above; loop var quietens linters
 
 
@@ -109,6 +109,33 @@ async def test_sync_endpoint_returns_202_and_runs_in_background(
     status = (await client.get("/api/v1/admin/status")).json()["sync"]
     assert status["status"] == "ok"
     assert status["result"]["cards_processed"] == 100
+
+
+@pytest.mark.asyncio
+async def test_mtgjson_endpoint_returns_202_and_runs_in_background(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = asyncio.Event()
+
+    async def _fake_run_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        progress("comparing", 1, 1)
+        await asyncio.sleep(0)
+        done.set()
+        return {"mtgjson_cards_processed": 5, "keyword_differences": 1}
+
+    monkeypatch.setattr("mtg_helper.routers.admin.mtgjson.run_sync", _fake_run_sync)
+
+    resp = await client.post("/api/v1/admin/sync-mtgjson")
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["job"] == "mtgjson"
+
+    await asyncio.wait_for(done.wait(), timeout=2.0)
+    await asyncio.sleep(0)
+
+    status = (await client.get("/api/v1/admin/status")).json()["mtgjson"]
+    assert status["status"] == "ok"
+    assert status["result"]["keyword_differences"] == 1
 
 
 @pytest.mark.asyncio

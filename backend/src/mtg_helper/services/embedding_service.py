@@ -12,6 +12,7 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from mtg_helper.config import settings
+from mtg_helper.services import card_representation
 from mtg_helper.services.llm_client import LLMClient
 
 if TYPE_CHECKING:
@@ -31,6 +32,15 @@ def build_embedding_text(
     type_line: str | None,
     oracle_text: str | None,
     keywords: list[str],
+    *,
+    color_identity: list[str] | None = None,
+    card_types: list[str] | None = None,
+    subtypes: list[str] | None = None,
+    tags: list[str] | None = None,
+    traits: list[str] | None = None,
+    token_types: list[str] | None = None,
+    mana_value: float | None = None,
+    edhrec_rank: int | None = None,
 ) -> str:
     """Build a composite text string to embed for a card.
 
@@ -43,14 +53,20 @@ def build_embedding_text(
     Returns:
         Single string combining all fields for embedding.
     """
-    parts = [name]
-    if type_line:
-        parts.append(type_line)
-    if oracle_text:
-        parts.append(oracle_text)
-    if keywords:
-        parts.append("Keywords: " + ", ".join(keywords))
-    return " | ".join(parts)
+    return card_representation.build_embedding_text(
+        name=name,
+        type_line=type_line,
+        oracle_text=oracle_text,
+        keywords=keywords,
+        color_identity=color_identity,
+        card_types=card_types,
+        subtypes=subtypes,
+        tags=tags,
+        traits=traits,
+        token_types=token_types,
+        mana_value=mana_value,
+        edhrec_rank=edhrec_rank,
+    )
 
 
 async def embed_texts(
@@ -106,13 +122,13 @@ def _card_row_to_point(row: asyncpg.Record) -> PointStruct:
     """Convert a DB card row (with embedding) to a Qdrant PointStruct.
 
     Args:
-        row: asyncpg record with id, name, color_identity, legalities,
-             tags, edhrec_rank, and embedding fields.
+        row: asyncpg record with card metadata, embedding, and payload fields.
 
     Returns:
         Qdrant PointStruct ready for upsert.
     """
     legalities: dict[str, Any] = json.loads(row["legalities"]) if row["legalities"] else {}
+    representation = card_representation.from_row(row)
     return PointStruct(
         id=str(row["id"]),
         vector=row["embedding"],
@@ -125,6 +141,9 @@ def _card_row_to_point(row: asyncpg.Record) -> PointStruct:
             "card_types": list(row["card_types"]),
             "subtypes": list(row["subtypes"]),
             "traits": list(row["traits"]),
+            "token_types": list(row["token_types"]),
+            "representation": representation.feature_payload(),
+            "feature_labels": representation.feature_labels(),
         },
     )
 
@@ -160,7 +179,7 @@ async def run_batch_embed(
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT id, name, type_line, oracle_text, keywords,
+            SELECT id, name, type_line, oracle_text, keywords, cmc,
                    color_identity, legalities, tags, edhrec_rank, card_types, subtypes, traits,
                    token_types
             FROM cards
@@ -189,6 +208,14 @@ async def run_batch_embed(
                 r["type_line"],
                 r["oracle_text"],
                 list(r["keywords"]),
+                color_identity=list(r["color_identity"]),
+                card_types=list(r["card_types"]),
+                subtypes=list(r["subtypes"]),
+                tags=list(r["tags"]),
+                traits=list(r["traits"]),
+                token_types=list(r["token_types"]),
+                mana_value=float(r["cmc"]) if r["cmc"] is not None else None,
+                edhrec_rank=r["edhrec_rank"],
             )
             for r in batch
         ]
@@ -199,6 +226,7 @@ async def run_batch_embed(
         points: list[PointStruct] = []
         card_ids: list[uuid.UUID] = []
         for row, vector in zip(batch, vectors, strict=True):
+            representation = card_representation.from_row(row)
             point = PointStruct(
                 id=str(row["id"]),
                 vector=vector,
@@ -217,6 +245,8 @@ async def run_batch_embed(
                     "subtypes": list(row["subtypes"]),
                     "traits": list(row["traits"]),
                     "token_types": list(row["token_types"]),
+                    "representation": representation.feature_payload(),
+                    "feature_labels": representation.feature_labels(),
                 },
             )
             points.append(point)

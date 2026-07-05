@@ -4,12 +4,15 @@ from decimal import Decimal
 from uuid import UUID
 
 from mtg_helper.services.retrieval_service import (
+    RepresentationQuery,
     TypeFilter,
+    _annotate_representation_signals,
     _apply_trusted_quota,
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
     _personal_rating,
+    _representation_match_score,
     _type_match_score,
     parse_query_tags,
     parse_query_types,
@@ -140,7 +143,62 @@ def _make_row(
         "edhrec_rank": edhrec_rank,
         "cmc": Decimal(str(cmc)),
         "color_identity": color_identity or ["G", "B"],
+        "tags": [],
+        "card_types": [],
+        "subtypes": [],
+        "keywords": [],
+        "traits": [],
+        "token_types": [],
     }
+
+
+def test_representation_match_score_full_match() -> None:
+    row = {
+        **_make_row(_A),
+        "tags": ["ramp", "token"],
+        "card_types": ["Artifact"],
+        "subtypes": ["Equipment"],
+        "keywords": ["Flying"],
+        "traits": ["activated"],
+        "token_types": ["treasure"],
+    }
+    query = RepresentationQuery(
+        tags=["ramp"],
+        card_types=["Artifact"],
+        keywords=["flying"],
+        traits=["activated"],
+        token_types=["treasure"],
+    )
+
+    assert _representation_match_score(row, query) == 1.0  # type: ignore[arg-type]
+
+
+def test_representation_match_score_partial_match() -> None:
+    row = {
+        **_make_row(_A),
+        "tags": ["ramp"],
+        "card_types": ["Artifact"],
+    }
+    query = RepresentationQuery(tags=["ramp"], card_types=["Creature"])
+
+    assert _representation_match_score(row, query) == 0.5  # type: ignore[arg-type]
+
+
+def test_representation_signal_annotation() -> None:
+    rows = {
+        _A: {**_make_row(_A), "tags": ["draw"]},
+        _B: {**_make_row(_B), "tags": ["ramp"]},
+    }
+    signal_map: dict[UUID, list[str]] = {}
+
+    _annotate_representation_signals(
+        signal_map,
+        rows,  # type: ignore[arg-type]
+        RepresentationQuery(tags=["ramp"]),
+    )
+
+    assert "representation" not in signal_map.get(_A, [])
+    assert signal_map[_B] == ["representation"]
 
 
 def test_weighted_score_higher_qdrant_wins() -> None:
@@ -187,6 +245,26 @@ def test_weighted_score_feedback_boosts_card() -> None:
         deck_cmc_counts=None,
         feedback_weights={_A: 1.5},
     )
+    assert scores[_A] > scores[_B]
+
+
+def test_weighted_score_representation_boosts_matching_card() -> None:
+    rows = {
+        _A: {**_make_row(_A), "tags": ["ramp"]},
+        _B: {**_make_row(_B), "tags": ["draw"]},
+    }
+    scores = _compute_weighted_scores(
+        [_A, _B],
+        qdrant_scores={_A: 0.5, _B: 0.5},
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,  # type: ignore[arg-type]
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        representation_query=RepresentationQuery(tags=["ramp"]),
+    )
+
     assert scores[_A] > scores[_B]
 
 

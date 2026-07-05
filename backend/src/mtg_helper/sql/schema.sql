@@ -73,6 +73,37 @@ CREATE INDEX IF NOT EXISTS idx_cards_subtypes ON cards USING GIN (subtypes);
 CREATE INDEX IF NOT EXISTS idx_cards_token_types ON cards USING GIN (token_types);
 
 -- ============================================================
+-- MTGJSON CARD METADATA (sidecar enrichment + diff source)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS mtgjson_card_metadata (
+    scryfall_id       UUID PRIMARY KEY,
+    mtgjson_uuid      UUID NOT NULL,
+    name              TEXT NOT NULL,
+    keywords          TEXT[] NOT NULL DEFAULT '{}',
+    types             TEXT[] NOT NULL DEFAULT '{}',
+    supertypes        TEXT[] NOT NULL DEFAULT '{}',
+    subtypes          TEXT[] NOT NULL DEFAULT '{}',
+    edhrec_saltiness  NUMERIC,
+    is_funny          BOOLEAN NOT NULL DEFAULT false,
+    is_online_only    BOOLEAN NOT NULL DEFAULT false,
+    is_rebalanced     BOOLEAN NOT NULL DEFAULT false,
+    is_game_changer   BOOLEAN NOT NULL DEFAULT false,
+    leadership_skills JSONB NOT NULL DEFAULT '{}',
+    related_cards     JSONB NOT NULL DEFAULT '{}',
+    raw_identifiers   JSONB NOT NULL DEFAULT '{}',
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_keywords
+    ON mtgjson_card_metadata USING GIN (keywords);
+CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_types
+    ON mtgjson_card_metadata USING GIN (types);
+CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_supertypes
+    ON mtgjson_card_metadata USING GIN (supertypes);
+CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_subtypes
+    ON mtgjson_card_metadata USING GIN (subtypes);
+
+-- ============================================================
 -- ACCOUNTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS accounts (

@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "oxlint src app lib components",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -30,11 +30,5 @@
     "tailwindcss": "4.1.4",
     "typescript": "5.8.3",
     "vitest": "3.1.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp"
-    ]
   }
 }

@@ -16,7 +16,7 @@ import asyncpg
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
-from mtg_helper.services import feature_flag_service, scryfall
+from mtg_helper.services import feature_flag_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
     JobState,
@@ -67,6 +67,18 @@ async def sync_cards(request: Request) -> dict[str, Any]:
     start(job)
     asyncio.create_task(
         _wrap(job, scryfall.run_sync(request.app.state.db_pool, progress=make_progress_cb(job)))
+    )
+    return _response(job)
+
+
+@router.post("/admin/sync-mtgjson", status_code=202)
+async def sync_mtgjson(request: Request) -> dict[str, Any]:
+    """Kick off MTGJSON sidecar metadata sync + diff as a background task."""
+    job = _registry(request).mtgjson
+    _ensure_idle(job)
+    start(job)
+    asyncio.create_task(
+        _wrap(job, mtgjson.run_sync(request.app.state.db_pool, progress=make_progress_cb(job)))
     )
     return _response(job)
 
@@ -141,6 +153,7 @@ async def status(request: Request) -> dict[str, Any]:
     registry = _registry(request)
     return {
         "sync": asdict(registry.sync),
+        "mtgjson": asdict(registry.mtgjson),
         "tag": asdict(registry.tag),
         "embed": asdict(registry.embed),
         "refresh_all": asdict(registry.refresh_all),

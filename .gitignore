@@ -206,6 +206,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# pnpm local store
+.pnpm-store/
+
 # PyPI configuration file
 .pypirc
 

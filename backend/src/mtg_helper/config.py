@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     database_url: str
     gemini_api_key: str = ""
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
+    mtgjson_all_printings_url: str = "https://mtgjson.com/api/v5/AllPrintings.json.zip"
     edhrec_base_url: str = "https://json.edhrec.com/pages/commanders"
     moxfield_base_url: str = "https://api2.moxfield.com"
     archidekt_base_url: str = "https://archidekt.com/api"

@@ -60,6 +60,18 @@ class TypeFilter:
 
 
 @dataclass(frozen=True)
+class RepresentationQuery:
+    """Structured deterministic terms used for representation scoring."""
+
+    tags: list[str] = field(default_factory=list)
+    card_types: list[str] = field(default_factory=list)
+    subtypes: list[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
+    traits: list[str] = field(default_factory=list)
+    token_types: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class CollectionFilter:
     """Restricts retrieval to a set of owned cards.
 
@@ -1018,6 +1030,58 @@ def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
     return matched / requested_count
 
 
+def _build_representation_query(
+    query_tags: list[str],
+    type_filter: TypeFilter | None,
+) -> RepresentationQuery | None:
+    """Build deterministic representation terms from parsed query context."""
+    query = RepresentationQuery(
+        tags=list(query_tags),
+        card_types=list(type_filter.card_types) if type_filter else [],
+        subtypes=list(type_filter.subtypes) if type_filter else [],
+        keywords=list(type_filter.keywords) if type_filter else [],
+        traits=list(type_filter.traits) if type_filter else [],
+        token_types=list(type_filter.token_types) if type_filter else [],
+    )
+    if _representation_term_count(query) == 0:
+        return None
+    return query
+
+
+def _representation_match_score(row: "asyncpg.Record", query: RepresentationQuery) -> float:
+    """Score deterministic feature overlap between a card row and query terms."""
+    requested = _representation_term_count(query)
+    if requested == 0:
+        return 0.0
+
+    tag_matches = set(row["tags"]) & set(query.tags)
+    type_matches = set(row["card_types"]) & set(query.card_types)
+    subtype_matches = set(row["subtypes"]) & set(query.subtypes)
+    keyword_matches = {k.lower() for k in row["keywords"]} & {k.lower() for k in query.keywords}
+    trait_matches = set(row["traits"]) & set(query.traits)
+    token_matches = set(row["token_types"]) & set(query.token_types)
+    matched = (
+        len(tag_matches)
+        + len(type_matches)
+        + len(subtype_matches)
+        + len(keyword_matches)
+        + len(trait_matches)
+        + len(token_matches)
+    )
+    return matched / requested
+
+
+def _representation_term_count(query: RepresentationQuery) -> int:
+    return (
+        len(query.tags)
+        + len(query.card_types)
+        + len(query.subtypes)
+        + len(query.keywords)
+        + len(query.traits)
+        + len(query.token_types)
+    )
+
+
 def _color_affinity_score(
     card_colors: list[str],
     commander_colors: set[str],
@@ -1052,6 +1116,7 @@ _W_PERSONAL: float = 0.15
 _W_CURVE: float = 0.10
 _W_COLOR: float = 0.05
 _W_PROFILE: float = 0.03
+_W_REPRESENTATION: float = 0.08
 
 _MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
 _MULTI_TAG_SYNERGY_THRESHOLD = 3
@@ -1079,6 +1144,7 @@ def _compute_weighted_scores(
     edhrec_inclusion: dict[UUID, float] | None = None,
     moxfield_inclusion: dict[UUID, float] | None = None,
     prefer_keywords: bool = False,
+    representation_query: RepresentationQuery | None = None,
 ) -> dict[UUID, float]:
     """Compute weighted scores for all candidate cards.
 
@@ -1109,6 +1175,7 @@ def _compute_weighted_scores(
         type_filter: Optional parsed type/subtype preferences; activates type boost.
         stage: Current build stage (used to determine synergy damping).
         ranking_weights: Optional per-user weight overrides.
+        representation_query: Deterministic feature terms to score against card representation.
 
     Returns:
         Dict mapping card UUID to final weighted score.
@@ -1161,6 +1228,12 @@ def _compute_weighted_scores(
 
         inclusion = edhrec_inclusion.get(uid, 0.0) if edhrec_inclusion else 0.0
         mox_inclusion = moxfield_inclusion.get(uid, 0.0) if moxfield_inclusion else 0.0
+        representation = (
+            _representation_match_score(row, representation_query)
+            if representation_query is not None
+            else 0.0
+        )
+        rep_weight = _W_REPRESENTATION if representation_query is not None else 0.0
 
         if type_filter is not None:
             type_score = _type_match_score(row, type_filter)
@@ -1168,12 +1241,13 @@ def _compute_weighted_scores(
                 scores[uid] = 0.0
                 continue
             # With type filter: reallocate 0.15 from semantic/synergy to type_score
-            tf_semantic = max(0.0, w.semantic - 0.08)
-            tf_synergy = max(0.0, w.synergy - 0.07)
+            tf_semantic = max(0.0, w.semantic - 0.08 - rep_weight / 2)
+            tf_synergy = max(0.0, w.synergy - 0.07 - rep_weight / 2)
             scores[uid] = (
                 tf_semantic * vec_sim
                 + tf_synergy * synergy
                 + 0.15 * type_score
+                + rep_weight * representation
                 + _W_COLOR * color
                 + w.popularity * popularity
                 + _W_CURVE * curve
@@ -1183,9 +1257,12 @@ def _compute_weighted_scores(
                 + w.moxfield_inclusion * mox_inclusion
             )
         else:
+            semantic_weight = max(0.0, w.semantic - rep_weight / 2)
+            synergy_weight = max(0.0, w.synergy - rep_weight / 2)
             scores[uid] = (
-                w.semantic * vec_sim
-                + w.synergy * synergy
+                semantic_weight * vec_sim
+                + synergy_weight * synergy
+                + rep_weight * representation
                 + _W_COLOR * color
                 + w.popularity * popularity
                 + _W_CURVE * curve
@@ -1214,6 +1291,22 @@ def _annotate_type_signals(
             entry = signal_map.setdefault(uid, [])
             if "type" not in entry:
                 entry.append("type")
+
+
+def _annotate_representation_signals(
+    signal_map: dict[UUID, list[str]],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+    representation_query: RepresentationQuery | None,
+) -> None:
+    """Add 'representation' for cards matching deterministic feature terms."""
+    if representation_query is None:
+        return
+    for uid, row in cards_by_id.items():
+        if _representation_match_score(row, representation_query) <= 0.0:
+            continue
+        entry = signal_map.setdefault(uid, [])
+        if "representation" not in entry:
+            entry.append("representation")
 
 
 def _merge_inclusion_scores(
@@ -1586,6 +1679,7 @@ async def retrieve_candidates(
     theme_inclusion = _filter_inclusion_by_stage(theme_inclusion, cards_by_id, stage)
     combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
     moxfield_inclusion = _filter_inclusion_by_stage(moxfield_inclusion, cards_by_id, stage)
+    representation_query = _build_representation_query(query_tags, type_filter)
 
     scores = _compute_weighted_scores(
         all_ids,
@@ -1603,9 +1697,11 @@ async def retrieve_candidates(
         edhrec_inclusion=combined_edhrec,
         moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=prefer_keywords,
+        representation_query=representation_query,
     )
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
+    _annotate_representation_signals(signal_map, cards_by_id, representation_query)
     _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
     _annotate_theme_signals(signal_map, theme_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
