@@ -16,7 +16,7 @@ import asyncpg
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
-from mtg_helper.services import feature_flag_service, mtgjson, scryfall
+from mtg_helper.services import edhrec_tag_catalog_service, feature_flag_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
     JobState,
@@ -79,6 +79,18 @@ async def sync_mtgjson(request: Request) -> dict[str, Any]:
     start(job)
     asyncio.create_task(
         _wrap(job, mtgjson.run_sync(request.app.state.db_pool, progress=make_progress_cb(job)))
+    )
+    return _response(job)
+
+
+@router.post("/admin/sync-edhrec-tags", status_code=202)
+async def sync_edhrec_tags(request: Request) -> dict[str, Any]:
+    """Refresh the local EDHREC tag catalog as a background task."""
+    job = _registry(request).tag
+    _ensure_idle(job)
+    start(job)
+    asyncio.create_task(
+        _wrap(job, edhrec_tag_catalog_service.sync_edhrec_tags(request.app.state.db_pool))
     )
     return _response(job)
 

@@ -18,6 +18,7 @@ from mtg_helper.services.commander_suggestor_service import (
     build_response,
     parse_intent_fallback,
 )
+from mtg_helper.services.edhrec_tag_catalog_service import load_edhrec_prompt_catalog
 from mtg_helper.services.keyword_catalog_service import load_keyword_prompt_catalog
 
 _TEMPERATURE = 0.25
@@ -30,6 +31,7 @@ class CommanderSuggestDeps:
 
     previous_intent: CommanderSuggestIntent | None
     at_history_limit: bool
+    edhrec_catalog: str
     keyword_catalog: str
 
 
@@ -55,7 +57,14 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "",
         f"Previous intent JSON: {previous}",
         "",
-        "Emit official MTGJSON keyword tags only in `mechanic_tags`.",
+        "Emit EDHREC deckbuilding theme tags in `archetype_tags`.",
+        "Every `archetype_tags` item must appear in the local EDHREC catalog below.",
+        "",
+        "Available local EDHREC theme catalog:",
+        deps.edhrec_catalog,
+        "",
+        "Emit official MTGJSON keyword tags only in `mechanic_tags` for exact printed",
+        "mechanics like convoke, dredge, cascade, surveil, or flashback.",
         "Use snake_case tag names such as:",
         ", ".join(KEYWORD_EXAMPLES),
         "Every `mechanic_tags` item must appear in the local catalog below.",
@@ -63,8 +72,8 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "Available local MTGJSON keyword catalog:",
         deps.keyword_catalog,
         "",
-        "Do not emit custom archetype tags like graveyard, blink, reanimator,",
-        "aristocrats, voltron, spellslinger, or tribal tags.",
+        "Prefer EDHREC archetype_tags for broad plans like graveyard, blink, reanimator,",
+        "aristocrats, voltron, pingers, +1/+1 counters, spellslinger, or tribal decks.",
         "Do not invent compound tags such as etb_ping, graveyard_value, or token_draw.",
         "",
         "When a player asks for a concept that is not an MTGJSON keyword, express it as",
@@ -129,6 +138,7 @@ async def suggest_turn(
     deps = CommanderSuggestDeps(
         previous_intent=previous_intent,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
+        edhrec_catalog=await load_edhrec_prompt_catalog(pool),
         keyword_catalog=await load_keyword_prompt_catalog(pool),
     )
     try:
@@ -150,10 +160,10 @@ async def suggest_turn(
 
 def _fallback_reply(intent: CommanderSuggestIntent) -> str:
     """Ask a useful deterministic follow-up when the model path is unavailable."""
-    tags = set(intent.mechanic_tags)
+    tags = set(intent.mechanic_tags) | set(intent.archetype_tags)
     if tags & {"dredge", "flashback", "escape", "descend", "threshold", "delirium"}:
         return "Do you want self-mill value, sacrifice loops, or cards you can reuse from graveyard?"
-    if "exile" in tags or "etb" in intent.traits:
+    if "blink" in tags or "etb" in tags or "exile" in tags or "etb" in intent.traits:
         return "Do you want ETB value, toolbox creatures, or token-copy effects?"
     if intent.color_identity is None:
         return "Do you have a color identity in mind, or any colors you want to avoid?"

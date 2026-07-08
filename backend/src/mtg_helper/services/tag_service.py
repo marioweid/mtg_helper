@@ -231,11 +231,22 @@ _TRIBAL_SUBTYPES: tuple[str, ...] = (
 # re-run `/admin/tag-cards` against the corpus. Not auto-enforced.
 TAG_VOCAB_VERSION = 3
 
+_EDHREC_TAG_ALIASES: dict[str, str] = {
+    "token": "tokens",
+    "plus_one_counters": "plus_one_plus_one_counters",
+    "treasure_matters": "treasure",
+    "food_matters": "food",
+    "clue_matters": "clues",
+    "infect_toxic": "infect",
+    "extra_turn": "extra_turns",
+    "land_destruction": "land_destruction",
+}
+
 
 # ─── Full mechanic catalog ────────────────────────────────────────────────────
 # Legacy fallback used only by direct callers that do not provide the synced
-# MTGJSON keyword catalog. The batch pipeline passes MTGJSON keywords and
-# writes MTGJSON keyword tags only.
+# MTGJSON keyword catalog. The batch pipeline now writes EDHREC-style theme
+# tags and stores MTGJSON mechanics separately.
 _FULL_MECHANIC_PATTERNS: dict[str, re.Pattern[str]] = {
     # Evergreen combat keywords
     "flying": _re(r"\bflying\b"),
@@ -729,6 +740,17 @@ def classify_card(
     return _dedupe_tags(tags)
 
 
+def classify_mtgjson_tags(
+    oracle_text: str | None,
+    keywords: list[str],
+    official_keywords: list[OfficialKeyword],
+) -> list[str]:
+    """Classify exact MTGJSON keyword/mechanic tags for advanced filtering."""
+    tags: list[str] = []
+    _tag_official_keywords(oracle_text or "", keywords, tags, official_keywords)
+    return _dedupe_tags(tags)
+
+
 def _dedupe_tags(tags: list[str]) -> list[str]:
     """Stable-dedupe generated tag lists."""
     seen: set[str] = set()
@@ -738,6 +760,11 @@ def _dedupe_tags(tags: list[str]) -> list[str]:
             seen.add(t)
             deduped.append(t)
     return deduped
+
+
+def normalize_edhrec_tags(tags: list[str]) -> list[str]:
+    """Normalize legacy rule tags to EDHREC-style theme ids."""
+    return _dedupe_tags([_EDHREC_TAG_ALIASES.get(tag, tag) for tag in tags])
 
 
 async def _load_official_keywords(pool: asyncpg.Pool) -> list[OfficialKeyword]:
@@ -765,7 +792,11 @@ async def _sync_tags_to_qdrant(
 
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT id, tags, traits, token_types FROM cards WHERE embedded_at IS NOT NULL"
+            """
+            SELECT id, tags, edhrec_tags, mtgjson_tags, traits, token_types
+            FROM cards
+            WHERE embedded_at IS NOT NULL
+            """
         )
 
     from mtg_helper.services.admin_jobs import noop_progress
@@ -776,11 +807,21 @@ async def _sync_tags_to_qdrant(
     cb("syncing-qdrant", 0, total)
 
     async def _update_one(
-        card_id: Any, tags: list[str], traits: list[str], token_types: list[str]
+        card_id: Any,
+        tags: list[str],
+        mtgjson_tags: list[str],
+        traits: list[str],
+        token_types: list[str],
     ) -> None:
         await qdrant_client.set_payload(
             collection_name=settings.qdrant_collection,
-            payload={"tags": tags, "traits": traits, "token_types": token_types},
+            payload={
+                "tags": tags,
+                "edhrec_tags": tags,
+                "mtgjson_tags": mtgjson_tags,
+                "traits": traits,
+                "token_types": token_types,
+            },
             points=[str(card_id)],
         )
 
@@ -788,7 +829,13 @@ async def _sync_tags_to_qdrant(
         chunk = rows[i : i + _QDRANT_CONCURRENCY]
         await asyncio.gather(
             *[
-                _update_one(r["id"], list(r["tags"]), list(r["traits"]), list(r["token_types"]))
+                _update_one(
+                    r["id"],
+                    list(r["edhrec_tags"] or r["tags"]),
+                    list(r["mtgjson_tags"]),
+                    list(r["traits"]),
+                    list(r["token_types"]),
+                )
                 for r in chunk
             ]
         )
@@ -833,26 +880,40 @@ async def run_batch_tag(
 
     for i in range(0, row_count, _BATCH_SIZE):
         batch = rows[i : i + _BATCH_SIZE]
-        updates: list[tuple[list[str], list[str], list[str], Any]] = [
-            (
-                classify_card(
-                    r["name"],
-                    r["type_line"],
-                    r["oracle_text"],
-                    list(r["keywords"]),
-                    float(r["cmc"]) if r["cmc"] is not None else None,
-                    official_keywords=official_keywords,
-                ),
-                classify_traits(r["oracle_text"], list(r["keywords"])),
-                classify_token_types(r["oracle_text"]),
-                r["id"],
+        updates: list[tuple[list[str], list[str], list[str], list[str], list[str], Any]] = []
+        for r in batch:
+            keywords = list(r["keywords"])
+            edhrec_tags = classify_card(
+                r["name"],
+                r["type_line"],
+                r["oracle_text"],
+                keywords,
+                float(r["cmc"]) if r["cmc"] is not None else None,
             )
-            for r in batch
-        ]
+            edhrec_tags = normalize_edhrec_tags(edhrec_tags)
+            mtgjson_tags = classify_mtgjson_tags(r["oracle_text"], keywords, official_keywords)
+            updates.append(
+                (
+                    edhrec_tags,
+                    edhrec_tags,
+                    mtgjson_tags,
+                    classify_traits(r["oracle_text"], keywords),
+                    classify_token_types(r["oracle_text"]),
+                    r["id"],
+                )
+            )
 
         async with pool.acquire() as conn:
             await conn.executemany(
-                "UPDATE cards SET tags = $1, traits = $2, token_types = $3 WHERE id = $4",
+                """
+                UPDATE cards
+                SET tags = $1,
+                    edhrec_tags = $2,
+                    mtgjson_tags = $3,
+                    traits = $4,
+                    token_types = $5
+                WHERE id = $6
+                """,
                 updates,
             )
 

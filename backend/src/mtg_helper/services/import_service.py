@@ -328,7 +328,7 @@ async def _aggregate_keyword_tags(
     pool: asyncpg.Pool,
     resolved_cards: list[tuple[str, int, str | None]],
 ) -> list[str]:
-    """Compute the top MTGJSON keyword tags across an imported deck's cards.
+    """Compute the top EDHREC theme tags across an imported deck's cards.
 
     Counts tag frequencies on the imported cards, drops old generic stage tags,
     and returns the top ``_MAX_SUGGESTED_KEYWORD_TAGS``.
@@ -339,7 +339,7 @@ async def _aggregate_keyword_tags(
             produced by ``_resolve_non_commanders``.
 
     Returns:
-        Up to ``_MAX_SUGGESTED_KEYWORD_TAGS`` keyword tag names sorted by
+        Up to ``_MAX_SUGGESTED_KEYWORD_TAGS`` EDHREC tag names sorted by
         frequency descending.
     """
     if not resolved_cards:
@@ -349,7 +349,13 @@ async def _aggregate_keyword_tags(
         rows = await conn.fetch(
             """
             SELECT tag, count(*)::int AS cnt
-            FROM cards, unnest(tags) AS tag
+            FROM cards,
+                 unnest(
+                     CASE
+                         WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
+                         ELSE tags
+                     END
+                 ) AS tag
             WHERE scryfall_id = ANY($1::uuid[])
             GROUP BY tag
             HAVING count(*) >= $2

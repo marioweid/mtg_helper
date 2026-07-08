@@ -54,7 +54,7 @@ export default function KeywordMenuPage() {
       </button>
       <PageHeader
         title="Pick keywords"
-        subtitle="Pick the official MTGJSON keywords your deck cares about. Suggestions in the build wizard will favour cards that share these tags."
+        subtitle="Pick the EDHREC themes your deck cares about. Suggestions in the build wizard will favour cards that share these tags."
       />
 
       <div className="flex flex-col gap-6">
@@ -102,7 +102,7 @@ export default function KeywordMenuPage() {
         </section>
 
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-3 font-semibold text-white">MTGJSON keywords</h2>
+          <h2 className="mb-3 font-semibold text-white">EDHREC themes</h2>
           <ArchetypeChipPicker value={archetypeTags} onChange={setArchetypeTags} />
         </section>
 

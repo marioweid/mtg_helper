@@ -18,6 +18,32 @@ from mtg_helper.services.keyword_catalog_service import sanitize_commander_inten
 _WUBRG = ["W", "U", "B", "R", "G"]
 _DEFAULT_STAGE_TARGETS = {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}
 
+_ARCHETYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("graveyard", ("graveyard", "grave", "recursion", "yard")),
+    ("self_mill", ("self mill", "self-mill")),
+    ("reanimator", ("reanimator", "reanimate", "cheat in", "big value")),
+    ("blink", ("blink", "flicker")),
+    ("etb", ("etb", "enter the battlefield", "enters the battlefield")),
+    ("aristocrats", ("aristocrat", "death trigger", "dies")),
+    ("sacrifice", ("sacrifice", "sac outlet", "sac ")),
+    ("tokens", ("token", "tokens")),
+    ("plus_one_plus_one_counters", ("+1/+1", "plus one", "counters")),
+    ("landfall", ("landfall", "lands matter")),
+    ("spellslinger", ("spellslinger", "instant", "sorcery")),
+    ("storm", ("storm",)),
+    ("cascade", ("cascade",)),
+    ("wheels", ("wheel", "discard hand")),
+    ("lifegain", ("lifegain", "life gain")),
+    ("proliferate", ("proliferate",)),
+    ("voltron", ("voltron",)),
+    ("equipment", ("equipment",)),
+    ("mill", ("mill",)),
+    ("treasure", ("treasure",)),
+    ("food", ("food", "forage")),
+    ("clues", ("clue", "investigate")),
+    ("pingers", ("ping", "pinger")),
+)
+
 _PLAN_MECHANIC_HINTS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     (
         ("dredge", "flashback", "escape", "descend", "threshold", "delirium"),
@@ -150,9 +176,11 @@ def _row_to_candidate(row: asyncpg.Record) -> _Candidate:
         edhrec_rank=row["edhrec_rank"],
         game_changer=bool(row["game_changer"]),
     )
+    edhrec_tags = list(row["edhrec_tags"] or []) if "edhrec_tags" in row.keys() else []
+    tags = edhrec_tags or list(row["tags"] or [])
     return _Candidate(
         card=card,
-        tags=list(row["tags"] or []),
+        tags=tags,
         traits=list(row["traits"] or []),
         token_types=list(row["token_types"] or []),
     )
@@ -169,9 +197,10 @@ def parse_intent_fallback(
     """Infer useful intent from obvious words when the LLM is unavailable."""
     merged = previous.model_copy(deep=True) if previous else CommanderSuggestIntent()
     text = message.lower()
-    merged.archetype_tags = []
+    merged.archetype_tags = _merge_vocab(merged.archetype_tags, _match_hints(text, _ARCHETYPE_HINTS))
     merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_hints(text, _MECHANIC_HINTS))
-    merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_plan_mechanics(text))
+    if not merged.archetype_tags:
+        merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_plan_mechanics(text))
     merged.traits = _merge_vocab(merged.traits, _match_hints(text, _TRAIT_HINTS))
     merged.token_types = _merge_vocab(merged.token_types, _match_hints(text, _TOKEN_HINTS))
     filters = _match_dynamic_filters(text)
@@ -458,9 +487,10 @@ def _phrase_matches(text: str, phrase: str) -> bool:
 
 def _stage_targets(intent: CommanderSuggestIntent) -> dict[str, int]:
     targets = dict(_DEFAULT_STAGE_TARGETS)
-    if "storm" in intent.mechanic_tags or "magecraft" in intent.mechanic_tags:
+    tags = set(intent.archetype_tags) | set(intent.mechanic_tags)
+    if "storm" in tags or "spellslinger" in tags or "magecraft" in tags:
         targets["draw"] = 14
-    if _has_graveyard_keyword(intent.mechanic_tags):
+    if tags & {"graveyard", "self_mill", "reanimator"} or _has_graveyard_keyword(intent.mechanic_tags):
         targets["interaction"] = 10
     return targets
 

@@ -10,6 +10,7 @@ interface Props {
   onChange: (next: string[]) => void;
   suggested?: string[];
   onMechanicTagsLoaded?: (tags: string[]) => void;
+  onEdhrecTagsLoaded?: (tags: string[]) => void;
 }
 
 export function ArchetypeChipPicker({
@@ -17,22 +18,27 @@ export function ArchetypeChipPicker({
   onChange,
   suggested,
   onMechanicTagsLoaded,
+  onEdhrecTagsLoaded,
 }: Props) {
+  const [edhrecGroups, setEdhrecGroups] = useState<KeywordGroup[] | null>(null);
   const [keywordGroups, setKeywordGroups] = useState<KeywordGroup[] | null>(null);
   const [keywordError, setKeywordError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setKeywordError(null);
-    apiClient
-      .listOfficialKeywords()
-      .then((groups) => {
-        if (!cancelled) setKeywordGroups(groups);
+    Promise.all([apiClient.listEdhrecTags(), apiClient.listOfficialKeywords()])
+      .then(([edhrec, mechanics]) => {
+        if (!cancelled) {
+          setEdhrecGroups(edhrec);
+          setKeywordGroups(mechanics);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
+          setEdhrecGroups([]);
           setKeywordGroups([]);
-          setKeywordError(err instanceof Error ? err.message : "Failed to load keywords.");
+          setKeywordError(err instanceof Error ? err.message : "Failed to load tags.");
         }
       });
     return () => {
@@ -43,11 +49,16 @@ export function ArchetypeChipPicker({
   const selected = useMemo(() => new Set(value), [value]);
   const suggestedSet = useMemo(() => new Set(suggested ?? []), [suggested]);
   const labels = useMemo(() => {
-    const entries = (keywordGroups ?? []).flatMap((group) =>
+    const entries = [...(edhrecGroups ?? []), ...(keywordGroups ?? [])].flatMap((group) =>
       group.keywords.map((keyword) => [keyword.tag, keyword.label] as const),
     );
     return new Map<string, string>(entries);
-  }, [keywordGroups]);
+  }, [edhrecGroups, keywordGroups]);
+
+  useEffect(() => {
+    if (edhrecGroups === null) return;
+    onEdhrecTagsLoaded?.(edhrecGroups.flatMap((group) => group.keywords.map((kw) => kw.tag)));
+  }, [edhrecGroups, onEdhrecTagsLoaded]);
 
   useEffect(() => {
     if (keywordGroups === null) return;
@@ -64,7 +75,9 @@ export function ArchetypeChipPicker({
 
   return (
     <div className="space-y-6">
-      {keywordGroups === null && <p className="text-sm text-gray-500">Loading MTGJSON keywords...</p>}
+      {(edhrecGroups === null || keywordGroups === null) && (
+        <p className="text-sm text-gray-500">Loading EDHREC themes...</p>
+      )}
       {keywordError && <p className="text-sm text-red-600">{keywordError}</p>}
       {value.length > 0 && (
         <section>
@@ -85,7 +98,7 @@ export function ArchetypeChipPicker({
           </div>
         </section>
       )}
-      {(keywordGroups ?? []).map((group) => (
+      {(edhrecGroups ?? []).map((group) => (
         <section key={group.category}>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
             {group.display_name}
@@ -108,6 +121,37 @@ export function ArchetypeChipPicker({
                   }`}
                 >
                   {keyword.label}
+                  {keyword.deck_count ? (
+                    <span className="ml-1 text-[11px] opacity-70">
+                      {formatDeckCount(keyword.deck_count)}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+      {(keywordGroups ?? []).map((group) => (
+        <section key={`mechanic-${group.category}`}>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Advanced mechanics - {group.display_name}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {group.keywords.map((keyword) => {
+              const active = selected.has(keyword.tag);
+              return (
+                <button
+                  key={keyword.tag}
+                  type="button"
+                  onClick={() => toggle(keyword.tag)}
+                  className={`rounded-full border px-3 py-1 text-sm transition ${
+                    active
+                      ? "border-violet-600 bg-violet-50 text-violet-700"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                  }`}
+                >
+                  {keyword.label}
                 </button>
               );
             })}
@@ -116,4 +160,9 @@ export function ArchetypeChipPicker({
       ))}
     </div>
   );
+}
+
+function formatDeckCount(count: number): string {
+  if (count >= 1000) return `${Math.round(count / 1000)}K`;
+  return String(count);
 }

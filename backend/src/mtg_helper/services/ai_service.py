@@ -56,7 +56,7 @@ _SIGNAL_LABELS: dict[str, str] = {
 # original three (edhrec, moxfield, type filter).
 _SOURCE_LABELS: dict[str, str] = {
     "semantic": "Semantic",
-    "tag": "Keywords",
+    "tag": "Tags",
     "fts": "Text",
     "edhrec": "EDHREC",
     "edhrec_theme": "EDHREC Theme",

@@ -386,6 +386,7 @@ export const apiClient = {
     }),
 
   listOfficialKeywords: () => request<KeywordGroup[]>("/tags/keywords"),
+  listEdhrecTags: () => request<KeywordGroup[]>("/tags/edhrec"),
 
   exportMoxfield: (deckId: string): Promise<string> =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/export/moxfield`).then((res) => {

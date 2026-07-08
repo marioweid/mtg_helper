@@ -116,7 +116,7 @@ def from_row(row: Any) -> CardRepresentation:
         keywords=list(row["keywords"] or []),
         card_types=list(row["card_types"] or []),
         subtypes=list(row["subtypes"] or []),
-        tags=list(row["tags"] or []),
+        tags=list((row["edhrec_tags"] if "edhrec_tags" in row.keys() else row["tags"]) or []),
         traits=list(row["traits"] or []),
         token_types=list(row["token_types"] or []),
         mana_value=row["cmc"],

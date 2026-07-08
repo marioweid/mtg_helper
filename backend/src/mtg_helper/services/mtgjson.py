@@ -2,9 +2,8 @@
 
 Downloads MTGJSON AllPrintings, extracts metadata that is useful for comparing
 against our Scryfall-derived card rows, stores it in a sidecar table, and returns
-a diff summary. This intentionally does not overwrite ``cards`` yet; the diff is
-the evidence gate for deciding whether MTGJSON should become the source of truth
-for keywords/types.
+a diff summary. MTGJSON keywords are used as optional exact mechanic filters;
+EDHREC-style tags remain the primary Commander deckbuilding vocabulary.
 """
 
 import io

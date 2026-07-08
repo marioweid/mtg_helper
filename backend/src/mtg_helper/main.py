@@ -27,7 +27,7 @@ from mtg_helper.routers import (
     snapshots,
     tags,
 )
-from mtg_helper.services import mtgjson, scryfall
+from mtg_helper.services import edhrec_tag_catalog_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.embedding_service import ensure_collection
 from mtg_helper.services.llm_client import LLMClient
@@ -73,6 +73,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             _log.info("MTGJSON keyword sync complete: %s", result)
         except Exception:
             _log.exception("MTGJSON keyword sync failed on startup; continuing with fallback data")
+
+    edhrec_tag_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM edhrec_tags")
+    if edhrec_tag_count == 0:
+        _log.info("EDHREC tag catalog is empty - running initial tag sync")
+        try:
+            await edhrec_tag_catalog_service.ensure_edhrec_tags(app.state.db_pool)
+        except Exception:
+            _log.exception("EDHREC tag sync failed on startup; continuing with fallback data")
 
     yield
     await app.state.qdrant_client.close()

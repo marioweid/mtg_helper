@@ -111,7 +111,7 @@ class DescribeResponse(BaseModel):
 
 
 class KeywordExtractRequest(BaseModel):
-    """Request body for the MTGJSON keyword-extracting deck agent."""
+    """Request body for the EDHREC theme-extracting deck agent."""
 
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
@@ -485,7 +485,7 @@ class CommanderCoachStartResponse(BaseModel):
 class KeywordExtractResponse(BaseModel):
     """Response from the keyword-extracting deck agent.
 
-    ``archetype_tags`` is the running set of canonical MTGJSON keyword tags the
+    ``archetype_tags`` is the running set of canonical EDHREC theme tags the
     agent has inferred from the conversation.
     """
 
@@ -498,8 +498,8 @@ class KeywordExtractResponse(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_known_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Accept MTGJSON snake-case keyword tags; preserve order."""
-        return _dedupe_sane_tags(value)
+        """Accept EDHREC-style deck theme tags; preserve order."""
+        return _dedupe_tag_shape(value)
 
 
 class CommanderSuggestIntent(BaseModel):
@@ -523,8 +523,8 @@ class CommanderSuggestIntent(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Legacy field: old custom archetype tags are no longer accepted."""
-        return []
+        """Keep EDHREC-style deck theme tags; DB sanitization checks catalog membership."""
+        return _dedupe_tag_shape(value)
 
     @field_validator("mechanic_tags", mode="after")
     @classmethod
@@ -662,6 +662,20 @@ def _filter_commander_suggest_tags(value: list[str], *, include_mechanics: bool)
     if include_mechanics:
         return _dedupe_sane_tags(value)
     return []
+
+
+def _dedupe_tag_shape(value: list[str]) -> list[str]:
+    """Accept short snake-case tag ids without importing DB state."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        tag = item.strip().lower()
+        if tag and tag not in seen and tag.replace("_", "").isalnum():
+            seen.add(tag)
+            out.append(tag)
+    return out
 
 
 def _dedupe_sane_tags(value: list[str]) -> list[str]:

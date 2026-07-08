@@ -1,10 +1,11 @@
-"""Helpers for using the local MTGJSON keyword catalog as source of truth."""
+"""Helpers for optional MTGJSON mechanic filters."""
 
 from dataclasses import dataclass
 
 import asyncpg
 
 from mtg_helper.models.ai import CommanderSuggestIntent
+from mtg_helper.services.edhrec_tag_catalog_service import load_edhrec_tags
 
 _CATEGORY_LABELS = {
     "ability_word": "ability word",
@@ -101,10 +102,11 @@ async def sanitize_commander_intent(
     intent: CommanderSuggestIntent,
 ) -> CommanderSuggestIntent:
     """Drop invented mechanic tags and normalize dynamic filters."""
-    allowed = await load_keyword_tags(pool)
+    allowed_mechanics = await load_keyword_tags(pool)
+    allowed_themes = await load_edhrec_tags(pool)
     data = intent.model_dump()
-    data["archetype_tags"] = []
-    data["mechanic_tags"] = [tag for tag in intent.mechanic_tags if tag in allowed]
+    data["archetype_tags"] = [tag for tag in intent.archetype_tags if tag in allowed_themes]
+    data["mechanic_tags"] = [tag for tag in intent.mechanic_tags if tag in allowed_mechanics]
     data["oracle_terms"] = _filter_text_terms(intent.oracle_terms)
     data["required_phrases"] = _filter_text_terms(intent.required_phrases)
     data["excluded_phrases"] = _filter_text_terms(intent.excluded_phrases)

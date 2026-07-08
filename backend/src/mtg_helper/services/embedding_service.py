@@ -180,8 +180,8 @@ async def run_batch_embed(
         rows = await conn.fetch(
             """
             SELECT id, name, type_line, oracle_text, keywords, cmc,
-                   color_identity, legalities, tags, edhrec_rank, card_types, subtypes, traits,
-                   token_types
+                   color_identity, legalities, tags, edhrec_tags, mtgjson_tags, edhrec_rank,
+                   card_types, subtypes, traits, token_types
             FROM cards
             WHERE embedded_at IS NULL OR updated_at > embedded_at
             ORDER BY name
@@ -211,7 +211,7 @@ async def run_batch_embed(
                 color_identity=list(r["color_identity"]),
                 card_types=list(r["card_types"]),
                 subtypes=list(r["subtypes"]),
-                tags=list(r["tags"]),
+                tags=list(r["edhrec_tags"] or r["tags"]),
                 traits=list(r["traits"]),
                 token_types=list(r["token_types"]),
                 mana_value=float(r["cmc"]) if r["cmc"] is not None else None,
@@ -239,7 +239,9 @@ async def run_batch_embed(
                         )
                         == "legal"
                     ),
-                    "tags": list(row["tags"]),
+                    "tags": list(row["edhrec_tags"] or row["tags"]),
+                    "edhrec_tags": list(row["edhrec_tags"] or row["tags"]),
+                    "mtgjson_tags": list(row["mtgjson_tags"]),
                     "edhrec_rank": row["edhrec_rank"],
                     "card_types": list(row["card_types"]),
                     "subtypes": list(row["subtypes"]),

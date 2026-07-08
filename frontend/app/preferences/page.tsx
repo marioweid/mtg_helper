@@ -316,7 +316,7 @@ export default function PreferencesPage() {
           <h2 className="font-semibold text-white">Suggestion Mix</h2>
           <p className="mt-1 text-sm text-gray-400">
             How much of each page is reserved for trusted EDHREC/Moxfield cards. Lower it to
-            give your MTGJSON keywords and deck description a real exploration channel.
+            give your EDHREC themes, mechanics, and deck description a real exploration channel.
           </p>
         </div>
         <div>

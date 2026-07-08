@@ -145,7 +145,7 @@ export default function AgentDeckPage() {
         </button>
         <PageHeader
           title="Chat with the agent"
-          subtitle="The agent asks 1-3 short questions, then converges on MTGJSON keywords. You can fine-tune the chips before creating the deck."
+          subtitle="The agent asks 1-3 short questions, then converges on EDHREC themes. You can fine-tune the chips before creating the deck."
         />
 
         <div className="flex flex-col gap-6">

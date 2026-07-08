@@ -28,10 +28,15 @@ TAG_TO_THEME_SLUGS: dict[str, tuple[str, ...]] = {
     "aristocrats": ("aristocrats",),
     "sacrifice": ("sacrifice", "aristocrats"),
     "token": ("tokens",),
+    "tokens": ("tokens",),
     "treasure_matters": ("treasures",),
+    "treasure": ("treasures",),
     "food_matters": ("food",),
+    "food": ("food",),
     "clue_matters": ("clues",),
+    "clues": ("clues",),
     "plus_one_counters": ("plus-1-plus-1-counters",),
+    "plus_one_plus_one_counters": ("plus-1-plus-1-counters",),
     "proliferate": ("proliferate",),
     "voltron": ("voltron",),
     "equipment": ("equipment",),
@@ -49,7 +54,13 @@ TAG_TO_THEME_SLUGS: dict[str, tuple[str, ...]] = {
     "stax": ("stax",),
     "group_hug": ("group-hug",),
     "extra_turn": ("extra-turns",),
+    "extra_turns": ("extra-turns",),
     "infect_toxic": ("infect",),
+    "etb": ("etb",),
+    "pingers": ("pingers",),
+    "card_draw": ("card-draw",),
+    "lands_matter": ("lands",),
+    "self_mill": ("self-mill",),
 }
 
 # Generic EDHREC cardlist weights. Unknown tags default to 0.55 so future
@@ -77,7 +88,8 @@ def theme_slugs_for_tags(tags: list[str]) -> list[str]:
     seen: set[str] = set()
     slugs: list[str] = []
     for tag in tags:
-        for slug in TAG_TO_THEME_SLUGS.get(tag, ()):
+        fallback = (tag.replace("_", "-"),)
+        for slug in TAG_TO_THEME_SLUGS.get(tag, fallback):
             if slug in seen:
                 continue
             seen.add(slug)

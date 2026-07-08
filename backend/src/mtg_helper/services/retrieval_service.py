@@ -64,6 +64,7 @@ class RepresentationQuery:
     """Structured deterministic terms used for representation scoring."""
 
     tags: list[str] = field(default_factory=list)
+    mtgjson_tags: list[str] = field(default_factory=list)
     card_types: list[str] = field(default_factory=list)
     subtypes: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
@@ -163,11 +164,11 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "counters": ["interaction", "plus_one_counters"],
     "tutor": ["tutor"],
     "search": ["tutor"],
-    "token": ["token"],
-    "tokens": ["token"],
-    "+1/+1": ["plus_one_counters"],
-    "plus one": ["plus_one_counters"],
-    "counters strategy": ["plus_one_counters"],
+    "token": ["tokens"],
+    "tokens": ["tokens"],
+    "+1/+1": ["plus_one_plus_one_counters"],
+    "plus one": ["plus_one_plus_one_counters"],
+    "counters strategy": ["plus_one_plus_one_counters"],
     "lifegain": ["lifegain"],
     "life": ["lifegain"],
     "gain life": ["lifegain"],
@@ -209,12 +210,12 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "surveil": ["card_selection"],
     "card selection": ["card_selection"],
     "filtering": ["card_selection"],
-    "treasure": ["token"],
-    "food token": ["token"],
-    "clue token": ["token"],
-    "blood token": ["token"],
-    "powerstone": ["token"],
-    "treasure token": ["token"],
+    "treasure": ["treasure"],
+    "food token": ["food"],
+    "clue token": ["clues"],
+    "blood token": ["tokens"],
+    "powerstone": ["tokens"],
+    "treasure token": ["treasure"],
     # New archetype synonyms (tag_service v2)
     "reanimate": ["reanimator"],
     "reanimation": ["reanimator"],
@@ -226,13 +227,13 @@ _TAG_SYNONYMS: dict[str, list[str]] = {
     "spells matter": ["spellslinger"],
     "wheels": ["wheels"],
     "wheel": ["wheels"],
-    "treasure matters": ["treasure_matters"],
-    "treasures matter": ["treasure_matters"],
-    "food matters": ["food_matters"],
-    "clue matters": ["clue_matters"],
-    "infect": ["infect_toxic"],
-    "toxic": ["infect_toxic"],
-    "poison": ["infect_toxic"],
+    "treasure matters": ["treasure"],
+    "treasures matter": ["treasure"],
+    "food matters": ["food"],
+    "clue matters": ["clues"],
+    "infect": ["infect"],
+    "toxic": ["infect"],
+    "poison": ["infect"],
 }
 
 # Token types that can be detected from a query (maps query word → canonical name)
@@ -279,7 +280,7 @@ _TOKEN_TYPE_NAMES: dict[str, str] = {
 # deck-specific (no tag mapping) and is excluded from auto-membership.
 _STAGE_TAG_MEMBERSHIP: dict[str, frozenset[str]] = {
     "ramp": frozenset({"ramp", "fast_mana", "cost_reduction"}),
-    "draw": frozenset({"draw", "card_selection"}),
+    "draw": frozenset({"draw", "card_draw", "card_selection"}),
     "interaction": frozenset({"interaction"}),
 }
 
@@ -812,13 +813,23 @@ async def _search_tags(
             SELECT id,
                    array_length(
                        ARRAY(
-                           SELECT unnest(tags)
+                           SELECT unnest(
+                               CASE
+                                   WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
+                                   ELSE tags
+                               END || mtgjson_tags
+                           )
                            INTERSECT
                            SELECT unnest($1::text[])
                        ), 1
                    ) AS overlap
             FROM cards
-            WHERE tags && $1::text[]
+            WHERE (
+                CASE
+                    WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
+                    ELSE tags
+                END || mtgjson_tags
+            ) && $1::text[]
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND id != ALL($3::uuid[])
@@ -831,7 +842,12 @@ async def _search_tags(
             ORDER BY
                 array_length(
                     ARRAY(
-                        SELECT unnest(tags)
+                        SELECT unnest(
+                            CASE
+                                WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
+                                ELSE tags
+                            END || mtgjson_tags
+                        )
                         INTERSECT
                         SELECT unnest($1::text[])
                     ), 1
@@ -1037,6 +1053,7 @@ def _build_representation_query(
     """Build deterministic representation terms from parsed query context."""
     query = RepresentationQuery(
         tags=list(query_tags),
+        mtgjson_tags=list(query_tags),
         card_types=list(type_filter.card_types) if type_filter else [],
         subtypes=list(type_filter.subtypes) if type_filter else [],
         keywords=list(type_filter.keywords) if type_filter else [],
@@ -1055,6 +1072,7 @@ def _representation_match_score(row: "asyncpg.Record", query: RepresentationQuer
         return 0.0
 
     tag_matches = set(row["tags"]) & set(query.tags)
+    mtgjson_matches = set(row["mtgjson_tags"]) & set(query.mtgjson_tags)
     type_matches = set(row["card_types"]) & set(query.card_types)
     subtype_matches = set(row["subtypes"]) & set(query.subtypes)
     keyword_matches = {k.lower() for k in row["keywords"]} & {k.lower() for k in query.keywords}
@@ -1062,6 +1080,7 @@ def _representation_match_score(row: "asyncpg.Record", query: RepresentationQuer
     token_matches = set(row["token_types"]) & set(query.token_types)
     matched = (
         len(tag_matches)
+        + len(mtgjson_matches)
         + len(type_matches)
         + len(subtype_matches)
         + len(keyword_matches)
@@ -1074,6 +1093,7 @@ def _representation_match_score(row: "asyncpg.Record", query: RepresentationQuer
 def _representation_term_count(query: RepresentationQuery) -> int:
     return (
         len(query.tags)
+        + len(query.mtgjson_tags)
         + len(query.card_types)
         + len(query.subtypes)
         + len(query.keywords)
@@ -1783,7 +1803,13 @@ async def _fetch_candidates(
         rows = await conn.fetch(
             f"""
             SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
-                   color_identity, image_uri, tags, edhrec_rank, power, toughness, rarity,
+                   color_identity, image_uri,
+                   CASE
+                       WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
+                       ELSE tags
+                   END AS tags,
+                   mtgjson_tags,
+                   edhrec_rank, power, toughness, rarity,
                    card_types, subtypes, keywords, traits, token_types,
                    CASE
                        WHEN (prices->>'eur') IS NULL THEN NULL

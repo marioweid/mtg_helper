@@ -785,7 +785,7 @@ async def extract_keywords(
 ) -> DataResponse[KeywordExtractResponse]:
     """Run one turn of the keyword-extracting deck agent.
 
-    The agent converges on structured MTGJSON keyword tags instead of writing
+    The agent converges on structured EDHREC theme tags instead of writing
     prose. Used by the ``/decks/new/agent`` flow.
     """
     _enforce_rate_limit(account, "extract_keywords", _DESCRIBE_LIMIT)

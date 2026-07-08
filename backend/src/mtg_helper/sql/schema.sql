@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS cards (
     released_at     DATE,
     edhrec_rank     INTEGER,
     tags            TEXT[] NOT NULL DEFAULT '{}',
+    edhrec_tags      TEXT[] NOT NULL DEFAULT '{}',
+    mtgjson_tags     TEXT[] NOT NULL DEFAULT '{}',
     traits          TEXT[] NOT NULL DEFAULT '{}',
     card_types      TEXT[] NOT NULL DEFAULT '{}',
     subtypes        TEXT[] NOT NULL DEFAULT '{}',
@@ -63,6 +65,8 @@ CREATE INDEX IF NOT EXISTS idx_cards_cmc ON cards (cmc);
 
 -- Tag-based filtering (hybrid retrieval)
 CREATE INDEX IF NOT EXISTS idx_cards_tags ON cards USING GIN (tags);
+CREATE INDEX IF NOT EXISTS idx_cards_edhrec_tags ON cards USING GIN (edhrec_tags);
+CREATE INDEX IF NOT EXISTS idx_cards_mtgjson_tags ON cards USING GIN (mtgjson_tags);
 
 -- Mechanical trait filtering (etb, activated, evasion)
 CREATE INDEX IF NOT EXISTS idx_cards_traits ON cards USING GIN (traits);
@@ -120,6 +124,21 @@ CREATE TABLE IF NOT EXISTS mtgjson_keywords (
 
 CREATE INDEX IF NOT EXISTS idx_mtgjson_keywords_category
     ON mtgjson_keywords (category, label);
+
+-- ============================================================
+-- EDHREC TAG / THEME CATALOG
+-- ============================================================
+CREATE TABLE IF NOT EXISTS edhrec_tags (
+    slug          TEXT PRIMARY KEY,
+    tag           TEXT UNIQUE NOT NULL,
+    label         TEXT NOT NULL,
+    category      TEXT NOT NULL DEFAULT 'theme',
+    deck_count    INTEGER,
+    fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_edhrec_tags_category
+    ON edhrec_tags (category, label);
 
 -- ============================================================
 -- ACCOUNTS
@@ -314,6 +333,14 @@ CREATE INDEX IF NOT EXISTS idx_collection_cards_card ON collection_cards(card_id
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS security_stamp TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS game_changer BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS edhrec_tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS mtgjson_tags TEXT[] NOT NULL DEFAULT '{}';
+UPDATE cards SET edhrec_tags = tags WHERE cardinality(edhrec_tags) = 0 AND cardinality(tags) > 0;
+UPDATE cards
+SET mtgjson_tags = tags
+WHERE cardinality(mtgjson_tags) = 0
+  AND cardinality(edhrec_tags) = 0
+  AND cardinality(tags) > 0;
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE deck_feedback ADD COLUMN IF NOT EXISTS reject_count INT NOT NULL DEFAULT 0;
 ALTER TABLE deck_feedback DROP CONSTRAINT IF EXISTS deck_feedback_feedback_check;
@@ -517,6 +544,11 @@ SELECT
     c.image_uri,
     c.rarity,
     c.tags,
+    CASE
+        WHEN cardinality(c.edhrec_tags) > 0 THEN c.edhrec_tags
+        ELSE c.tags
+    END           AS edhrec_tags,
+    c.mtgjson_tags,
     CASE
         WHEN (c.prices->>'eur') IS NULL THEN NULL
         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer

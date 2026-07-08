@@ -112,7 +112,9 @@ def _parse_power(raw: str | None) -> int | None:
 
 
 def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
-    tags = list(row["tags"] or []) if "tags" in row.keys() else []
+    edhrec_tags = list(row["edhrec_tags"] or []) if "edhrec_tags" in row.keys() else []
+    tags = edhrec_tags or (list(row["tags"] or []) if "tags" in row.keys() else [])
+    mtgjson_tags = list(row["mtgjson_tags"] or []) if "mtgjson_tags" in row.keys() else []
     categories = list(row["categories"] or [])
     stages = card_qualifying_stages(tags, row["type_line"])
     for cat in categories:
@@ -137,6 +139,8 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
         tags=tags,
+        edhrec_tags=tags,
+        mtgjson_tags=mtgjson_tags,
         power=power,
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
         game_changer=bool(row["game_changer"]) if "game_changer" in row.keys() else False,
@@ -214,6 +218,9 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
         partner_id = None
         if data.partner_scryfall_id:
             partner_id = await _resolve_scryfall_id(conn, data.partner_scryfall_id)
+        archetype_tags = list(data.archetype_tags)
+        if not archetype_tags:
+            archetype_tags = await _commander_seed_tags(conn, commander_id)
 
         row = await conn.fetchrow(
             """
@@ -230,12 +237,27 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             _normalize_email(email),
             json.dumps(data.stage_targets or {}),
             list(data.suggestion_collection_ids),
-            list(data.archetype_tags),
+            archetype_tags,
         )
     deck = _row_to_deck(row)
     asyncio.create_task(_safe_edhrec_refresh(pool, deck.commander_id))
     asyncio.create_task(_safe_moxfield_refresh(pool, deck.commander_id))
     return deck
+
+
+async def _commander_seed_tags(conn: asyncpg.Connection, commander_id: UUID) -> list[str]:
+    """Use the commander's EDHREC tags as initial deck identity when available."""
+    row = await conn.fetchrow(
+        """
+        SELECT edhrec_tags, tags
+        FROM cards
+        WHERE id = $1
+        """,
+        commander_id,
+    )
+    if row is None:
+        return []
+    return list(row["edhrec_tags"] or row["tags"] or [])
 
 
 async def _safe_edhrec_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
@@ -395,12 +417,14 @@ async def _fetch_commander_summary(
     """Load minimal card fields for the deck detail commander preview."""
     row = await conn.fetchrow(
         "SELECT id, name, mana_cost, cmc, type_line, oracle_text, image_uri, "
-        "color_identity, power, tags, game_changer "
+        "color_identity, power, tags, edhrec_tags, mtgjson_tags, game_changer "
         "FROM cards WHERE id = $1",
         card_id,
     )
     if row is None:
         return None
+    edhrec_tags = list(row["edhrec_tags"] or row["tags"] or [])
+    mtgjson_tags = list(row["mtgjson_tags"] or [])
     return CommanderCardSummary(
         id=row["id"],
         name=row["name"],
@@ -411,7 +435,9 @@ async def _fetch_commander_summary(
         image_uri=row["image_uri"],
         color_identity=list(row["color_identity"] or []),
         power=_parse_power(row["power"]),
-        tags=list(row["tags"] or []),
+        tags=edhrec_tags,
+        edhrec_tags=edhrec_tags,
+        mtgjson_tags=mtgjson_tags,
         game_changer=bool(row["game_changer"]),
     )
 

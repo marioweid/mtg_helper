@@ -74,6 +74,7 @@ export default function CommanderSuggestPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [intent, setIntent] = useState<CommanderSuggestIntent>(emptyIntent);
   const [commanders, setCommanders] = useState<CommanderSuggestion[]>([]);
+  const [edhrecTags, setEdhrecTags] = useState<string[]>([]);
   const [mechanicTags, setMechanicTags] = useState<string[]>([]);
   const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
   const [suggestedName, setSuggestedName] = useState<string | null>(null);
@@ -151,7 +152,9 @@ export default function CommanderSuggestPage() {
         <BracketPanel intent={intent} onChange={rerank} />
         <KeywordPanel
           intent={intent}
+          edhrecTags={edhrecTags}
           mechanicTags={mechanicTags}
+          onEdhrecTagsLoaded={setEdhrecTags}
           onMechanicTagsLoaded={setMechanicTags}
           onChange={rerank}
         />
@@ -343,26 +346,32 @@ function BracketPanel({ intent, onChange }: { intent: CommanderSuggestIntent; on
 
 function KeywordPanel({
   intent,
+  edhrecTags,
   mechanicTags,
+  onEdhrecTagsLoaded,
   onMechanicTagsLoaded,
   onChange,
 }: {
   intent: CommanderSuggestIntent;
+  edhrecTags: string[];
   mechanicTags: string[];
+  onEdhrecTagsLoaded: (tags: string[]) => void;
   onMechanicTagsLoaded: (tags: string[]) => void;
   onChange: Rerank;
 }) {
+  const edhrecSet = useMemo(() => new Set(edhrecTags), [edhrecTags]);
   const mechanicSet = useMemo(() => new Set(mechanicTags), [mechanicTags]);
   return (
     <section className={PANEL_CLASS}>
-      <h2 className="mb-3 text-sm font-semibold text-white">Inferred keywords</h2>
+      <h2 className="mb-3 text-sm font-semibold text-white">Inferred themes</h2>
       <ArchetypeChipPicker
         value={[...intent.archetype_tags, ...intent.mechanic_tags]}
+        onEdhrecTagsLoaded={onEdhrecTagsLoaded}
         onMechanicTagsLoaded={onMechanicTagsLoaded}
         onChange={(tags) =>
           onChange({
             ...intent,
-            archetype_tags: [],
+            archetype_tags: tags.filter((tag) => edhrecSet.has(tag)),
             mechanic_tags: tags.filter((tag) => mechanicSet.has(tag)),
           })
         }

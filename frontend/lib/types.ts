@@ -88,6 +88,8 @@ export interface DeckCardItem {
   ai_reasoning: string | null;
   qualifying_stages: string[];
   tags: string[];
+  edhrec_tags: string[];
+  mtgjson_tags: string[];
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
   game_changer: boolean;
@@ -115,6 +117,9 @@ export interface CommanderCardSummary {
   oracle_text: string | null;
   image_uri: string | null;
   color_identity: string[];
+  tags?: string[];
+  edhrec_tags?: string[];
+  mtgjson_tags?: string[];
   game_changer: boolean;
 }
 
@@ -303,6 +308,7 @@ export interface CommanderSuggestResponse {
 export interface KeywordChip {
   tag: string;
   label: string;
+  deck_count?: number | null;
 }
 
 export interface KeywordGroup {

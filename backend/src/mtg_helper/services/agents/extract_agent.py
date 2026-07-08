@@ -17,6 +17,10 @@ from mtg_helper.services.agents._prompts import (
     SANDBOX_RULES,
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
+from mtg_helper.services.edhrec_tag_catalog_service import (
+    load_edhrec_prompt_catalog,
+    load_edhrec_tags,
+)
 
 _TEMPERATURE = 0.3
 _MAX_OUTPUT_TOKENS = 2048
@@ -57,6 +61,7 @@ class ExtractDeps:
     partner_oracle: str | None
     bracket: int
     at_history_limit: bool
+    edhrec_catalog: str
 
 
 def _build_system_prompt(deps: ExtractDeps) -> str:
@@ -66,9 +71,9 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
 
     parts = [
         "You are a Magic: The Gathering Commander deck strategist.",
-        "Your job is to identify a small set of official MTGJSON keyword tags",
+        "Your job is to identify a small set of EDHREC deckbuilding theme tags",
         "that match the player's deck vision. The downstream retrieval system",
-        "filters cards by these keyword tags.",
+        "uses these tags as the primary card-suggestion signal.",
         "",
         SANDBOX_RULES,
         "",
@@ -86,12 +91,14 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
     parts += [
         f"\nPower level: Bracket {deps.bracket} — {bracket_desc}",
         "",
-        "Use MTGJSON keyword tags in snake_case, such as:",
+        "Use EDHREC theme tags from this local catalog:",
+        deps.edhrec_catalog,
+        "",
+        "MTGJSON mechanic examples, for context only, include:",
         vocab_str,
         "",
-        "Do not emit custom archetype tags like graveyard, blink, reanimator,",
-        "aristocrats, voltron, spellslinger, or tribal tags. Translate intent to",
-        "official MTGJSON keyword tags whenever possible.",
+        "Prefer EDHREC tags like graveyard, blink, reanimator, aristocrats,",
+        "voltron, spellslinger, etb, pingers, or plus_one_plus_one_counters.",
         "",
         "RULES:",
         "- Ask 1-3 short, focused questions to narrow the keyword plan while done=false.",
@@ -99,7 +106,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- Reference the commander's specific abilities when picking what to ask.",
         "- The `reply` field holds the conversational text shown to the user.",
         "- Set done=true ONLY when you have enough information.",
-        "- When done=true, populate archetype_tags with MTGJSON keyword tags,",
+        "- When done=true, populate archetype_tags with EDHREC theme tags,",
         "  suggested_name, and stage_targets.",
         "",
         "STAGE TARGET GUIDELINES (defaults are fixed):",
@@ -110,7 +117,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- theme has no fixed target — fills remaining slots",
         "",
         "FORBIDDEN:",
-        "- Do NOT invent custom archetype tags.",
+        "- Do NOT invent tags outside the EDHREC catalog.",
         "- Do NOT write a prose `description` field.",
         "- Do NOT mention semantic match, embeddings, or oracle text.",
     ]
@@ -169,7 +176,7 @@ async def extract_turn(
 
     Returns:
         ``KeywordExtractResponse`` with the reply, completion flag, and the
-        running MTGJSON keyword tag selection.
+        running EDHREC theme tag selection.
 
     Raises:
         CommanderNotFoundError: If the commander card is not in the database.
@@ -196,6 +203,7 @@ async def extract_turn(
         partner_oracle=partner_oracle,
         bracket=bracket,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
+        edhrec_catalog=await load_edhrec_prompt_catalog(pool),
     )
     user_message = message.strip() or "I want to build a deck with this commander."
     result = await get_agent().run(
@@ -203,4 +211,7 @@ async def extract_turn(
         deps=deps,
         message_history=to_model_messages(trimmed),
     )
-    return result.output
+    output = result.output
+    allowed = await load_edhrec_tags(pool)
+    output.archetype_tags = [tag for tag in output.archetype_tags if tag in allowed]
+    return output
