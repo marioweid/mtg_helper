@@ -18,6 +18,7 @@ from mtg_helper.services.commander_suggestor_service import (
     build_response,
     parse_intent_fallback,
 )
+from mtg_helper.services.keyword_catalog_service import load_keyword_prompt_catalog
 
 _TEMPERATURE = 0.25
 _MAX_OUTPUT_TOKENS = 1536
@@ -29,6 +30,7 @@ class CommanderSuggestDeps:
 
     previous_intent: CommanderSuggestIntent | None
     at_history_limit: bool
+    keyword_catalog: str
 
 
 class CommanderSuggestAgentOutput(CommanderSuggestIntent):
@@ -56,9 +58,19 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "Emit official MTGJSON keyword tags only in `mechanic_tags`.",
         "Use snake_case tag names such as:",
         ", ".join(KEYWORD_EXAMPLES),
+        "Every `mechanic_tags` item must appear in the local catalog below.",
+        "",
+        "Available local MTGJSON keyword catalog:",
+        deps.keyword_catalog,
         "",
         "Do not emit custom archetype tags like graveyard, blink, reanimator,",
         "aristocrats, voltron, spellslinger, or tribal tags.",
+        "Do not invent compound tags such as etb_ping, graveyard_value, or token_draw.",
+        "",
+        "When a player asks for a concept that is not an MTGJSON keyword, express it as",
+        "`traits`, `oracle_terms`, and `required_phrases` instead of fake keywords.",
+        "Example: ETB ping should use traits=['etb'], oracle_terms=['enters', 'damage'],",
+        "and required_phrases=['enters', 'damage'].",
         "",
         "Traits you may emit: etb, activated, evasion.",
         "Token types may be common token nouns such as treasure, food, clue, zombie, squirrel.",
@@ -117,6 +129,7 @@ async def suggest_turn(
     deps = CommanderSuggestDeps(
         previous_intent=previous_intent,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
+        keyword_catalog=await load_keyword_prompt_catalog(pool),
     )
     try:
         result = await get_agent().run(

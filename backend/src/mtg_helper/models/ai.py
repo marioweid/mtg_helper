@@ -516,6 +516,9 @@ class CommanderSuggestIntent(BaseModel):
     direction: str = Field(default="", max_length=500)
     must_have: list[str] = Field(default_factory=list, max_length=12)
     avoid: list[str] = Field(default_factory=list, max_length=12)
+    oracle_terms: list[str] = Field(default_factory=list, max_length=16)
+    required_phrases: list[str] = Field(default_factory=list, max_length=8)
+    excluded_phrases: list[str] = Field(default_factory=list, max_length=8)
 
     @field_validator("archetype_tags", mode="after")
     @classmethod
@@ -592,6 +595,12 @@ class CommanderSuggestIntent(BaseModel):
     def _filter_excluded_colors(cls, value: list[str]) -> list[str]:
         """Normalize excluded color letters and preserve WUBRG order."""
         return _dedupe_allowed(value, {"W", "U", "B", "R", "G"}, upper=True)
+
+    @field_validator("oracle_terms", "required_phrases", "excluded_phrases", mode="after")
+    @classmethod
+    def _filter_text_filters(cls, value: list[str]) -> list[str]:
+        """Keep short searchable oracle text filters."""
+        return _dedupe_short_text(value)
 
 
 class CommanderSuggestRequest(BaseModel):
@@ -702,3 +711,25 @@ def _dedupe_sane_tags(value: list[str]) -> list[str]:
             seen.add(tag)
             out.append(tag)
     return out
+
+
+def _dedupe_short_text(value: list[str]) -> list[str]:
+    """Normalize and deduplicate short natural-language search phrases."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        phrase = " ".join(item.strip().lower().split())
+        if not phrase or len(phrase) > 48 or phrase in seen:
+            continue
+        if not _is_safe_text_filter(phrase):
+            continue
+        seen.add(phrase)
+        out.append(phrase)
+    return out
+
+
+def _is_safe_text_filter(phrase: str) -> bool:
+    """Return true for phrase fragments that are safe to use as text filters."""
+    return bool(phrase.replace("'", "").replace("-", " ").replace(" ", "").isalnum())

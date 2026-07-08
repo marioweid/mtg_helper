@@ -269,6 +269,9 @@ export interface CommanderSuggestIntent {
   direction: string;
   must_have: string[];
   avoid: string[];
+  oracle_terms: string[];
+  required_phrases: string[];
+  excluded_phrases: string[];
 }
 
 export interface CommanderSuggestRequest {

@@ -12,6 +12,23 @@ from mtg_helper.services import commander_suggestor_service
 MULDROTHA_ID = UUID("aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa")
 GENERIC_ID = UUID("bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb")
 BANNED_ID = UUID("cccccccc-3333-4333-8333-cccccccccccc")
+PINGER_ID = UUID("dddddddd-4444-4444-8444-dddddddddddd")
+
+
+async def _insert_keyword(pool: asyncpg.Pool, label: str, tag: str) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO mtgjson_keywords (keyword, tag, label, category)
+            VALUES ($1, $2, $1, 'keyword_ability')
+            ON CONFLICT (keyword) DO UPDATE
+            SET tag = EXCLUDED.tag,
+                label = EXCLUDED.label,
+                category = EXCLUDED.category
+            """,
+            label,
+            tag,
+        )
 
 
 async def _insert_card(
@@ -66,6 +83,7 @@ async def _insert_card(
 async def test_suggest_commanders_marks_card_advantage_without_score_boost(
     db_pool: asyncpg.Pool,
 ) -> None:
+    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -101,6 +119,7 @@ async def test_suggest_commanders_marks_card_advantage_without_score_boost(
 async def test_suggest_commanders_prioritizes_selected_keyword(
     db_pool: asyncpg.Pool,
 ) -> None:
+    await _insert_keyword(db_pool, "Surveil", "surveil")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -134,6 +153,7 @@ async def test_suggest_commanders_prioritizes_selected_keyword(
 async def test_suggest_commanders_filters_illegal_and_off_color(
     db_pool: asyncpg.Pool,
 ) -> None:
+    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -167,6 +187,7 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
 async def test_suggest_commanders_exact_color_match_requires_same_identity(
     db_pool: asyncpg.Pool,
 ) -> None:
+    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -210,6 +231,7 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
     client: AsyncClient,
     db_pool: asyncpg.Pool,
 ) -> None:
+    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -246,3 +268,78 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
     data = resp.json()["data"]
     assert data["commanders"][0]["card"]["scryfall_id"] == str(MULDROTHA_ID)
     assert data["intent"]["mechanic_tags"] == ["escape"]
+
+
+async def test_build_response_drops_invented_mechanic_tags(
+    db_pool: asyncpg.Pool,
+) -> None:
+    await _insert_keyword(db_pool, "Surveil", "surveil")
+    await _insert_card(
+        db_pool,
+        scryfall_id=GENERIC_ID,
+        name="Surveil Legal Legend",
+        type_line="Legendary Creature - Wizard",
+        oracle_text="Whenever you surveil, draw a card.",
+        colors=["U", "B"],
+        tags=[],
+        keywords=["Surveil"],
+    )
+
+    intent = CommanderSuggestIntent(mechanic_tags=["etb_ping", "surveil"])
+    response = await commander_suggestor_service.build_response(
+        db_pool,
+        reply="Sure.",
+        done=False,
+        intent=intent,
+        limit=8,
+    )
+
+    assert response.intent.mechanic_tags == ["surveil"]
+    assert "etb_ping" not in response.commanders[0].matched_tags
+
+
+async def test_suggest_commanders_uses_dynamic_text_filters_for_etb_ping(
+    db_pool: asyncpg.Pool,
+) -> None:
+    await _insert_card(
+        db_pool,
+        scryfall_id=MULDROTHA_ID,
+        name="Popular Draw Legend",
+        type_line="Legendary Creature - Wizard",
+        oracle_text="Whenever you cast a spell, draw a card.",
+        colors=["U"],
+        tags=[],
+        edhrec_rank=1,
+    )
+    await _insert_card(
+        db_pool,
+        scryfall_id=PINGER_ID,
+        name="ETB Pinger Legend",
+        type_line="Legendary Creature - Shaman",
+        oracle_text=(
+            "Whenever another creature enters the battlefield under your control, "
+            "ETB Pinger Legend deals 1 damage to each opponent."
+        ),
+        colors=["B", "R"],
+        tags=[],
+        traits=["etb"],
+        edhrec_rank=50000,
+    )
+
+    intent = CommanderSuggestIntent(
+        mechanic_tags=["etb_ping"],
+        traits=["etb"],
+        oracle_terms=["enters", "damage"],
+        required_phrases=["enters", "damage"],
+    )
+    response = await commander_suggestor_service.build_response(
+        db_pool,
+        reply="Sure.",
+        done=False,
+        intent=intent,
+        limit=8,
+    )
+
+    assert response.intent.mechanic_tags == []
+    assert response.commanders[0].card.scryfall_id == PINGER_ID
+    assert "Text filter match" in response.commanders[0].score_reasons

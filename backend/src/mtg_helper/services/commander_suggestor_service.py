@@ -13,6 +13,7 @@ from mtg_helper.models.ai import (
     CommanderSuggestResponse,
 )
 from mtg_helper.models.cards import CardResponse
+from mtg_helper.services.keyword_catalog_service import sanitize_commander_intent
 
 _WUBRG = ["W", "U", "B", "R", "G"]
 _DEFAULT_STAGE_TARGETS = {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}
@@ -173,6 +174,10 @@ def parse_intent_fallback(
     merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_plan_mechanics(text))
     merged.traits = _merge_vocab(merged.traits, _match_hints(text, _TRAIT_HINTS))
     merged.token_types = _merge_vocab(merged.token_types, _match_hints(text, _TOKEN_HINTS))
+    filters = _match_dynamic_filters(text)
+    merged.oracle_terms = _merge_vocab(merged.oracle_terms, filters["oracle_terms"])
+    merged.required_phrases = _merge_vocab(merged.required_phrases, filters["required_phrases"])
+    merged.excluded_phrases = _merge_vocab(merged.excluded_phrases, filters["excluded_phrases"])
     colors = _extract_colors(text)
     if colors:
         merged.color_identity = colors
@@ -220,6 +225,17 @@ async def suggest_commanders(
     limit: int = 8,
 ) -> list[CommanderSuggestion]:
     """Rank local legal commander candidates for a structured intent."""
+    intent = await sanitize_commander_intent(pool, intent)
+    return await _rank_commanders(pool, intent, limit=limit)
+
+
+async def _rank_commanders(
+    pool: asyncpg.Pool,
+    intent: CommanderSuggestIntent,
+    *,
+    limit: int,
+) -> list[CommanderSuggestion]:
+    """Rank candidates for an already-sanitized intent."""
     candidates = await _fetch_candidates(pool)
     ranked = [_score_candidate(candidate, intent) for candidate in candidates]
     filtered = [item for item in ranked if item.score > 0 or not _has_specific_intent(intent)]
@@ -236,7 +252,8 @@ async def build_response(
     limit: int,
 ) -> CommanderSuggestResponse:
     """Build a complete suggestor response from intent plus deterministic ranking."""
-    commanders = await suggest_commanders(pool, intent, limit=limit)
+    intent = await sanitize_commander_intent(pool, intent)
+    commanders = await _rank_commanders(pool, intent, limit=limit)
     return CommanderSuggestResponse(
         reply=reply,
         done=done,
@@ -288,6 +305,7 @@ def _score_candidate(candidate: _Candidate, intent: CommanderSuggestIntent) -> C
     if candidate.card.edhrec_rank:
         score += max(0, 8 - candidate.card.edhrec_rank / 10000)
     score += _text_intent_score(candidate.card.oracle_text, intent, reasons)
+    score += _dynamic_filter_score(candidate.card.oracle_text, intent, reasons)
 
     return CommanderSuggestion(
         card=candidate.card,
@@ -399,6 +417,45 @@ def _text_intent_score(
     return score
 
 
+def _dynamic_filter_score(
+    oracle_text: str | None,
+    intent: CommanderSuggestIntent,
+    reasons: list[str],
+) -> float:
+    """Score flexible oracle-text filters extracted from conversational intent."""
+    text = (oracle_text or "").lower()
+    if any(_phrase_matches(text, phrase) for phrase in intent.excluded_phrases):
+        reasons.append("Avoided text match")
+        return -100
+
+    score = 0.0
+    required = [phrase for phrase in intent.required_phrases if _phrase_matches(text, phrase)]
+    optional = [term for term in intent.oracle_terms if _phrase_matches(text, term)]
+    missing_required = [phrase for phrase in intent.required_phrases if phrase not in required]
+    if intent.required_phrases and missing_required:
+        score -= len(missing_required) * 4
+    if required:
+        score += len(required) * 8
+    if optional:
+        score += len(optional) * 4
+    if required or optional:
+        reasons.append("Text filter match")
+    return score
+
+
+def _phrase_matches(text: str, phrase: str) -> bool:
+    """Return true when a normalized phrase or common shorthand matches text."""
+    if phrase in text:
+        return True
+    if phrase == "enters":
+        return "enters the battlefield" in text or "enter the battlefield" in text
+    if phrase == "damage":
+        return "deals" in text and "damage" in text
+    if phrase == "dies":
+        return "dies" in text or "is put into a graveyard" in text
+    return False
+
+
 def _stage_targets(intent: CommanderSuggestIntent) -> dict[str, int]:
     targets = dict(_DEFAULT_STAGE_TARGETS)
     if "storm" in intent.mechanic_tags or "magecraft" in intent.mechanic_tags:
@@ -423,7 +480,33 @@ def _has_specific_intent(intent: CommanderSuggestIntent) -> bool:
         or intent.traits
         or intent.token_types
         or intent.color_identity
+        or intent.oracle_terms
+        or intent.required_phrases
+        or intent.excluded_phrases
     )
+
+
+def _match_dynamic_filters(text: str) -> dict[str, list[str]]:
+    """Map non-keyword natural language plans to searchable oracle text filters."""
+    oracle_terms: list[str] = []
+    required_phrases: list[str] = []
+    excluded_phrases: list[str] = []
+    has_etb = any(needle in text for needle in ("etb", "enter the battlefield", "enters"))
+    wants_damage = any(needle in text for needle in ("ping", "damage", "burn", "pinger"))
+    if has_etb:
+        oracle_terms.append("enters")
+    if has_etb and wants_damage:
+        required_phrases.extend(["enters", "damage"])
+        oracle_terms.extend(["damage", "opponent"])
+    if "death trigger" in text or ("dies" in text and "drain" in text):
+        required_phrases.extend(["dies", "loses life"])
+    if "big reanimation" in text or "cheat in" in text:
+        oracle_terms.extend(["graveyard", "battlefield"])
+    return {
+        "oracle_terms": oracle_terms,
+        "required_phrases": required_phrases,
+        "excluded_phrases": excluded_phrases,
+    }
 
 
 def _dedupe(items: list[str]) -> list[str]:

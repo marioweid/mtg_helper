@@ -63,6 +63,9 @@ function emptyIntent(): CommanderSuggestIntent {
     direction: "",
     must_have: [],
     avoid: [],
+    oracle_terms: [],
+    required_phrases: [],
+    excluded_phrases: [],
   };
 }
 
@@ -364,7 +367,29 @@ function KeywordPanel({
           })
         }
       />
+      <DynamicFilterChips intent={intent} />
     </section>
+  );
+}
+
+function DynamicFilterChips({ intent }: { intent: CommanderSuggestIntent }) {
+  const filters = [
+    ...intent.required_phrases.map((text) => ({ text, label: "required" })),
+    ...intent.oracle_terms.map((text) => ({ text, label: "text" })),
+    ...intent.excluded_phrases.map((text) => ({ text, label: "avoid" })),
+  ];
+  if (filters.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {filters.map((filter) => (
+        <span
+          key={`${filter.label}-${filter.text}`}
+          className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200"
+        >
+          {filter.label}: {filter.text}
+        </span>
+      ))}
+    </div>
   );
 }
 
