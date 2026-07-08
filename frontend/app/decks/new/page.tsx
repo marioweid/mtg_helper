@@ -8,6 +8,14 @@ export const metadata = {
 
 const OPTIONS: { href: string; title: string; subtitle: string; description: string }[] = [
   {
+    href: "/decks/new/suggest",
+    title: "Suggest a commander",
+    subtitle: "Start from an idea",
+    description:
+      "Describe the play pattern you want, refine it with quick questions, then pick from " +
+      "a live top 8 of local Commander-legal legends.",
+  },
+  {
     href: "/decks/new/keywords",
     title: "Pick keywords",
     subtitle: "Fastest path",

@@ -21,6 +21,8 @@ from mtg_helper.models.ai import (
     CommanderCoachRequest,
     CommanderCoachResponse,
     CommanderCoachStartResponse,
+    CommanderSuggestRequest,
+    CommanderSuggestResponse,
     DeckDoctorResponse,
     DescribeRequest,
     DescribeResponse,
@@ -45,6 +47,7 @@ from mtg_helper.services import (
     ai_service,
     coach_memory_service,
     commander_coach,
+    commander_suggestor_service,
     deck_optimizer_service,
     deck_service,
     feature_flag_service,
@@ -296,6 +299,34 @@ async def suggest_cards(
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
+    return DataResponse(data=result)
+
+
+@router.post("/suggest-commanders", response_model=DataResponse[CommanderSuggestResponse])
+async def suggest_commanders(
+    body: CommanderSuggestRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[CommanderSuggestResponse]:
+    """Run one pre-commander suggestion turn and return live ranked commanders."""
+    _enforce_rate_limit(account, "suggest_commanders", _DESCRIBE_LIMIT)
+    pool = request.app.state.db_pool
+    if body.intent_override is not None and not body.message.strip():
+        result = await commander_suggestor_service.build_response(
+            pool,
+            reply="I updated the commander board with your current filters.",
+            done=False,
+            intent=body.intent_override,
+            limit=body.limit,
+        )
+    else:
+        result = await agents.suggest_turn(
+            pool,
+            [{"role": m.role, "content": m.content} for m in body.history],
+            body.message,
+            body.intent_override,
+            limit=body.limit,
+        )
     return DataResponse(data=result)
 
 

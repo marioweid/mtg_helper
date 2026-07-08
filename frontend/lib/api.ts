@@ -36,6 +36,8 @@ import type {
   CommanderCoachRequest,
   CommanderCoachResponse,
   CommanderCoachStartResponse,
+  CommanderSuggestRequest,
+  CommanderSuggestResponse,
   KeywordExtractRequest,
   KeywordExtractResponse,
   ManaFixResponse,
@@ -373,6 +375,12 @@ export const apiClient = {
 
   extractKeywords: (body: KeywordExtractRequest) =>
     request<KeywordExtractResponse>("/decks/extract-keywords", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  suggestCommanders: (body: CommanderSuggestRequest) =>
+    request<CommanderSuggestResponse>("/decks/suggest-commanders", {
       method: "POST",
       body: JSON.stringify(body),
     }),

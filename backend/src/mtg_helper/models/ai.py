@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from mtg_helper.models.cards import CardResponse
+
 
 class BuildRequest(BaseModel):
     """Request body for the staged deck build."""
@@ -521,3 +523,159 @@ class KeywordExtractResponse(BaseModel):
                 seen.add(tag)
                 out.append(tag)
         return out
+
+
+class CommanderSuggestIntent(BaseModel):
+    """Structured deck intent inferred before a commander has been selected."""
+
+    archetype_tags: list[str] = Field(default_factory=list, max_length=24)
+    mechanic_tags: list[str] = Field(default_factory=list, max_length=24)
+    traits: list[str] = Field(default_factory=list, max_length=12)
+    token_types: list[str] = Field(default_factory=list, max_length=12)
+    color_identity: list[str] | None = Field(default=None, max_length=5)
+    excluded_colors: list[str] = Field(default_factory=list, max_length=5)
+    bracket: int = Field(default=3, ge=1, le=5)
+    direction: str = Field(default="", max_length=500)
+    must_have: list[str] = Field(default_factory=list, max_length=12)
+    avoid: list[str] = Field(default_factory=list, max_length=12)
+
+    @field_validator("archetype_tags", mode="after")
+    @classmethod
+    def _filter_archetype_tags(cls, value: list[str]) -> list[str]:
+        """Keep known archetype and tribal tags only."""
+        return _filter_commander_suggest_tags(value, include_mechanics=False)
+
+    @field_validator("mechanic_tags", mode="after")
+    @classmethod
+    def _filter_mechanic_tags(cls, value: list[str]) -> list[str]:
+        """Keep known printed mechanic tags only."""
+        return _filter_commander_suggest_tags(value, include_mechanics=True)
+
+    @field_validator("traits", mode="after")
+    @classmethod
+    def _filter_traits(cls, value: list[str]) -> list[str]:
+        """Keep supported mechanical traits only."""
+        return _dedupe_allowed(value, {"etb", "activated", "evasion"})
+
+    @field_validator("token_types", mode="after")
+    @classmethod
+    def _filter_token_types(cls, value: list[str]) -> list[str]:
+        """Keep simple canonical token type tags."""
+        allowed = {
+            "treasure",
+            "food",
+            "clue",
+            "blood",
+            "powerstone",
+            "map",
+            "incubator",
+            "zombie",
+            "soldier",
+            "spirit",
+            "saproling",
+            "goblin",
+            "elf",
+            "squirrel",
+            "angel",
+            "demon",
+            "dragon",
+            "elemental",
+            "beast",
+            "bird",
+            "cat",
+            "human",
+            "knight",
+            "warrior",
+            "thopter",
+            "servo",
+            "insect",
+            "rat",
+            "snake",
+            "wolf",
+            "vampire",
+            "faerie",
+            "merfolk",
+            "plant",
+            "horror",
+        }
+        return _dedupe_allowed(value, allowed)
+
+    @field_validator("color_identity", mode="after")
+    @classmethod
+    def _filter_color_identity(cls, value: list[str] | None) -> list[str] | None:
+        """Normalize color identity letters and preserve WUBRG order."""
+        if value is None:
+            return None
+        colors = _dedupe_allowed(value, {"W", "U", "B", "R", "G"}, upper=True)
+        return colors or None
+
+    @field_validator("excluded_colors", mode="after")
+    @classmethod
+    def _filter_excluded_colors(cls, value: list[str]) -> list[str]:
+        """Normalize excluded color letters and preserve WUBRG order."""
+        return _dedupe_allowed(value, {"W", "U", "B", "R", "G"}, upper=True)
+
+
+class CommanderSuggestRequest(BaseModel):
+    """Request body for the pre-commander suggestion agent."""
+
+    history: list[DescribeMessage] = Field(default_factory=list, max_length=24)
+    message: str = Field(default="", max_length=2000)
+    intent_override: CommanderSuggestIntent | None = None
+    limit: int = Field(default=8, ge=1, le=16)
+
+
+class CommanderSuggestion(BaseModel):
+    """One legal commander recommendation with deterministic score evidence."""
+
+    card: "CardResponse"
+    score: float
+    score_reasons: list[str] = Field(default_factory=list)
+    matched_tags: list[str] = Field(default_factory=list)
+    matched_traits: list[str] = Field(default_factory=list)
+    matched_token_types: list[str] = Field(default_factory=list)
+    card_advantage_reasons: list[str] = Field(default_factory=list)
+
+
+class CommanderSuggestResponse(BaseModel):
+    """Response from one interactive commander suggestion turn."""
+
+    reply: str
+    done: bool
+    intent: CommanderSuggestIntent
+    commanders: list[CommanderSuggestion]
+    stage_targets: dict[str, int] | None = None
+    suggested_name: str | None = None
+
+
+def _dedupe_allowed(
+    value: list[str],
+    allowed: set[str],
+    *,
+    upper: bool = False,
+) -> list[str]:
+    """Normalize, filter, and deduplicate short vocabulary lists."""
+    seen: set[str] = set()
+    out: list[str] = []
+    order = ["W", "U", "B", "R", "G"] if upper else None
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        tag = item.strip().upper() if upper else item.strip().lower()
+        if tag in allowed and tag not in seen:
+            seen.add(tag)
+            out.append(tag)
+    if order is None:
+        return out
+    return [color for color in order if color in seen]
+
+
+def _filter_commander_suggest_tags(value: list[str], *, include_mechanics: bool) -> list[str]:
+    """Filter tags against the curated archetype, tribal, or mechanic vocabularies."""
+    from mtg_helper.services.agents.extract_agent import KEYWORD_VOCAB
+    from mtg_helper.services.tag_service import _FULL_MECHANIC_PATTERNS, _TRIBAL_SUBTYPES
+
+    allowed = set(_FULL_MECHANIC_PATTERNS) if include_mechanics else set(KEYWORD_VOCAB)
+    if not include_mechanics:
+        allowed |= {f"{s.lower()}_tribal" for s in _TRIBAL_SUBTYPES}
+    return _dedupe_allowed(value, allowed)

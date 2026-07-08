@@ -257,6 +257,45 @@ export interface KeywordExtractResponse {
   stage_targets: Record<string, number> | null;
 }
 
+export interface CommanderSuggestIntent {
+  archetype_tags: string[];
+  mechanic_tags: string[];
+  traits: string[];
+  token_types: string[];
+  color_identity: string[] | null;
+  excluded_colors: string[];
+  bracket: number;
+  direction: string;
+  must_have: string[];
+  avoid: string[];
+}
+
+export interface CommanderSuggestRequest {
+  history: DescribeMessage[];
+  message: string;
+  intent_override?: CommanderSuggestIntent | null;
+  limit?: number;
+}
+
+export interface CommanderSuggestion {
+  card: CardResponse;
+  score: number;
+  score_reasons: string[];
+  matched_tags: string[];
+  matched_traits: string[];
+  matched_token_types: string[];
+  card_advantage_reasons: string[];
+}
+
+export interface CommanderSuggestResponse {
+  reply: string;
+  done: boolean;
+  intent: CommanderSuggestIntent;
+  commanders: CommanderSuggestion[];
+  stage_targets: Record<string, number> | null;
+  suggested_name: string | null;
+}
+
 // Tribal tag enumeration (used by keyword pickers)
 export interface TribalTag {
   tag: string;
