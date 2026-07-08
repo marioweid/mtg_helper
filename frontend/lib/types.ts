@@ -297,13 +297,6 @@ export interface CommanderSuggestResponse {
   suggested_name: string | null;
 }
 
-// Tribal tag enumeration (used by keyword pickers)
-export interface TribalTag {
-  tag: string;
-  subtype: string;
-  card_count: number;
-}
-
 export interface KeywordChip {
   tag: string;
   label: string;

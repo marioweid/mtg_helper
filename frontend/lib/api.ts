@@ -61,7 +61,6 @@ import type {
   SuggestResponse,
   SwapRequest,
   SwapResponse,
-  TribalTag,
 } from "@/lib/types";
 
 const CLIENT_BASE =
@@ -385,9 +384,6 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-
-  listTribalTags: (minCount = 3) =>
-    request<TribalTag[]>(`/tags/tribal?min_count=${minCount}`),
 
   listOfficialKeywords: () => request<KeywordGroup[]>("/tags/keywords"),
 

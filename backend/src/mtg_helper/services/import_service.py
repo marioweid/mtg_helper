@@ -297,7 +297,7 @@ async def import_parsed_entries(
     )
 
     updated_deck = await deck_service._fetch_deck(pool, deck.id)
-    suggested_tags = await _aggregate_archetype_tags(pool, resolved_cards)
+    suggested_tags = await _aggregate_keyword_tags(pool, resolved_cards)
 
     return DeckImportResponse(
         deck=updated_deck,  # type: ignore[arg-type]
@@ -308,8 +308,8 @@ async def import_parsed_entries(
     )
 
 
-# Stage-default tags that appear in nearly every deck — excluded from archetype
-# suggestions because they don't distinguish one strategy from another.
+# Stage-default tags from old databases that appear in nearly every deck.
+# Exclude them from import suggestions; new batch tagging emits MTGJSON tags.
 _GENERIC_STAGE_TAGS: frozenset[str] = frozenset(
     {
         "ramp",
@@ -320,19 +320,18 @@ _GENERIC_STAGE_TAGS: frozenset[str] = frozenset(
         "fast_mana",
     }
 )
-_MAX_SUGGESTED_ARCHETYPE_TAGS = 6
+_MAX_SUGGESTED_KEYWORD_TAGS = 6
 _MIN_TAG_SUPPORT = 2
 
 
-async def _aggregate_archetype_tags(
+async def _aggregate_keyword_tags(
     pool: asyncpg.Pool,
     resolved_cards: list[tuple[str, int, str | None]],
 ) -> list[str]:
-    """Compute the top archetype keywords across an imported deck's cards.
+    """Compute the top MTGJSON keyword tags across an imported deck's cards.
 
-    Counts tag frequencies on the imported cards, drops generic stage tags
-    (ramp/draw/removal/...) so the surfaced suggestions actually describe the
-    deck's archetype, and returns the top ``_MAX_SUGGESTED_ARCHETYPE_TAGS``.
+    Counts tag frequencies on the imported cards, drops old generic stage tags,
+    and returns the top ``_MAX_SUGGESTED_KEYWORD_TAGS``.
 
     Args:
         pool: asyncpg connection pool.
@@ -340,7 +339,7 @@ async def _aggregate_archetype_tags(
             produced by ``_resolve_non_commanders``.
 
     Returns:
-        Up to ``_MAX_SUGGESTED_ARCHETYPE_TAGS`` archetype tag names sorted by
+        Up to ``_MAX_SUGGESTED_KEYWORD_TAGS`` keyword tag names sorted by
         frequency descending.
     """
     if not resolved_cards:
@@ -360,7 +359,7 @@ async def _aggregate_archetype_tags(
             _MIN_TAG_SUPPORT,
         )
     return [r["tag"] for r in rows if r["tag"] not in _GENERIC_STAGE_TAGS][
-        :_MAX_SUGGESTED_ARCHETYPE_TAGS
+        :_MAX_SUGGESTED_KEYWORD_TAGS
     ]
 
 

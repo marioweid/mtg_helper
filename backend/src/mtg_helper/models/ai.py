@@ -111,12 +111,7 @@ class DescribeResponse(BaseModel):
 
 
 class KeywordExtractRequest(BaseModel):
-    """Request body for the keyword-extracting deck agent.
-
-    Mirrors ``DescribeRequest`` but the agent is asked to converge on a
-    structured set of archetype keywords (Moxfield-style: ``voltron``,
-    ``aristocrats``, ``squirrel_tribal``) rather than a free-form description.
-    """
+    """Request body for the MTGJSON keyword-extracting deck agent."""
 
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
@@ -490,10 +485,8 @@ class CommanderCoachStartResponse(BaseModel):
 class KeywordExtractResponse(BaseModel):
     """Response from the keyword-extracting deck agent.
 
-    ``archetype_tags`` is the running set of canonical keywords the agent has
-    inferred from the conversation. The frontend mirrors them as live chips so
-    the user can refine selection mid-conversation. Unknown tags are silently
-    dropped — see :meth:`_filter_known_archetype_tags`.
+    ``archetype_tags`` is the running set of canonical MTGJSON keyword tags the
+    agent has inferred from the conversation.
     """
 
     reply: str
@@ -505,24 +498,8 @@ class KeywordExtractResponse(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_known_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Drop tags outside the agent's archetype/tribal vocab; preserve order."""
-        from mtg_helper.services.agents.extract_agent import KEYWORD_VOCAB
-        from mtg_helper.services.tag_service import _TRIBAL_SUBTYPES
-
-        allowed_archetypes = set(KEYWORD_VOCAB)
-        allowed_tribes = {f"{s.lower()}_tribal" for s in _TRIBAL_SUBTYPES}
-        seen: set[str] = set()
-        out: list[str] = []
-        for item in value:
-            if not isinstance(item, str):
-                continue
-            tag = item.strip().lower()
-            if tag in seen:
-                continue
-            if tag in allowed_archetypes or tag in allowed_tribes:
-                seen.add(tag)
-                out.append(tag)
-        return out
+        """Accept MTGJSON snake-case keyword tags; preserve order."""
+        return _dedupe_sane_tags(value)
 
 
 class CommanderSuggestIntent(BaseModel):
@@ -543,8 +520,8 @@ class CommanderSuggestIntent(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Keep known archetype and tribal tags only."""
-        return _filter_commander_suggest_tags(value, include_mechanics=False)
+        """Legacy field: old custom archetype tags are no longer accepted."""
+        return []
 
     @field_validator("mechanic_tags", mode="after")
     @classmethod
@@ -672,27 +649,56 @@ def _dedupe_allowed(
 
 
 def _filter_commander_suggest_tags(value: list[str], *, include_mechanics: bool) -> list[str]:
-    """Filter tags against the curated archetype, tribal, or mechanic vocabularies."""
-    from mtg_helper.services.agents.extract_agent import KEYWORD_VOCAB
-    from mtg_helper.services.tag_service import _TRIBAL_SUBTYPES
-
+    """Filter commander tags against the MTGJSON keyword vocabulary shape."""
     if include_mechanics:
         return _dedupe_sane_tags(value)
-    allowed = set(KEYWORD_VOCAB)
-    if not include_mechanics:
-        allowed |= {f"{s.lower()}_tribal" for s in _TRIBAL_SUBTYPES}
-    return _dedupe_allowed(value, allowed)
+    return []
 
 
 def _dedupe_sane_tags(value: list[str]) -> list[str]:
     """Accept locally synced MTGJSON keyword tags without importing DB state."""
+    old_custom_tags = {
+        "ramp",
+        "draw",
+        "interaction",
+        "tutor",
+        "token",
+        "plus_one_counters",
+        "lifegain",
+        "graveyard",
+        "aristocrats",
+        "cost_reduction",
+        "anthem",
+        "card_selection",
+        "equipment",
+        "voltron",
+        "stax",
+        "group_hug",
+        "fast_mana",
+        "blink",
+        "extra_turn",
+        "land_destruction",
+        "tribal",
+        "reanimator",
+        "spellslinger",
+        "wheels",
+        "treasure_matters",
+        "food_matters",
+        "clue_matters",
+        "infect_toxic",
+    }
     seen: set[str] = set()
     out: list[str] = []
     for item in value:
         if not isinstance(item, str):
             continue
         tag = item.strip().lower()
-        if tag and tag not in seen and tag.replace("_", "").isalnum():
+        if (
+            tag
+            and tag not in old_custom_tags
+            and tag not in seen
+            and tag.replace("_", "").isalnum()
+        ):
             seen.add(tag)
             out.append(tag)
     return out

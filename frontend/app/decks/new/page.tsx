@@ -20,21 +20,21 @@ const OPTIONS: { href: string; title: string; subtitle: string; description: str
     title: "Pick keywords",
     subtitle: "Fastest path",
     description:
-      "Pick a commander, then chip-select archetype keywords (voltron, aristocrats, squirrel tribal…) and tribal subtypes. Suggestions are tag-driven from there.",
+      "Pick a commander, then select official MTGJSON keywords. Suggestions are tag-driven from there.",
   },
   {
     href: "/decks/new/agent",
     title: "Chat with the agent",
     subtitle: "Best for fuzzy ideas",
     description:
-      "Describe what you want; the agent asks 1–3 short questions, then converges on the same archetype keywords for you. You can fine-tune the chips before creating.",
+      "Describe what you want; the agent asks 1-3 short questions, then converges on MTGJSON keywords for you. You can fine-tune the chips before creating.",
   },
   {
     href: "/decks/import",
     title: "Import a deck list",
     subtitle: "Already have a list",
     description:
-      "Paste a Moxfield/Archidekt list or URL. After import you'll set archetype keywords from the cards we detected so further suggestions stay on-theme.",
+      "Paste a Moxfield/Archidekt list or URL. After import you'll set MTGJSON keywords from the cards we detected so further suggestions stay on-theme.",
   },
 ];
 
@@ -43,7 +43,7 @@ export default function NewDeckChooser() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Start a new deck"
-        subtitle="Three paths. Pick whichever fits your mood — they all converge on the same keyword-driven suggestion engine."
+        subtitle="Three paths. Pick whichever fits your mood - they all converge on MTGJSON keywords."
       />
 
       <p className="mb-6 text-xs text-gray-500">

@@ -17,26 +17,31 @@ from mtg_helper.models.cards import CardResponse
 _WUBRG = ["W", "U", "B", "R", "G"]
 _DEFAULT_STAGE_TARGETS = {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}
 
-_ARCHETYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("graveyard", ("graveyard", "grave", "recursion", "yard")),
-    ("reanimator", ("reanimator", "reanimate", "cheat in", "big value")),
-    ("blink", ("blink", "flicker", "etb", "enter the battlefield")),
-    ("aristocrats", ("aristocrat", "death trigger", "dies")),
-    ("sacrifice", ("sacrifice", "sac outlet", "sac ")),
-    ("token", ("token", "tokens")),
-    ("landfall", ("landfall", "lands")),
-    ("spellslinger", ("spellslinger", "instant", "sorcery")),
-    ("storm", ("storm",)),
-    ("cascade", ("cascade",)),
-    ("wheels", ("wheel", "discard hand")),
-    ("lifegain", ("lifegain", "life gain")),
-    ("plus_one_counters", ("+1/+1", "counters")),
-    ("voltron", ("voltron", "auras", "equipment")),
-    ("equipment", ("equipment",)),
-    ("mill", ("mill", "self mill", "self-mill")),
-    ("treasure_matters", ("treasure",)),
-    ("food_matters", ("food", "forage")),
-    ("clue_matters", ("clue", "investigate")),
+_PLAN_MECHANIC_HINTS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        ("dredge", "flashback", "escape", "descend", "threshold", "delirium"),
+        ("graveyard", "grave", "recursion", "yard"),
+    ),
+    (
+        ("unearth", "encore", "persist", "undying"),
+        ("reanimator", "reanimate", "cheat in", "big value"),
+    ),
+    (("exile",), ("blink", "flicker", "etb", "enter the battlefield")),
+    (("morbid",), ("aristocrat", "death trigger", "dies")),
+    (("sacrifice",), ("sacrifice", "sac outlet", "sac ")),
+    (("create",), ("token", "tokens")),
+    (("landfall",), ("landfall", "lands")),
+    (("magecraft",), ("spellslinger", "instant", "sorcery")),
+    (("storm",), ("storm",)),
+    (("cascade",), ("cascade",)),
+    (("discard",), ("wheel", "discard hand")),
+    (("lifelink",), ("lifegain", "life gain")),
+    (("proliferate",), ("+1/+1", "counters")),
+    (("equip",), ("voltron", "auras", "equipment")),
+    (("mill",), ("mill", "self mill", "self-mill")),
+    (("treasure",), ("treasure",)),
+    (("food", "forage"), ("food", "forage")),
+    (("investigate",), ("clue", "investigate")),
 )
 
 _MECHANIC_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -163,11 +168,9 @@ def parse_intent_fallback(
     """Infer useful intent from obvious words when the LLM is unavailable."""
     merged = previous.model_copy(deep=True) if previous else CommanderSuggestIntent()
     text = message.lower()
-    merged.archetype_tags = _merge_vocab(
-        merged.archetype_tags,
-        _match_hints(text, _ARCHETYPE_HINTS),
-    )
+    merged.archetype_tags = []
     merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_hints(text, _MECHANIC_HINTS))
+    merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_plan_mechanics(text))
     merged.traits = _merge_vocab(merged.traits, _match_hints(text, _TRAIT_HINTS))
     merged.token_types = _merge_vocab(merged.token_types, _match_hints(text, _TOKEN_HINTS))
     colors = _extract_colors(text)
@@ -180,6 +183,14 @@ def parse_intent_fallback(
 
 def _match_hints(text: str, hints: tuple[tuple[str, tuple[str, ...]], ...]) -> list[str]:
     return [tag for tag, needles in hints if any(needle in text for needle in needles)]
+
+
+def _match_plan_mechanics(text: str) -> list[str]:
+    tags: list[str] = []
+    for mechanics, needles in _PLAN_MECHANIC_HINTS:
+        if any(needle in text for needle in needles):
+            tags.extend(mechanics)
+    return tags
 
 
 def _merge_vocab(current: list[str], additions: list[str]) -> list[str]:
@@ -327,13 +338,30 @@ def _match_reasons(
         reasons.append("Theme overlap")
     if keywords:
         reasons.append("Keyword overlap")
-    if "graveyard" in tags or "reanimator" in tags:
+    if _has_graveyard_keyword(tags):
         reasons.append("Graveyard engine")
-    if "etb" in traits or "blink" in tags:
+    if "etb" in traits or "exile" in tags:
         reasons.append("ETB payoff")
     if tokens:
         reasons.append("Token synergy")
     return reasons
+
+
+def _has_graveyard_keyword(tags: list[str]) -> bool:
+    graveyard_keywords = {
+        "dredge",
+        "flashback",
+        "escape",
+        "descend",
+        "threshold",
+        "delirium",
+        "undergrowth",
+        "unearth",
+        "encore",
+        "persist",
+        "undying",
+    }
+    return bool(set(tags) & graveyard_keywords)
 
 
 def _card_advantage_reasons(oracle_text: str | None) -> list[str]:
@@ -354,17 +382,18 @@ def _text_intent_score(
     reasons: list[str],
 ) -> float:
     text = (oracle_text or "").lower()
+    direction = intent.direction.lower()
     score = 0.0
-    if "graveyard" in intent.archetype_tags and "graveyard" in text:
+    if "graveyard" in direction and "graveyard" in text:
         score += 6
         reasons.append("Mentions graveyard")
     if "etb" in intent.traits and "enters" in text:
         score += 6
         reasons.append("Mentions entering the battlefield")
-    if "reanimator" in intent.archetype_tags and "battlefield" in text and "graveyard" in text:
+    if "reanimator" in direction and "battlefield" in text and "graveyard" in text:
         score += 5
         reasons.append("Supports reanimation")
-    if "sacrifice" in intent.archetype_tags and "sacrifice" in text:
+    if "sacrifice" in direction and "sacrifice" in text:
         score += 5
         reasons.append("Sacrifice outlet or payoff")
     return score
@@ -372,17 +401,18 @@ def _text_intent_score(
 
 def _stage_targets(intent: CommanderSuggestIntent) -> dict[str, int]:
     targets = dict(_DEFAULT_STAGE_TARGETS)
-    if "spellslinger" in intent.archetype_tags or "storm" in intent.archetype_tags:
+    if "storm" in intent.mechanic_tags or "magecraft" in intent.mechanic_tags:
         targets["draw"] = 14
-    if "reanimator" in intent.archetype_tags or "graveyard" in intent.archetype_tags:
+    if _has_graveyard_keyword(intent.mechanic_tags):
         targets["interaction"] = 10
     return targets
 
 
 def _suggested_name(intent: CommanderSuggestIntent) -> str | None:
-    if not intent.archetype_tags:
+    tags = intent.mechanic_tags or intent.archetype_tags
+    if not tags:
         return None
-    label = intent.archetype_tags[0].replace("_", " ").title()
+    label = tags[0].replace("_", " ").title()
     return f"{label} Brew"
 
 

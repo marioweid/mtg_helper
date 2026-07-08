@@ -71,12 +71,10 @@ async def test_suggest_commanders_marks_card_advantage_without_score_boost(
         scryfall_id=MULDROTHA_ID,
         name="Muldrotha Test",
         type_line="Legendary Creature - Elemental Avatar",
-        oracle_text=(
-            "During each of your turns, you may play a permanent card of each permanent "
-            "type from your graveyard."
-        ),
+        oracle_text="During each of your turns, you may play a card from your graveyard.",
         colors=["B", "G", "U"],
-        tags=["graveyard"],
+        tags=["escape"],
+        keywords=["Escape"],
         traits=["etb"],
         edhrec_rank=100,
     )
@@ -87,16 +85,17 @@ async def test_suggest_commanders_marks_card_advantage_without_score_boost(
         type_line="Legendary Creature - Zombie",
         oracle_text="Whenever a creature dies, each opponent loses 1 life.",
         colors=["B", "G"],
-        tags=["graveyard"],
+        tags=["morbid"],
+        keywords=["Morbid"],
         edhrec_rank=200,
     )
 
-    intent = CommanderSuggestIntent(archetype_tags=["graveyard"], traits=["etb"])
+    intent = CommanderSuggestIntent(mechanic_tags=["escape"], traits=["etb"], direction="graveyard")
     results = await commander_suggestor_service.suggest_commanders(db_pool, intent)
 
     assert results[0].card.scryfall_id == MULDROTHA_ID
     assert "Card advantage signal" in results[0].score_reasons
-    assert "graveyard" in results[0].matched_tags
+    assert "escape" in results[0].matched_tags
 
 
 async def test_suggest_commanders_prioritizes_selected_keyword(
@@ -142,7 +141,8 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="Draw a card from your graveyard.",
         colors=["B", "G", "U"],
-        tags=["graveyard"],
+        tags=["escape"],
+        keywords=["Escape"],
     )
     await _insert_card(
         db_pool,
@@ -151,11 +151,12 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
         type_line="Legendary Creature - Horror",
         oracle_text="Draw a card.",
         colors=["B"],
-        tags=["graveyard"],
+        tags=["escape"],
+        keywords=["Escape"],
         legality="banned",
     )
 
-    intent = CommanderSuggestIntent(archetype_tags=["graveyard"], color_identity=["B"])
+    intent = CommanderSuggestIntent(mechanic_tags=["escape"], color_identity=["B"])
     results = await commander_suggestor_service.suggest_commanders(db_pool, intent)
     result_ids = {item.card.scryfall_id for item in results}
 
@@ -173,7 +174,8 @@ async def test_suggest_commanders_exact_color_match_requires_same_identity(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="Draw a card from your graveyard.",
         colors=["B", "G", "U"],
-        tags=["graveyard"],
+        tags=["escape"],
+        keywords=["Escape"],
     )
     await _insert_card(
         db_pool,
@@ -182,12 +184,13 @@ async def test_suggest_commanders_exact_color_match_requires_same_identity(
         type_line="Legendary Creature - Zombie",
         oracle_text="Draw a card from your graveyard.",
         colors=["B"],
-        tags=["graveyard"],
+        tags=["escape"],
+        keywords=["Escape"],
     )
 
-    loose = CommanderSuggestIntent(archetype_tags=["graveyard"], color_identity=["B"])
+    loose = CommanderSuggestIntent(mechanic_tags=["escape"], color_identity=["B"])
     exact = CommanderSuggestIntent(
-        archetype_tags=["graveyard"],
+        mechanic_tags=["escape"],
         color_identity=["B"],
         exact_color_identity=True,
     )
@@ -214,7 +217,8 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="You may cast creature cards from your graveyard. Draw a card.",
         colors=["B", "G", "U"],
-        tags=["graveyard"],
+        tags=["escape"],
+        keywords=["Escape"],
         traits=["etb"],
     )
 
@@ -223,8 +227,8 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
         json={
             "message": "",
             "intent_override": {
-                "archetype_tags": ["graveyard"],
-                "mechanic_tags": [],
+                "archetype_tags": [],
+                "mechanic_tags": ["escape"],
                 "traits": ["etb"],
                 "token_types": [],
                 "color_identity": ["B", "G", "U"],
@@ -241,4 +245,4 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["commanders"][0]["card"]["scryfall_id"] == str(MULDROTHA_ID)
-    assert data["intent"]["archetype_tags"] == ["graveyard"]
+    assert data["intent"]["mechanic_tags"] == ["escape"]

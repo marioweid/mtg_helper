@@ -131,13 +131,13 @@ async def test_describe_unknown_commander(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_extract_keywords_filters_unknown_tags(client: AsyncClient) -> None:
-    """The KeywordExtractResponse validator drops tags outside the vocabulary."""
+    """The KeywordExtractResponse validator keeps MTGJSON tags only."""
     with _override_extract(
         {
             "reply": "Locked in.",
             "done": True,
             "suggested_name": "Hazel Tokens",
-            "archetype_tags": ["voltron", "not_a_real_tag", "aristocrats"],
+            "archetype_tags": ["surveil", "not a real tag!", "voltron", "landfall"],
         }
     ):
         resp = await client.post(
@@ -146,10 +146,10 @@ async def test_extract_keywords_filters_unknown_tags(client: AsyncClient) -> Non
                 "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
                 "bracket": 3,
                 "history": [],
-                "message": "voltron tokens",
+                "message": "surveil lands",
             },
         )
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["done"] is True
-    assert data["archetype_tags"] == ["voltron", "aristocrats"]
+    assert data["archetype_tags"] == ["surveil", "landfall"]

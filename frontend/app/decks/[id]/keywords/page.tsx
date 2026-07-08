@@ -113,8 +113,8 @@ export default function DeckKeywordsPage() {
         title={fromImport ? "Set keywords for your imported deck" : "Edit deck keywords"}
         subtitle={
           fromImport
-            ? "We pre-selected the most common archetype tags from your imported cards. Adjust the chips so future suggestions stay on-theme."
-            : "Adjust the archetype tags that drive AI card suggestions for this deck."
+            ? "We pre-selected the most common MTGJSON keywords from your imported cards. Adjust the chips so future suggestions stay on-theme."
+            : "Adjust the MTGJSON keywords that drive AI card suggestions for this deck."
         }
       />
 

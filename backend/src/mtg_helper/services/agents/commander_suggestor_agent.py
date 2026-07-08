@@ -13,12 +13,11 @@ from mtg_helper.services.agents._prompts import (
     MAX_HISTORY_TURNS,
     SANDBOX_RULES,
 )
-from mtg_helper.services.agents.extract_agent import KEYWORD_VOCAB
+from mtg_helper.services.agents.extract_agent import KEYWORD_EXAMPLES
 from mtg_helper.services.commander_suggestor_service import (
     build_response,
     parse_intent_fallback,
 )
-from mtg_helper.services.tag_service import _FULL_MECHANIC_PATTERNS
 
 _TEMPERATURE = 0.25
 _MAX_OUTPUT_TOKENS = 1536
@@ -54,11 +53,12 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "",
         f"Previous intent JSON: {previous}",
         "",
-        "Curated archetype tags you may emit:",
-        ", ".join(KEYWORD_VOCAB),
+        "Emit official MTGJSON keyword tags only in `mechanic_tags`.",
+        "Use snake_case tag names such as:",
+        ", ".join(KEYWORD_EXAMPLES),
         "",
-        "Printed mechanic tags you may emit:",
-        ", ".join(sorted(_FULL_MECHANIC_PATTERNS)),
+        "Do not emit custom archetype tags like graveyard, blink, reanimator,",
+        "aristocrats, voltron, spellslinger, or tribal tags.",
         "",
         "Traits you may emit: etb, activated, evasion.",
         "Token types may be common token nouns such as treasure, food, clue, zombie, squirrel.",
@@ -137,11 +137,11 @@ async def suggest_turn(
 
 def _fallback_reply(intent: CommanderSuggestIntent) -> str:
     """Ask a useful deterministic follow-up when the model path is unavailable."""
-    tags = set(intent.archetype_tags)
-    if "graveyard" in tags:
-        return "Do you want ETB value, sacrifice loops, self-mill, or big reanimation targets?"
-    if "blink" in tags or "etb" in intent.traits:
-        return "Do you want blink engines, creature toolbox value, or token-copy ETB effects?"
+    tags = set(intent.mechanic_tags)
+    if tags & {"dredge", "flashback", "escape", "descend", "threshold", "delirium"}:
+        return "Do you want self-mill value, sacrifice loops, or cards you can reuse from graveyard?"
+    if "exile" in tags or "etb" in intent.traits:
+        return "Do you want ETB value, toolbox creatures, or token-copy effects?"
     if intent.color_identity is None:
         return "Do you have a color identity in mind, or any colors you want to avoid?"
     return "Do you want this to be casual value, upgraded synergy, or optimized?"

@@ -233,12 +233,9 @@ TAG_VOCAB_VERSION = 3
 
 
 # ─── Full mechanic catalog ────────────────────────────────────────────────────
-# Mirrors the printed keyword vocabulary of Magic so the chip picker's "All
-# mechanics" tab can surface every card that mentions a given mechanic by
-# name. Distinct from the curated archetype taggers below: those infer
-# deck-level archetypes (aristocrats, voltron, mill, etc.); these tags are
-# literal keyword presence. The frontend mirror lives in
-# ``frontend/lib/mechanics.ts`` — both must stay in sync.
+# Legacy fallback used only by direct callers that do not provide the synced
+# MTGJSON keyword catalog. The batch pipeline passes MTGJSON keywords and
+# writes MTGJSON keyword tags only.
 _FULL_MECHANIC_PATTERNS: dict[str, re.Pattern[str]] = {
     # Evergreen combat keywords
     "flying": _re(r"\bflying\b"),
@@ -709,6 +706,10 @@ def classify_card(
     kw_set = {k.lower() for k in keywords}
     tags: list[str] = []
 
+    if official_keywords is not None:
+        _tag_official_keywords(text, keywords, tags, official_keywords)
+        return _dedupe_tags(tags)
+
     _tag_ramp(text, tl, tags)
     _tag_draw(text, tags)
     _tag_removal(text, tags)
@@ -722,12 +723,14 @@ def classify_card(
     _tag_keyword_archetypes(text, kw_set, tags)
     _tag_token_economies(text, tags)
     _tag_spell_archetypes(text, tags)
-    if official_keywords is None:
-        _tag_full_mechanics(text, tags)
-    else:
-        _tag_official_keywords(text, keywords, tags, official_keywords)
+    _tag_full_mechanics(text, tags)
     tags.extend(classify_tribal(oracle_text))
 
+    return _dedupe_tags(tags)
+
+
+def _dedupe_tags(tags: list[str]) -> list[str]:
+    """Stable-dedupe generated tag lists."""
     seen: set[str] = set()
     deduped: list[str] = []
     for t in tags:
@@ -737,11 +740,9 @@ def classify_card(
     return deduped
 
 
-async def _load_official_keywords(pool: asyncpg.Pool) -> list[OfficialKeyword] | None:
+async def _load_official_keywords(pool: asyncpg.Pool) -> list[OfficialKeyword]:
     async with pool.acquire() as conn:
         rows = await conn.fetch("SELECT label, tag FROM mtgjson_keywords ORDER BY label")
-    if not rows:
-        return None
     return [(row["label"], row["tag"], _keyword_pattern(row["label"])) for row in rows]
 
 

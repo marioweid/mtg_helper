@@ -8,7 +8,6 @@ import { ManaSymbols } from "@/components/mana-symbols";
 import { PageHeader } from "@/components/page-header";
 import { apiClient } from "@/lib/api";
 import { archetypeLabel, BRACKET_LABELS, COLOR_SYMBOLS } from "@/lib/constants";
-import { MECHANIC_TAGS } from "@/lib/mechanics";
 import type {
   CommanderSuggestIntent,
   CommanderSuggestion,
@@ -72,7 +71,7 @@ export default function CommanderSuggestPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [intent, setIntent] = useState<CommanderSuggestIntent>(emptyIntent);
   const [commanders, setCommanders] = useState<CommanderSuggestion[]>([]);
-  const [mechanicTags, setMechanicTags] = useState<string[]>(MECHANIC_TAGS);
+  const [mechanicTags, setMechanicTags] = useState<string[]>([]);
   const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
   const [suggestedName, setSuggestedName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -360,7 +359,7 @@ function KeywordPanel({
         onChange={(tags) =>
           onChange({
             ...intent,
-            archetype_tags: tags.filter((tag) => !mechanicSet.has(tag)),
+            archetype_tags: [],
             mechanic_tags: tags.filter((tag) => mechanicSet.has(tag)),
           })
         }
