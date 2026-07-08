@@ -304,6 +304,17 @@ export interface TribalTag {
   card_count: number;
 }
 
+export interface KeywordChip {
+  tag: string;
+  label: string;
+}
+
+export interface KeywordGroup {
+  category: string;
+  display_name: string;
+  keywords: KeywordChip[];
+}
+
 /**
  * Total number of physical cards across rows. Sums ``quantity`` so basic-land
  * rows like "18 Forest" count as 18, not 1. Treats missing quantity as 1.

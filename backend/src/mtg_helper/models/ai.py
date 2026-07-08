@@ -674,9 +674,25 @@ def _dedupe_allowed(
 def _filter_commander_suggest_tags(value: list[str], *, include_mechanics: bool) -> list[str]:
     """Filter tags against the curated archetype, tribal, or mechanic vocabularies."""
     from mtg_helper.services.agents.extract_agent import KEYWORD_VOCAB
-    from mtg_helper.services.tag_service import _FULL_MECHANIC_PATTERNS, _TRIBAL_SUBTYPES
+    from mtg_helper.services.tag_service import _TRIBAL_SUBTYPES
 
-    allowed = set(_FULL_MECHANIC_PATTERNS) if include_mechanics else set(KEYWORD_VOCAB)
+    if include_mechanics:
+        return _dedupe_sane_tags(value)
+    allowed = set(KEYWORD_VOCAB)
     if not include_mechanics:
         allowed |= {f"{s.lower()}_tribal" for s in _TRIBAL_SUBTYPES}
     return _dedupe_allowed(value, allowed)
+
+
+def _dedupe_sane_tags(value: list[str]) -> list[str]:
+    """Accept locally synced MTGJSON keyword tags without importing DB state."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        tag = item.strip().lower()
+        if tag and tag not in seen and tag.replace("_", "").isalnum():
+            seen.add(tag)
+            out.append(tag)
+    return out

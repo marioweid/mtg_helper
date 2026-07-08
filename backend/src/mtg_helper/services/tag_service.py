@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 import asyncpg
 from qdrant_client import AsyncQdrantClient
 
+from mtg_helper.services.mtgjson import keyword_to_tag
+
 if TYPE_CHECKING:
     from mtg_helper.services.admin_jobs import ProgressCb
 
@@ -16,6 +18,7 @@ _log = logging.getLogger(__name__)
 
 _BATCH_SIZE = 500
 _QDRANT_CONCURRENCY = 50
+OfficialKeyword = tuple[str, str, re.Pattern[str]]
 
 # Fast-mana cards: low-CMC mana producers that give more mana than they cost.
 _FAST_MANA_NAMES = frozenset(
@@ -355,6 +358,30 @@ _FULL_MECHANIC_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
+def _keyword_pattern(keyword: str) -> re.Pattern[str]:
+    escaped = re.escape(keyword.strip())
+    escaped = escaped.replace(r"\ ", r"[\s-]+")
+    escaped = escaped.replace(r"\-", r"[\s-]+")
+    return _re(rf"(?<![A-Za-z]){escaped}(?![A-Za-z])")
+
+
+def _tag_official_keywords(
+    text: str,
+    keywords: list[str],
+    tags: list[str],
+    official_keywords: list[OfficialKeyword],
+) -> None:
+    """Append MTGJSON keyword tags from Scryfall keywords and oracle text."""
+    existing = set(tags)
+    card_keyword_tags = {keyword_to_tag(keyword) for keyword in keywords}
+    for _label, tag, pattern in official_keywords:
+        if tag in existing:
+            continue
+        if tag in card_keyword_tags or pattern.search(text):
+            tags.append(tag)
+            existing.add(tag)
+
+
 def _tag_full_mechanics(text: str, tags: list[str]) -> None:
     """Append a tag for every printed mechanic the oracle text mentions.
 
@@ -662,6 +689,8 @@ def classify_card(
     oracle_text: str | None,
     keywords: list[str],
     cmc: float | None,
+    *,
+    official_keywords: list[OfficialKeyword] | None = None,
 ) -> list[str]:
     """Classify a card into one or more tags using rule-based heuristics.
 
@@ -693,7 +722,10 @@ def classify_card(
     _tag_keyword_archetypes(text, kw_set, tags)
     _tag_token_economies(text, tags)
     _tag_spell_archetypes(text, tags)
-    _tag_full_mechanics(text, tags)
+    if official_keywords is None:
+        _tag_full_mechanics(text, tags)
+    else:
+        _tag_official_keywords(text, keywords, tags, official_keywords)
     tags.extend(classify_tribal(oracle_text))
 
     seen: set[str] = set()
@@ -703,6 +735,14 @@ def classify_card(
             seen.add(t)
             deduped.append(t)
     return deduped
+
+
+async def _load_official_keywords(pool: asyncpg.Pool) -> list[OfficialKeyword] | None:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT label, tag FROM mtgjson_keywords ORDER BY label")
+    if not rows:
+        return None
+    return [(row["label"], row["tag"], _keyword_pattern(row["label"])) for row in rows]
 
 
 async def _sync_tags_to_qdrant(
@@ -783,6 +823,7 @@ async def run_batch_tag(
         rows = await conn.fetch(
             "SELECT id, name, type_line, oracle_text, keywords, cmc FROM cards ORDER BY name"
         )
+    official_keywords = await _load_official_keywords(pool)
 
     row_count = len(rows)
     _log.info("Tagging %d cards", row_count)
@@ -799,6 +840,7 @@ async def run_batch_tag(
                     r["oracle_text"],
                     list(r["keywords"]),
                     float(r["cmc"]) if r["cmc"] is not None else None,
+                    official_keywords=official_keywords,
                 ),
                 classify_traits(r["oracle_text"], list(r["keywords"])),
                 classify_token_types(r["oracle_text"]),

@@ -5,13 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { ARCHETYPE_GROUPS, archetypeLabel } from "@/lib/constants";
 import { MECHANIC_GROUPS } from "@/lib/mechanics";
-import type { TribalTag } from "@/lib/types";
+import type { KeywordGroup, TribalTag } from "@/lib/types";
 
 interface Props {
   value: string[];
   onChange: (next: string[]) => void;
   /** Tags pre-suggested by the backend (e.g. aggregated from imported cards). */
   suggested?: string[];
+  onMechanicTagsLoaded?: (tags: string[]) => void;
 }
 
 /**
@@ -22,8 +23,14 @@ interface Props {
  * The shape of ``value`` is the canonical tag list — including
  * ``<subtype>_tribal`` tags — that the backend stores on ``decks.archetype_tags``.
  */
-export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
+export function ArchetypeChipPicker({
+  value,
+  onChange,
+  suggested,
+  onMechanicTagsLoaded,
+}: Props) {
   const [tribal, setTribal] = useState<TribalTag[]>([]);
+  const [keywordGroups, setKeywordGroups] = useState<KeywordGroup[] | null>(null);
   const [tribalQuery, setTribalQuery] = useState("");
   const [tribalLoading, setTribalLoading] = useState(false);
   const [tribalError, setTribalError] = useState<string | null>(null);
@@ -46,6 +53,34 @@ export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .listOfficialKeywords()
+      .then((groups) => {
+        if (!cancelled) setKeywordGroups(groups.length > 0 ? groups : null);
+      })
+      .catch(() => {
+        if (!cancelled) setKeywordGroups(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mechanicGroups = useMemo(() => keywordGroups ?? fallbackKeywordGroups(), [keywordGroups]);
+  const mechanicLabels = useMemo(
+    () =>
+      new Map<string, string>(
+        mechanicGroups.flatMap((group) => group.keywords.map((kw) => [kw.tag, kw.label])),
+      ),
+    [mechanicGroups],
+  );
+
+  useEffect(() => {
+    onMechanicTagsLoaded?.(mechanicGroups.flatMap((group) => group.keywords.map((kw) => kw.tag)));
+  }, [mechanicGroups, onMechanicTagsLoaded]);
 
   const selected = useMemo(() => new Set(value), [value]);
 
@@ -81,7 +116,7 @@ export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
                 onClick={() => toggle(tag)}
                 className="rounded-full bg-blue-600 px-3 py-1 text-sm text-white shadow hover:bg-blue-700"
               >
-                {archetypeLabel(tag)} ✕
+                {chipLabel(tag, mechanicLabels)} x
               </button>
             ))}
           </div>
@@ -105,7 +140,7 @@ export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
                     : "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100"
                 }`}
               >
-                {archetypeLabel(tag)}
+                {chipLabel(tag, mechanicLabels)}
               </button>
             ))}
           </div>
@@ -144,34 +179,33 @@ export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
 
       <details className="rounded-lg border border-gray-200 bg-gray-50 open:bg-white">
         <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700">
-          All mechanics ({MECHANIC_GROUPS.reduce((n, g) => n + g.chips.length, 0)}) — click to expand
+          All MTGJSON keywords ({mechanicGroups.reduce((n, g) => n + g.keywords.length, 0)}) - click to expand
         </summary>
         <div className="space-y-5 border-t border-gray-200 px-3 py-3">
           <p className="text-xs text-gray-500">
-            Every printed keyword and mechanic — flying, dredge, cycling, explore, plot, monarch,
-            and so on. Picking one filters the corpus to cards that mention the mechanic by name,
-            not curated deck archetypes.
+            Official MTGJSON ability words, keyword abilities, and keyword actions. Picking one
+            filters the corpus to cards that carry or mention that keyword.
           </p>
-          {MECHANIC_GROUPS.map((group) => (
-            <section key={group.group}>
+          {mechanicGroups.map((group) => (
+            <section key={group.category}>
               <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                {group.group}
+                {group.display_name}
               </h4>
               <div className="flex flex-wrap gap-2">
-                {group.chips.map((chip) => {
-                  const active = selected.has(chip.tag);
+                {group.keywords.map((keyword) => {
+                  const active = selected.has(keyword.tag);
                   return (
                     <button
-                      key={chip.tag}
+                      key={keyword.tag}
                       type="button"
-                      onClick={() => toggle(chip.tag)}
+                      onClick={() => toggle(keyword.tag)}
                       className={`rounded-full border px-3 py-1 text-sm transition ${
                         active
                           ? "border-blue-600 bg-blue-50 text-blue-700"
                           : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50"
                       }`}
                     >
-                      {chip.label}
+                      {keyword.label}
                     </button>
                   );
                 })}
@@ -222,4 +256,16 @@ export function ArchetypeChipPicker({ value, onChange, suggested }: Props) {
       </section>
     </div>
   );
+}
+
+function fallbackKeywordGroups(): KeywordGroup[] {
+  return MECHANIC_GROUPS.map((group) => ({
+    category: group.group,
+    display_name: group.group,
+    keywords: group.chips.map((chip) => ({ tag: chip.tag, label: chip.label })),
+  }));
+}
+
+function chipLabel(tag: string, mechanicLabels: Map<string, string>): string {
+  return mechanicLabels.get(tag) ?? archetypeLabel(tag);
 }

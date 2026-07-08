@@ -104,6 +104,24 @@ CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_subtypes
     ON mtgjson_card_metadata USING GIN (subtypes);
 
 -- ============================================================
+-- MTGJSON OFFICIAL KEYWORD CATALOG
+-- ============================================================
+CREATE TABLE IF NOT EXISTS mtgjson_keywords (
+    keyword         TEXT PRIMARY KEY,
+    tag             TEXT UNIQUE NOT NULL,
+    label           TEXT NOT NULL,
+    category        TEXT NOT NULL CHECK (category IN (
+        'ability_word', 'keyword_ability', 'keyword_action'
+    )),
+    mtgjson_version TEXT,
+    mtgjson_date    DATE,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mtgjson_keywords_category
+    ON mtgjson_keywords (category, label);
+
+-- ============================================================
 -- ACCOUNTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS accounts (

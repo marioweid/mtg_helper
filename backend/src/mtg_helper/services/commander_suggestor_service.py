@@ -262,17 +262,18 @@ def _score_candidate(candidate: _Candidate, intent: CommanderSuggestIntent) -> C
     reasons: list[str] = []
     score = _color_score(candidate.card.color_identity, intent, reasons)
     matched_tags = _intersection(candidate.tags, [*intent.archetype_tags, *intent.mechanic_tags])
+    matched_keywords = _intersection(_keyword_tags(candidate.card.keywords), intent.mechanic_tags)
     matched_traits = _intersection(candidate.traits, intent.traits)
     matched_tokens = _intersection(candidate.token_types, intent.token_types)
 
     score += len(matched_tags) * 10
+    score += len(matched_keywords) * 12
     score += len(matched_traits) * 8
     score += len(matched_tokens) * 6
-    reasons.extend(_match_reasons(matched_tags, matched_traits, matched_tokens))
+    reasons.extend(_match_reasons(matched_tags, matched_keywords, matched_traits, matched_tokens))
     advantage_reasons = _card_advantage_reasons(candidate.card.oracle_text)
     if advantage_reasons:
-        score += 14 + min(len(advantage_reasons), 3) * 3
-        reasons.append("Card advantage in command zone")
+        reasons.append("Card advantage signal")
     if candidate.card.edhrec_rank:
         score += max(0, 8 - candidate.card.edhrec_rank / 10000)
     score += _text_intent_score(candidate.card.oracle_text, intent, reasons)
@@ -281,7 +282,7 @@ def _score_candidate(candidate: _Candidate, intent: CommanderSuggestIntent) -> C
         card=candidate.card,
         score=round(float(score), 3),
         score_reasons=_dedupe(reasons)[:6],
-        matched_tags=matched_tags,
+        matched_tags=_dedupe([*matched_tags, *matched_keywords]),
         matched_traits=matched_traits,
         matched_token_types=matched_tokens,
         card_advantage_reasons=advantage_reasons,
@@ -311,10 +312,21 @@ def _intersection(left: list[str], right: list[str]) -> list[str]:
     return [item for item in left if item in allowed]
 
 
-def _match_reasons(tags: list[str], traits: list[str], tokens: list[str]) -> list[str]:
+def _keyword_tags(keywords: list[str]) -> list[str]:
+    return [re.sub(r"[^a-z0-9]+", "_", keyword.strip().lower()).strip("_") for keyword in keywords]
+
+
+def _match_reasons(
+    tags: list[str],
+    keywords: list[str],
+    traits: list[str],
+    tokens: list[str],
+) -> list[str]:
     reasons: list[str] = []
     if tags:
         reasons.append("Theme overlap")
+    if keywords:
+        reasons.append("Keyword overlap")
     if "graveyard" in tags or "reanimator" in tags:
         reasons.append("Graveyard engine")
     if "etb" in traits or "blink" in tags:

@@ -10,9 +10,11 @@ for keywords/types.
 import io
 import json
 import logging
+import re
 import time
 import zipfile
 from dataclasses import dataclass
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 import asyncpg
@@ -27,6 +29,12 @@ _log = logging.getLogger(__name__)
 
 _BATCH_SIZE = 500
 _DIFF_SAMPLE_LIMIT = 20
+_HTTP_HEADERS = {"User-Agent": "mtg-helper-local/1.0"}
+_KEYWORD_CATEGORIES = {
+    "abilityWords": "ability_word",
+    "keywordAbilities": "keyword_ability",
+    "keywordActions": "keyword_action",
+}
 
 
 @dataclass(frozen=True)
@@ -50,6 +58,18 @@ class MTGJSONCardMetadata:
     raw_identifiers: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class MTGJSONKeyword:
+    """Official keyword catalog item from MTGJSON ``Keywords.json``."""
+
+    keyword: str
+    tag: str
+    label: str
+    category: str
+    mtgjson_version: str | None
+    mtgjson_date: date | None
+
+
 def _dedupe(values: list[Any] | None) -> list[str]:
     """Return a stable, string-only, deduplicated list."""
     if not values:
@@ -62,6 +82,16 @@ def _dedupe(values: list[Any] | None) -> list[str]:
         seen.add(value)
         out.append(value)
     return out
+
+
+def keyword_to_tag(keyword: str) -> str:
+    """Convert a printed MTGJSON keyword into our canonical snake-case tag."""
+    tag = re.sub(r"[^a-z0-9]+", "_", keyword.strip().lower()).strip("_")
+    if not tag:
+        return "keyword"
+    if tag[0].isdigit():
+        return f"kw_{tag}"
+    return tag
 
 
 def _scryfall_id(card: dict[str, Any]) -> str | None:
@@ -132,9 +162,40 @@ def _extract_cards(payload: dict[str, Any]) -> list[MTGJSONCardMetadata]:
 
 
 async def _fetch_cards(client: httpx.AsyncClient) -> list[MTGJSONCardMetadata]:
-    response = await client.get(settings.mtgjson_all_printings_url)
+    response = await client.get(settings.mtgjson_all_printings_url, headers=_HTTP_HEADERS)
     response.raise_for_status()
     return _extract_cards(_decode_payload(response.content))
+
+
+async def _fetch_keyword_catalog(client: httpx.AsyncClient) -> list[MTGJSONKeyword]:
+    response = await client.get(settings.mtgjson_keywords_url, headers=_HTTP_HEADERS)
+    response.raise_for_status()
+    return _extract_keyword_catalog(response.json())
+
+
+def _extract_keyword_catalog(payload: dict[str, Any]) -> list[MTGJSONKeyword]:
+    """Extract the official MTGJSON keyword catalog into canonical tags."""
+    meta = payload.get("meta") or {}
+    raw_date = meta.get("date")
+    parsed_date = date.fromisoformat(raw_date) if isinstance(raw_date, str) else None
+    version = meta.get("version") if isinstance(meta.get("version"), str) else None
+    data = payload.get("data") or {}
+    keywords: list[MTGJSONKeyword] = []
+    for source_key, category in _KEYWORD_CATEGORIES.items():
+        for keyword in data.get(source_key) or []:
+            if isinstance(keyword, str) and keyword.strip():
+                label = keyword.strip()
+                keywords.append(
+                    MTGJSONKeyword(
+                        keyword=label,
+                        tag=keyword_to_tag(label),
+                        label=label,
+                        category=category,
+                        mtgjson_version=version,
+                        mtgjson_date=parsed_date,
+                    )
+                )
+    return keywords
 
 
 async def _upsert_batch(conn: asyncpg.Connection, batch: list[MTGJSONCardMetadata]) -> None:
@@ -188,6 +249,40 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[MTGJSONCardMetadat
             for c in batch
         ],
     )
+
+
+async def _upsert_keyword_catalog(conn: asyncpg.Connection, keywords: list[MTGJSONKeyword]) -> None:
+    """Replace the local official keyword catalog with the latest MTGJSON set."""
+    async with conn.transaction():
+        await conn.executemany(
+            """
+            INSERT INTO mtgjson_keywords (
+                keyword, tag, label, category, mtgjson_version, mtgjson_date, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, now())
+            ON CONFLICT (keyword) DO UPDATE SET
+                tag             = EXCLUDED.tag,
+                label           = EXCLUDED.label,
+                category        = EXCLUDED.category,
+                mtgjson_version = EXCLUDED.mtgjson_version,
+                mtgjson_date    = EXCLUDED.mtgjson_date,
+                updated_at      = now()
+            """,
+            [
+                (
+                    item.keyword,
+                    item.tag,
+                    item.label,
+                    item.category,
+                    item.mtgjson_version,
+                    item.mtgjson_date,
+                )
+                for item in keywords
+            ],
+        )
+        await conn.execute(
+            "DELETE FROM mtgjson_keywords WHERE keyword <> ALL($1::text[])",
+            [item.keyword for item in keywords],
+        )
 
 
 def _same_values(left: list[str], right: list[str]) -> bool:
@@ -260,10 +355,12 @@ async def run_sync(
     cb("downloading", 0, 0)
     async with httpx.AsyncClient(timeout=180) as client:
         cards = await _fetch_cards(client)
+        keywords = await _fetch_keyword_catalog(client)
 
     total = len(cards)
     cb("upserting", 0, total)
     async with pool.acquire() as conn:
+        await _upsert_keyword_catalog(conn, keywords)
         for i in range(0, total, _BATCH_SIZE):
             await _upsert_batch(conn, cards[i : i + _BATCH_SIZE])
             cb("upserting", min(i + _BATCH_SIZE, total), total)
@@ -274,5 +371,19 @@ async def run_sync(
     return {
         "mtgjson_cards_processed": total,
         "duration_seconds": round(time.monotonic() - started, 2),
+        "mtgjson_keywords_processed": len(keywords),
         **diff,
+    }
+
+
+async def sync_keywords(pool: asyncpg.Pool) -> dict[str, object]:
+    """Refresh only the small MTGJSON official keyword catalog."""
+    started = time.monotonic()
+    async with httpx.AsyncClient(timeout=30) as client:
+        keywords = await _fetch_keyword_catalog(client)
+    async with pool.acquire() as conn:
+        await _upsert_keyword_catalog(conn, keywords)
+    return {
+        "mtgjson_keywords_processed": len(keywords),
+        "duration_seconds": round(time.monotonic() - started, 2),
     }

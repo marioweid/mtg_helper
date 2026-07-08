@@ -40,6 +40,7 @@ import type {
   CommanderSuggestResponse,
   KeywordExtractRequest,
   KeywordExtractResponse,
+  KeywordGroup,
   ManaFixResponse,
   OptimizeJobStatus,
   OptimizeRequest,
@@ -387,6 +388,8 @@ export const apiClient = {
 
   listTribalTags: (minCount = 3) =>
     request<TribalTag[]>(`/tags/tribal?min_count=${minCount}`),
+
+  listOfficialKeywords: () => request<KeywordGroup[]>("/tags/keywords"),
 
   exportMoxfield: (deckId: string): Promise<string> =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/export/moxfield`).then((res) => {

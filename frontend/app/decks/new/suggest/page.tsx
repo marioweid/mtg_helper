@@ -72,6 +72,7 @@ export default function CommanderSuggestPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [intent, setIntent] = useState<CommanderSuggestIntent>(emptyIntent);
   const [commanders, setCommanders] = useState<CommanderSuggestion[]>([]);
+  const [mechanicTags, setMechanicTags] = useState<string[]>(MECHANIC_TAGS);
   const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
   const [suggestedName, setSuggestedName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -146,7 +147,12 @@ export default function CommanderSuggestPage() {
         />
         <ColorPanel intent={intent} onChange={rerank} />
         <BracketPanel intent={intent} onChange={rerank} />
-        <KeywordPanel intent={intent} onChange={rerank} />
+        <KeywordPanel
+          intent={intent}
+          mechanicTags={mechanicTags}
+          onMechanicTagsLoaded={setMechanicTags}
+          onChange={rerank}
+        />
       </aside>
       <CommanderResults
         commanders={commanders}
@@ -333,17 +339,29 @@ function BracketPanel({ intent, onChange }: { intent: CommanderSuggestIntent; on
   );
 }
 
-function KeywordPanel({ intent, onChange }: { intent: CommanderSuggestIntent; onChange: Rerank }) {
+function KeywordPanel({
+  intent,
+  mechanicTags,
+  onMechanicTagsLoaded,
+  onChange,
+}: {
+  intent: CommanderSuggestIntent;
+  mechanicTags: string[];
+  onMechanicTagsLoaded: (tags: string[]) => void;
+  onChange: Rerank;
+}) {
+  const mechanicSet = useMemo(() => new Set(mechanicTags), [mechanicTags]);
   return (
     <section className={PANEL_CLASS}>
       <h2 className="mb-3 text-sm font-semibold text-white">Inferred keywords</h2>
       <ArchetypeChipPicker
         value={[...intent.archetype_tags, ...intent.mechanic_tags]}
+        onMechanicTagsLoaded={onMechanicTagsLoaded}
         onChange={(tags) =>
           onChange({
             ...intent,
-            archetype_tags: tags.filter((tag) => !MECHANIC_TAGS.includes(tag)),
-            mechanic_tags: tags.filter((tag) => MECHANIC_TAGS.includes(tag)),
+            archetype_tags: tags.filter((tag) => !mechanicSet.has(tag)),
+            mechanic_tags: tags.filter((tag) => mechanicSet.has(tag)),
           })
         }
       />

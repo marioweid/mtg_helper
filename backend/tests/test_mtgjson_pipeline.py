@@ -88,3 +88,24 @@ def test_decode_payload_accepts_zip_archive() -> None:
 def test_same_values_ignores_order() -> None:
     assert mtgjson._same_values(["Flying", "Vigilance"], ["Vigilance", "Flying"]) is True
     assert mtgjson._same_values(["Flying"], ["Vigilance"]) is False
+
+
+def test_extract_keyword_catalog_maps_all_mtgjson_groups() -> None:
+    payload = {
+        "meta": {"date": "2026-07-08", "version": "5.3.0+20260708"},
+        "data": {
+            "abilityWords": ["Landfall"],
+            "keywordAbilities": ["Double strike"],
+            "keywordActions": ["Surveil"],
+        },
+    }
+
+    keywords = mtgjson._extract_keyword_catalog(payload)
+
+    assert [(item.label, item.tag, item.category) for item in keywords] == [
+        ("Landfall", "landfall", "ability_word"),
+        ("Double strike", "double_strike", "keyword_ability"),
+        ("Surveil", "surveil", "keyword_action"),
+    ]
+    assert keywords[0].mtgjson_version == "5.3.0+20260708"
+    assert str(keywords[0].mtgjson_date) == "2026-07-08"
