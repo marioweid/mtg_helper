@@ -295,13 +295,15 @@ def _color_score(colors: list[str], intent: CommanderSuggestIntent, reasons: lis
     requested = set(intent.color_identity or [])
     if not requested:
         return 2
-    if not color_set <= requested:
+    if intent.exact_color_identity and color_set != requested:
+        return -100
+    if not intent.exact_color_identity and not requested <= color_set:
         return -100
     if color_set == requested:
-        reasons.append("Matches requested colors")
-        return 14
-    reasons.append("Fits within requested colors")
-    return 8
+        reasons.append("Exact color match")
+        return 16
+    reasons.append("Includes requested colors")
+    return 10
 
 
 def _intersection(left: list[str], right: list[str]) -> list[str]:

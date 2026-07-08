@@ -533,6 +533,7 @@ class CommanderSuggestIntent(BaseModel):
     traits: list[str] = Field(default_factory=list, max_length=12)
     token_types: list[str] = Field(default_factory=list, max_length=12)
     color_identity: list[str] | None = Field(default=None, max_length=5)
+    exact_color_identity: bool = False
     excluded_colors: list[str] = Field(default_factory=list, max_length=5)
     bracket: int = Field(default=3, ge=1, le=5)
     direction: str = Field(default="", max_length=500)

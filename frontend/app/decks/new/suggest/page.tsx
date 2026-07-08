@@ -58,6 +58,7 @@ function emptyIntent(): CommanderSuggestIntent {
     traits: [],
     token_types: [],
     color_identity: null,
+    exact_color_identity: false,
     excluded_colors: [],
     bracket: 3,
     direction: "",
@@ -252,7 +253,7 @@ function ColorPanel({ intent, onChange }: { intent: CommanderSuggestIntent; onCh
   const selected = useMemo(() => new Set(intent.color_identity ?? []), [intent.color_identity]);
   return (
     <section className={PANEL_CLASS}>
-      <h2 className="mb-3 text-sm font-semibold text-white">Color identity</h2>
+      <h2 className="mb-3 text-sm font-semibold text-white">Includes colors</h2>
       <div className="flex flex-wrap gap-2">
         {COLORS.map((color) => (
           <ColorButton
@@ -263,6 +264,15 @@ function ColorPanel({ intent, onChange }: { intent: CommanderSuggestIntent; onCh
           />
         ))}
       </div>
+      <label className="mt-3 flex items-center gap-2 text-sm text-gray-300">
+        <input
+          type="checkbox"
+          checked={intent.exact_color_identity}
+          onChange={(e) => onChange({ ...intent, exact_color_identity: e.target.checked })}
+          className="h-4 w-4 rounded border-white/20 bg-white/5 accent-indigo-500"
+        />
+        Exact color match
+      </label>
     </section>
   );
 }

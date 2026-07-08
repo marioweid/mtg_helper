@@ -119,12 +119,52 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
         legality="banned",
     )
 
-    intent = CommanderSuggestIntent(archetype_tags=["graveyard"], color_identity=["B", "G", "U"])
+    intent = CommanderSuggestIntent(archetype_tags=["graveyard"], color_identity=["B"])
     results = await commander_suggestor_service.suggest_commanders(db_pool, intent)
     result_ids = {item.card.scryfall_id for item in results}
 
     assert MULDROTHA_ID in result_ids
     assert BANNED_ID not in result_ids
+
+
+async def test_suggest_commanders_exact_color_match_requires_same_identity(
+    db_pool: asyncpg.Pool,
+) -> None:
+    await _insert_card(
+        db_pool,
+        scryfall_id=MULDROTHA_ID,
+        name="Sultai Graveyard Legend",
+        type_line="Legendary Creature - Elemental Avatar",
+        oracle_text="Draw a card from your graveyard.",
+        colors=["B", "G", "U"],
+        tags=["graveyard"],
+    )
+    await _insert_card(
+        db_pool,
+        scryfall_id=GENERIC_ID,
+        name="Mono Black Graveyard Legend",
+        type_line="Legendary Creature - Zombie",
+        oracle_text="Draw a card from your graveyard.",
+        colors=["B"],
+        tags=["graveyard"],
+    )
+
+    loose = CommanderSuggestIntent(archetype_tags=["graveyard"], color_identity=["B"])
+    exact = CommanderSuggestIntent(
+        archetype_tags=["graveyard"],
+        color_identity=["B"],
+        exact_color_identity=True,
+    )
+
+    loose_results = await commander_suggestor_service.suggest_commanders(db_pool, loose)
+    exact_results = await commander_suggestor_service.suggest_commanders(db_pool, exact)
+    loose_ids = {item.card.scryfall_id for item in loose_results}
+    exact_ids = {item.card.scryfall_id for item in exact_results}
+
+    assert MULDROTHA_ID in loose_ids
+    assert GENERIC_ID in loose_ids
+    assert MULDROTHA_ID not in exact_ids
+    assert GENERIC_ID in exact_ids
 
 
 async def test_suggest_commanders_endpoint_reranks_from_intent_override(
@@ -152,6 +192,7 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
                 "traits": ["etb"],
                 "token_types": [],
                 "color_identity": ["B", "G", "U"],
+                "exact_color_identity": False,
                 "excluded_colors": [],
                 "bracket": 3,
                 "direction": "graveyard etb value",

@@ -263,6 +263,7 @@ export interface CommanderSuggestIntent {
   traits: string[];
   token_types: string[];
   color_identity: string[] | null;
+  exact_color_identity: boolean;
   excluded_colors: string[];
   bracket: number;
   direction: string;
