@@ -65,8 +65,6 @@ CREATE INDEX IF NOT EXISTS idx_cards_cmc ON cards (cmc);
 
 -- Tag-based filtering (hybrid retrieval)
 CREATE INDEX IF NOT EXISTS idx_cards_tags ON cards USING GIN (tags);
-CREATE INDEX IF NOT EXISTS idx_cards_edhrec_tags ON cards USING GIN (edhrec_tags);
-CREATE INDEX IF NOT EXISTS idx_cards_mtgjson_tags ON cards USING GIN (mtgjson_tags);
 
 -- Mechanical trait filtering (etb, activated, evasion)
 CREATE INDEX IF NOT EXISTS idx_cards_traits ON cards USING GIN (traits);
@@ -341,6 +339,8 @@ SET mtgjson_tags = tags
 WHERE cardinality(mtgjson_tags) = 0
   AND cardinality(edhrec_tags) = 0
   AND cardinality(tags) > 0;
+CREATE INDEX IF NOT EXISTS idx_cards_edhrec_tags ON cards USING GIN (edhrec_tags);
+CREATE INDEX IF NOT EXISTS idx_cards_mtgjson_tags ON cards USING GIN (mtgjson_tags);
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE deck_feedback ADD COLUMN IF NOT EXISTS reject_count INT NOT NULL DEFAULT 0;
 ALTER TABLE deck_feedback DROP CONSTRAINT IF EXISTS deck_feedback_feedback_check;
@@ -525,6 +525,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS feature_flags_account_idx
 -- ============================================================
 -- VIEW: deck detail with full card info
 -- ============================================================
+DROP VIEW IF EXISTS deck_detail_view;
 CREATE OR REPLACE VIEW deck_detail_view AS
 SELECT
     dc.deck_id,
