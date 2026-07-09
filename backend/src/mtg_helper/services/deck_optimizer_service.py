@@ -28,14 +28,12 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import CardSuggestion
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.models.optimizer import OptimizationProposal, ProposedSwap, SearchDepth
 from mtg_helper.models.playtest import PlaytestSimulateRequest, PlaytestStats
 from mtg_helper.services import mana_base_service, playtest_service, swap_service
-from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.optimizer_jobs import ProgressCb, noop_progress
 from mtg_helper.services.swap_service import SwapError
 
@@ -385,8 +383,6 @@ async def _run_land_search(
     state: _RunState,
     prog: _Progress,
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     search_sim: PlaytestSimulateRequest,
     *,
     max_price_cents: int | None,
@@ -403,8 +399,6 @@ async def _run_land_search(
     prog.phase = "searching lands"
     candidates = await mana_base_service.candidate_lands(
         pool,
-        ai_client,
-        qdrant_client,
         state.variant_deck,
         max_price_cents=max_price_cents,
         limit=depth.pool,
@@ -434,8 +428,6 @@ async def _try_swap(
     state: _RunState,
     prog: _Progress,
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     weak: _WeakCard,
     search_sim: PlaytestSimulateRequest,
     *,
@@ -446,8 +438,6 @@ async def _try_swap(
     try:
         swap_resp = await swap_service.find_budget_swaps(
             pool,
-            ai_client,
-            qdrant_client,
             state.variant_deck,
             weak.card.card_id,
             max_price_cents=max_price_cents,
@@ -487,8 +477,6 @@ async def _run_nonland_search(
     state: _RunState,
     prog: _Progress,
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     search_sim: PlaytestSimulateRequest,
     *,
     max_price_cents: int | None,
@@ -508,8 +496,6 @@ async def _run_nonland_search(
                 state,
                 prog,
                 pool,
-                ai_client,
-                qdrant_client,
                 weak,
                 search_sim,
                 max_price_cents=max_price_cents,
@@ -540,8 +526,6 @@ def _estimate_total(depth: _DepthPreset) -> int:
 
 async def run_search(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     deck: DeckDetailResponse,
     sim_request: PlaytestSimulateRequest,
     *,
@@ -555,8 +539,6 @@ async def run_search(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used by retrieval for query embedding).
-        qdrant_client: Qdrant async client.
         deck: The deck to optimize. Not mutated.
         sim_request: Full-trial sim parameters; ``seed`` is pinned across every
             variant (derived from the deck id when omitted) and ``trials`` is
@@ -592,8 +574,6 @@ async def run_search(
         state,
         prog,
         pool,
-        ai_client,
-        qdrant_client,
         search_sim,
         max_price_cents=max_price_cents,
         max_swaps=max_swaps,
@@ -603,8 +583,6 @@ async def run_search(
         state,
         prog,
         pool,
-        ai_client,
-        qdrant_client,
         search_sim,
         max_price_cents=max_price_cents,
         account_id=account_id,

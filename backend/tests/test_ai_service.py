@@ -227,27 +227,27 @@ async def test_feedback_boosting_disabled_build_still_works(client: AsyncClient)
 
 
 def test_highlight_reasons_banger_two_signals() -> None:
-    card = _make_candidate(["semantic", "tag"], score=_BANGER_SCORE_THRESHOLD)
+    card = _make_candidate(["tag", "fts"], score=_BANGER_SCORE_THRESHOLD)
     reasons = _compute_highlight_reasons(card)
     assert reasons is not None
-    assert "Strong semantic match" in reasons
     assert "High tag relevance" in reasons
+    assert "Strong text match" in reasons
 
 
-def test_highlight_reasons_banger_all_three_signals() -> None:
-    card = _make_candidate(["semantic", "tag", "fts"], score=_BANGER_SCORE_THRESHOLD)
+def test_highlight_reasons_banger_known_signals() -> None:
+    card = _make_candidate(["tag", "fts", "moxfield"], score=_BANGER_SCORE_THRESHOLD)
     reasons = _compute_highlight_reasons(card)
     assert reasons is not None
-    assert len(reasons) == 3
+    assert reasons == ["High tag relevance", "Strong text match"]
 
 
 def test_highlight_reasons_none_for_single_signal() -> None:
-    card = _make_candidate(["semantic"], score=_BANGER_SCORE_THRESHOLD)
+    card = _make_candidate(["tag"], score=_BANGER_SCORE_THRESHOLD)
     assert _compute_highlight_reasons(card) is None
 
 
 def test_highlight_reasons_none_for_low_score() -> None:
-    card = _make_candidate(["semantic", "tag"], score=_BANGER_SCORE_THRESHOLD - 0.001)
+    card = _make_candidate(["tag", "fts"], score=_BANGER_SCORE_THRESHOLD - 0.001)
     assert _compute_highlight_reasons(card) is None
 
 

@@ -1,4 +1,4 @@
-"""Hybrid retrieval service: semantic + tag + FTS search with weighted scoring."""
+"""Structured retrieval service: tags + FTS + trusted inclusion scoring."""
 
 import asyncio
 import logging
@@ -8,17 +8,7 @@ from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import (
-    FieldCondition,
-    Filter,
-    HasIdCondition,
-    MatchAny,
-    MatchValue,
-    ScoredPoint,
-)
 
-from mtg_helper.config import settings
 from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
     edhrec_service,
@@ -26,12 +16,8 @@ from mtg_helper.services import (
     moxfield_recs_service,
     profile_service,
 )
-from mtg_helper.services.embedding_service import embed_single
-from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
-
-_ALL_COLORS = {"W", "U", "B", "R", "G"}
 
 # Target CMC distribution for a typical commander deck (excluding lands/commander).
 # Keys are CMC buckets; 6 means "6 or more". Values are target fractions.
@@ -671,9 +657,8 @@ def parse_query_types(query: str) -> TypeFilter | None:
 def stage_retrieval_query(stage: str, deck_description: str | None) -> tuple[str, list[str]]:
     """Map a build stage to a (query_text, query_tags) pair for retrieval.
 
-    Appends the deck description to every stage's query text so that
-    thematically relevant cards get a semantic boost even in generic
-    stages like ramp or draw.
+    Appends the deck description to every stage's query text so full-text and
+    tag parsing can use theme language even in generic stages like ramp or draw.
 
     Args:
         stage: Build stage name (e.g. "ramp", "draw", "theme").
@@ -692,11 +677,6 @@ def stage_retrieval_query(stage: str, deck_description: str | None) -> tuple[str
 
     query_text = f"{base[0]} {deck_description}"
     return query_text, list(base[1])
-
-
-def _excluded_colors(commander_color_identity: list[str]) -> list[str]:
-    """Return colors not in the commander's identity."""
-    return list(_ALL_COLORS - set(commander_color_identity))
 
 
 def _normalize_card_name(name: str) -> str:
@@ -723,54 +703,6 @@ async def _excluded_nonbasic_names(pool: asyncpg.Pool, ids: list[UUID]) -> set[s
 def _is_land_card(type_line: str | None) -> bool:
     """Return True if the card's type line indicates it is a land."""
     return "Land" in (type_line or "")
-
-
-async def _search_qdrant(
-    qdrant_client: AsyncQdrantClient,
-    query_vector: list[float],
-    commander_color_identity: list[str],
-    exclude_ids: list[UUID],
-    limit: int = 50,
-    owned_card_ids: frozenset[UUID] | None = None,
-) -> list[tuple[UUID, float]]:
-    """Semantic search via Qdrant cosine similarity.
-
-    Args:
-        qdrant_client: Async Qdrant client.
-        query_vector: Embedding of the query text.
-        commander_color_identity: Commander's color identity letters.
-        exclude_ids: Card UUIDs already in the deck (excluded from results).
-        limit: Maximum results to return.
-        owned_card_ids: When set, restricts results to these card UUIDs.
-
-    Returns:
-        List of (card_uuid, cosine_similarity) pairs, best match first.
-    """
-    must_conditions: list = [FieldCondition(key="commander_legal", match=MatchValue(value=True))]
-    if owned_card_ids:
-        must_conditions.append(HasIdCondition(has_id=[str(uid) for uid in owned_card_ids]))
-
-    excluded_colors = _excluded_colors(commander_color_identity)
-    must_not_conditions: list = []
-    if excluded_colors:
-        must_not_conditions.append(
-            FieldCondition(key="color_identity", match=MatchAny(any=excluded_colors))
-        )
-    if exclude_ids:
-        must_not_conditions.append(HasIdCondition(has_id=[str(uid) for uid in exclude_ids]))
-
-    query_filter = Filter(
-        must=must_conditions,
-        must_not=must_not_conditions if must_not_conditions else None,
-    )
-
-    results: list[ScoredPoint] = await qdrant_client.search(
-        collection_name=settings.qdrant_collection,
-        query_vector=query_vector,
-        query_filter=query_filter,
-        limit=limit,
-    )
-    return [(UUID(str(p.id)), p.score) for p in results]
 
 
 async def _search_tags(
@@ -921,11 +853,9 @@ async def _search_fts(
 
 
 def _build_signal_map(
-    semantic_results: list[tuple[UUID, float]],
     tag_results: list[tuple[UUID, int]],
     fts_ids: list[UUID],
 ) -> tuple[
-    dict[UUID, float],
     dict[UUID, int],
     set[UUID],
     dict[UUID, list[str]],
@@ -933,20 +863,16 @@ def _build_signal_map(
     """Build per-signal score maps and signal membership from individual search results.
 
     Args:
-        semantic_results: (uuid, cosine_score) pairs from Qdrant.
         tag_results: (uuid, overlap_count) pairs from Postgres tag search.
         fts_ids: UUIDs from Postgres FTS search.
 
     Returns:
-        Tuple of (qdrant_scores, tag_overlaps, fts_set, signal_map).
+        Tuple of (tag_overlaps, fts_set, signal_map).
     """
-    qdrant_scores: dict[UUID, float] = {uid: score for uid, score in semantic_results}
     tag_overlaps: dict[UUID, int] = {uid: overlap for uid, overlap in tag_results}
     fts_set: set[UUID] = set(fts_ids)
     signal_map: dict[UUID, list[str]] = {}
 
-    for uid in qdrant_scores:
-        signal_map.setdefault(uid, []).append("semantic")
     for uid in tag_overlaps:
         if uid not in signal_map or "tag" not in signal_map[uid]:
             signal_map.setdefault(uid, []).append("tag")
@@ -955,7 +881,7 @@ def _build_signal_map(
         if "fts" not in entry:
             entry.append("fts")
 
-    return qdrant_scores, tag_overlaps, fts_set, signal_map
+    return tag_overlaps, fts_set, signal_map
 
 
 def _curve_fit_score(cmc: Decimal | None, deck_cmc_counts: dict[int, int] | None) -> float:
@@ -1128,7 +1054,6 @@ def _color_affinity_score(
 
 
 # Default signal weights (no type filter)
-_W_SEMANTIC: float = 0.25
 _W_SYNERGY: float = 0.22
 _W_POPULARITY: float = 0.20
 _W_PERSONAL: float = 0.15
@@ -1142,15 +1067,9 @@ _MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
 _MULTI_TAG_SYNERGY_THRESHOLD = 3
 _MULTI_TAG_SYNERGY_DAMPEN = 0.7
 
-# When the deck supplies explicit archetype keywords we pivot 0.10 of weight
-# from the semantic signal into tag synergy so chip-driven decks stop being
-# diluted by Qdrant neighbors that share oracle-text vocabulary but not theme.
-_KEYWORD_SHIFT: float = 0.10
-
 
 def _compute_weighted_scores(
     all_ids: list[UUID],
-    qdrant_scores: dict[UUID, float],
     tag_overlaps: dict[UUID, int],
     fts_set: set[UUID],
     cards_by_id: dict[UUID, "asyncpg.Record"],
@@ -1169,22 +1088,22 @@ def _compute_weighted_scores(
     """Compute weighted scores for all candidate cards.
 
     Default weights (no type_filter):
-        score = w_semantic  * vector_similarity
-              + w_synergy   * synergy_score
+        score = w_synergy   * synergy_score
               + w_popularity* popularity (log-scaled EDHREC)
               + w_personal  * personal_card_rating
               + 0.10        * curve_fit
               + 0.05        * color_affinity
               + 0.03        * user_profile_score
 
-    With type_filter, 0.15 is reallocated from semantic/synergy to a type_score signal.
+    The legacy semantic weight is folded into synergy so saved ranking settings
+    remain compatible after removing vector search. With type_filter, 0.15 is
+    reallocated from synergy to a type_score signal.
 
     Weights come from ``ranking_weights`` when provided; otherwise module defaults apply.
     Multi-modal cards (3+ tag matches) outside theme/bangers stages have synergy dampened 0.7x.
 
     Args:
         all_ids: All candidate card UUIDs.
-        qdrant_scores: Cosine similarity per card from Qdrant [0, 1].
         tag_overlaps: Tag overlap count per card from Postgres.
         fts_set: Set of card UUIDs found via full-text search.
         cards_by_id: Raw DB rows indexed by card UUID.
@@ -1201,13 +1120,9 @@ def _compute_weighted_scores(
         Dict mapping card UUID to final weighted score.
     """
     w = ranking_weights if ranking_weights is not None else RankingWeights()
+    synergy_base_weight = w.synergy + w.semantic
     if prefer_keywords:
-        w = w.model_copy(
-            update={
-                "semantic": max(0.0, w.semantic - _KEYWORD_SHIFT),
-                "synergy": w.synergy + _KEYWORD_SHIFT,
-            }
-        )
+        synergy_base_weight += 0.05
 
     max_overlap = max(tag_overlaps.values(), default=1) or 1
     edhrec_ranks = [
@@ -1223,8 +1138,6 @@ def _compute_weighted_scores(
         row = cards_by_id.get(uid)
         if row is None:
             continue
-
-        vec_sim = qdrant_scores.get(uid, 0.0)
 
         raw_overlap = tag_overlaps.get(uid, 0)
         fts_bonus = 0.15 if uid in fts_set else 0.0
@@ -1260,12 +1173,10 @@ def _compute_weighted_scores(
             if type_filter.strict and type_score == 0.0:
                 scores[uid] = 0.0
                 continue
-            # With type filter: reallocate 0.15 from semantic/synergy to type_score
-            tf_semantic = max(0.0, w.semantic - 0.08 - rep_weight / 2)
-            tf_synergy = max(0.0, w.synergy - 0.07 - rep_weight / 2)
+            # With type filter: reallocate 0.15 from synergy to type_score.
+            tf_synergy = max(0.0, synergy_base_weight - 0.15 - rep_weight)
             scores[uid] = (
-                tf_semantic * vec_sim
-                + tf_synergy * synergy
+                tf_synergy * synergy
                 + 0.15 * type_score
                 + rep_weight * representation
                 + _W_COLOR * color
@@ -1277,11 +1188,9 @@ def _compute_weighted_scores(
                 + w.moxfield_inclusion * mox_inclusion
             )
         else:
-            semantic_weight = max(0.0, w.semantic - rep_weight / 2)
-            synergy_weight = max(0.0, w.synergy - rep_weight / 2)
+            synergy_weight = max(0.0, synergy_base_weight - rep_weight)
             scores[uid] = (
-                semantic_weight * vec_sim
-                + synergy_weight * synergy
+                synergy_weight * synergy
                 + rep_weight * representation
                 + _W_COLOR * color
                 + w.popularity * popularity
@@ -1502,10 +1411,10 @@ def _apply_trusted_quota(
     2. Trusted cards (Moxfield + EDHREC inclusion ≥ 0 with a positive composite
        score), sorted by trusted score desc then composite score desc. Capped
        at ``floor(limit * quota)`` slots so the composite channel always has
-       room to surface keyword/semantic winners when ``quota < 1.0``. A card
+       room to surface keyword/text winners when ``quota < 1.0``. A card
        present in all 10 top Moxfield decks (trust = 1.0) therefore ranks
        above one in 5 decks (trust = 0.5).
-    3. Composite-ranked fill (semantic + keyword + FTS scoring) for any
+    3. Composite-ranked fill (keyword + FTS scoring) for any
        remaining slots up to ``limit``.
 
     The result is then truncated to ``limit`` so over-allocation from large
@@ -1521,7 +1430,7 @@ def _apply_trusted_quota(
         stage: Active build stage; controls the theme uncategorizable-pin pass.
         quota: Fraction of ``limit`` reserved for trusted cards. ``1.0`` keeps
             the historical "all trusted first" behavior; ``0.5`` yields the
-            50/50 mix that lets keyword/semantic winners share the page.
+            50/50 mix that lets keyword/text winners share the page.
 
     Returns:
         Ordered list of UUIDs: pinned + trusted (capped by quota) + composite
@@ -1558,8 +1467,6 @@ def _apply_trusted_quota(
 
 async def retrieve_candidates(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     query_text: str,
     query_tags: list[str],
     commander_color_identity: list[str],
@@ -1579,15 +1486,13 @@ async def retrieve_candidates(
     bracket: int | None = None,
     prefer_keywords: bool = False,
 ) -> list[RetrievedCard]:
-    """Run hybrid retrieval and return top candidate cards with weighted scoring.
+    """Run structured retrieval and return top candidate cards with weighted scoring.
 
-    Combines semantic (Qdrant), tag (Postgres GIN), and full-text (Postgres FTS)
-    search, applies a weighted scoring formula, then fetches full card data.
+    Combines tag (Postgres GIN), full-text (Postgres FTS), EDHREC inclusion,
+    Moxfield inclusion, and deterministic card representation matches.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter for query embedding.
-        qdrant_client: Qdrant async client for semantic search.
         query_text: Text describing desired cards.
         query_tags: Pre-parsed tags for GIN search.
         commander_color_identity: Commander's color identity letters.
@@ -1605,9 +1510,7 @@ async def retrieve_candidates(
             applies the deck_inclusion ranking signal.
         bracket: Deck bracket; gates EDHREC's gamechangers category.
         prefer_keywords: When True (deck supplies explicit archetype keywords),
-            shifts 0.10 of the semantic weight onto tag synergy so chip-driven
-            decks aren't diluted by Qdrant neighbors that share oracle-text
-            vocabulary but not theme.
+            slightly increases tag/keyword synergy weight.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1616,7 +1519,6 @@ async def retrieve_candidates(
     owned_ids = collection_filter.owned_card_ids if collection_filter else None
     if owned_ids == frozenset():
         return []
-    query_vector = await embed_single(ai_client, query_text)
     excluded_names = await _excluded_nonbasic_names(pool, deck_card_ids)
 
     # Build a deep enough ranked list to satisfy ``offset + limit`` (Load More
@@ -1627,15 +1529,7 @@ async def retrieve_candidates(
     pool_size = min(_MAX_INNER_POOL, max(headroom, 50))
     fts_pool_size = min(_MAX_INNER_POOL, max(headroom, 30))
 
-    semantic_results, tag_results, fts_ids = await asyncio.gather(
-        _search_qdrant(
-            qdrant_client,
-            query_vector,
-            commander_color_identity,
-            deck_card_ids,
-            limit=pool_size,
-            owned_card_ids=owned_ids,
-        ),
+    tag_results, fts_ids = await asyncio.gather(
         _search_tags(
             pool,
             query_tags,
@@ -1658,9 +1552,7 @@ async def retrieve_candidates(
         ),
     )
 
-    qdrant_scores, tag_overlaps, fts_set, signal_map = _build_signal_map(
-        semantic_results, tag_results, fts_ids
-    )
+    tag_overlaps, fts_set, signal_map = _build_signal_map(tag_results, fts_ids)
 
     edhrec_inclusion, theme_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
         pool, commander_id, commander_color_identity, bracket, query_tags
@@ -1668,7 +1560,7 @@ async def retrieve_candidates(
     combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
 
     # Include EDHREC- and Moxfield-only matches as candidates so a high-synergy
-    # card not surfaced by semantic/tag/FTS still has a path into the result set.
+    # card not surfaced by tag/FTS still has a path into the result set.
     # Must respect ``deck_card_ids`` — the search channels filter against it,
     # but this fallback path bypasses them and would otherwise resurface cards
     # already in the deck.
@@ -1676,13 +1568,12 @@ async def retrieve_candidates(
     extra_ids = [
         uid
         for uid in {*combined_edhrec, *moxfield_inclusion}
-        if uid not in qdrant_scores
-        and uid not in tag_overlaps
+        if uid not in tag_overlaps
         and uid not in fts_set
         and uid not in deck_exclude
         and (owned_ids is None or uid in owned_ids)
     ]
-    all_ids = list({*qdrant_scores, *tag_overlaps, *fts_set, *extra_ids})
+    all_ids = list({*tag_overlaps, *fts_set, *extra_ids})
     if not all_ids:
         return []
 
@@ -1703,7 +1594,6 @@ async def retrieve_candidates(
 
     scores = _compute_weighted_scores(
         all_ids,
-        qdrant_scores,
         tag_overlaps,
         fts_set,
         cards_by_id,
@@ -1790,8 +1680,6 @@ async def _fetch_candidates(
         ids: Card UUIDs to fetch.
         exclude_lands: If True, filter out land cards from results.
         price_filter: When set, drops cards with no EUR price or EUR > cap.
-            Required here because Qdrant payload has no price data; this is
-            the safety net for semantic results.
 
     Returns:
         List of raw asyncpg records.

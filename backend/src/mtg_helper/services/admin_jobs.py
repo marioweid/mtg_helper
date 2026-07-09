@@ -1,6 +1,6 @@
 """In-memory progress registry for admin maintenance jobs.
 
-Each long-running admin endpoint (sync, tag, embed, refresh-all) updates a
+Each long-running admin endpoint (sync, tag, refresh-all) updates a
 shared :class:`JobState` via the callback returned by
 :func:`make_progress_cb`. The Admin UI polls ``GET /admin/status`` every
 couple of seconds and renders a progress bar from ``current`` / ``total``.
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
-JobKey = Literal["sync", "mtgjson", "tag", "embed", "refresh-all"]
+JobKey = Literal["sync", "mtgjson", "tag", "refresh-all"]
 JobStatus = Literal["idle", "running", "ok", "error"]
 
 ProgressCb = Callable[[str, int, int], None]
@@ -43,7 +43,6 @@ class JobRegistry:
     sync: JobState = field(default_factory=lambda: JobState(key="sync"))
     mtgjson: JobState = field(default_factory=lambda: JobState(key="mtgjson"))
     tag: JobState = field(default_factory=lambda: JobState(key="tag"))
-    embed: JobState = field(default_factory=lambda: JobState(key="embed"))
     refresh_all: JobState = field(default_factory=lambda: JobState(key="refresh-all"))
 
 

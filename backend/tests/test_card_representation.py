@@ -3,7 +3,6 @@
 from decimal import Decimal
 
 from mtg_helper.services import card_representation
-from mtg_helper.services.embedding_service import build_embedding_text
 
 
 def test_representation_embedding_text_includes_structured_labels() -> None:
@@ -61,11 +60,3 @@ def test_representation_deduplicates_features_stably() -> None:
     )
 
     assert rep.keywords == ["Flying", "Vigilance"]
-
-
-def test_embedding_service_preserves_old_call_shape() -> None:
-    text = build_embedding_text("Sol Ring", "Artifact", "{T}: Add {C}{C}.", ["Ramp"])
-
-    assert "Name: Sol Ring" in text
-    assert "Type line: Artifact" in text
-    assert "Keywords: Ramp" in text

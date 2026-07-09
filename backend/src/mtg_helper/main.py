@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.auth import get_current_account, require_admin_or_internal
 from mtg_helper.config import settings
@@ -29,7 +28,6 @@ from mtg_helper.routers import (
 )
 from mtg_helper.services import edhrec_tag_catalog_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import JobRegistry
-from mtg_helper.services.embedding_service import ensure_collection
 from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
@@ -46,12 +44,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         embed_model=settings.embedding_model,
         embed_dim=settings.embedding_dimensions,
     )
-    # Default qdrant-client timeout is 5s — too short for the batch payload
-    # updates run by the admin sync job (~31k cards). 600s gives individual
-    # requests room to breathe under concurrent load without affecting the
-    # snappy single-call paths (search, get_collection).
-    app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url, timeout=600)
-    await ensure_collection(app.state.qdrant_client)
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
     app.state.coach_jobs = {}
@@ -83,7 +75,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             _log.exception("EDHREC tag sync failed on startup; continuing with fallback data")
 
     yield
-    await app.state.qdrant_client.close()
     await close_pool(app.state.db_pool)
 
 

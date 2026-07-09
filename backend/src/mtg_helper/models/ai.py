@@ -21,6 +21,7 @@ class BuildRequest(BaseModel):
     min_price_cents: int | None = Field(default=None, ge=0)
     card_types: list[str] | None = Field(default=None, max_length=10)
     subtypes: list[str] | None = Field(default=None, max_length=10)
+    theme_tag: str | None = Field(default=None, max_length=80)
 
 
 class CollectionMembership(BaseModel):

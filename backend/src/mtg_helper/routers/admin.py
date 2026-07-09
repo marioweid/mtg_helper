@@ -1,4 +1,4 @@
-"""Admin maintenance endpoints (sync / tag / embed) with progress tracking.
+"""Admin maintenance endpoints (sync / tag) with progress tracking.
 
 Each ``POST`` returns ``202 Accepted`` immediately and runs the underlying
 service in a background task that updates a shared :class:`JobRegistry` on
@@ -25,7 +25,6 @@ from mtg_helper.services.admin_jobs import (
     make_progress_cb,
     start,
 )
-from mtg_helper.services.embedding_service import run_batch_embed
 from mtg_helper.services.tag_service import run_batch_tag
 
 router = APIRouter(tags=["admin"])
@@ -106,27 +105,6 @@ async def tag_cards(request: Request) -> dict[str, Any]:
             job,
             run_batch_tag(
                 request.app.state.db_pool,
-                request.app.state.qdrant_client,
-                progress=make_progress_cb(job),
-            ),
-        )
-    )
-    return _response(job)
-
-
-@router.post("/admin/embed-cards", status_code=202)
-async def embed_cards(request: Request) -> dict[str, Any]:
-    """Kick off Gemini embedding generation as a background task."""
-    job = _registry(request).embed
-    _ensure_idle(job)
-    start(job)
-    asyncio.create_task(
-        _wrap(
-            job,
-            run_batch_embed(
-                request.app.state.db_pool,
-                request.app.state.ai_client,
-                request.app.state.qdrant_client,
                 progress=make_progress_cb(job),
             ),
         )
@@ -136,7 +114,7 @@ async def embed_cards(request: Request) -> dict[str, Any]:
 
 @router.post("/admin/refresh-all", status_code=202)
 async def refresh_all(request: Request) -> dict[str, Any]:
-    """Run sync → tag → embed sequentially under one job slot."""
+    """Run sync then tag sequentially under one job slot."""
     job = _registry(request).refresh_all
     _ensure_idle(job)
     start(job)
@@ -145,17 +123,13 @@ async def refresh_all(request: Request) -> dict[str, Any]:
 
 
 async def _run_refresh_all(app: FastAPI, job: JobState) -> dict[str, Any]:
-    """Chain sync, tag, and embed under the single refresh-all job state."""
+    """Chain sync and tag under the single refresh-all job state."""
     cb = make_progress_cb(job)
     sync_result = await scryfall.run_sync(app.state.db_pool, progress=cb)
-    tag_result = await run_batch_tag(app.state.db_pool, app.state.qdrant_client, progress=cb)
-    embed_result = await run_batch_embed(
-        app.state.db_pool, app.state.ai_client, app.state.qdrant_client, progress=cb
-    )
+    tag_result = await run_batch_tag(app.state.db_pool, progress=cb)
     return {
         "cards_processed": sync_result.get("cards_processed"),
         "cards_tagged": tag_result.get("cards_tagged"),
-        "cards_embedded": embed_result.get("cards_embedded"),
     }
 
 
@@ -167,7 +141,6 @@ async def status(request: Request) -> dict[str, Any]:
         "sync": asdict(registry.sync),
         "mtgjson": asdict(registry.mtgjson),
         "tag": asdict(registry.tag),
-        "embed": asdict(registry.embed),
         "refresh_all": asdict(registry.refresh_all),
     }
 

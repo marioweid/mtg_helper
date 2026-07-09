@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Job = "sync" | "tag" | "embed" | "refresh-all";
+type Job = "sync" | "tag" | "refresh-all";
 
 const JOBS: { id: Job; label: string; path: string; description: string }[] = [
   {
     id: "refresh-all",
     label: "Refresh all",
     path: "/api/v1/admin/refresh-all",
-    description: "Run sync → tag → embed back-to-back. Use after pulling new Scryfall sets.",
+    description: "Run sync then tag back-to-back. Use after pulling new Scryfall sets.",
   },
   {
     id: "sync",
@@ -22,12 +22,6 @@ const JOBS: { id: Job; label: string; path: string; description: string }[] = [
     label: "Tag cards",
     path: "/api/v1/admin/tag-cards",
     description: "Re-classify cards with the rule-based tagger.",
-  },
-  {
-    id: "embed",
-    label: "Embed cards",
-    path: "/api/v1/admin/embed-cards",
-    description: "Generate Gemini embeddings for un-embedded cards.",
   },
 ];
 
@@ -48,7 +42,6 @@ type JobSnapshot = {
 type StatusResponse = {
   sync: JobSnapshot;
   tag: JobSnapshot;
-  embed: JobSnapshot;
   refresh_all: JobSnapshot;
 };
 
@@ -58,7 +51,6 @@ const POLL_INTERVAL_MS = 2000;
 const SLOT_BY_ID: Record<Job, keyof StatusResponse> = {
   sync: "sync",
   tag: "tag",
-  embed: "embed",
   "refresh-all": "refresh_all",
 };
 
@@ -80,7 +72,6 @@ export function AdminPanel() {
   const [status, setStatus] = useState<StatusResponse>(() => ({
     sync: emptySnapshot("sync"),
     tag: emptySnapshot("tag"),
-    embed: emptySnapshot("embed"),
     refresh_all: emptySnapshot("refresh-all"),
   }));
   const [kickoffError, setKickoffError] = useState<Partial<Record<Job, string>>>({});
@@ -100,7 +91,6 @@ export function AdminPanel() {
     () =>
       status.sync.status === "running" ||
       status.tag.status === "running" ||
-      status.embed.status === "running" ||
       status.refresh_all.status === "running",
     [status],
   );

@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.decks import DeckCardAdd, DeckCreate, DeckResponse, DeckUpdate
 from mtg_helper.services import ai_service, card_service, deck_service
@@ -22,7 +21,6 @@ from mtg_helper.services.deck_service import (
     ColorIdentityError,
     DeckNotFoundError,
 )
-from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
@@ -86,8 +84,6 @@ ProgressCb = Callable[[QuickstartStageResult], Awaitable[None]]
 
 async def quickstart(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     *,
     email: str,
     account_id: UUID,
@@ -101,8 +97,6 @@ async def quickstart(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used by build_stage for embeddings).
-        qdrant_client: Qdrant async client (used by build_stage retrieval).
         email: Authenticated account email; deck owner.
         account_id: Authenticated account UUID; passed to build_stage so
             preference and feedback weights are honored.
@@ -158,8 +152,6 @@ async def quickstart(
         else:
             result = await _build_and_accept_stage(
                 pool,
-                ai_client,
-                qdrant_client,
                 deck_id=deck.id,
                 account_id=account_id,
                 email=email,
@@ -295,8 +287,6 @@ async def _fill_basic_lands(
 
 async def _build_and_accept_stage(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     *,
     deck_id: UUID,
     account_id: UUID,
@@ -315,8 +305,6 @@ async def _build_and_accept_stage(
     """
     response = await ai_service.build_stage(
         pool,
-        ai_client,
-        qdrant_client,
         deck_id,
         account_id,
         email,

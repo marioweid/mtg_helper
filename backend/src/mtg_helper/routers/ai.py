@@ -250,8 +250,6 @@ async def build_stage(
     try:
         result = await ai_service.build_stage(
             request.app.state.db_pool,
-            request.app.state.ai_client,
-            request.app.state.qdrant_client,
             deck_id,
             account.id,
             email,
@@ -264,6 +262,7 @@ async def build_stage(
             min_price_cents=body.min_price_cents,
             card_types=body.card_types,
             subtypes=body.subtypes,
+            theme_tag=body.theme_tag,
         )
     except DeckNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "DECK_NOT_FOUND", "message": str(e)})
@@ -284,8 +283,6 @@ async def suggest_cards(
     try:
         result = await ai_service.suggest_cards(
             request.app.state.db_pool,
-            request.app.state.ai_client,
-            request.app.state.qdrant_client,
             deck_id,
             account.id,
             email,
@@ -597,8 +594,6 @@ async def playtest_analyze(
 async def _run_optimize_job(
     job: optimizer_jobs.OptimizerJob,
     pool: Any,
-    ai_client: Any,
-    qdrant_client: Any,
     deck: Any,
     body: OptimizeRequest,
     account_id: UUID,
@@ -613,8 +608,6 @@ async def _run_optimize_job(
         try:
             result = await deck_optimizer_service.run_search(
                 pool,
-                ai_client,
-                qdrant_client,
                 deck,
                 body.sim,
                 search_depth=body.search_depth,
@@ -662,8 +655,6 @@ async def playtest_optimize(
         _run_optimize_job(
             job,
             request.app.state.db_pool,
-            request.app.state.ai_client,
-            request.app.state.qdrant_client,
             deck,
             body,
             account.id,
@@ -716,8 +707,6 @@ async def mana_fix(
         raise _deck_not_found(deck_id)
     result = await mana_base_service.suggest_mana_fix(
         request.app.state.db_pool,
-        request.app.state.ai_client,
-        request.app.state.qdrant_client,
         deck,
         account.id,
     )
@@ -740,8 +729,6 @@ async def find_swaps(
     try:
         result = await swap_service.find_budget_swaps(
             request.app.state.db_pool,
-            request.app.state.ai_client,
-            request.app.state.qdrant_client,
             deck,
             card_id,
             max_price_cents=body.max_price_cents,

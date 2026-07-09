@@ -29,43 +29,33 @@ _D = UUID("dddddddd-0000-0000-0000-000000000000")
 # ── _build_signal_map ─────────────────────────────────────────────────────────
 
 
-def test_build_signal_map_all_three_signals() -> None:
-    qdrant, tag_overlaps, fts_set, signal_map = _build_signal_map([(_A, 0.9)], [(_B, 2)], [_C])
-    assert signal_map[_A] == ["semantic"]
+def test_build_signal_map_all_signals() -> None:
+    tag_overlaps, fts_set, signal_map = _build_signal_map([(_B, 2)], [_C])
     assert signal_map[_B] == ["tag"]
     assert signal_map[_C] == ["fts"]
 
 
 def test_build_signal_map_card_in_multiple_signals() -> None:
-    _, _, _, signal_map = _build_signal_map([(_A, 0.9), (_B, 0.7)], [(_A, 2)], [])
-    assert "semantic" in signal_map[_A]
+    _, _, signal_map = _build_signal_map([(_A, 2)], [_A])
     assert "tag" in signal_map[_A]
     assert len(signal_map[_A]) == 2
 
 
 def test_build_signal_map_empty_inputs() -> None:
-    qdrant, tag_overlaps, fts_set, signal_map = _build_signal_map([], [], [])
-    assert qdrant == {}
+    tag_overlaps, fts_set, signal_map = _build_signal_map([], [])
     assert tag_overlaps == {}
     assert fts_set == set()
     assert signal_map == {}
 
 
 def test_build_signal_map_skips_empty_lists() -> None:
-    _, _, _, signal_map = _build_signal_map([(_A, 0.9)], [], [_C])
-    assert _A in signal_map
+    _, _, signal_map = _build_signal_map([], [_C])
     assert _C in signal_map
     assert _B not in signal_map
 
 
-def test_build_signal_map_qdrant_scores_captured() -> None:
-    qdrant, _, _, _ = _build_signal_map([(_A, 0.85), (_B, 0.72)], [], [])
-    assert abs(qdrant[_A] - 0.85) < 1e-9
-    assert abs(qdrant[_B] - 0.72) < 1e-9
-
-
 def test_build_signal_map_tag_overlaps_captured() -> None:
-    _, tag_overlaps, _, _ = _build_signal_map([], [(_A, 3), (_B, 1)], [])
+    tag_overlaps, _, _ = _build_signal_map([(_A, 3), (_B, 1)], [])
     assert tag_overlaps[_A] == 3
     assert tag_overlaps[_B] == 1
 
@@ -205,7 +195,6 @@ def test_weighted_score_higher_qdrant_wins() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.9, _B: 0.3},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -221,7 +210,6 @@ def test_weighted_score_fts_boosts_synergy() -> None:
     # Same qdrant score; _A is also in FTS
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set={_A},
         cards_by_id=rows,
@@ -237,7 +225,6 @@ def test_weighted_score_feedback_boosts_card() -> None:
     # Same base; _A has pet card feedback
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -255,7 +242,6 @@ def test_weighted_score_representation_boosts_matching_card() -> None:
     }
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
@@ -272,7 +258,6 @@ def test_weighted_score_skips_missing_rows() -> None:
     rows = {_A: _make_row(_A)}
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.9, _B: 0.9},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -288,7 +273,6 @@ def test_weighted_score_edhrec_inclusion_boosts_card() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -304,7 +288,6 @@ def test_weighted_score_moxfield_inclusion_boosts_card() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -320,7 +303,6 @@ def test_weighted_score_edhrec_inclusion_none_is_noop() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     base = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -330,7 +312,6 @@ def test_weighted_score_edhrec_inclusion_none_is_noop() -> None:
     )
     explicit_none = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -517,7 +498,6 @@ def test_weighted_score_range_zero_to_one() -> None:
     rows = {_A: _make_row(_A, edhrec_rank=1), _B: _make_row(_B, edhrec_rank=10000)}
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 1.0, _B: 0.0},
         tag_overlaps={_A: 3, _B: 0},
         fts_set={_A},
         cards_by_id=rows,
@@ -782,7 +762,6 @@ def test_weighted_score_type_filter_boosts_matching_card() -> None:
     tf = TypeFilter(card_types=["Artifact"], subtypes=[])
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
@@ -798,7 +777,6 @@ def test_weighted_score_no_type_filter_unchanged_weights() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     scores_no_filter = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.8, _B: 0.2},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
@@ -915,7 +893,6 @@ def test_strict_mode_zeroes_out_zero_match_cards() -> None:
     tf = TypeFilter(card_types=["Creature"], subtypes=[], keywords=["Flying"], strict=True)
     scores = _compute_weighted_scores(
         [_A, _B],
-        qdrant_scores={_A: 0.5, _B: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
@@ -936,7 +913,6 @@ def test_strict_mode_partial_match_not_zeroed() -> None:
     tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"], strict=True)
     scores = _compute_weighted_scores(
         [_A],
-        qdrant_scores={_A: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]
@@ -955,7 +931,6 @@ def test_non_strict_mode_zero_match_not_zeroed() -> None:
     tf = TypeFilter(card_types=["Creature"], subtypes=[], strict=False)
     scores = _compute_weighted_scores(
         [_A],
-        qdrant_scores={_A: 0.5},
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,  # type: ignore[arg-type]

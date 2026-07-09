@@ -2,7 +2,7 @@
 
 The similarity heuristic is a deterministic pure function over four signals —
 tag overlap (Jaccard), primary-type match, CMC proximity, color-identity
-containment. No LLM call. Candidates come from the existing hybrid retrieval
+containment. No LLM call. Candidates come from the structured retrieval
 pipeline with a price ceiling derived from the source card.
 """
 
@@ -11,7 +11,6 @@ from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import CardSuggestion
 from mtg_helper.models.cards import CardResponse
@@ -19,7 +18,6 @@ from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.swaps import SwapCandidate, SwapResponse
 from mtg_helper.services import card_service, collection_service
 from mtg_helper.services.ai_service import card_from_retrieved
-from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.retrieval_service import (
     PriceFilter,
     RetrievedCard,
@@ -253,8 +251,6 @@ def _to_swap_candidate(
 
 async def find_budget_swaps(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     deck: DeckDetailResponse,
     card_id: UUID,
     *,
@@ -266,8 +262,6 @@ async def find_budget_swaps(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used by retrieval for query embedding).
-        qdrant_client: Qdrant async client.
         deck: The deck containing the source card.
         card_id: Internal UUID of the card to swap.
         max_price_cents: Hard cap on candidate price. None → source price - 1.
@@ -295,8 +289,6 @@ async def find_budget_swaps(
 
     candidates = await retrieve_candidates(
         pool,
-        ai_client,
-        qdrant_client,
         query_text=_query_text_for(source),
         query_tags=list(source.tags),
         commander_color_identity=deck.commander_color_identity,

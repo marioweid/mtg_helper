@@ -24,7 +24,7 @@ const DEFAULT_WEIGHTS = {
 const DEFAULT_TRUSTED_QUOTA = 1.0;
 
 const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
-  semantic: "Semantic Match",
+  semantic: "Keyword Match",
   synergy: "Tag Synergy",
   popularity: "EDHREC Popularity",
   personal: "Personal Feedback",
@@ -33,7 +33,7 @@ const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
 };
 
 const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
-  semantic: "How closely a card matches the deck strategy description",
+  semantic: "Extra weight applied to keyword and tag-based card matches",
   synergy: "How many relevant tags a card shares with the deck",
   popularity: "How often the card appears anywhere on EDHREC (global rank)",
   personal: "Your accept/reject history for this deck",

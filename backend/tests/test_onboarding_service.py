@@ -1,7 +1,7 @@
 """Tests for the onboarding quickstart pipeline."""
 
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import Any
 from unittest.mock import patch
 from uuid import UUID
 
@@ -12,7 +12,6 @@ from httpx import AsyncClient
 from mtg_helper.models.ai import BuildResponse, CardSuggestion
 from mtg_helper.services import ai_service, onboarding_service
 from mtg_helper.services.deck_service import ColorIdentityError
-from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.onboarding_service import (
     QUICKSTART_STAGE_ORDER,
     QUICKSTART_TARGETS,
@@ -23,7 +22,6 @@ from tests.conftest import (
     HAZEL_SCRYFALL_ID,
     RHYSTIC_STUDY_SCRYFALL_ID,
     SOL_RING_SCRYFALL_ID,
-    make_mock_llm_client,
 )
 
 
@@ -59,8 +57,6 @@ def _make_mock_build_stage(
 
     async def _mock(
         pool: asyncpg.Pool,
-        ai_client: Any,
-        qdrant_client: Any,
         deck_id: UUID,
         account_id: UUID,
         email: str,
@@ -114,8 +110,6 @@ async def test_quickstart_calls_nonland_stages_in_order(
     with patch.object(ai_service, "build_stage", mock_build):
         deck, results = await quickstart(
             hazel_pool,
-            cast("LLMClient", make_mock_llm_client()),
-            None,  # type: ignore[arg-type]  # qdrant unused — build_stage is mocked
             email="default@test.local",
             account_id=account_id,
             commander_scryfall_id=HAZEL_SCRYFALL_ID,
@@ -157,8 +151,6 @@ async def test_quickstart_skips_color_violations(
         with patch.object(ai_service, "build_stage", mock_build):
             deck, results = await quickstart(
                 hazel_pool,
-                cast("LLMClient", make_mock_llm_client()),
-                None,  # type: ignore[arg-type]  # qdrant unused — build_stage is mocked
                 email="default@test.local",
                 account_id=account_row["id"],
                 commander_scryfall_id=HAZEL_SCRYFALL_ID,

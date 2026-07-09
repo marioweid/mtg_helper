@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -24,7 +23,7 @@ from mtg_helper.services.admin_jobs import (
 
 def test_registry_initial_state() -> None:
     reg = JobRegistry()
-    for job in (reg.sync, reg.mtgjson, reg.tag, reg.embed, reg.refresh_all):
+    for job in (reg.sync, reg.mtgjson, reg.tag, reg.refresh_all):
         assert job.status == "idle"
         assert job.current == 0
         assert job.total == 0
@@ -76,10 +75,10 @@ async def test_status_endpoint_returns_all_job_slots(client: AsyncClient) -> Non
     resp = await client.get("/api/v1/admin/status")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"sync", "mtgjson", "tag", "embed", "refresh_all"}
+    assert set(body.keys()) == {"sync", "mtgjson", "tag", "refresh_all"}
     for key, slot in body.items():
         assert slot["status"] == "idle"
-        assert slot["key"] in {"sync", "mtgjson", "tag", "embed", "refresh-all"}
+        assert slot["key"] in {"sync", "mtgjson", "tag", "refresh-all"}
         del key  # keys checked above; loop var quietens linters
 
 
@@ -187,10 +186,10 @@ async def test_sync_endpoint_records_error_on_failure(
 
 
 @pytest.mark.asyncio
-async def test_refresh_all_chains_sync_tag_embed(
+async def test_refresh_all_chains_sync_tag(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """refresh-all calls sync, tag, embed in order and updates phase as it goes."""
+    """refresh-all calls sync then tag in order and updates phase as it goes."""
     phases_seen: list[str] = []
 
     async def _fake_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
@@ -198,21 +197,13 @@ async def test_refresh_all_chains_sync_tag_embed(
         phases_seen.append("sync")
         return {"cards_processed": 5}
 
-    async def _fake_tag(_pool: Any, _qdr: Any, *, progress: Any) -> dict[str, Any]:
+    async def _fake_tag(_pool: Any, *, progress: Any) -> dict[str, Any]:
         progress("tagging", 5, 5)
         phases_seen.append("tag")
         return {"cards_tagged": 5}
 
-    async def _fake_embed(_pool: Any, _ai: Any, _qdr: Any, *, progress: Any) -> dict[str, Any]:
-        progress("embedding", 5, 5)
-        phases_seen.append("embed")
-        return {"cards_embedded": 5}
-
     monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _fake_sync)
     monkeypatch.setattr("mtg_helper.routers.admin.run_batch_tag", _fake_tag)
-    monkeypatch.setattr("mtg_helper.routers.admin.run_batch_embed", _fake_embed)
-    # ai_client is read but only by the fake; stub it so app.state has the attribute.
-    app.state.ai_client = AsyncMock()
 
     resp = await client.post("/api/v1/admin/refresh-all")
     assert resp.status_code == 202
@@ -224,9 +215,8 @@ async def test_refresh_all_chains_sync_tag_embed(
             break
 
     assert status["status"] == "ok"
-    assert phases_seen == ["sync", "tag", "embed"]
+    assert phases_seen == ["sync", "tag"]
     assert status["result"] == {
         "cards_processed": 5,
         "cards_tagged": 5,
-        "cards_embedded": 5,
     }

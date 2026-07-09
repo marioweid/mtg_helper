@@ -66,8 +66,6 @@ async def quickstart(
     try:
         deck, results = await onboarding_service.quickstart(
             request.app.state.db_pool,
-            request.app.state.ai_client,
-            request.app.state.qdrant_client,
             email=email,
             account_id=account.id,
             commander_scryfall_id=body.commander_scryfall_id,

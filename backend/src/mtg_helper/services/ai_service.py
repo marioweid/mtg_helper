@@ -6,7 +6,6 @@ from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import (
     BuildResponse,
@@ -25,7 +24,6 @@ from mtg_helper.services import (
     ranking_weight_service,
 )
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
-from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.retrieval_service import (
     CollectionFilter,
     PriceFilter,
@@ -45,7 +43,6 @@ _REJECT_BASE: float = 0.3  # weight = _REJECT_BASE ** reject_count
 _REJECT_FLOOR: float = 0.02
 
 _SIGNAL_LABELS: dict[str, str] = {
-    "semantic": "Strong semantic match",
     "tag": "High tag relevance",
     "fts": "Strong text match",
 }
@@ -55,7 +52,6 @@ _SIGNAL_LABELS: dict[str, str] = {
 # are the simple "where did this come from?" chips and cover signals beyond the
 # original three (edhrec, moxfield, type filter).
 _SOURCE_LABELS: dict[str, str] = {
-    "semantic": "Semantic",
     "tag": "Tags",
     "fts": "Text",
     "edhrec": "EDHREC",
@@ -99,7 +95,8 @@ def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
     """
     reasons: list[str] = []
 
-    if len(candidate.signals) >= _BANGER_MIN_SIGNALS and candidate.score >= _BANGER_SCORE_THRESHOLD:
+    enough_signals = len(candidate.signals) >= _BANGER_MIN_SIGNALS
+    if enough_signals and candidate.score >= _BANGER_SCORE_THRESHOLD:
         reasons.extend(_SIGNAL_LABELS[s] for s in candidate.signals if s in _SIGNAL_LABELS)
 
     if candidate.edhrec_weight >= _HOT_EDHREC_THRESHOLD:
@@ -475,8 +472,6 @@ def _resolve_price_filter(max_cents: int | None, min_cents: int | None) -> Price
 
 async def build_stage(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     account_id: UUID,
     email: str,
@@ -489,13 +484,12 @@ async def build_stage(
     min_price_cents: int | None = None,
     card_types: list[str] | None = None,
     subtypes: list[str] | None = None,
+    theme_tag: str | None = None,
 ) -> BuildResponse:
     """Generate card suggestions for a build stage using hybrid retrieval.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used for embeddings only).
-        qdrant_client: Qdrant async client for semantic retrieval.
         deck_id: The deck's UUID.
         stage: Specific stage to generate for. If None, auto-advances to the next stage.
         target: Override target card count (determines how many candidates to return).
@@ -505,6 +499,7 @@ async def build_stage(
             used for pagination — that's handled via ``offset``.
         collection_ids: Per-request override. When provided, replaces the deck's
             stored ``suggestion_collection_ids`` for this call only.
+        theme_tag: Active theme keyword when building the theme stage.
 
     Returns:
         BuildResponse with card suggestions for the stage.
@@ -539,7 +534,14 @@ async def build_stage(
 
     query_text, base_tags = stage_retrieval_query(resolved_stage, deck.description)
     deck_archetype_tags = list(deck.archetype_tags or [])
-    if deck_archetype_tags:
+    if resolved_stage == "theme" and deck_archetype_tags:
+        active_theme_tag = (
+            theme_tag if theme_tag in deck_archetype_tags else deck_archetype_tags[0]
+        )
+        query_tags = [active_theme_tag]
+        query_text = f"{query_text} {active_theme_tag.replace('_', ' ')}"
+        prefer_keywords = True
+    elif deck_archetype_tags:
         # Union the explicit chips with the stage's default tags so e.g. the
         # ramp stage still pulls ramp cards while the deck's archetype tilts
         # which ramp pieces win the tiebreaker.
@@ -565,8 +567,6 @@ async def build_stage(
     limit = target if target is not None else 20
     candidates = await retrieve_candidates(
         pool,
-        ai_client,
-        qdrant_client,
         query_text,
         query_tags,
         commander.color_identity,
@@ -597,7 +597,9 @@ async def build_stage(
     ]
 
     if advance_deck_stage:
-        await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage))
+        await deck_service.update_deck(
+            pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage)
+        )
 
     return BuildResponse(
         stage=resolved_stage,
@@ -610,8 +612,6 @@ async def build_stage(
 
 async def suggest_cards(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     deck_id: UUID,
     account_id: UUID,
     email: str,
@@ -623,12 +623,10 @@ async def suggest_cards(
     card_types: list[str] | None = None,
     subtypes: list[str] | None = None,
 ) -> SuggestResponse:
-    """Return suggested cards matching a free-form prompt via hybrid retrieval.
+    """Return suggested cards matching a free-form prompt via structured retrieval.
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used for embeddings only).
-        qdrant_client: Qdrant async client for semantic retrieval.
         deck_id: The deck's UUID.
         prompt: Natural language description of desired cards.
         count: Number of cards to return.
@@ -654,7 +652,9 @@ async def suggest_cards(
     parsed_tags = parse_query_tags(prompt)
     deck_archetype_tags = list(deck.archetype_tags or [])
     seen: set[str] = set()
-    query_tags = [t for t in (*deck_archetype_tags, *parsed_tags) if not (t in seen or seen.add(t))]
+    query_tags = [
+        t for t in (*deck_archetype_tags, *parsed_tags) if not (t in seen or seen.add(t))
+    ]
     prefer_keywords = bool(deck_archetype_tags)
     parsed_filter = parse_query_types(prompt)
     structured_filter = _resolve_structured_type_filter(card_types, subtypes)
@@ -669,8 +669,6 @@ async def suggest_cards(
 
     candidates = await retrieve_candidates(
         pool,
-        ai_client,
-        qdrant_client,
         prompt,
         query_tags,
         commander.color_identity,

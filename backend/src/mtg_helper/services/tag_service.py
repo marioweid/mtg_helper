@@ -1,13 +1,11 @@
 """Rule-based card tag classification pipeline."""
 
-import asyncio
 import logging
 import re
 import time
 from typing import TYPE_CHECKING, Any
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.services.mtgjson import keyword_to_tag
 
@@ -17,7 +15,6 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 _BATCH_SIZE = 500
-_QDRANT_CONCURRENCY = 50
 OfficialKeyword = tuple[str, str, re.Pattern[str]]
 
 # Fast-mana cards: low-CMC mana producers that give more mana than they cost.
@@ -773,91 +770,18 @@ async def _load_official_keywords(pool: asyncpg.Pool) -> list[OfficialKeyword]:
     return [(row["label"], row["tag"], _keyword_pattern(row["label"])) for row in rows]
 
 
-async def _sync_tags_to_qdrant(
-    pool: asyncpg.Pool,
-    qdrant_client: AsyncQdrantClient,
-    progress: "ProgressCb | None" = None,
-) -> None:
-    """Push updated tags and traits from Postgres into Qdrant point payloads.
-
-    Uses concurrent set_payload calls in batches to avoid 30k sequential
-    round-trips.
-
-    Args:
-        pool: asyncpg connection pool.
-        qdrant_client: Async Qdrant client.
-        progress: Optional progress callback for the ``"syncing-qdrant"`` phase.
-    """
-    from mtg_helper.config import settings
-
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT id, tags, edhrec_tags, mtgjson_tags, traits, token_types
-            FROM cards
-            WHERE embedded_at IS NOT NULL
-            """
-        )
-
-    from mtg_helper.services.admin_jobs import noop_progress
-
-    cb = progress or noop_progress
-    total = len(rows)
-    _log.info("Syncing %d card tags/traits to Qdrant", total)
-    cb("syncing-qdrant", 0, total)
-
-    async def _update_one(
-        card_id: Any,
-        tags: list[str],
-        mtgjson_tags: list[str],
-        traits: list[str],
-        token_types: list[str],
-    ) -> None:
-        await qdrant_client.set_payload(
-            collection_name=settings.qdrant_collection,
-            payload={
-                "tags": tags,
-                "edhrec_tags": tags,
-                "mtgjson_tags": mtgjson_tags,
-                "traits": traits,
-                "token_types": token_types,
-            },
-            points=[str(card_id)],
-        )
-
-    for i in range(0, total, _QDRANT_CONCURRENCY):
-        chunk = rows[i : i + _QDRANT_CONCURRENCY]
-        await asyncio.gather(
-            *[
-                _update_one(
-                    r["id"],
-                    list(r["edhrec_tags"] or r["tags"]),
-                    list(r["mtgjson_tags"]),
-                    list(r["traits"]),
-                    list(r["token_types"]),
-                )
-                for r in chunk
-            ]
-        )
-        cb("syncing-qdrant", min(i + _QDRANT_CONCURRENCY, total), total)
-
-
 async def run_batch_tag(
     pool: asyncpg.Pool,
-    qdrant_client: AsyncQdrantClient | None = None,
     progress: "ProgressCb | None" = None,
 ) -> dict[str, Any]:
     """Classify all cards and persist their tags to the database.
 
     Re-classifies all cards on every run so tag rule changes are fully applied.
-    When qdrant_client is provided, also refreshes the tags payload on each
-    Qdrant point after the DB update completes.
 
     Args:
         pool: asyncpg connection pool.
-        qdrant_client: Optional Qdrant client for payload sync.
         progress: Optional callback ``(phase, current, total)`` invoked at each
-            batch boundary. Phases: ``"tagging"`` then ``"syncing-qdrant"``.
+            batch boundary. Phase: ``"tagging"``.
 
     Returns:
         Summary dict with cards_tagged and duration_seconds.
@@ -919,9 +843,6 @@ async def run_batch_tag(
 
         total += len(batch)
         cb("tagging", total, row_count)
-
-    if qdrant_client is not None:
-        await _sync_tags_to_qdrant(pool, qdrant_client, progress=cb)
 
     _log.info("Tagged %d cards", total)
     return {

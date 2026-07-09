@@ -11,7 +11,6 @@ import re
 from uuid import UUID
 
 import asyncpg
-from qdrant_client import AsyncQdrantClient
 
 from mtg_helper.models.ai import (
     CardSuggestion,
@@ -23,7 +22,6 @@ from mtg_helper.models.ai import (
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services import collection_service
 from mtg_helper.services.ai_service import card_from_retrieved
-from mtg_helper.services.llm_client import LLMClient
 from mtg_helper.services.retrieval_service import PriceFilter, RetrievedCard, retrieve_candidates
 
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G")
@@ -363,8 +361,6 @@ async def _fetch_card_tags(pool: asyncpg.Pool, card_ids: list[UUID]) -> dict[UUI
 
 async def suggest_mana_fix(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     deck: DeckDetailResponse,
     account_id: UUID | None,
     *,
@@ -378,8 +374,6 @@ async def suggest_mana_fix(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used by retrieval for query embedding).
-        qdrant_client: Qdrant async client.
         deck: Deck to analyze.
         account_id: Caller's account (for ownership annotations).
         max_price_cents: When set, excludes candidate lands above this EUR
@@ -398,8 +392,6 @@ async def suggest_mana_fix(
     price_filter = PriceFilter(max_cents=max_price_cents, min_cents=0) if max_price_cents else None
     candidates = await retrieve_candidates(
         pool,
-        ai_client,
-        qdrant_client,
         query_text="mana fixing lands color sources",
         query_tags=["lands"],
         commander_color_identity=deck.commander_color_identity,
@@ -422,8 +414,6 @@ async def suggest_mana_fix(
 
 async def candidate_lands(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,
-    qdrant_client: AsyncQdrantClient,
     deck: DeckDetailResponse,
     *,
     max_price_cents: int | None = None,
@@ -439,8 +429,6 @@ async def candidate_lands(
 
     Args:
         pool: asyncpg connection pool.
-        ai_client: LLM adapter (used by retrieval for query embedding).
-        qdrant_client: Qdrant async client.
         deck: Deck to optimize.
         max_price_cents: When set, excludes candidate lands above this EUR cap.
         limit: Maximum number of land candidates to return.
@@ -455,8 +443,6 @@ async def candidate_lands(
 
     candidates = await retrieve_candidates(
         pool,
-        ai_client,
-        qdrant_client,
         query_text="mana fixing dual lands color sources",
         query_tags=["lands"],
         commander_color_identity=deck.commander_color_identity,

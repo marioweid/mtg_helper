@@ -25,8 +25,7 @@ function formatEur(cents: number | null): string {
 }
 
 const SOURCE_CLASSES: Record<string, string> = {
-  Semantic: "bg-indigo-900/40 text-indigo-300",
-  Keywords: "bg-violet-900/40 text-violet-300",
+  Tags: "bg-violet-900/40 text-violet-300",
   Text: "bg-sky-900/40 text-sky-300",
   EDHREC: "bg-orange-900/40 text-orange-300",
   Moxfield: "bg-cyan-900/40 text-cyan-300",

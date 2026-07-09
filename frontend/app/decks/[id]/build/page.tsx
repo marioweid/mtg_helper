@@ -60,7 +60,8 @@ type WizardAction =
   | { type: "REJECT_AND_REPLACE"; stage: string; scryfallId: string; cardName: string }
   | { type: "SET_TARGET"; stage: string; target: number }
   | { type: "SET_QUANTITY"; stage: string; scryfallId: string; quantity: number }
-  | { type: "INVALIDATE_ALL" };
+  | { type: "INVALIDATE_ALL" }
+  | { type: "INVALIDATE_STAGE"; stage: string };
 
 function makeStageState(stage: string): StageState {
   return {
@@ -130,6 +131,14 @@ function basicLandsForIdentity(identity: string): readonly string[] {
   return BASIC_LAND_NAMES.filter((n) => allowed.has(n));
 }
 
+function formatTagLabel(tag: string): string {
+  return tag
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const card of cards) {
@@ -144,20 +153,6 @@ function computeStageCounts(cards: DeckCardItem[]): Record<string, number> {
     }
   }
   return counts;
-}
-
-function getAcceptedCount(stageState: StageState): number {
-  let count = 0;
-  for (const [id, status] of Object.entries(stageState.statuses)) {
-    if (status !== "accepted") continue;
-    const suggestion = stageState.suggestions.find((s) => s.scryfall_id === id);
-    if (suggestion && isBasicLand(suggestion)) {
-      count += stageState.quantities[id] ?? 1;
-    } else {
-      count += 1;
-    }
-  }
-  return count;
 }
 
 function wizardReducer(state: WizardState, action: WizardAction): WizardState {
@@ -324,6 +319,19 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       }
       return { ...state, stages };
     }
+    case "INVALIDATE_STAGE": {
+      const current = state.stages[action.stage]!;
+      return {
+        ...state,
+        stages: {
+          ...state.stages,
+          [action.stage]: {
+            ...makeStageState(action.stage),
+            target: current.target,
+          },
+        },
+      };
+    }
     default:
       return state;
   }
@@ -357,6 +365,8 @@ export default function BuildPage() {
   const [basicLandAdding, setBasicLandAdding] = useState<Record<string, boolean>>({});
   const [collections, setCollections] = useState<CollectionResponse[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
+  const [archetypeTags, setArchetypeTags] = useState<string[]>([]);
+  const [selectedThemeTag, setSelectedThemeTag] = useState<string | null>(null);
   const [maxPriceCents, setMaxPriceCents] = useState<number | null>(null);
   const [minPriceCents, setMinPriceCents] = useState<number | null>(null);
   const [pricePanelOpen, setPricePanelOpen] = useState(false);
@@ -417,6 +427,8 @@ export default function BuildPage() {
       setManaCurve(deck.mana_curve);
       setDeckCommander(deck.commander_card ?? null);
       setDeckBracket(deck.bracket ?? null);
+      setArchetypeTags(deck.archetype_tags);
+      setSelectedThemeTag((current) => current ?? deck.archetype_tags[0] ?? null);
     } catch {
       /* non-critical */
     }
@@ -436,6 +448,8 @@ export default function BuildPage() {
         setDeckCommander(deck.commander_card ?? null);
         setDeckBracket(deck.bracket ?? null);
         setSelectedCollectionIds(deck.suggestion_collection_ids);
+        setArchetypeTags(deck.archetype_tags);
+        setSelectedThemeTag((current) => current ?? deck.archetype_tags[0] ?? null);
         // Apply AI-suggested stage targets if present
         if (deck.stage_targets && Object.keys(deck.stage_targets).length > 0) {
           for (const [stage, target] of Object.entries(deck.stage_targets)) {
@@ -453,15 +467,18 @@ export default function BuildPage() {
   }, [deckId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadStage = useCallback(
-    async (stage: string) => {
+    async (stage: string, themeTagOverride?: string) => {
       dispatch({ type: "LOAD_START", stage });
       try {
         const exclude = globalRejectedNames.length > 0 ? globalRejectedNames : undefined;
+        const themeTag =
+          stage === "theme" ? (themeTagOverride ?? selectedThemeTag ?? archetypeTags[0] ?? null) : null;
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
           offset: 0,
           ...(exclude ? { exclude } : {}),
+          theme_tag: themeTag,
           card_types: cardTypeFilters,
           subtypes: subtypeFilters,
           max_price_cents: maxPriceCents,
@@ -482,7 +499,16 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId, cardTypeFilters, subtypeFilters, globalRejectedNames, maxPriceCents, minPriceCents],
+    [
+      deckId,
+      archetypeTags,
+      selectedThemeTag,
+      cardTypeFilters,
+      subtypeFilters,
+      globalRejectedNames,
+      maxPriceCents,
+      minPriceCents,
+    ],
   );
 
   const loadMore = useCallback(
@@ -491,11 +517,13 @@ export default function BuildPage() {
       try {
         const persistentExclude = [...rejectedNames, ...globalRejectedNames];
         const exclude = persistentExclude.length > 0 ? persistentExclude : undefined;
+        const themeTag = stage === "theme" ? (selectedThemeTag ?? archetypeTags[0] ?? null) : null;
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
           offset,
           ...(exclude ? { exclude } : {}),
+          theme_tag: themeTag,
           card_types: cardTypeFilters,
           subtypes: subtypeFilters,
           max_price_cents: maxPriceCents,
@@ -516,7 +544,16 @@ export default function BuildPage() {
         });
       }
     },
-    [deckId, globalRejectedNames, cardTypeFilters, subtypeFilters, maxPriceCents, minPriceCents],
+    [
+      deckId,
+      archetypeTags,
+      selectedThemeTag,
+      globalRejectedNames,
+      cardTypeFilters,
+      subtypeFilters,
+      maxPriceCents,
+      minPriceCents,
+    ],
   );
 
   function switchStage(stage: string) {
@@ -1173,6 +1210,33 @@ export default function BuildPage() {
               )}
             </div>
           </div>
+
+          {state.activeStage === "theme" && archetypeTags.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {archetypeTags.map((tag) => {
+                const active = (selectedThemeTag ?? archetypeTags[0]) === tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      if (active) return;
+                      setSelectedThemeTag(tag);
+                      dispatch({ type: "INVALIDATE_STAGE", stage: "theme" });
+                      void loadStage("theme", tag);
+                    }}
+                    className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      active
+                        ? "border-indigo-500 bg-indigo-600 text-white"
+                        : "border-white/10 bg-white/5 text-gray-300 hover:border-white/20 hover:text-white"
+                    }`}
+                  >
+                    {formatTagLabel(tag)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Basic Lands (lands tab only) */}
           {state.activeStage === "lands" && (
