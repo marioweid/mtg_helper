@@ -11,6 +11,7 @@ from mtg_helper.services.retrieval_service import (
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
+    _filter_theme_rows,
     _personal_rating,
     _representation_match_score,
     _type_match_score,
@@ -127,6 +128,7 @@ def _make_row(
     edhrec_rank: int | None = 100,
     cmc: float = 2.0,
     color_identity: list[str] | None = None,
+    edhrec_tags: list[str] | None = None,
 ) -> dict:
     return {
         "id": uid,
@@ -134,12 +136,41 @@ def _make_row(
         "cmc": Decimal(str(cmc)),
         "color_identity": color_identity or ["G", "B"],
         "tags": [],
+        "edhrec_tags": edhrec_tags or [],
         "card_types": [],
         "subtypes": [],
         "keywords": [],
         "traits": [],
         "token_types": [],
     }
+
+
+def test_theme_rows_require_exact_edhrec_tag() -> None:
+    rows = [
+        _make_row(_A, edhrec_tags=["artifacts"]),
+        _make_row(_B, edhrec_tags=["etb"]),
+        _make_row(_C, edhrec_tags=[]),
+    ]
+
+    filtered = _filter_theme_rows(rows, required_edhrec_tag="artifacts")  # type: ignore[arg-type]
+
+    assert [row["id"] for row in filtered] == [_A]
+
+
+def test_theme_rows_etc_excludes_selected_edhrec_tags() -> None:
+    rows = [
+        _make_row(_A, edhrec_tags=["artifacts"]),
+        _make_row(_B, edhrec_tags=["etb"]),
+        _make_row(_C, edhrec_tags=["lifegain"]),
+        _make_row(_D, edhrec_tags=[]),
+    ]
+
+    filtered = _filter_theme_rows(
+        rows,  # type: ignore[arg-type]
+        excluded_edhrec_tags=frozenset({"artifacts", "etb"}),
+    )
+
+    assert [row["id"] for row in filtered] == [_C, _D]
 
 
 def test_representation_match_score_full_match() -> None:

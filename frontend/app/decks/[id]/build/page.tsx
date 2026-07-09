@@ -18,6 +18,8 @@ import { CATEGORY_ORDER, STAGE_LABELS, STAGE_DEFAULTS, CATEGORY_TARGETS } from "
 
 type SuggestionStatus = "pending" | "accepted" | "rejected";
 
+const THEME_ETC_TAG = "__etc";
+
 interface StageState {
   suggestions: CardSuggestion[];
   buffer: CardSuggestion[];
@@ -132,6 +134,7 @@ function basicLandsForIdentity(identity: string): readonly string[] {
 }
 
 function formatTagLabel(tag: string): string {
+  if (tag === THEME_ETC_TAG) return "Etc";
   return tag
     .split("_")
     .filter(Boolean)
@@ -367,6 +370,7 @@ export default function BuildPage() {
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [archetypeTags, setArchetypeTags] = useState<string[]>([]);
   const [selectedThemeTag, setSelectedThemeTag] = useState<string | null>(null);
+  const themeTabs = useMemo(() => [...archetypeTags, THEME_ETC_TAG], [archetypeTags]);
   const [maxPriceCents, setMaxPriceCents] = useState<number | null>(null);
   const [minPriceCents, setMinPriceCents] = useState<number | null>(null);
   const [pricePanelOpen, setPricePanelOpen] = useState(false);
@@ -472,7 +476,9 @@ export default function BuildPage() {
       try {
         const exclude = globalRejectedNames.length > 0 ? globalRejectedNames : undefined;
         const themeTag =
-          stage === "theme" ? (themeTagOverride ?? selectedThemeTag ?? archetypeTags[0] ?? null) : null;
+          stage === "theme"
+            ? (themeTagOverride ?? selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG)
+            : null;
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
@@ -517,7 +523,8 @@ export default function BuildPage() {
       try {
         const persistentExclude = [...rejectedNames, ...globalRejectedNames];
         const exclude = persistentExclude.length > 0 ? persistentExclude : undefined;
-        const themeTag = stage === "theme" ? (selectedThemeTag ?? archetypeTags[0] ?? null) : null;
+        const themeTag =
+          stage === "theme" ? (selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG) : null;
         const result = await apiClient.buildStage(deckId, {
           stage,
           target: 80,
@@ -1211,10 +1218,10 @@ export default function BuildPage() {
             </div>
           </div>
 
-          {state.activeStage === "theme" && archetypeTags.length > 0 && (
+          {state.activeStage === "theme" && themeTabs.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
-              {archetypeTags.map((tag) => {
-                const active = (selectedThemeTag ?? archetypeTags[0]) === tag;
+              {themeTabs.map((tag) => {
+                const active = (selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG) === tag;
                 return (
                   <button
                     key={tag}

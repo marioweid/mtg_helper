@@ -1371,6 +1371,36 @@ def _filter_inclusion_by_stage(
     return filtered
 
 
+def _card_edhrec_tags(row: "asyncpg.Record") -> set[str]:
+    """Return canonical EDHREC tags for a fetched card row."""
+    return set(row["edhrec_tags"] or [])
+
+
+def _filter_theme_rows(
+    rows: list["asyncpg.Record"],
+    *,
+    required_edhrec_tag: str | None = None,
+    excluded_edhrec_tags: frozenset[str] | None = None,
+) -> list["asyncpg.Record"]:
+    """Keep theme rows in the selected EDHREC-tag bucket.
+
+    A concrete theme tab requires exact EDHREC tag membership. The Etc tab uses
+    the inverse: cards that do not belong to any selected deck archetype tag.
+    """
+    if required_edhrec_tag is None and not excluded_edhrec_tags:
+        return rows
+
+    filtered: list["asyncpg.Record"] = []
+    for row in rows:
+        tags = _card_edhrec_tags(row)
+        if required_edhrec_tag is not None and required_edhrec_tag not in tags:
+            continue
+        if excluded_edhrec_tags and tags & excluded_edhrec_tags:
+            continue
+        filtered.append(row)
+    return filtered
+
+
 def _theme_pinned_uncategorizable(
     trusted: list[tuple[UUID, float]],
     cards_by_id: dict[UUID, "asyncpg.Record"],
@@ -1485,6 +1515,8 @@ async def retrieve_candidates(
     commander_id: UUID | None = None,
     bracket: int | None = None,
     prefer_keywords: bool = False,
+    required_edhrec_tag: str | None = None,
+    excluded_edhrec_tags: frozenset[str] | None = None,
 ) -> list[RetrievedCard]:
     """Run structured retrieval and return top candidate cards with weighted scoring.
 
@@ -1511,6 +1543,10 @@ async def retrieve_candidates(
         bracket: Deck bracket; gates EDHREC's gamechangers category.
         prefer_keywords: When True (deck supplies explicit archetype keywords),
             slightly increases tag/keyword synergy weight.
+        required_edhrec_tag: For a selected theme tab, require exact EDHREC tag
+            membership so unrelated trusted cards cannot leak into the tab.
+        excluded_edhrec_tags: For the Etc theme tab, exclude cards that belong
+            to any selected deck archetype tag.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1582,6 +1618,11 @@ async def retrieve_candidates(
     )
     if excluded_names:
         rows = [r for r in rows if _normalize_card_name(r["name"]) not in excluded_names]
+    rows = _filter_theme_rows(
+        rows,
+        required_edhrec_tag=required_edhrec_tag,
+        excluded_edhrec_tags=excluded_edhrec_tags,
+    )
     cards_by_id = {r["id"]: r for r in rows}
 
     # Trusted-card boost only fires when the card actually fits the stage —
@@ -1696,6 +1737,7 @@ async def _fetch_candidates(
                        WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
                        ELSE tags
                    END AS tags,
+                   edhrec_tags,
                    mtgjson_tags,
                    edhrec_rank, power, toughness, rarity,
                    card_types, subtypes, keywords, traits, token_types,

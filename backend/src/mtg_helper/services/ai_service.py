@@ -38,6 +38,7 @@ from mtg_helper.services.retrieval_service import (
 
 _log = logging.getLogger(__name__)
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
+_THEME_ETC_TAG = "__etc"
 _FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3}
 _REJECT_BASE: float = 0.3  # weight = _REJECT_BASE ** reject_count
 _REJECT_FLOOR: float = 0.02
@@ -534,12 +535,20 @@ async def build_stage(
 
     query_text, base_tags = stage_retrieval_query(resolved_stage, deck.description)
     deck_archetype_tags = list(deck.archetype_tags or [])
+    required_edhrec_tag: str | None = None
+    excluded_edhrec_tags: frozenset[str] | None = None
     if resolved_stage == "theme" and deck_archetype_tags:
-        active_theme_tag = (
-            theme_tag if theme_tag in deck_archetype_tags else deck_archetype_tags[0]
-        )
-        query_tags = [active_theme_tag]
-        query_text = f"{query_text} {active_theme_tag.replace('_', ' ')}"
+        if theme_tag == _THEME_ETC_TAG:
+            query_tags = base_tags
+            excluded_edhrec_tags = frozenset(deck_archetype_tags)
+            query_text = f"{query_text} commander staples support"
+        else:
+            active_theme_tag = (
+                theme_tag if theme_tag in deck_archetype_tags else deck_archetype_tags[0]
+            )
+            query_tags = [active_theme_tag]
+            required_edhrec_tag = active_theme_tag
+            query_text = f"{query_text} {active_theme_tag.replace('_', ' ')}"
         prefer_keywords = True
     elif deck_archetype_tags:
         # Union the explicit chips with the stage's default tags so e.g. the
@@ -584,6 +593,8 @@ async def build_stage(
         bracket=deck.bracket,
         type_filter=type_filter,
         prefer_keywords=prefer_keywords,
+        required_edhrec_tag=required_edhrec_tag,
+        excluded_edhrec_tags=excluded_edhrec_tags,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 
