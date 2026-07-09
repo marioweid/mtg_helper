@@ -1381,6 +1381,8 @@ def _filter_theme_rows(
     *,
     required_edhrec_tag: str | None = None,
     excluded_edhrec_tags: frozenset[str] | None = None,
+    allowed_theme_ids: frozenset[UUID] | None = None,
+    excluded_theme_ids: frozenset[UUID] | None = None,
 ) -> list["asyncpg.Record"]:
     """Keep theme rows in the selected EDHREC-tag bucket.
 
@@ -1393,9 +1395,16 @@ def _filter_theme_rows(
     filtered: list["asyncpg.Record"] = []
     for row in rows:
         tags = _card_edhrec_tags(row)
-        if required_edhrec_tag is not None and required_edhrec_tag not in tags:
+        uid = row["id"]
+        if (
+            required_edhrec_tag is not None
+            and required_edhrec_tag not in tags
+            and uid not in (allowed_theme_ids or frozenset())
+        ):
             continue
         if excluded_edhrec_tags and tags & excluded_edhrec_tags:
+            continue
+        if excluded_theme_ids and uid in excluded_theme_ids:
             continue
         filtered.append(row)
     return filtered
@@ -1593,6 +1602,16 @@ async def retrieve_candidates(
     edhrec_inclusion, theme_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
         pool, commander_id, commander_color_identity, bracket, query_tags
     )
+    excluded_theme_ids: frozenset[UUID] | None = None
+    if excluded_edhrec_tags:
+        try:
+            excluded_theme_ids = frozenset(
+                await edhrec_theme_index_service.score_themes(
+                    pool, list(excluded_edhrec_tags), commander_color_identity
+                )
+            )
+        except Exception:
+            _log.exception("EDHREC theme exclusion lookup failed; continuing with tag-only Etc")
     combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
 
     # Include EDHREC- and Moxfield-only matches as candidates so a high-synergy
@@ -1622,6 +1641,8 @@ async def retrieve_candidates(
         rows,
         required_edhrec_tag=required_edhrec_tag,
         excluded_edhrec_tags=excluded_edhrec_tags,
+        allowed_theme_ids=frozenset(theme_inclusion),
+        excluded_theme_ids=excluded_theme_ids,
     )
     cards_by_id = {r["id"]: r for r in rows}
 

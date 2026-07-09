@@ -157,6 +157,21 @@ def test_theme_rows_require_exact_edhrec_tag() -> None:
     assert [row["id"] for row in filtered] == [_A]
 
 
+def test_theme_rows_allow_edhrec_theme_page_card() -> None:
+    rows = [
+        _make_row(_A, edhrec_tags=[]),
+        _make_row(_B, edhrec_tags=["etb"]),
+    ]
+
+    filtered = _filter_theme_rows(
+        rows,  # type: ignore[arg-type]
+        required_edhrec_tag="artifacts",
+        allowed_theme_ids=frozenset({_A}),
+    )
+
+    assert [row["id"] for row in filtered] == [_A]
+
+
 def test_theme_rows_etc_excludes_selected_edhrec_tags() -> None:
     rows = [
         _make_row(_A, edhrec_tags=["artifacts"]),
@@ -171,6 +186,21 @@ def test_theme_rows_etc_excludes_selected_edhrec_tags() -> None:
     )
 
     assert [row["id"] for row in filtered] == [_C, _D]
+
+
+def test_theme_rows_etc_excludes_selected_theme_page_ids() -> None:
+    rows = [
+        _make_row(_A, edhrec_tags=[]),
+        _make_row(_B, edhrec_tags=[]),
+    ]
+
+    filtered = _filter_theme_rows(
+        rows,  # type: ignore[arg-type]
+        excluded_edhrec_tags=frozenset({"artifacts"}),
+        excluded_theme_ids=frozenset({_A}),
+    )
+
+    assert [row["id"] for row in filtered] == [_B]
 
 
 def test_representation_match_score_full_match() -> None:

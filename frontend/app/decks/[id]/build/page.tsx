@@ -20,6 +20,18 @@ type SuggestionStatus = "pending" | "accepted" | "rejected";
 
 const THEME_ETC_TAG = "__etc";
 
+function themeStageKey(tag: string): string {
+  return `theme:${tag}`;
+}
+
+function apiStageFor(stageKey: string): string {
+  return stageKey.startsWith("theme:") ? "theme" : stageKey;
+}
+
+function themeTagForStageKey(stageKey: string): string | null {
+  return stageKey.startsWith("theme:") ? stageKey.slice("theme:".length) : null;
+}
+
 interface StageState {
   suggestions: CardSuggestion[];
   buffer: CardSuggestion[];
@@ -66,6 +78,7 @@ type WizardAction =
   | { type: "INVALIDATE_STAGE"; stage: string };
 
 function makeStageState(stage: string): StageState {
+  const apiStage = apiStageFor(stage);
   return {
     suggestions: [],
     buffer: [],
@@ -75,7 +88,7 @@ function makeStageState(stage: string): StageState {
     loaded: false,
     loading: false,
     error: null,
-    target: STAGE_DEFAULTS[stage] ?? 10,
+    target: STAGE_DEFAULTS[apiStage] ?? 10,
     unresolved: [],
     exhausted: false,
     offset: 0,
@@ -162,14 +175,16 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
     case "SET_ACTIVE_STAGE":
       return { ...state, activeStage: action.stage };
-    case "LOAD_START":
+    case "LOAD_START": {
+      const loadingStage = state.stages[action.stage] ?? makeStageState(action.stage);
       return {
         ...state,
         stages: {
           ...state.stages,
-          [action.stage]: { ...state.stages[action.stage]!, loading: true, error: null },
+          [action.stage]: { ...loadingStage, loading: true, error: null },
         },
       };
+    }
     case "LOAD_SUCCESS": {
       const seen = new Set<string>();
       const deduped = action.suggestions.filter((s) => {
@@ -186,7 +201,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         stages: {
           ...state.stages,
           [action.stage]: {
-            ...state.stages[action.stage]!,
+            ...(state.stages[action.stage] ?? makeStageState(action.stage)),
             loading: false,
             loaded: true,
             suggestions: deduped,
@@ -247,26 +262,28 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         stages: {
           ...state.stages,
           [action.stage]: {
-            ...state.stages[action.stage]!,
+            ...(state.stages[action.stage] ?? makeStageState(action.stage)),
             loading: false,
             error: action.error,
           },
         },
       };
-    case "SET_STATUS":
+    case "SET_STATUS": {
+      const statusStage = state.stages[action.stage] ?? makeStageState(action.stage);
       return {
         ...state,
         stages: {
           ...state.stages,
           [action.stage]: {
-            ...state.stages[action.stage]!,
+            ...statusStage,
             statuses: {
-              ...state.stages[action.stage]!.statuses,
+              ...statusStage.statuses,
               [action.scryfallId]: action.status,
             },
           },
         },
       };
+    }
     case "REJECT_AND_REPLACE": {
       const stage = state.stages[action.stage]!;
       const filtered = stage.suggestions.filter((s) => s.scryfall_id !== action.scryfallId);
@@ -288,24 +305,27 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         },
       };
     }
-    case "SET_TARGET":
+    case "SET_TARGET": {
+      const targetStage = state.stages[action.stage] ?? makeStageState(action.stage);
       return {
         ...state,
         stages: {
           ...state.stages,
-          [action.stage]: { ...state.stages[action.stage]!, target: action.target },
+          [action.stage]: { ...targetStage, target: action.target },
         },
       };
+    }
     case "SET_QUANTITY": {
       const clamped = Math.min(99, Math.max(1, action.quantity));
+      const quantityStage = state.stages[action.stage] ?? makeStageState(action.stage);
       return {
         ...state,
         stages: {
           ...state.stages,
           [action.stage]: {
-            ...state.stages[action.stage]!,
+            ...quantityStage,
             quantities: {
-              ...state.stages[action.stage]!.quantities,
+              ...quantityStage.quantities,
               [action.scryfallId]: clamped,
             },
           },
@@ -472,15 +492,21 @@ export default function BuildPage() {
 
   const loadStage = useCallback(
     async (stage: string, themeTagOverride?: string) => {
-      dispatch({ type: "LOAD_START", stage });
+      const apiStage = apiStageFor(stage);
+      const themeTag =
+        apiStage === "theme"
+          ? (themeTagForStageKey(stage) ??
+            themeTagOverride ??
+            selectedThemeTag ??
+            archetypeTags[0] ??
+            THEME_ETC_TAG)
+          : null;
+      const stageKey = apiStage === "theme" ? themeStageKey(themeTag ?? THEME_ETC_TAG) : stage;
+      dispatch({ type: "LOAD_START", stage: stageKey });
       try {
         const exclude = globalRejectedNames.length > 0 ? globalRejectedNames : undefined;
-        const themeTag =
-          stage === "theme"
-            ? (themeTagOverride ?? selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG)
-            : null;
         const result = await apiClient.buildStage(deckId, {
-          stage,
+          stage: apiStage,
           target: 80,
           offset: 0,
           ...(exclude ? { exclude } : {}),
@@ -492,7 +518,7 @@ export default function BuildPage() {
         });
         dispatch({
           type: "LOAD_SUCCESS",
-          stage,
+          stage: stageKey,
           suggestions: result.suggestions.slice(0, 40),
           buffer: result.suggestions.slice(40),
           unresolved: result.unresolved,
@@ -500,7 +526,7 @@ export default function BuildPage() {
       } catch (err) {
         dispatch({
           type: "LOAD_ERROR",
-          stage,
+          stage: stageKey,
           error: err instanceof ApiError ? err.message : "Failed to generate suggestions",
         });
       }
@@ -519,14 +545,18 @@ export default function BuildPage() {
 
   const loadMore = useCallback(
     async (stage: string, offset: number, rejectedNames: string[]) => {
-      dispatch({ type: "LOAD_START", stage });
+      const apiStage = apiStageFor(stage);
+      const themeTag =
+        apiStage === "theme"
+          ? (themeTagForStageKey(stage) ?? selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG)
+          : null;
+      const stageKey = apiStage === "theme" ? themeStageKey(themeTag ?? THEME_ETC_TAG) : stage;
+      dispatch({ type: "LOAD_START", stage: stageKey });
       try {
         const persistentExclude = [...rejectedNames, ...globalRejectedNames];
         const exclude = persistentExclude.length > 0 ? persistentExclude : undefined;
-        const themeTag =
-          stage === "theme" ? (selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG) : null;
         const result = await apiClient.buildStage(deckId, {
-          stage,
+          stage: apiStage,
           target: 80,
           offset,
           ...(exclude ? { exclude } : {}),
@@ -538,7 +568,7 @@ export default function BuildPage() {
         });
         dispatch({
           type: "LOAD_MORE_SUCCESS",
-          stage,
+          stage: stageKey,
           suggestions: result.suggestions.slice(0, 40),
           buffer: result.suggestions.slice(40),
           unresolved: result.unresolved,
@@ -546,7 +576,7 @@ export default function BuildPage() {
       } catch (err) {
         dispatch({
           type: "LOAD_ERROR",
-          stage,
+          stage: stageKey,
           error: err instanceof ApiError ? err.message : "Failed to generate suggestions",
         });
       }
@@ -563,8 +593,22 @@ export default function BuildPage() {
     ],
   );
 
+  const preloadThemeTabs = useCallback((force = false) => {
+    const tabs = themeTabs.length > 0 ? themeTabs : [THEME_ETC_TAG];
+    for (const tag of tabs) {
+      const key = themeStageKey(tag);
+      const bucket = state.stages[key];
+      if (!force && (bucket?.loaded || bucket?.loading)) continue;
+      void loadStage("theme", tag);
+    }
+  }, [loadStage, state.stages, themeTabs]);
+
   function switchStage(stage: string) {
     dispatch({ type: "SET_ACTIVE_STAGE", stage });
+    if (stage === "theme") {
+      preloadThemeTabs();
+      return;
+    }
     const stageState = state.stages[stage];
     if (stageState && !stageState.loaded && !stageState.loading) {
       void loadStage(stage);
@@ -580,6 +624,10 @@ export default function BuildPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (state.activeStage === "theme") preloadThemeTabs();
+  }, [state.activeStage, themeTabs]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Refetch when type/subtype filters change (skip the initial render)
   const typeFilterMounted = useRef(false);
   useEffect(() => {
@@ -588,7 +636,8 @@ export default function BuildPage() {
       return;
     }
     dispatch({ type: "INVALIDATE_ALL" });
-    void loadStage(state.activeStage);
+    if (state.activeStage === "theme") preloadThemeTabs(true);
+    else void loadStage(state.activeStage);
   }, [cardTypeFilters, subtypeFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch when the session-local price filter changes (skip the initial render)
@@ -599,7 +648,8 @@ export default function BuildPage() {
       return;
     }
     dispatch({ type: "INVALIDATE_ALL" });
-    void loadStage(state.activeStage);
+    if (state.activeStage === "theme") preloadThemeTabs(true);
+    else void loadStage(state.activeStage);
   }, [maxPriceCents, minPriceCents]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function persistSelectedCollections(next: string[]) {
@@ -647,7 +697,8 @@ export default function BuildPage() {
 
   function reloadAllSuggestions() {
     dispatch({ type: "INVALIDATE_ALL" });
-    void loadStage(state.activeStage);
+    if (state.activeStage === "theme") preloadThemeTabs(true);
+    else void loadStage(state.activeStage);
   }
 
   function parsePriceInput(raw: string): number | null | "invalid" {
@@ -817,11 +868,11 @@ export default function BuildPage() {
       await apiClient.removeCard(deckId, scryfallId);
       void refreshDeck();
       // If card is in current stage suggestions, reset status to pending
-      const activeStage = state.stages[state.activeStage];
+      const activeStage = state.stages[activeStageKey];
       if (activeStage) {
         const match = activeStage.suggestions.find((s) => s.scryfall_id === scryfallId);
         if (match) {
-          dispatch({ type: "SET_STATUS", stage: state.activeStage, scryfallId, status: "pending" });
+          dispatch({ type: "SET_STATUS", stage: activeStageKey, scryfallId, status: "pending" });
         }
       }
     } catch (err) {
@@ -829,7 +880,10 @@ export default function BuildPage() {
     }
   }
 
-  const activeStageState = state.stages[state.activeStage];
+  const activeThemeTag = selectedThemeTag ?? archetypeTags[0] ?? THEME_ETC_TAG;
+  const activeStageKey =
+    state.activeStage === "theme" ? themeStageKey(activeThemeTag) : state.activeStage;
+  const activeStageState = state.stages[activeStageKey] ?? makeStageState(activeStageKey);
   const stageTargetSummary = useMemo(
     () =>
       Object.fromEntries(
@@ -1154,7 +1208,7 @@ export default function BuildPage() {
                 onClick={() =>
                   dispatch({
                     type: "SET_TARGET",
-                    stage: state.activeStage,
+                    stage: activeStageKey,
                     target: Math.max(1, activeStageState.target - 1),
                   })
                 }
@@ -1170,7 +1224,7 @@ export default function BuildPage() {
                 onChange={(e) => {
                   const v = parseInt(e.target.value, 10);
                   if (!isNaN(v) && v >= 1 && v <= 99) {
-                    dispatch({ type: "SET_TARGET", stage: state.activeStage, target: v });
+                    dispatch({ type: "SET_TARGET", stage: activeStageKey, target: v });
                   }
                 }}
                 className="w-12 rounded-md bg-white/10 px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -1179,7 +1233,7 @@ export default function BuildPage() {
                 onClick={() =>
                   dispatch({
                     type: "SET_TARGET",
-                    stage: state.activeStage,
+                    stage: activeStageKey,
                     target: Math.min(99, activeStageState.target + 1),
                   })
                 }
@@ -1229,8 +1283,9 @@ export default function BuildPage() {
                     onClick={() => {
                       if (active) return;
                       setSelectedThemeTag(tag);
-                      dispatch({ type: "INVALIDATE_STAGE", stage: "theme" });
-                      void loadStage("theme", tag);
+                      const key = themeStageKey(tag);
+                      const bucket = state.stages[key];
+                      if (!bucket?.loaded && !bucket?.loading) void loadStage("theme", tag);
                     }}
                     className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                       active
@@ -1323,10 +1378,10 @@ export default function BuildPage() {
                     key={s.scryfall_id}
                     suggestion={s}
                     status={activeStageState.statuses[s.scryfall_id] ?? "pending"}
-                    onAccept={() => void handleAccept(state.activeStage, s)}
-                    onReject={() => void handleReject(state.activeStage, s)}
-                    onRemove={() => void handleRemoveAccepted(state.activeStage, s)}
-                    onAddBack={() => void handleAddRejected(state.activeStage, s)}
+                    onAccept={() => void handleAccept(activeStageKey, s)}
+                    onReject={() => void handleReject(activeStageKey, s)}
+                    onRemove={() => void handleRemoveAccepted(activeStageKey, s)}
+                    onAddBack={() => void handleAddRejected(activeStageKey, s)}
                     isPetCard={petCardNames.has(s.name)}
                     isBasicLand={isBasicLand(s)}
                     inCombo={comboCardNames.has(s.name.toLowerCase())}
@@ -1334,7 +1389,7 @@ export default function BuildPage() {
                     onQuantityChange={(qty) =>
                       dispatch({
                         type: "SET_QUANTITY",
-                        stage: state.activeStage,
+                        stage: activeStageKey,
                         scryfallId: s.scryfall_id,
                         quantity: qty,
                       })
@@ -1363,7 +1418,7 @@ export default function BuildPage() {
           {!activeStageState.loading && !activeStageState.loaded && (
             <div className="flex justify-center py-12">
               <button
-                onClick={() => void loadStage(state.activeStage)}
+                onClick={() => void loadStage(activeStageKey)}
                 className="rounded-lg bg-indigo-600 px-6 py-2.5 font-medium text-white hover:bg-indigo-500 transition-colors"
               >
                 Generate Suggestions
@@ -1383,7 +1438,7 @@ export default function BuildPage() {
                 <button
                   onClick={() =>
                     void loadMore(
-                      state.activeStage,
+                      activeStageKey,
                       activeStageState.offset,
                       activeStageState.rejectedNames,
                     )
