@@ -1,12 +1,14 @@
 """EDHREC theme/archetype index fetch, cache, and card scoring.
 
 This is the foundation for using EDHREC as a reusable Commander knowledge
-index. It maps our current deck tags to EDHREC theme pages, caches those pages,
+index. It maps our current deck tags to EDHREC tag/theme pages, caches those pages,
 and resolves their cardlists into local card IDs for retrieval boosts.
 """
 
+import html
 import json
 import logging
+import re
 from datetime import UTC, timedelta
 from typing import Any
 from uuid import UUID
@@ -21,6 +23,10 @@ _log = logging.getLogger(__name__)
 _DEFAULT_MAX_AGE = timedelta(days=28)
 _REQUEST_TIMEOUT = 30.0
 _SENTINEL_PAYLOAD: dict[str, Any] = {"categories": {}}
+_NEXT_DATA_RE = re.compile(
+    r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+    re.DOTALL,
+)
 
 # Curated bridge from our current Moxfield-style tags to EDHREC theme slugs.
 # This keeps existing decks working while the EDHREC-native vocabulary grows.
@@ -102,6 +108,11 @@ def _theme_base_url() -> str:
     return f"{root}/themes"
 
 
+def _tag_base_url() -> str:
+    root = settings.edhrec_base_url.rsplit("/commanders", maxsplit=1)[0]
+    return f"{root}/tags"
+
+
 def _normalize_payload(raw: dict[str, Any]) -> dict[str, Any]:
     """Reduce a raw EDHREC theme response to category -> card-name lists."""
     categories: dict[str, list[str]] = {}
@@ -114,6 +125,32 @@ def _normalize_payload(raw: dict[str, Any]) -> dict[str, Any]:
     return {"categories": categories}
 
 
+def _normalize_tag_page(markup: str) -> dict[str, Any] | None:
+    """Extract cardlists from an EDHREC Next.js tag page."""
+    match = _NEXT_DATA_RE.search(markup)
+    if match is None:
+        return None
+    try:
+        data = json.loads(html.unescape(match.group(1)))
+    except json.JSONDecodeError:
+        return None
+    page_data = data.get("props", {}).get("pageProps", {}).get("data")
+    if not isinstance(page_data, dict):
+        return None
+    payload = _normalize_payload(page_data)
+    return payload if payload != _SENTINEL_PAYLOAD else None
+
+
+async def fetch_tag_payload(slug: str, *, client: httpx.AsyncClient) -> dict[str, Any] | None:
+    """Fetch and normalize one EDHREC tag page."""
+    response = await client.get(f"{_tag_base_url()}/{slug}")
+    if response.status_code in (403, 404):
+        _log.info("EDHREC tag slug not found: %s (status %s)", slug, response.status_code)
+        return None
+    response.raise_for_status()
+    return _normalize_tag_page(response.text)
+
+
 async def fetch_theme_payload(slug: str, *, client: httpx.AsyncClient) -> dict[str, Any] | None:
     """Fetch and normalize one EDHREC theme page."""
     response = await client.get(f"{_theme_base_url()}/{slug}.json")
@@ -122,6 +159,14 @@ async def fetch_theme_payload(slug: str, *, client: httpx.AsyncClient) -> dict[s
         return None
     response.raise_for_status()
     return _normalize_payload(response.json())
+
+
+async def fetch_index_payload(slug: str, *, client: httpx.AsyncClient) -> dict[str, Any] | None:
+    """Fetch EDHREC cardlists, preferring tag pages over legacy theme JSON."""
+    tag_payload = await fetch_tag_payload(slug, client=client)
+    if tag_payload is not None:
+        return tag_payload
+    return await fetch_theme_payload(slug, client=client)
 
 
 async def get_or_refresh(
@@ -144,12 +189,14 @@ async def get_or_refresh(
             slug,
         )
     if row is not None and _row_age(row) < max_age:
-        return _parse(row["payload"])
+        payload = _parse(row["payload"])
+        if payload != _SENTINEL_PAYLOAD:
+            return payload
 
     owned_client = client is None
     http_client = client or httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)
     try:
-        payload = await fetch_theme_payload(slug, client=http_client)
+        payload = await fetch_index_payload(slug, client=http_client)
     except httpx.HTTPError as exc:
         _log.warning("Transient EDHREC theme error for %s: %s", slug, exc)
         if row is not None:

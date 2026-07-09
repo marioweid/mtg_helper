@@ -15,6 +15,7 @@ from mtg_helper.services import edhrec_theme_index_service as service
 from mtg_helper.services.edhrec_theme_index_service import (
     _collect_name_weights,
     _normalize_payload,
+    _normalize_tag_page,
     score_themes,
     theme_slugs_for_tags,
 )
@@ -36,14 +37,15 @@ def _raw_payload(*, tag: str = "topcards", names: list[str] | None = None) -> di
 def _stub_response(status_code: int, json_body: dict | None = None) -> MagicMock:
     response = MagicMock(spec=httpx.Response)
     response.status_code = status_code
+    response.text = ""
     response.json = MagicMock(return_value=json_body or {})
     response.raise_for_status = MagicMock()
     return response
 
 
-def _stub_client(response: MagicMock) -> MagicMock:
+def _stub_client(*responses: MagicMock) -> MagicMock:
     client = MagicMock()
-    client.get = AsyncMock(return_value=response)
+    client.get = AsyncMock(side_effect=responses)
     return client
 
 
@@ -57,6 +59,25 @@ def test_theme_slugs_for_tags_maps_and_dedupes() -> None:
 def test_normalize_payload_keeps_dynamic_categories() -> None:
     payload = _normalize_payload(_raw_payload(tag="highsynergycards", names=["Blood Artist"]))
     assert payload == {"categories": {"highsynergycards": ["Blood Artist"]}}
+
+
+def test_normalize_tag_page_extracts_next_data_cardlists() -> None:
+    next_data = {
+        "props": {
+            "pageProps": {
+                "data": _raw_payload(tag="highsynergycards", names=["Seat of the Synod"])
+            }
+        }
+    }
+    markup = (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        f"{json.dumps(next_data)}"
+        "</script>"
+    )
+
+    payload = _normalize_tag_page(markup)
+
+    assert payload == {"categories": {"highsynergycards": ["Seat of the Synod"]}}
 
 
 def test_collect_name_weights_uses_max_weight() -> None:
@@ -73,7 +94,13 @@ def test_collect_name_weights_uses_max_weight() -> None:
 
 @pytest.mark.asyncio
 async def test_get_or_refresh_inserts_theme_row(db_pool: asyncpg.Pool) -> None:
-    client = _stub_client(_stub_response(200, _raw_payload(names=["Sol Ring"])))
+    tag_response = _stub_response(200)
+    tag_response.text = (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        f"{json.dumps({'props': {'pageProps': {'data': _raw_payload(names=['Sol Ring'])}}})}"
+        "</script>"
+    )
+    client = _stub_client(tag_response)
 
     payload = await service.get_or_refresh(db_pool, "aristocrats", client=client)
 
@@ -112,11 +139,36 @@ async def test_get_or_refresh_writes_sentinel_on_404(db_pool: asyncpg.Pool) -> N
     payload = await service.get_or_refresh(
         db_pool,
         "missing-theme",
-        client=_stub_client(_stub_response(404)),
+        client=_stub_client(_stub_response(404), _stub_response(404)),
         max_age=timedelta(seconds=0),
     )
 
     assert payload == {"categories": {}}
+
+
+@pytest.mark.asyncio
+async def test_get_or_refresh_refreshes_cached_sentinel(db_pool: asyncpg.Pool) -> None:
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO edhrec_theme_index (slug, display_name, source_type, payload, fetched_at)
+            VALUES ($1, $2, $3, $4::jsonb, now())
+            """,
+            "artifacts",
+            "Artifacts",
+            "theme",
+            json.dumps({"categories": {}}),
+        )
+    tag_response = _stub_response(200)
+    tag_response.text = (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        f"{json.dumps({'props': {'pageProps': {'data': _raw_payload(names=['Seat of the Synod'])}}})}"
+        "</script>"
+    )
+
+    payload = await service.get_or_refresh(db_pool, "artifacts", client=_stub_client(tag_response))
+
+    assert payload["categories"]["topcards"] == ["Seat of the Synod"]
 
 
 @pytest.mark.asyncio

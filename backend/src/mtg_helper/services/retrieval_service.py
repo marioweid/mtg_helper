@@ -1399,15 +1399,84 @@ def _filter_theme_rows(
         if (
             required_edhrec_tag is not None
             and required_edhrec_tag not in tags
+            and not _row_matches_local_theme_bucket(row, required_edhrec_tag)
             and uid not in (allowed_theme_ids or frozenset())
         ):
             continue
         if excluded_edhrec_tags and tags & excluded_edhrec_tags:
             continue
+        if excluded_edhrec_tags and any(
+            _row_matches_local_theme_bucket(row, tag) for tag in excluded_edhrec_tags
+        ):
+            continue
         if excluded_theme_ids and uid in excluded_theme_ids:
             continue
         filtered.append(row)
     return filtered
+
+
+def _row_matches_local_theme_bucket(row: "asyncpg.Record", tag: str) -> bool:
+    """Return True when local structured fields prove theme membership."""
+    if tag in {"artifact", "artifacts"}:
+        return "Artifact" in set(row["card_types"] or []) or "Artifact" in (row["type_line"] or "")
+    if tag == "etb":
+        return "etb" in set(row["traits"] or [])
+    return False
+
+
+def _local_theme_where(tag: str) -> str | None:
+    """Return a SQL predicate for deterministic local theme buckets."""
+    if tag in {"artifact", "artifacts"}:
+        return "('Artifact' = ANY(card_types) OR type_line LIKE '%Artifact%')"
+    if tag == "etb":
+        return "'etb' = ANY(traits)"
+    return None
+
+
+async def _fetch_local_theme_ids(
+    pool: asyncpg.Pool,
+    tags: list[str],
+    commander_color_identity: list[str],
+    deck_card_ids: list[UUID],
+    *,
+    exclude_lands: bool,
+    owned_card_ids: frozenset[UUID] | None = None,
+    price_filter: PriceFilter | None = None,
+) -> set[UUID]:
+    """Fetch local deterministic theme-bucket members for tags such as ETB."""
+    clauses = [clause for tag in tags if (clause := _local_theme_where(tag)) is not None]
+    if not clauses:
+        return set()
+
+    land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
+    params: list = [commander_color_identity, deck_card_ids]
+    collection_filter = ""
+    if owned_card_ids is not None:
+        params.append(list(owned_card_ids))
+        collection_filter = f"AND id = ANY(${len(params)}::uuid[])"
+    price_clause = _build_price_clause(price_filter, params)
+    local_clause = " OR ".join(f"({clause})" for clause in clauses)
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            f"""
+            SELECT id
+            FROM cards
+            WHERE ({local_clause})
+              AND color_identity <@ $1::text[]
+              AND legalities->>'commander' = 'legal'
+              AND id != ALL($2::uuid[])
+              AND COALESCE(border_color, '') != 'gold'
+              AND COALESCE(security_stamp, '') != 'acorn'
+              AND type_line NOT LIKE '%Conspiracy%'
+              {land_filter}
+              {collection_filter}
+              {price_clause}
+            ORDER BY edhrec_rank ASC NULLS LAST
+            LIMIT 500
+            """,
+            *params,
+        )
+    return {row["id"] for row in rows}
 
 
 def _theme_pinned_uncategorizable(
@@ -1602,14 +1671,35 @@ async def retrieve_candidates(
     edhrec_inclusion, theme_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
         pool, commander_id, commander_color_identity, bracket, query_tags
     )
+    local_theme_ids: set[UUID] = set()
+    if required_edhrec_tag is not None:
+        local_theme_ids = await _fetch_local_theme_ids(
+            pool,
+            [required_edhrec_tag],
+            commander_color_identity,
+            deck_card_ids,
+            exclude_lands=exclude_lands,
+            owned_card_ids=owned_ids,
+            price_filter=price_filter,
+        )
     excluded_theme_ids: frozenset[UUID] | None = None
     if excluded_edhrec_tags:
         try:
-            excluded_theme_ids = frozenset(
+            edhrec_theme_exclusions = set(
                 await edhrec_theme_index_service.score_themes(
                     pool, list(excluded_edhrec_tags), commander_color_identity
                 )
             )
+            local_theme_exclusions = await _fetch_local_theme_ids(
+                pool,
+                list(excluded_edhrec_tags),
+                commander_color_identity,
+                deck_card_ids,
+                exclude_lands=exclude_lands,
+                owned_card_ids=owned_ids,
+                price_filter=price_filter,
+            )
+            excluded_theme_ids = frozenset(edhrec_theme_exclusions | local_theme_exclusions)
         except Exception:
             _log.exception("EDHREC theme exclusion lookup failed; continuing with tag-only Etc")
     combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
@@ -1622,7 +1712,7 @@ async def retrieve_candidates(
     deck_exclude = set(deck_card_ids)
     extra_ids = [
         uid
-        for uid in {*combined_edhrec, *moxfield_inclusion}
+        for uid in {*combined_edhrec, *moxfield_inclusion, *local_theme_ids}
         if uid not in tag_overlaps
         and uid not in fts_set
         and uid not in deck_exclude
@@ -1641,7 +1731,7 @@ async def retrieve_candidates(
         rows,
         required_edhrec_tag=required_edhrec_tag,
         excluded_edhrec_tags=excluded_edhrec_tags,
-        allowed_theme_ids=frozenset(theme_inclusion),
+        allowed_theme_ids=frozenset({*theme_inclusion, *local_theme_ids}),
         excluded_theme_ids=excluded_theme_ids,
     )
     cards_by_id = {r["id"]: r for r in rows}

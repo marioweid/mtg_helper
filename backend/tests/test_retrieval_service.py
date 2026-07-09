@@ -129,18 +129,22 @@ def _make_row(
     cmc: float = 2.0,
     color_identity: list[str] | None = None,
     edhrec_tags: list[str] | None = None,
+    card_types: list[str] | None = None,
+    traits: list[str] | None = None,
+    type_line: str = "Creature",
 ) -> dict:
     return {
         "id": uid,
         "edhrec_rank": edhrec_rank,
         "cmc": Decimal(str(cmc)),
         "color_identity": color_identity or ["G", "B"],
+        "type_line": type_line,
         "tags": [],
         "edhrec_tags": edhrec_tags or [],
-        "card_types": [],
+        "card_types": card_types or [],
         "subtypes": [],
         "keywords": [],
-        "traits": [],
+        "traits": traits or [],
         "token_types": [],
     }
 
@@ -168,6 +172,28 @@ def test_theme_rows_allow_edhrec_theme_page_card() -> None:
         required_edhrec_tag="artifacts",
         allowed_theme_ids=frozenset({_A}),
     )
+
+    assert [row["id"] for row in filtered] == [_A]
+
+
+def test_theme_rows_allow_local_artifact_bucket_card() -> None:
+    rows = [
+        _make_row(_A, card_types=["Artifact"], type_line="Artifact Creature"),
+        _make_row(_B, card_types=["Creature"], type_line="Creature"),
+    ]
+
+    filtered = _filter_theme_rows(rows, required_edhrec_tag="artifacts")  # type: ignore[arg-type]
+
+    assert [row["id"] for row in filtered] == [_A]
+
+
+def test_theme_rows_allow_local_etb_trait_card() -> None:
+    rows = [
+        _make_row(_A, traits=["etb"]),
+        _make_row(_B, traits=[]),
+    ]
+
+    filtered = _filter_theme_rows(rows, required_edhrec_tag="etb")  # type: ignore[arg-type]
 
     assert [row["id"] for row in filtered] == [_A]
 
