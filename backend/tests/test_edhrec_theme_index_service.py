@@ -61,6 +61,23 @@ def test_normalize_payload_keeps_dynamic_categories() -> None:
     assert payload == {"categories": {"highsynergycards": ["Blood Artist"]}}
 
 
+def test_normalize_payload_skips_commander_lists() -> None:
+    payload = _normalize_payload(
+        {
+            "container": {
+                "json_dict": {
+                    "cardlists": [
+                        {"tag": "topcommanders", "cardviews": [{"name": "Yarok, the Desecrated"}]},
+                        {"tag": "topcards", "cardviews": [{"name": "Panharmonicon"}]},
+                    ]
+                }
+            }
+        }
+    )
+
+    assert payload == {"categories": {"topcards": ["Panharmonicon"]}}
+
+
 def test_normalize_tag_page_extracts_next_data_cardlists() -> None:
     next_data = {
         "props": {

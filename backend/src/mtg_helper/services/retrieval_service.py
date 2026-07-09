@@ -1371,11 +1371,6 @@ def _filter_inclusion_by_stage(
     return filtered
 
 
-def _card_edhrec_tags(row: "asyncpg.Record") -> set[str]:
-    """Return canonical EDHREC tags for a fetched card row."""
-    return set(row["edhrec_tags"] or [])
-
-
 def _filter_theme_rows(
     rows: list["asyncpg.Record"],
     *,
@@ -1394,16 +1389,12 @@ def _filter_theme_rows(
 
     filtered: list["asyncpg.Record"] = []
     for row in rows:
-        tags = _card_edhrec_tags(row)
         uid = row["id"]
         if (
             required_edhrec_tag is not None
-            and required_edhrec_tag not in tags
             and not _row_matches_local_theme_bucket(row, required_edhrec_tag)
             and uid not in (allowed_theme_ids or frozenset())
         ):
-            continue
-        if excluded_edhrec_tags and tags & excluded_edhrec_tags:
             continue
         if excluded_edhrec_tags and any(
             _row_matches_local_theme_bucket(row, tag) for tag in excluded_edhrec_tags

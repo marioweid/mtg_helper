@@ -87,6 +87,7 @@ _CATEGORY_WEIGHTS: dict[str, float] = {
     "lands": 0.55,
 }
 _DEFAULT_CATEGORY_WEIGHT = 0.55
+_COMMANDER_CARDLIST_TAGS = frozenset({"newcommanders", "topcommanders", "commanders"})
 
 
 def theme_slugs_for_tags(tags: list[str]) -> list[str]:
@@ -119,6 +120,8 @@ def _normalize_payload(raw: dict[str, Any]) -> dict[str, Any]:
     cardlists = raw.get("container", {}).get("json_dict", {}).get("cardlists") or []
     for cardlist in cardlists:
         tag = cardlist.get("tag") or cardlist.get("name") or "cards"
+        if str(tag).lower() in _COMMANDER_CARDLIST_TAGS:
+            continue
         names = [cv.get("name") for cv in cardlist.get("cardviews") or [] if cv.get("name")]
         if names:
             categories[str(tag)] = names
