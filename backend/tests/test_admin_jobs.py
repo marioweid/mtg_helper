@@ -189,20 +189,37 @@ async def test_sync_endpoint_records_error_on_failure(
 async def test_refresh_all_chains_sync_tag(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """refresh-all calls sync then tag in order and updates phase as it goes."""
+    """refresh-all runs schema, source syncs, then tags in order."""
     phases_seen: list[str] = []
+
+    async def _fake_apply_schema(_pool: Any) -> None:
+        phases_seen.append("schema")
 
     async def _fake_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
         progress("upserting", 5, 5)
-        phases_seen.append("sync")
+        phases_seen.append("scryfall")
         return {"cards_processed": 5}
+
+    async def _fake_mtgjson(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        progress("mtgjson", 3, 3)
+        phases_seen.append("mtgjson")
+        return {"mtgjson_cards_processed": 3, "mtgjson_keywords_processed": 2}
+
+    async def _fake_edhrec(_pool: Any) -> dict[str, Any]:
+        phases_seen.append("edhrec")
+        return {"edhrec_tags_processed": 7}
 
     async def _fake_tag(_pool: Any, *, progress: Any) -> dict[str, Any]:
         progress("tagging", 5, 5)
         phases_seen.append("tag")
         return {"cards_tagged": 5}
 
+    monkeypatch.setattr("mtg_helper.routers.admin.apply_schema", _fake_apply_schema)
     monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _fake_sync)
+    monkeypatch.setattr("mtg_helper.routers.admin.mtgjson.run_sync", _fake_mtgjson)
+    monkeypatch.setattr(
+        "mtg_helper.routers.admin.edhrec_tag_catalog_service.sync_edhrec_tags", _fake_edhrec
+    )
     monkeypatch.setattr("mtg_helper.routers.admin.run_batch_tag", _fake_tag)
 
     resp = await client.post("/api/v1/admin/refresh-all")
@@ -215,8 +232,11 @@ async def test_refresh_all_chains_sync_tag(
             break
 
     assert status["status"] == "ok"
-    assert phases_seen == ["sync", "tag"]
+    assert phases_seen == ["schema", "scryfall", "mtgjson", "edhrec", "tag"]
     assert status["result"] == {
         "cards_processed": 5,
+        "mtgjson_cards_processed": 3,
+        "mtgjson_keywords_processed": 2,
+        "edhrec_tags_processed": 7,
         "cards_tagged": 5,
     }

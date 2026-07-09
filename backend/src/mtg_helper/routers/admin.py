@@ -16,6 +16,7 @@ import asyncpg
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
+from mtg_helper.db import apply_schema
 from mtg_helper.services import edhrec_tag_catalog_service, feature_flag_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
@@ -114,7 +115,7 @@ async def tag_cards(request: Request) -> dict[str, Any]:
 
 @router.post("/admin/refresh-all", status_code=202)
 async def refresh_all(request: Request) -> dict[str, Any]:
-    """Run sync then tag sequentially under one job slot."""
+    """Run the complete source refresh and card tagging pipeline."""
     job = _registry(request).refresh_all
     _ensure_idle(job)
     start(job)
@@ -123,12 +124,20 @@ async def refresh_all(request: Request) -> dict[str, Any]:
 
 
 async def _run_refresh_all(app: FastAPI, job: JobState) -> dict[str, Any]:
-    """Chain sync and tag under the single refresh-all job state."""
+    """Chain schema, source syncs, and tagging under one refresh-all job state."""
     cb = make_progress_cb(job)
-    sync_result = await scryfall.run_sync(app.state.db_pool, progress=cb)
+    cb("applying schema", 0, 1)
+    await apply_schema(app.state.db_pool)
+    cb("applying schema", 1, 1)
+    scryfall_result = await scryfall.run_sync(app.state.db_pool, progress=cb)
+    mtgjson_result = await mtgjson.run_sync(app.state.db_pool, progress=cb)
+    edhrec_result = await edhrec_tag_catalog_service.sync_edhrec_tags(app.state.db_pool)
     tag_result = await run_batch_tag(app.state.db_pool, progress=cb)
     return {
-        "cards_processed": sync_result.get("cards_processed"),
+        "cards_processed": scryfall_result.get("cards_processed"),
+        "mtgjson_cards_processed": mtgjson_result.get("mtgjson_cards_processed"),
+        "mtgjson_keywords_processed": mtgjson_result.get("mtgjson_keywords_processed"),
+        "edhrec_tags_processed": edhrec_result.get("edhrec_tags_processed"),
         "cards_tagged": tag_result.get("cards_tagged"),
     }
 

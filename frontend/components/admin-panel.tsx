@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Job = "sync" | "tag" | "refresh-all";
+type JobKey = Job | "mtgjson";
 
 const JOBS: { id: Job; label: string; path: string; description: string }[] = [
   {
     id: "refresh-all",
     label: "Refresh all",
     path: "/api/v1/admin/refresh-all",
-    description: "Run sync then tag back-to-back. Use after pulling new Scryfall sets.",
+    description: "Apply schema, sync Scryfall, MTGJSON, EDHREC tags, then re-tag cards.",
   },
   {
     id: "sync",
@@ -28,7 +29,7 @@ const JOBS: { id: Job; label: string; path: string; description: string }[] = [
 type JobStatus = "idle" | "running" | "ok" | "error";
 
 type JobSnapshot = {
-  key: Job;
+  key: JobKey;
   status: JobStatus;
   phase: string;
   current: number;
@@ -41,6 +42,7 @@ type JobSnapshot = {
 
 type StatusResponse = {
   sync: JobSnapshot;
+  mtgjson: JobSnapshot;
   tag: JobSnapshot;
   refresh_all: JobSnapshot;
 };
@@ -54,7 +56,7 @@ const SLOT_BY_ID: Record<Job, keyof StatusResponse> = {
   "refresh-all": "refresh_all",
 };
 
-function emptySnapshot(key: Job): JobSnapshot {
+function emptySnapshot(key: JobKey): JobSnapshot {
   return {
     key,
     status: "idle",
@@ -71,6 +73,7 @@ function emptySnapshot(key: Job): JobSnapshot {
 export function AdminPanel() {
   const [status, setStatus] = useState<StatusResponse>(() => ({
     sync: emptySnapshot("sync"),
+    mtgjson: emptySnapshot("mtgjson"),
     tag: emptySnapshot("tag"),
     refresh_all: emptySnapshot("refresh-all"),
   }));
