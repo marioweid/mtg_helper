@@ -8,7 +8,7 @@ import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
 import { OwnedBadge } from "@/components/owned-badge";
 import { STAGE_LABELS } from "@/lib/constants";
-import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
+import { bucketReason, bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 
 interface Props {
   category: string;
@@ -171,6 +171,7 @@ export function DeckCategoryGroup({
                           <span
                             key={t}
                             className="rounded bg-indigo-900/40 px-1.5 py-0.5 text-[10px] text-indigo-300 capitalize"
+                            title={bucketReason(card, t)}
                           >
                             {STAGE_LABELS[t] ?? t}
                           </span>

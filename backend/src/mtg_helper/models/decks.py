@@ -87,6 +87,7 @@ class DeckCardItem(BaseModel):
     added_by: str
     ai_reasoning: str | None
     qualifying_stages: list[str] = Field(default_factory=list)
+    role_reasons: dict[str, list[str]] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
     edhrec_tags: list[str] = Field(default_factory=list)
     mtgjson_tags: list[str] = Field(default_factory=list)

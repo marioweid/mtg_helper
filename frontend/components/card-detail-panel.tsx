@@ -18,6 +18,13 @@ interface Props {
 
 const CATEGORY_OPTIONS = CATEGORY_ORDER;
 
+function roleReasonTitle(card: DeckCardItem, role: string, auto: boolean): string | undefined {
+  if (!auto) return undefined;
+  const reasons = card.role_reasons?.[role] ?? [];
+  if (reasons.length === 0) return "Auto-counted for this builder role";
+  return `Auto-counted because of: ${reasons.join(", ")}`;
+}
+
 /**
  * Shared detail surface for a deck card — image, type line, oracle text,
  * category chip editor (manual + auto-tagged states), and remove button.
@@ -102,6 +109,19 @@ export function CardDetailPanel({
                 );
               })}
             </div>
+            {card.categories.length === 0 && Object.keys(card.role_reasons ?? {}).length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {Object.entries(card.role_reasons).map(([role, reasons]) => (
+                  <span
+                    key={role}
+                    className="rounded bg-white/5 px-2 py-0.5 text-[10px] text-gray-400"
+                    title={roleReasonTitle(card, role, true)}
+                  >
+                    {STAGE_LABELS[role] ?? role}: {reasons[0] ?? "auto"}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

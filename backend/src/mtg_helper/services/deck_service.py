@@ -19,7 +19,7 @@ from mtg_helper.models.decks import (
     DeckUpdate,
 )
 from mtg_helper.services import collection_service, mana_curve_service
-from mtg_helper.services.retrieval_service import card_qualifying_stages
+from mtg_helper.services.builder_roles import derive_builder_roles
 
 _log = logging.getLogger(__name__)
 
@@ -116,7 +116,8 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
     tags = edhrec_tags or (list(row["tags"] or []) if "tags" in row.keys() else [])
     mtgjson_tags = list(row["mtgjson_tags"] or []) if "mtgjson_tags" in row.keys() else []
     categories = list(row["categories"] or [])
-    stages = card_qualifying_stages(tags, row["type_line"])
+    builder_roles = derive_builder_roles(tags, mtgjson_tags, row["type_line"])
+    stages = list(builder_roles.roles)
     for cat in categories:
         if cat not in stages:
             stages.append(cat)
@@ -138,6 +139,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         added_by=row["added_by"],
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
+        role_reasons=builder_roles.reasons,
         tags=tags,
         edhrec_tags=tags,
         mtgjson_tags=mtgjson_tags,

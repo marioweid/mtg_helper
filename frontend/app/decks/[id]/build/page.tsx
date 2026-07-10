@@ -740,7 +740,7 @@ export default function BuildPage() {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
         ...(qty !== undefined && { quantity: qty }),
-        categories: [suggestion.category],
+        categories: [],
         added_by: "ai",
         ai_reasoning: suggestion.reasoning,
       });

@@ -87,6 +87,7 @@ export interface DeckCardItem {
   added_by: string;
   ai_reasoning: string | null;
   qualifying_stages: string[];
+  role_reasons: Record<string, string[]>;
   tags: string[];
   edhrec_tags: string[];
   mtgjson_tags: string[];
@@ -346,6 +347,13 @@ export function bucketsFor(card: DeckCardItem): string[] {
   const source = card.categories.length > 0 ? card.categories : card.qualifying_stages;
   if (source.length === 0) return ["untagged"];
   return [...new Set(source)];
+}
+
+export function bucketReason(card: DeckCardItem, bucket: string): string | undefined {
+  if (card.categories.includes(bucket)) return "Manual deck role override";
+  const reasons = card.role_reasons?.[bucket] ?? [];
+  if (reasons.length === 0) return undefined;
+  return `Auto-counted because of: ${reasons.join(", ")}`;
 }
 
 // Combos (Commander Spellbook)

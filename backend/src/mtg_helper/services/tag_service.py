@@ -768,7 +768,11 @@ def _dedupe_tags(tags: list[str]) -> list[str]:
 
 def normalize_edhrec_tags(tags: list[str]) -> list[str]:
     """Normalize legacy rule tags to EDHREC-style theme ids."""
-    return _dedupe_tags([_EDHREC_TAG_ALIASES.get(tag, tag) for tag in tags])
+    normalized: list[str] = []
+    for tag in tags:
+        key = re.sub(r"[^a-z0-9]+", "_", tag.lower()).strip("_")
+        normalized.append(_EDHREC_TAG_ALIASES.get(key, key))
+    return _dedupe_tags(normalized)
 
 
 async def _load_official_keywords(pool: asyncpg.Pool) -> list[OfficialKeyword]:

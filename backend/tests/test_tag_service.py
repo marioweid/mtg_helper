@@ -146,7 +146,7 @@ def test_plus_one_counters() -> None:
 
 def test_normalize_edhrec_tags_maps_legacy_role_tags() -> None:
     assert normalize_edhrec_tags(
-        ["draw", "card_advantage", "artifact", "treasures", "plus_one_plus_1_counters"]
+        ["Card Draw", "card_advantage", "artifact", "Treasures", "plus_one_plus_1_counters"]
     ) == ["card_draw", "artifacts", "treasure", "plus_one_plus_one_counters"]
 
 

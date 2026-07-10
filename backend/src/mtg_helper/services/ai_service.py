@@ -35,6 +35,7 @@ from mtg_helper.services.retrieval_service import (
     retrieve_candidates,
     stage_retrieval_query,
 )
+from mtg_helper.services.tag_service import normalize_edhrec_tags
 
 _log = logging.getLogger(__name__)
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
@@ -535,18 +536,25 @@ async def build_stage(
     all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
 
     query_text, base_tags = stage_retrieval_query(resolved_stage, deck.description)
-    deck_archetype_tags = list(deck.archetype_tags or [])
+    deck_archetype_tags = normalize_edhrec_tags(list(deck.archetype_tags or []))
     required_edhrec_tag: str | None = None
     excluded_edhrec_tags: frozenset[str] | None = None
     if resolved_stage == "theme" and deck_archetype_tags:
+        normalized_theme_tag = normalize_edhrec_tags([theme_tag])[0] if theme_tag else None
         if theme_tag == _THEME_ETC_TAG:
             query_tags = base_tags
             excluded_edhrec_tags = frozenset(deck_archetype_tags)
             query_text = f"{query_text} commander staples support"
         else:
-            active_theme_tag = (
-                theme_tag if theme_tag in deck_archetype_tags else deck_archetype_tags[0]
-            )
+            if normalized_theme_tag not in deck_archetype_tags:
+                return BuildResponse(
+                    stage=resolved_stage,
+                    stage_number=stage_number(resolved_stage),
+                    total_stages=_TOTAL_STAGES,
+                    suggestions=[],
+                    unresolved=[],
+                )
+            active_theme_tag = normalized_theme_tag
             query_tags = [active_theme_tag]
             required_edhrec_tag = active_theme_tag
             query_text = f"{query_text} {active_theme_tag.replace('_', ' ')}"
