@@ -21,9 +21,9 @@ _log = logging.getLogger(__name__)
 _IMPERSONATE_TARGET = "chrome"
 _REQUEST_TIMEOUT = 30.0
 _HUB_PAGE_SIZE = 200
-_HUB_DECK_SAMPLE = 20
-_BASELINE_DECK_SAMPLE = 80
-_DECK_FETCH_CONCURRENCY = 4
+_HUB_DECK_SAMPLE = 10
+_BASELINE_DECK_SAMPLE = 20
+_DECK_FETCH_CONCURRENCY = 1
 _MIN_HUB_DECKS = 5
 _MIN_HUB_PCT = 0.10
 _MIN_SYNERGY = 0.05
@@ -91,6 +91,8 @@ async def sync_hub_card_stats(
             stats = _score_hub_cards(hub_tally, baseline_tally, len(deck_ids), len(baseline))
             matched_cards += await _store_hub_stats(pool, hub, stats, len(deck_ids), len(baseline))
             processed += 1
+            if processed < total:
+                await _sleep_between_hubs()
         if progress is not None:
             progress("syncing hubs", total, total)
     await rebuild_card_hub_tags(pool)
@@ -98,6 +100,7 @@ async def sync_hub_card_stats(
         "moxfield_hubs_processed": len(hubs),
         "moxfield_hub_cards_matched": matched_cards,
         "baseline_decks_sampled": len(baseline),
+        "hub_delay_seconds": settings.moxfield_hub_delay_seconds,
     }
 
 
@@ -221,6 +224,12 @@ async def fetch_hubs(*, client: Any) -> list[Hub]:
             break
         page += 1
     return hubs
+
+
+async def _sleep_between_hubs() -> None:
+    delay = max(0.0, settings.moxfield_hub_delay_seconds)
+    if delay > 0:
+        await asyncio.sleep(delay)
 
 
 async def _upsert_hubs(conn: asyncpg.Connection, hubs: list[Hub]) -> None:
