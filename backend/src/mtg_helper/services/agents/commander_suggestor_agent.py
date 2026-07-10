@@ -18,8 +18,8 @@ from mtg_helper.services.commander_suggestor_service import (
     build_response,
     parse_intent_fallback,
 )
-from mtg_helper.services.edhrec_tag_catalog_service import load_edhrec_prompt_catalog
 from mtg_helper.services.keyword_catalog_service import load_keyword_prompt_catalog
+from mtg_helper.services.moxfield_hub_service import load_hub_prompt_catalog
 
 _TEMPERATURE = 0.25
 _MAX_OUTPUT_TOKENS = 1536
@@ -31,7 +31,7 @@ class CommanderSuggestDeps:
 
     previous_intent: CommanderSuggestIntent | None
     at_history_limit: bool
-    edhrec_catalog: str
+    hub_catalog: str
     keyword_catalog: str
 
 
@@ -57,11 +57,11 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "",
         f"Previous intent JSON: {previous}",
         "",
-        "Emit EDHREC deckbuilding theme tags in `archetype_tags`.",
-        "Every `archetype_tags` item must appear in the local EDHREC catalog below.",
+        "Emit Moxfield hub theme tags in `archetype_tags`.",
+        "Every `archetype_tags` item must appear in the local Moxfield hub catalog below.",
         "",
-        "Available local EDHREC theme catalog:",
-        deps.edhrec_catalog,
+        "Available local Moxfield hub catalog:",
+        deps.hub_catalog,
         "",
         "Emit official MTGJSON keyword tags only in `mechanic_tags` for exact printed",
         "mechanics like convoke, dredge, cascade, surveil, or flashback.",
@@ -72,7 +72,7 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "Available local MTGJSON keyword catalog:",
         deps.keyword_catalog,
         "",
-        "Prefer EDHREC archetype_tags for broad plans like graveyard, blink, reanimator,",
+        "Prefer hub archetype_tags for broad plans like graveyard, blink, reanimator,",
         "aristocrats, voltron, pingers, +1/+1 counters, spellslinger, or tribal decks.",
         "Do not invent compound tags such as etb_ping, graveyard_value, or token_draw.",
         "",
@@ -138,7 +138,7 @@ async def suggest_turn(
     deps = CommanderSuggestDeps(
         previous_intent=previous_intent,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
-        edhrec_catalog=await load_edhrec_prompt_catalog(pool),
+        hub_catalog=await load_hub_prompt_catalog(pool),
         keyword_catalog=await load_keyword_prompt_catalog(pool),
     )
     try:

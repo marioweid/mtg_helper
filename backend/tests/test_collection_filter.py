@@ -1,6 +1,5 @@
 """Tests for the collection ownership filter on /suggest and /build."""
 
-from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import asyncpg
@@ -15,24 +14,6 @@ from tests.conftest import (
     create_test_account,
     create_test_deck,
 )
-
-
-def _make_ai_client() -> MagicMock:
-    """Mock LLMClient with an embedding method of the correct dimension."""
-
-    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
-        return [[0.0] * 1536 for _ in texts]
-
-    ai = MagicMock()
-    ai.embed = AsyncMock(side_effect=_embed)
-    return ai
-
-
-def _set_qdrant_empty() -> None:
-    mock = MagicMock()
-    mock.search = AsyncMock(return_value=[])
-    app.state.qdrant_client = mock
-
 
 async def _get_card_id(pool: asyncpg.Pool, scryfall_id: UUID) -> UUID:
     async with pool.acquire() as conn:
@@ -167,9 +148,6 @@ async def test_get_owned_card_ids_for_collections_empty_list(
 async def test_suggest_with_collection_filters_to_owned(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -190,9 +168,6 @@ async def test_suggest_with_collection_filters_to_owned(
 async def test_suggest_without_collection_returns_unfiltered(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -210,9 +185,6 @@ async def test_suggest_without_collection_returns_unfiltered(
 async def test_empty_collection_returns_no_suggestions(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     _, cid = await _create_collection(client, "EmptyFilter")
     deck_id = await create_test_deck(client, name="Empty Filter Deck")
 
@@ -230,9 +202,6 @@ async def test_empty_collection_returns_no_suggestions(
 async def test_build_with_collection_ids_filters_stage(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -255,9 +224,6 @@ async def test_build_with_collection_ids_filters_stage(
 async def test_build_excludes_alternate_printing_already_in_deck(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     alternate_sol_ring = UUID("33333333-36f5-40e7-91de-9c8c1b44da67")
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _insert_alternate_printing(

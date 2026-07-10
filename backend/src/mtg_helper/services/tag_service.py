@@ -224,11 +224,11 @@ _TRIBAL_SUBTYPES: tuple[str, ...] = (
     "Zombie",
 )
 
-# Bumped whenever the tag vocabulary changes — used as a manual signal to
+# Bumped whenever the local rule-tag vocabulary changes — used as a manual signal to
 # re-run `/admin/tag-cards` against the corpus. Not auto-enforced.
 TAG_VOCAB_VERSION = 3
 
-_EDHREC_TAG_ALIASES: dict[str, str] = {
+_LOCAL_TAG_ALIASES: dict[str, str] = {
     "artifact": "artifacts",
     "token": "tokens",
     "draw": "card_draw",
@@ -249,8 +249,8 @@ _EDHREC_TAG_ALIASES: dict[str, str] = {
 
 # ─── Full mechanic catalog ────────────────────────────────────────────────────
 # Legacy fallback used only by direct callers that do not provide the synced
-# MTGJSON keyword catalog. The batch pipeline now writes EDHREC-style theme
-# tags and stores MTGJSON mechanics separately.
+# MTGJSON keyword catalog. The batch pipeline writes local rule tags and stores
+# MTGJSON mechanics separately.
 _FULL_MECHANIC_PATTERNS: dict[str, re.Pattern[str]] = {
     # Evergreen combat keywords
     "flying": _re(r"\bflying\b"),
@@ -766,12 +766,12 @@ def _dedupe_tags(tags: list[str]) -> list[str]:
     return deduped
 
 
-def normalize_edhrec_tags(tags: list[str]) -> list[str]:
-    """Normalize legacy rule tags to EDHREC-style theme ids."""
+def normalize_local_tags(tags: list[str]) -> list[str]:
+    """Normalize local rule tags to stable ids."""
     normalized: list[str] = []
     for tag in tags:
         key = re.sub(r"[^a-z0-9]+", "_", tag.lower()).strip("_")
-        normalized.append(_EDHREC_TAG_ALIASES.get(key, key))
+        normalized.append(_LOCAL_TAG_ALIASES.get(key, key))
     return _dedupe_tags(normalized)
 
 
@@ -815,22 +815,21 @@ async def run_batch_tag(
 
     for i in range(0, row_count, _BATCH_SIZE):
         batch = rows[i : i + _BATCH_SIZE]
-        updates: list[tuple[list[str], list[str], list[str], list[str], list[str], Any]] = []
+        updates: list[tuple[list[str], list[str], list[str], list[str], Any]] = []
         for r in batch:
             keywords = list(r["keywords"])
-            edhrec_tags = classify_card(
+            local_tags = classify_card(
                 r["name"],
                 r["type_line"],
                 r["oracle_text"],
                 keywords,
                 float(r["cmc"]) if r["cmc"] is not None else None,
             )
-            edhrec_tags = normalize_edhrec_tags(edhrec_tags)
+            local_tags = normalize_local_tags(local_tags)
             mtgjson_tags = classify_mtgjson_tags(r["oracle_text"], keywords, official_keywords)
             updates.append(
                 (
-                    edhrec_tags,
-                    edhrec_tags,
+                    local_tags,
                     mtgjson_tags,
                     classify_traits(r["oracle_text"], keywords),
                     classify_token_types(r["oracle_text"]),
@@ -843,11 +842,10 @@ async def run_batch_tag(
                 """
                 UPDATE cards
                 SET tags = $1,
-                    edhrec_tags = $2,
-                    mtgjson_tags = $3,
-                    traits = $4,
-                    token_types = $5
-                WHERE id = $6
+                    mtgjson_tags = $2,
+                    traits = $3,
+                    token_types = $4
+                WHERE id = $5
                 """,
                 updates,
             )

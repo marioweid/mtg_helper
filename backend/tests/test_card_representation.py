@@ -26,7 +26,7 @@ def test_representation_embedding_text_includes_structured_labels() -> None:
     assert "Commander role tags: ramp" in text
     assert "Produces tokens: treasure" in text
     assert "Mana value: 5" in text
-    assert "EDHREC rank: 123" in text
+    assert "Popularity rank: 123" in text
 
 
 def test_representation_feature_payload_is_structured() -> None:

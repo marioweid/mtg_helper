@@ -5,7 +5,7 @@ from mtg_helper.services.tag_service import (
     classify_token_types,
     classify_traits,
     classify_tribal,
-    normalize_edhrec_tags,
+    normalize_local_tags,
 )
 
 
@@ -144,8 +144,8 @@ def test_plus_one_counters() -> None:
     assert "plus_one_counters" in tags
 
 
-def test_normalize_edhrec_tags_maps_legacy_role_tags() -> None:
-    assert normalize_edhrec_tags(
+def test_normalize_local_tags_maps_legacy_role_tags() -> None:
+    assert normalize_local_tags(
         ["Card Draw", "card_advantage", "artifact", "Treasures", "plus_one_plus_1_counters"]
     ) == ["card_draw", "artifacts", "treasure", "plus_one_plus_one_counters"]
 

@@ -1,6 +1,5 @@
 """Tests for the EUR price cap filter on /suggest and /build."""
 
-from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import asyncpg
@@ -15,22 +14,6 @@ from tests.conftest import (
     SOL_RING_SCRYFALL_ID,
     create_test_deck,
 )
-
-
-def _make_ai_client() -> MagicMock:
-    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
-        return [[0.0] * 1536 for _ in texts]
-
-    ai = MagicMock()
-    ai.embed = AsyncMock(side_effect=_embed)
-    return ai
-
-
-def _set_qdrant_empty() -> None:
-    mock = MagicMock()
-    mock.search = AsyncMock(return_value=[])
-    app.state.qdrant_client = mock
-
 
 async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
     async with pool.acquire() as conn:
@@ -59,9 +42,6 @@ async def test_suggest_with_price_cap_excludes_expensive(
     Sol Ring (€0.20) passes. Rhystic Study (€12), Doubling Season (€45),
     Dockside (no EUR price) are excluded.
     """
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, RHYSTIC_STUDY_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
@@ -85,9 +65,6 @@ async def test_suggest_null_eur_price_excluded_when_cap_active(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
     """Cards with no EUR price must be excluded — safe default."""
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, DOCKSIDE_SCRYFALL_ID, ["ramp"])
 
     deck_id = await create_test_deck(client, name="Null Price Deck")
@@ -103,9 +80,6 @@ async def test_suggest_null_eur_price_excluded_when_cap_active(
 
 async def test_suggest_without_cap_includes_all(client: AsyncClient, db_pool: asyncpg.Pool) -> None:
     """No cap → expensive cards allowed (color-identity still applies)."""
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -126,9 +100,6 @@ async def test_suggest_without_cap_includes_all(client: AsyncClient, db_pool: as
 async def test_build_honors_request_override_cap(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -155,9 +126,6 @@ async def test_suggest_with_price_floor_excludes_cheap(
 
     Dockside (no EUR price) is also excluded — safe default for null prices.
     """
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOCKSIDE_SCRYFALL_ID, ["ramp"])
@@ -179,9 +147,6 @@ async def test_suggest_price_range_bounds_both_sides(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
     """Range €0.10 – €1.00 keeps Sol Ring (€0.20) and excludes Doubling Season (€45)."""
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -208,9 +173,6 @@ async def test_suggest_price_range_bounds_both_sides(
 async def test_build_honors_request_override_floor(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 

@@ -1,7 +1,7 @@
 """Moxfield top-decks recommendations: fetch + cache + score.
 
-Mirrors :mod:`mtg_helper.services.edhrec_service`. For each commander we fetch
-the top 10 most-liked Moxfield decks, resolve every mainboard printing to its
+For each commander we fetch the top 10 most-liked Moxfield decks, resolve every
+mainboard printing to its
 oracle_id via Scryfall, and aggregate the oracle_ids. Cards appearing in more
 of the top decks score higher. Resolving to oracle_id (vs. printing-level
 scryfall_id) is what lets alternate-art / reprint references match our local
@@ -217,6 +217,7 @@ async def fetch_deck_card_entries(
         cards.append(
             {
                 "scryfall_id": sf_id,
+                "name": card.get("name"),
                 "cmc": card.get("cmc") or card.get("mana_value"),
                 "type_line": card.get("type_line") or card.get("type"),
                 "quantity": int(entry.get("quantity") or 1),
@@ -478,8 +479,8 @@ async def score_inclusion(
     """Resolve payload scryfall ids to local UUIDs with weighted scores.
 
     A card present in all top decks scores 1.0; one in a single deck scores
-    ``1 / _TOP_DECKS``. Same color-identity / legality / border filter as
-    EDHREC's :func:`mtg_helper.services.edhrec_service.score_inclusion`.
+    ``1 / _TOP_DECKS``. Uses the same color-identity, legality, and border
+    filters as the hub scorer.
 
     Args:
         pool: asyncpg connection pool.

@@ -17,10 +17,7 @@ from mtg_helper.services.agents._prompts import (
     SANDBOX_RULES,
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
-from mtg_helper.services.edhrec_tag_catalog_service import (
-    load_edhrec_prompt_catalog,
-    load_edhrec_tags,
-)
+from mtg_helper.services.moxfield_hub_service import load_hub_prompt_catalog, load_hub_tags
 
 _TEMPERATURE = 0.3
 _MAX_OUTPUT_TOKENS = 2048
@@ -61,7 +58,7 @@ class ExtractDeps:
     partner_oracle: str | None
     bracket: int
     at_history_limit: bool
-    edhrec_catalog: str
+    hub_catalog: str
 
 
 def _build_system_prompt(deps: ExtractDeps) -> str:
@@ -71,7 +68,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
 
     parts = [
         "You are a Magic: The Gathering Commander deck strategist.",
-        "Your job is to identify a small set of EDHREC deckbuilding theme tags",
+        "Your job is to identify a small set of Moxfield hub theme tags",
         "that match the player's deck vision. The downstream retrieval system",
         "uses these tags as the primary card-suggestion signal.",
         "",
@@ -91,13 +88,13 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
     parts += [
         f"\nPower level: Bracket {deps.bracket} — {bracket_desc}",
         "",
-        "Use EDHREC theme tags from this local catalog:",
-        deps.edhrec_catalog,
+        "Use Moxfield hub theme tags from this local catalog:",
+        deps.hub_catalog,
         "",
         "MTGJSON mechanic examples, for context only, include:",
         vocab_str,
         "",
-        "Prefer EDHREC tags like graveyard, blink, reanimator, aristocrats,",
+        "Prefer hub tags like graveyard, blink, reanimator, aristocrats,",
         "voltron, spellslinger, etb, pingers, or plus_one_plus_one_counters.",
         "",
         "RULES:",
@@ -106,7 +103,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- Reference the commander's specific abilities when picking what to ask.",
         "- The `reply` field holds the conversational text shown to the user.",
         "- Set done=true ONLY when you have enough information.",
-        "- When done=true, populate archetype_tags with EDHREC theme tags,",
+        "- When done=true, populate archetype_tags with Moxfield hub theme tags,",
         "  suggested_name, and stage_targets.",
         "",
         "STAGE TARGET GUIDELINES (defaults are fixed):",
@@ -117,9 +114,9 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- theme has no fixed target — fills remaining slots",
         "",
         "FORBIDDEN:",
-        "- Do NOT invent tags outside the EDHREC catalog.",
+        "- Do NOT invent tags outside the Moxfield hub catalog.",
         "- Do NOT write a prose `description` field.",
-        "- Do NOT mention semantic match, embeddings, or oracle text.",
+        "- Do NOT mention internal matching implementation details.",
     ]
     if deps.at_history_limit:
         parts += ["", FORCE_FINALIZE_HINT]
@@ -176,7 +173,7 @@ async def extract_turn(
 
     Returns:
         ``KeywordExtractResponse`` with the reply, completion flag, and the
-        running EDHREC theme tag selection.
+        running Moxfield hub theme tag selection.
 
     Raises:
         CommanderNotFoundError: If the commander card is not in the database.
@@ -203,7 +200,7 @@ async def extract_turn(
         partner_oracle=partner_oracle,
         bracket=bracket,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
-        edhrec_catalog=await load_edhrec_prompt_catalog(pool),
+        hub_catalog=await load_hub_prompt_catalog(pool),
     )
     user_message = message.strip() or "I want to build a deck with this commander."
     result = await get_agent().run(
@@ -212,6 +209,6 @@ async def extract_turn(
         message_history=to_model_messages(trimmed),
     )
     output = result.output
-    allowed = await load_edhrec_tags(pool)
+    allowed = await load_hub_tags(pool)
     output.archetype_tags = [tag for tag in output.archetype_tags if tag in allowed]
     return output

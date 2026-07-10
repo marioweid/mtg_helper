@@ -89,7 +89,7 @@ export interface DeckCardItem {
   qualifying_stages: string[];
   role_reasons: Record<string, string[]>;
   tags: string[];
-  edhrec_tags: string[];
+  hub_tags: string[];
   mtgjson_tags: string[];
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
@@ -119,7 +119,7 @@ export interface CommanderCardSummary {
   image_uri: string | null;
   color_identity: string[];
   tags?: string[];
-  edhrec_tags?: string[];
+  hub_tags?: string[];
   mtgjson_tags?: string[];
   game_changer: boolean;
 }

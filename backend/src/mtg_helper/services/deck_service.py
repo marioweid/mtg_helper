@@ -112,8 +112,8 @@ def _parse_power(raw: str | None) -> int | None:
 
 
 def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
-    edhrec_tags = list(row["edhrec_tags"] or []) if "edhrec_tags" in row.keys() else []
-    tags = edhrec_tags or (list(row["tags"] or []) if "tags" in row.keys() else [])
+    hub_tags = list(row["hub_tags"] or []) if "hub_tags" in row.keys() else []
+    tags = hub_tags or (list(row["tags"] or []) if "tags" in row.keys() else [])
     mtgjson_tags = list(row["mtgjson_tags"] or []) if "mtgjson_tags" in row.keys() else []
     categories = list(row["categories"] or [])
     builder_roles = derive_builder_roles(tags, mtgjson_tags, row["type_line"])
@@ -141,7 +141,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         qualifying_stages=stages,
         role_reasons=builder_roles.reasons,
         tags=tags,
-        edhrec_tags=tags,
+        hub_tags=tags,
         mtgjson_tags=mtgjson_tags,
         power=power,
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
@@ -242,16 +242,15 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             archetype_tags,
         )
     deck = _row_to_deck(row)
-    asyncio.create_task(_safe_edhrec_refresh(pool, deck.commander_id))
     asyncio.create_task(_safe_moxfield_refresh(pool, deck.commander_id))
     return deck
 
 
 async def _commander_seed_tags(conn: asyncpg.Connection, commander_id: UUID) -> list[str]:
-    """Use the commander's EDHREC tags as initial deck identity when available."""
+    """Use the commander's Moxfield hub tags as initial deck identity when available."""
     row = await conn.fetchrow(
         """
-        SELECT edhrec_tags, tags
+        SELECT hub_tags, tags
         FROM cards
         WHERE id = $1
         """,
@@ -259,21 +258,7 @@ async def _commander_seed_tags(conn: asyncpg.Connection, commander_id: UUID) -> 
     )
     if row is None:
         return []
-    return list(row["edhrec_tags"] or row["tags"] or [])
-
-
-async def _safe_edhrec_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
-    """Pre-warm the EDHREC cache for a freshly created deck's commander.
-
-    Errors are logged and swallowed so deck creation never fails because of an
-    EDHREC outage or slug miss.
-    """
-    from mtg_helper.services import edhrec_service
-
-    try:
-        await edhrec_service.get_or_refresh(pool, commander_id)
-    except Exception:
-        _log.exception("Background EDHREC refresh failed for commander %s", commander_id)
+    return list(row["hub_tags"] or row["tags"] or [])
 
 
 async def _safe_moxfield_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
@@ -419,13 +404,13 @@ async def _fetch_commander_summary(
     """Load minimal card fields for the deck detail commander preview."""
     row = await conn.fetchrow(
         "SELECT id, name, mana_cost, cmc, type_line, oracle_text, image_uri, "
-        "color_identity, power, tags, edhrec_tags, mtgjson_tags, game_changer "
+        "color_identity, power, tags, hub_tags, mtgjson_tags, game_changer "
         "FROM cards WHERE id = $1",
         card_id,
     )
     if row is None:
         return None
-    edhrec_tags = list(row["edhrec_tags"] or row["tags"] or [])
+    hub_tags = list(row["hub_tags"] or row["tags"] or [])
     mtgjson_tags = list(row["mtgjson_tags"] or [])
     return CommanderCardSummary(
         id=row["id"],
@@ -437,8 +422,8 @@ async def _fetch_commander_summary(
         image_uri=row["image_uri"],
         color_identity=list(row["color_identity"] or []),
         power=_parse_power(row["power"]),
-        tags=edhrec_tags,
-        edhrec_tags=edhrec_tags,
+        tags=hub_tags,
+        hub_tags=hub_tags,
         mtgjson_tags=mtgjson_tags,
         game_changer=bool(row["game_changer"]),
     )

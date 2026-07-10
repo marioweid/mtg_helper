@@ -1,7 +1,7 @@
 """Deckbuilder role derivation from canonical card facts.
 
 Builder roles are not theme tags. They are deck-construction counters derived
-from EDHREC/MTGJSON tags and card type, with deck-local manual overrides
+from Moxfield hub/local/MTGJSON tags and card type, with deck-local manual overrides
 handled separately on ``deck_cards.categories``.
 """
 
@@ -63,21 +63,21 @@ class BuilderRoles:
 
 
 def derive_builder_roles(
-    edhrec_tags: list[str],
+    hub_tags: list[str],
     mtgjson_tags: list[str],
     type_line: str | None,
 ) -> BuilderRoles:
     """Derive builder role counters from card facts.
 
     Args:
-        edhrec_tags: Canonical EDHREC-style tags stored on the card.
+        hub_tags: Moxfield hub tags or local rule tags stored on the card.
         mtgjson_tags: MTGJSON keyword/mechanic tags stored on the card.
         type_line: Card type line, used for land detection.
 
     Returns:
         Roles in stable display order and per-role source tags.
     """
-    tag_set = {tag for tag in [*edhrec_tags, *mtgjson_tags] if tag}
+    tag_set = {tag for tag in [*hub_tags, *mtgjson_tags] if tag}
     reasons: dict[str, list[str]] = {}
 
     if "Land" in (type_line or ""):

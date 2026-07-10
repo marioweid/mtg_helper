@@ -11,12 +11,10 @@ import asyncpg
 
 from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
-    edhrec_service,
-    edhrec_theme_index_service,
+    moxfield_hub_service,
     moxfield_recs_service,
     profile_service,
 )
-from mtg_helper.services.tag_service import normalize_edhrec_tags
 
 _log = logging.getLogger(__name__)
 
@@ -124,7 +122,7 @@ class RetrievedCard:
     score: float
     game_changer: bool = False
     signals: list[str] = field(default_factory=list)
-    edhrec_weight: float = 0.0
+    hub_weight: float = 0.0
     moxfield_weight: float = 0.0
 
 
@@ -747,22 +745,14 @@ async def _search_tags(
             SELECT id,
                    array_length(
                        ARRAY(
-                           SELECT unnest(
-                               CASE
-                                   WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
-                                   ELSE tags
-                               END || mtgjson_tags
-                           )
+                           SELECT unnest(hub_tags || mtgjson_tags)
                            INTERSECT
                            SELECT unnest($1::text[])
                        ), 1
                    ) AS overlap
             FROM cards
             WHERE (
-                CASE
-                    WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
-                    ELSE tags
-                END || mtgjson_tags
+                hub_tags || mtgjson_tags
             ) && $1::text[]
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
@@ -777,10 +767,7 @@ async def _search_tags(
                 array_length(
                     ARRAY(
                         SELECT unnest(
-                            CASE
-                                WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
-                                ELSE tags
-                            END || mtgjson_tags
+                            hub_tags || mtgjson_tags
                         )
                         INTERSECT
                         SELECT unnest($1::text[])
@@ -1082,7 +1069,7 @@ def _compute_weighted_scores(
     type_filter: TypeFilter | None = None,
     stage: str | None = None,
     ranking_weights: RankingWeights | None = None,
-    edhrec_inclusion: dict[UUID, float] | None = None,
+    hub_inclusion: dict[UUID, float] | None = None,
     moxfield_inclusion: dict[UUID, float] | None = None,
     prefer_keywords: bool = False,
     representation_query: RepresentationQuery | None = None,
@@ -1091,14 +1078,14 @@ def _compute_weighted_scores(
 
     Default weights (no type_filter):
         score = w_synergy   * synergy_score
-              + w_popularity* popularity (log-scaled EDHREC)
+              + w_popularity* popularity
               + w_personal  * personal_card_rating
               + 0.10        * curve_fit
               + 0.05        * color_affinity
               + 0.03        * user_profile_score
 
-    The legacy semantic weight is folded into synergy so saved ranking settings
-    remain compatible after removing vector search. With type_filter, 0.15 is
+    The legacy keyword-match weight is folded into synergy so saved ranking
+    settings remain compatible after removing vector search. With type_filter, 0.15 is
     reallocated from synergy to a type_score signal.
 
     Weights come from ``ranking_weights`` when provided; otherwise module defaults apply.
@@ -1161,7 +1148,7 @@ def _compute_weighted_scores(
         else:
             profile_score = 0.5
 
-        inclusion = edhrec_inclusion.get(uid, 0.0) if edhrec_inclusion else 0.0
+        inclusion = hub_inclusion.get(uid, 0.0) if hub_inclusion else 0.0
         mox_inclusion = moxfield_inclusion.get(uid, 0.0) if moxfield_inclusion else 0.0
         representation = (
             _representation_match_score(row, representation_query)
@@ -1251,18 +1238,18 @@ def _merge_inclusion_scores(
     return merged
 
 
-def _annotate_edhrec_signals(
+def _annotate_hub_signals(
     signal_map: dict[UUID, list[str]],
-    edhrec_inclusion: dict[UUID, float],
+    hub_inclusion: dict[UUID, float],
     cards_by_id: dict[UUID, "asyncpg.Record"],
 ) -> None:
-    """Add 'edhrec' to signal_map for cards present in the commander's EDHREC lists."""
-    for uid, weight in edhrec_inclusion.items():
+    """Add 'hub' to signal_map for cards present in selected Moxfield hubs."""
+    for uid, weight in hub_inclusion.items():
         if weight <= 0.0 or uid not in cards_by_id:
             continue
         entry = signal_map.setdefault(uid, [])
-        if "edhrec" not in entry:
-            entry.append("edhrec")
+        if "hub" not in entry:
+            entry.append("hub")
 
 
 async def _fetch_inclusion_signals(
@@ -1271,25 +1258,17 @@ async def _fetch_inclusion_signals(
     commander_color_identity: list[str],
     bracket: int | None,
     query_tags: list[str],
-) -> tuple[dict[UUID, float], dict[UUID, float], dict[UUID, float]]:
-    """Fetch EDHREC, EDHREC-theme, and Moxfield scores; swallow source failures."""
-    edhrec_inclusion: dict[UUID, float] = {}
-    theme_inclusion: dict[UUID, float] = {}
+) -> tuple[dict[UUID, float], dict[UUID, float]]:
+    """Fetch Moxfield hub and top-commander-pick scores; swallow source failures."""
+    _ = bracket
+    hub_inclusion: dict[UUID, float] = {}
     moxfield_inclusion: dict[UUID, float] = {}
-    if commander_id is not None:
-        try:
-            payload = await edhrec_service.get_or_refresh(pool, commander_id)
-            edhrec_inclusion = await edhrec_service.score_inclusion(
-                pool, payload, commander_color_identity, bracket=bracket
-            )
-        except Exception:
-            _log.exception("EDHREC inclusion lookup failed; continuing without boost")
     try:
-        theme_inclusion = await edhrec_theme_index_service.score_themes(
+        hub_inclusion = await moxfield_hub_service.score_hubs(
             pool, query_tags, commander_color_identity
         )
     except Exception:
-        _log.exception("EDHREC theme inclusion lookup failed; continuing without boost")
+        _log.exception("Moxfield hub inclusion lookup failed; continuing without boost")
     if commander_id is not None:
         try:
             mox_payload = await moxfield_recs_service.get_or_refresh(pool, commander_id)
@@ -1298,21 +1277,7 @@ async def _fetch_inclusion_signals(
             )
         except Exception:
             _log.exception("Moxfield inclusion lookup failed; continuing without boost")
-    return edhrec_inclusion, theme_inclusion, moxfield_inclusion
-
-
-def _annotate_theme_signals(
-    signal_map: dict[UUID, list[str]],
-    theme_inclusion: dict[UUID, float],
-    cards_by_id: dict[UUID, "asyncpg.Record"],
-) -> None:
-    """Add 'edhrec_theme' for cards present in indexed EDHREC theme pages."""
-    for uid, weight in theme_inclusion.items():
-        if weight <= 0.0 or uid not in cards_by_id:
-            continue
-        entry = signal_map.setdefault(uid, [])
-        if "edhrec_theme" not in entry:
-            entry.append("edhrec_theme")
+    return hub_inclusion, moxfield_inclusion
 
 
 def _annotate_moxfield_signals(
@@ -1320,13 +1285,13 @@ def _annotate_moxfield_signals(
     moxfield_inclusion: dict[UUID, float],
     cards_by_id: dict[UUID, "asyncpg.Record"],
 ) -> None:
-    """Add 'moxfield' to signal_map for cards present in top-liked Moxfield decks."""
+    """Add 'top_commander_pick' for cards present in top-liked commander decks."""
     for uid, weight in moxfield_inclusion.items():
         if weight <= 0.0 or uid not in cards_by_id:
             continue
         entry = signal_map.setdefault(uid, [])
-        if "moxfield" not in entry:
-            entry.append("moxfield")
+        if "top_commander_pick" not in entry:
+            entry.append("top_commander_pick")
 
 
 # Hard cap on the inner candidate pool. Each Load More click bumps the requested
@@ -1340,12 +1305,12 @@ def _filter_inclusion_by_stage(
     cards_by_id: dict[UUID, "asyncpg.Record"],
     stage: str | None,
 ) -> dict[UUID, float]:
-    """Drop trusted (EDHREC/Moxfield) cards that don't fit the active stage.
+    """Drop trusted Moxfield cards that don't fit the active stage.
 
     Stages with explicit tag membership (ramp/interaction/draw/utility) keep
     only cards whose tags overlap. The ``lands`` stage keeps only lands. The
     catch-all stages (``theme``, ``bangers``, ``None``) pass through unchanged
-    — there a high-trust card from EDHREC/Moxfield is always fair game.
+    because a high-trust hub or commander-deck card is fair game there.
 
     Without this filter, the trusted quota injects globally popular staples
     (Sol Ring, Arcane Signet) into every stage's top results, including the
@@ -1376,30 +1341,30 @@ def _filter_inclusion_by_stage(
 def _filter_theme_rows(
     rows: list["asyncpg.Record"],
     *,
-    required_edhrec_tag: str | None = None,
-    excluded_edhrec_tags: frozenset[str] | None = None,
+    required_hub_tag: str | None = None,
+    excluded_hub_tags: frozenset[str] | None = None,
     allowed_theme_ids: frozenset[UUID] | None = None,
     excluded_theme_ids: frozenset[UUID] | None = None,
 ) -> list["asyncpg.Record"]:
-    """Keep theme rows in the selected EDHREC-tag bucket.
+    """Keep theme rows in the selected Moxfield hub bucket.
 
-    A concrete theme tab requires exact EDHREC tag membership. The Etc tab uses
+    A concrete theme tab requires exact hub membership. The Etc tab uses
     the inverse: cards that do not belong to any selected deck archetype tag.
     """
-    if required_edhrec_tag is None and not excluded_edhrec_tags:
+    if required_hub_tag is None and not excluded_hub_tags:
         return rows
 
     filtered: list["asyncpg.Record"] = []
     for row in rows:
         uid = row["id"]
         if (
-            required_edhrec_tag is not None
-            and not _row_matches_local_theme_bucket(row, required_edhrec_tag)
+            required_hub_tag is not None
+            and not _row_matches_local_theme_bucket(row, required_hub_tag)
             and uid not in (allowed_theme_ids or frozenset())
         ):
             continue
-        if excluded_edhrec_tags and any(
-            _row_matches_local_theme_bucket(row, tag) for tag in excluded_edhrec_tags
+        if excluded_hub_tags and any(
+            _row_matches_local_theme_bucket(row, tag) for tag in excluded_hub_tags
         ):
             continue
         if excluded_theme_ids and uid in excluded_theme_ids:
@@ -1411,76 +1376,15 @@ def _filter_theme_rows(
 def _row_matches_local_theme_bucket(row: "asyncpg.Record", tag: str) -> bool:
     """Return True when local structured fields prove theme membership."""
     normalized_tag = _normalize_theme_tag(tag)
-    row_tags = set(normalize_edhrec_tags(list(row["edhrec_tags"] or row["tags"] or [])))
+    row_tags = set(row["hub_tags"] or row["tags"] or [])
     if normalized_tag in row_tags:
         return True
-    if normalized_tag == "artifacts":
-        return "Artifact" in set(row["card_types"] or []) or "Artifact" in (row["type_line"] or "")
-    if normalized_tag == "etb":
-        return "etb" in set(row["traits"] or [])
     return False
-
-
-def _local_theme_where(tag: str) -> str | None:
-    """Return a SQL predicate for deterministic local theme buckets."""
-    normalized_tag = _normalize_theme_tag(tag)
-    if normalized_tag == "artifacts":
-        return "('Artifact' = ANY(card_types) OR type_line LIKE '%Artifact%')"
-    if normalized_tag == "etb":
-        return "'etb' = ANY(traits)"
-    return None
 
 
 def _normalize_theme_tag(tag: str) -> str:
     """Normalize one selected theme tag for local bucket comparisons."""
-    normalized = normalize_edhrec_tags([tag])
-    return normalized[0] if normalized else tag
-
-
-async def _fetch_local_theme_ids(
-    pool: asyncpg.Pool,
-    tags: list[str],
-    commander_color_identity: list[str],
-    deck_card_ids: list[UUID],
-    *,
-    exclude_lands: bool,
-    owned_card_ids: frozenset[UUID] | None = None,
-    price_filter: PriceFilter | None = None,
-) -> set[UUID]:
-    """Fetch local deterministic theme-bucket members for tags such as ETB."""
-    clauses = [clause for tag in tags if (clause := _local_theme_where(tag)) is not None]
-    if not clauses:
-        return set()
-
-    land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
-    params: list = [commander_color_identity, deck_card_ids]
-    collection_filter = ""
-    if owned_card_ids is not None:
-        params.append(list(owned_card_ids))
-        collection_filter = f"AND id = ANY(${len(params)}::uuid[])"
-    price_clause = _build_price_clause(price_filter, params)
-    local_clause = " OR ".join(f"({clause})" for clause in clauses)
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            f"""
-            SELECT id
-            FROM cards
-            WHERE ({local_clause})
-              AND color_identity <@ $1::text[]
-              AND legalities->>'commander' = 'legal'
-              AND id != ALL($2::uuid[])
-              AND COALESCE(border_color, '') != 'gold'
-              AND COALESCE(security_stamp, '') != 'acorn'
-              AND type_line NOT LIKE '%Conspiracy%'
-              {land_filter}
-              {collection_filter}
-              {price_clause}
-            ORDER BY edhrec_rank ASC NULLS LAST
-            LIMIT 500
-            """,
-            *params,
-        )
-    return {row["id"] for row in rows}
+    return tag.strip().lower().replace("-", "_")
 
 
 def _theme_pinned_uncategorizable(
@@ -1507,7 +1411,7 @@ def _theme_pinned_uncategorizable(
 
 def _apply_trusted_quota(
     scores: dict[UUID, float],
-    edhrec_inclusion: dict[UUID, float],
+    hub_inclusion: dict[UUID, float],
     moxfield_inclusion: dict[UUID, float],
     cards_by_id: dict[UUID, "asyncpg.Record"],
     limit: int,
@@ -1520,7 +1424,7 @@ def _apply_trusted_quota(
 
     1. ``theme``-stage uncategorizable pins (cards with no qualifying mechanical
        stage but high trust — see :func:`_theme_pinned_uncategorizable`).
-    2. Trusted cards (Moxfield + EDHREC inclusion ≥ 0 with a positive composite
+    2. Trusted cards (hub + top commander pick inclusion >= 0 with a positive composite
        score), sorted by trusted score desc then composite score desc. Capped
        at ``floor(limit * quota)`` slots so the composite channel always has
        room to surface keyword/text winners when ``quota < 1.0``. A card
@@ -1535,8 +1439,8 @@ def _apply_trusted_quota(
 
     Args:
         scores: Final composite scores per card UUID.
-        edhrec_inclusion: EDHREC inclusion scores per card UUID.
-        moxfield_inclusion: Moxfield inclusion scores per card UUID.
+        hub_inclusion: Moxfield hub inclusion scores per card UUID.
+        moxfield_inclusion: Top commander pick scores per card UUID.
         cards_by_id: Raw DB rows indexed by card UUID.
         limit: Maximum number of UIDs to return (page_end in pagination terms).
         stage: Active build stage; controls the theme uncategorizable-pin pass.
@@ -1554,10 +1458,10 @@ def _apply_trusted_quota(
     composite_ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
 
     trusted: list[tuple[UUID, float]] = []
-    for uid in {*edhrec_inclusion, *moxfield_inclusion}:
+    for uid in {*hub_inclusion, *moxfield_inclusion}:
         if uid not in cards_by_id or scores.get(uid, 0.0) <= 0.0:
             continue
-        trusted_score = max(edhrec_inclusion.get(uid, 0.0), moxfield_inclusion.get(uid, 0.0))
+        trusted_score = max(hub_inclusion.get(uid, 0.0), moxfield_inclusion.get(uid, 0.0))
         if trusted_score <= 0.0:
             continue
         trusted.append((uid, trusted_score))
@@ -1597,13 +1501,13 @@ async def retrieve_candidates(
     commander_id: UUID | None = None,
     bracket: int | None = None,
     prefer_keywords: bool = False,
-    required_edhrec_tag: str | None = None,
-    excluded_edhrec_tags: frozenset[str] | None = None,
+    required_hub_tag: str | None = None,
+    excluded_hub_tags: frozenset[str] | None = None,
 ) -> list[RetrievedCard]:
     """Run structured retrieval and return top candidate cards with weighted scoring.
 
-    Combines tag (Postgres GIN), full-text (Postgres FTS), EDHREC inclusion,
-    Moxfield inclusion, and deterministic card representation matches.
+    Combines tag (Postgres GIN), full-text (Postgres FTS), Moxfield hub inclusion,
+    top commander picks, and deterministic card representation matches.
 
     Args:
         pool: asyncpg connection pool.
@@ -1620,15 +1524,15 @@ async def retrieve_candidates(
         ranking_weights: Optional per-user signal weight overrides.
         collection_filter: When set, restricts candidates to owned cards.
         price_filter: When set, excludes cards above the EUR cap (nonfoil).
-        commander_id: When set, fetches EDHREC commander recommendations and
-            applies the deck_inclusion ranking signal.
-        bracket: Deck bracket; gates EDHREC's gamechangers category.
+        commander_id: When set, fetches top Moxfield commander-deck picks and
+            applies the commander-pick ranking signal.
+        bracket: Deck bracket.
         prefer_keywords: When True (deck supplies explicit archetype keywords),
             slightly increases tag/keyword synergy weight.
-        required_edhrec_tag: For a selected theme tab, require exact EDHREC tag
-            membership so unrelated trusted cards cannot leak into the tab.
-        excluded_edhrec_tags: For the Etc theme tab, exclude cards that belong
-            to any selected deck archetype tag.
+        required_hub_tag: For a selected theme tab, require exact hub membership
+            so unrelated trusted cards cannot leak into the tab.
+        excluded_hub_tags: For the Etc theme tab, exclude cards that belong to
+            any selected deck archetype hub.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1672,43 +1576,22 @@ async def retrieve_candidates(
 
     tag_overlaps, fts_set, signal_map = _build_signal_map(tag_results, fts_ids)
 
-    edhrec_inclusion, theme_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
+    hub_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
         pool, commander_id, commander_color_identity, bracket, query_tags
     )
-    local_theme_ids: set[UUID] = set()
-    if required_edhrec_tag is not None:
-        local_theme_ids = await _fetch_local_theme_ids(
-            pool,
-            [required_edhrec_tag],
-            commander_color_identity,
-            deck_card_ids,
-            exclude_lands=exclude_lands,
-            owned_card_ids=owned_ids,
-            price_filter=price_filter,
-        )
     excluded_theme_ids: frozenset[UUID] | None = None
-    if excluded_edhrec_tags:
+    if excluded_hub_tags:
         try:
-            edhrec_theme_exclusions = set(
-                await edhrec_theme_index_service.score_themes(
-                    pool, list(excluded_edhrec_tags), commander_color_identity
+            hub_theme_exclusions = set(
+                await moxfield_hub_service.score_hubs(
+                    pool, list(excluded_hub_tags), commander_color_identity
                 )
             )
-            local_theme_exclusions = await _fetch_local_theme_ids(
-                pool,
-                list(excluded_edhrec_tags),
-                commander_color_identity,
-                deck_card_ids,
-                exclude_lands=exclude_lands,
-                owned_card_ids=owned_ids,
-                price_filter=price_filter,
-            )
-            excluded_theme_ids = frozenset(edhrec_theme_exclusions | local_theme_exclusions)
+            excluded_theme_ids = frozenset(hub_theme_exclusions)
         except Exception:
-            _log.exception("EDHREC theme exclusion lookup failed; continuing with tag-only Etc")
-    combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
+            _log.exception("Moxfield hub exclusion lookup failed; continuing with tag-only Etc")
 
-    # Include EDHREC- and Moxfield-only matches as candidates so a high-synergy
+    # Include Moxfield hub and top-commander-pick matches as candidates so a high-synergy
     # card not surfaced by tag/FTS still has a path into the result set.
     # Must respect ``deck_card_ids`` — the search channels filter against it,
     # but this fallback path bypasses them and would otherwise resurface cards
@@ -1716,7 +1599,7 @@ async def retrieve_candidates(
     deck_exclude = set(deck_card_ids)
     extra_ids = [
         uid
-        for uid in {*combined_edhrec, *moxfield_inclusion, *local_theme_ids}
+        for uid in {*hub_inclusion, *moxfield_inclusion}
         if uid not in tag_overlaps
         and uid not in fts_set
         and uid not in deck_exclude
@@ -1733,18 +1616,16 @@ async def retrieve_candidates(
         rows = [r for r in rows if _normalize_card_name(r["name"]) not in excluded_names]
     rows = _filter_theme_rows(
         rows,
-        required_edhrec_tag=required_edhrec_tag,
-        excluded_edhrec_tags=excluded_edhrec_tags,
-        allowed_theme_ids=frozenset({*theme_inclusion, *local_theme_ids}),
+        required_hub_tag=required_hub_tag,
+        excluded_hub_tags=excluded_hub_tags,
+        allowed_theme_ids=frozenset(hub_inclusion),
         excluded_theme_ids=excluded_theme_ids,
     )
     cards_by_id = {r["id"]: r for r in rows}
 
     # Trusted-card boost only fires when the card actually fits the stage —
     # otherwise Sol Ring keeps showing up under "interaction" etc.
-    edhrec_inclusion = _filter_inclusion_by_stage(edhrec_inclusion, cards_by_id, stage)
-    theme_inclusion = _filter_inclusion_by_stage(theme_inclusion, cards_by_id, stage)
-    combined_edhrec = _merge_inclusion_scores(edhrec_inclusion, theme_inclusion)
+    hub_inclusion = _filter_inclusion_by_stage(hub_inclusion, cards_by_id, stage)
     moxfield_inclusion = _filter_inclusion_by_stage(moxfield_inclusion, cards_by_id, stage)
     representation_query = _build_representation_query(query_tags, type_filter)
 
@@ -1760,7 +1641,7 @@ async def retrieve_candidates(
         type_filter,
         stage=stage,
         ranking_weights=ranking_weights,
-        edhrec_inclusion=combined_edhrec,
+        hub_inclusion=hub_inclusion,
         moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=prefer_keywords,
         representation_query=representation_query,
@@ -1768,13 +1649,12 @@ async def retrieve_candidates(
 
     _annotate_type_signals(signal_map, cards_by_id, type_filter)
     _annotate_representation_signals(signal_map, cards_by_id, representation_query)
-    _annotate_edhrec_signals(signal_map, edhrec_inclusion, cards_by_id)
-    _annotate_theme_signals(signal_map, theme_inclusion, cards_by_id)
+    _annotate_hub_signals(signal_map, hub_inclusion, cards_by_id)
     _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
     trusted_quota = ranking_weights.trusted_quota if ranking_weights is not None else 1.0
     full_ranked = _apply_trusted_quota(
         scores,
-        combined_edhrec,
+        hub_inclusion,
         moxfield_inclusion,
         cards_by_id,
         page_end,
@@ -1816,7 +1696,7 @@ async def retrieve_candidates(
                 game_changer=bool(row["game_changer"]),
                 score=scores[uid],
                 signals=signal_map.get(uid, []),
-                edhrec_weight=combined_edhrec.get(uid, 0.0),
+                hub_weight=hub_inclusion.get(uid, 0.0),
                 moxfield_weight=moxfield_inclusion.get(uid, 0.0),
             )
         )
@@ -1849,11 +1729,8 @@ async def _fetch_candidates(
             f"""
             SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
                    color_identity, image_uri,
-                   CASE
-                       WHEN cardinality(edhrec_tags) > 0 THEN edhrec_tags
-                       ELSE tags
-                   END AS tags,
-                   edhrec_tags,
+                   hub_tags AS tags,
+                   hub_tags,
                    mtgjson_tags,
                    edhrec_rank, power, toughness, rarity, game_changer,
                    card_types, subtypes, keywords, traits, token_types,

@@ -584,7 +584,6 @@ async def playtest_analyze(
     stats = playtest_service.simulate(deck, body)
     result = await simulation_analysis_service.analyze_simulation(
         request.app.state.db_pool,
-        request.app.state.ai_client,
         deck,
         stats,
     )
@@ -772,7 +771,7 @@ async def extract_keywords(
 ) -> DataResponse[KeywordExtractResponse]:
     """Run one turn of the keyword-extracting deck agent.
 
-    The agent converges on structured EDHREC theme tags instead of writing
+    The agent converges on structured Moxfield hub theme tags instead of writing
     prose. Used by the ``/decks/new/agent`` flow.
     """
     _enforce_rate_limit(account, "extract_keywords", _DESCRIBE_LIMIT)

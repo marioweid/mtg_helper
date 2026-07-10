@@ -1,7 +1,6 @@
 """Tests for the budget swap service."""
 
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -27,22 +26,6 @@ from tests.conftest import (
     SOL_RING_SCRYFALL_ID,
     create_test_deck,
 )
-
-
-def _make_ai_client() -> MagicMock:
-    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
-        return [[0.0] * 1536 for _ in texts]
-
-    ai = MagicMock()
-    ai.embed = AsyncMock(side_effect=_embed)
-    return ai
-
-
-def _set_qdrant_empty() -> None:
-    mock = MagicMock()
-    mock.search = AsyncMock(return_value=[])
-    app.state.qdrant_client = mock
-
 
 async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
     async with pool.acquire() as conn:
@@ -224,9 +207,6 @@ async def test_find_swaps_returns_cheaper_alternative(
     sub-€45 candidates with green-compatible color identity (Sol Ring is
     colorless; Rhystic Study is mono-U so excluded from a mono-G commander).
     """
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, RHYSTIC_STUDY_SCRYFALL_ID, ["ramp"])
@@ -254,9 +234,6 @@ async def test_find_swaps_returns_cheaper_alternative(
 
 async def test_find_swaps_rejects_basic_land(client: AsyncClient, db_pool: asyncpg.Pool) -> None:
     """Basic lands have no useful swaps — endpoint returns 400."""
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
-
     # Seed a basic land directly
     plains_scryfall = uuid4()
     async with db_pool.acquire() as conn:
@@ -283,8 +260,6 @@ async def test_find_swaps_rejects_basic_land(client: AsyncClient, db_pool: async
 
 async def test_find_swaps_card_not_found(client: AsyncClient) -> None:
     """Unknown card_id → 404."""
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     deck_id = await create_test_deck(client, name="Missing Card Deck")
     bogus = uuid4()
     resp = await client.post(
@@ -296,8 +271,6 @@ async def test_find_swaps_card_not_found(client: AsyncClient) -> None:
 
 async def test_find_swaps_unknown_deck(client: AsyncClient, db_pool: asyncpg.Pool) -> None:
     """Unknown deck_id → 404 (deck_not_found is checked before card)."""
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     async with db_pool.acquire() as conn:
         ds_id = await conn.fetchval(
             "SELECT id FROM cards WHERE scryfall_id = $1", DOUBLING_SEASON_SCRYFALL_ID

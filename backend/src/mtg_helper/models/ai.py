@@ -113,7 +113,7 @@ class DescribeResponse(BaseModel):
 
 
 class KeywordExtractRequest(BaseModel):
-    """Request body for the EDHREC theme-extracting deck agent."""
+    """Request body for the Moxfield hub theme-extracting deck agent."""
 
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
@@ -487,7 +487,7 @@ class CommanderCoachStartResponse(BaseModel):
 class KeywordExtractResponse(BaseModel):
     """Response from the keyword-extracting deck agent.
 
-    ``archetype_tags`` is the running set of canonical EDHREC theme tags the
+    ``archetype_tags`` is the running set of canonical Moxfield hub theme tags the
     agent has inferred from the conversation.
     """
 
@@ -500,7 +500,7 @@ class KeywordExtractResponse(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_known_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Accept EDHREC-style deck theme tags; preserve order."""
+        """Accept Moxfield hub theme tags; preserve order."""
         return _dedupe_tag_shape(value)
 
 
@@ -525,7 +525,7 @@ class CommanderSuggestIntent(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Keep EDHREC-style deck theme tags; DB sanitization checks catalog membership."""
+        """Keep Moxfield hub theme tags; DB sanitization checks catalog membership."""
         return _dedupe_tag_shape(value)
 
     @field_validator("mechanic_tags", mode="after")

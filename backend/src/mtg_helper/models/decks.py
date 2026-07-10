@@ -89,7 +89,7 @@ class DeckCardItem(BaseModel):
     qualifying_stages: list[str] = Field(default_factory=list)
     role_reasons: dict[str, list[str]] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
-    edhrec_tags: list[str] = Field(default_factory=list)
+    hub_tags: list[str] = Field(default_factory=list)
     mtgjson_tags: list[str] = Field(default_factory=list)
     power: int | None = None
     price_eur_cents: int | None = None
@@ -112,7 +112,7 @@ class CommanderCardSummary(BaseModel):
     color_identity: list[str] = Field(default_factory=list)
     power: int | None = None
     tags: list[str] = Field(default_factory=list)
-    edhrec_tags: list[str] = Field(default_factory=list)
+    hub_tags: list[str] = Field(default_factory=list)
     mtgjson_tags: list[str] = Field(default_factory=list)
     game_changer: bool = False
 

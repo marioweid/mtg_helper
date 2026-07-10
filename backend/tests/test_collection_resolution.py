@@ -1,6 +1,5 @@
 """Tests for deck-level suggestion_collection_ids resolution."""
 
-from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import asyncpg
@@ -14,22 +13,6 @@ from tests.conftest import (
     SOL_RING_SCRYFALL_ID,
     create_test_account,
 )
-
-
-def _make_ai_client() -> MagicMock:
-    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
-        return [[0.0] * 1536 for _ in texts]
-
-    ai = MagicMock()
-    ai.embed = AsyncMock(side_effect=_embed)
-    return ai
-
-
-def _set_qdrant_empty() -> None:
-    mock = MagicMock()
-    mock.search = AsyncMock(return_value=[])
-    app.state.qdrant_client = mock
-
 
 async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
     async with pool.acquire() as conn:
@@ -93,8 +76,6 @@ async def _reset_card_tags(db_pool: asyncpg.Pool):
 async def test_no_deck_filter_no_request_override_returns_unfiltered(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -112,8 +93,6 @@ async def test_no_deck_filter_no_request_override_returns_unfiltered(
 async def test_deck_suggestion_collection_ids_restricts_suggestions(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -131,8 +110,6 @@ async def test_deck_suggestion_collection_ids_restricts_suggestions(
 
 
 async def test_multiple_collections_form_union(client: AsyncClient, db_pool: asyncpg.Pool) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -156,8 +133,6 @@ async def test_multiple_collections_form_union(client: AsyncClient, db_pool: asy
 async def test_request_collection_ids_override_deck_selection(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 
@@ -180,8 +155,6 @@ async def test_request_collection_ids_override_deck_selection(
 async def test_empty_request_collection_ids_disables_filter(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    app.state.ai_client = _make_ai_client()
-    _set_qdrant_empty()
     await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
 

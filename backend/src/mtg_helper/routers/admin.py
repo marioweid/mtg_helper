@@ -17,7 +17,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from mtg_helper.db import apply_schema
-from mtg_helper.services import edhrec_tag_catalog_service, feature_flag_service, mtgjson, scryfall
+from mtg_helper.services import feature_flag_service, moxfield_hub_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
     JobState,
@@ -83,14 +83,20 @@ async def sync_mtgjson(request: Request) -> dict[str, Any]:
     return _response(job)
 
 
-@router.post("/admin/sync-edhrec-tags", status_code=202)
-async def sync_edhrec_tags(request: Request) -> dict[str, Any]:
-    """Refresh the local EDHREC tag catalog as a background task."""
+@router.post("/admin/sync-moxfield-hubs", status_code=202)
+async def sync_moxfield_hubs(request: Request) -> dict[str, Any]:
+    """Refresh Moxfield hub catalog and card membership as a background task."""
     job = _registry(request).tag
     _ensure_idle(job)
     start(job)
     asyncio.create_task(
-        _wrap(job, edhrec_tag_catalog_service.sync_edhrec_tags(request.app.state.db_pool))
+        _wrap(
+            job,
+            moxfield_hub_service.sync_hub_card_stats(
+                request.app.state.db_pool,
+                progress=make_progress_cb(job),
+            ),
+        )
     )
     return _response(job)
 
@@ -131,13 +137,16 @@ async def _run_refresh_all(app: FastAPI, job: JobState) -> dict[str, Any]:
     cb("applying schema", 1, 1)
     scryfall_result = await scryfall.run_sync(app.state.db_pool, progress=cb)
     mtgjson_result = await mtgjson.run_sync(app.state.db_pool, progress=cb)
-    edhrec_result = await edhrec_tag_catalog_service.sync_edhrec_tags(app.state.db_pool)
+    moxfield_hub_result = await moxfield_hub_service.sync_hub_card_stats(
+        app.state.db_pool, progress=cb
+    )
     tag_result = await run_batch_tag(app.state.db_pool, progress=cb)
     return {
         "cards_processed": scryfall_result.get("cards_processed"),
         "mtgjson_cards_processed": mtgjson_result.get("mtgjson_cards_processed"),
         "mtgjson_keywords_processed": mtgjson_result.get("mtgjson_keywords_processed"),
-        "edhrec_tags_processed": edhrec_result.get("edhrec_tags_processed"),
+        "moxfield_hubs_processed": moxfield_hub_result.get("moxfield_hubs_processed"),
+        "moxfield_hub_cards_matched": moxfield_hub_result.get("moxfield_hub_cards_matched"),
         "cards_tagged": tag_result.get("cards_tagged"),
     }
 

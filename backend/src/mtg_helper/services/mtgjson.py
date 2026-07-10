@@ -3,7 +3,7 @@
 Downloads MTGJSON AllPrintings, extracts metadata that is useful for comparing
 against our Scryfall-derived card rows, stores it in a sidecar table, and returns
 a diff summary. MTGJSON keywords are used as optional exact mechanic filters;
-EDHREC-style tags remain the primary Commander deckbuilding vocabulary.
+Moxfield hub tags are the primary Commander deckbuilding vocabulary.
 """
 
 import io

@@ -2,9 +2,8 @@
 
 The LLM calls this with structural filters (types, tags, CMC, price); the
 backend always overlays the deck's color identity so suggestions cannot
-escape it. Reads from the ``cards`` table directly; semantic queries fall
-through to ``retrieval_service.retrieve_candidates`` when ``text_query`` is
-set.
+escape it. Reads from the ``cards`` table directly and routes text queries
+through ``retrieval_service.retrieve_candidates``.
 """
 
 import asyncpg

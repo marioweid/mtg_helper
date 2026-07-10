@@ -35,7 +35,6 @@ from mtg_helper.services.retrieval_service import (
     retrieve_candidates,
     stage_retrieval_query,
 )
-from mtg_helper.services.tag_service import normalize_edhrec_tags
 
 _log = logging.getLogger(__name__)
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
@@ -51,14 +50,12 @@ _SIGNAL_LABELS: dict[str, str] = {
 
 # User-facing labels for the *source* badges shown on every suggestion card.
 # Distinct from ``_SIGNAL_LABELS`` (which feed banger highlight reasons): these
-# are the simple "where did this come from?" chips and cover signals beyond the
-# original three (edhrec, moxfield, type filter).
+# are the simple "where did this come from?" chips.
 _SOURCE_LABELS: dict[str, str] = {
     "tag": "Tags",
     "fts": "Text",
-    "edhrec": "EDHREC",
-    "edhrec_theme": "EDHREC Theme",
-    "moxfield": "Moxfield",
+    "hub": "Moxfield Hub",
+    "top_commander_pick": "Top Commander Pick",
     "type": "Type",
 }
 
@@ -67,11 +64,8 @@ _BANGER_SCORE_THRESHOLD = 0.6
 _BANGER_MIN_SIGNALS = 2
 
 # Inclusion-weight thresholds that promote a card to the "hot" set even when
-# it doesn't meet the multi-signal banger rule. EDHREC weights are the per-
-# category boost (highsynergycards = 1.00, topcards = 0.85, etc.); 0.7 captures
-# the strongest categories. Moxfield weights are ``count / _TOP_DECKS`` (10),
-# so 0.5 means the card is in 5+ of the top-liked decks for the commander.
-_HOT_EDHREC_THRESHOLD = 0.7
+# it doesn't meet the multi-signal banger rule.
+_HOT_HUB_THRESHOLD = 0.7
 _HOT_MOXFIELD_THRESHOLD = 0.5
 
 
@@ -84,8 +78,7 @@ def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
 
     Triggers (any one is enough):
       * Multi-signal top hit: ≥2 retrieval signals AND composite score ≥ 0.6.
-      * Hot on EDHREC: inclusion weight ≥ ``_HOT_EDHREC_THRESHOLD`` — present
-        in EDHREC's strong categories (highsynergy / topcards / combos).
+      * Strong Moxfield hub fit: inclusion weight >= ``_HOT_HUB_THRESHOLD``.
       * In majority of top Moxfield decks: weight ≥ ``_HOT_MOXFIELD_THRESHOLD``
         — appears in at least half of the cached top-liked Moxfield decks.
 
@@ -101,8 +94,8 @@ def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
     if enough_signals and candidate.score >= _BANGER_SCORE_THRESHOLD:
         reasons.extend(_SIGNAL_LABELS[s] for s in candidate.signals if s in _SIGNAL_LABELS)
 
-    if candidate.edhrec_weight >= _HOT_EDHREC_THRESHOLD:
-        reasons.append("Hot on EDHREC")
+    if candidate.hub_weight >= _HOT_HUB_THRESHOLD:
+        reasons.append("Strong Moxfield hub fit")
     if candidate.moxfield_weight >= _HOT_MOXFIELD_THRESHOLD:
         reasons.append("In majority of top Moxfield decks")
 
@@ -154,7 +147,7 @@ def card_from_retrieved(
         if label:
             parts.append(label)
     if card.edhrec_rank and card.edhrec_rank < 1000:
-        parts.append(f"EDHREC rank {card.edhrec_rank}")
+        parts.append(f"Popularity rank {card.edhrec_rank}")
     reasoning = ". ".join(parts) if parts else "Relevant to stage"
 
     cmc_float: float | None = float(card.cmc) if card.cmc is not None else None
@@ -473,6 +466,13 @@ def _resolve_price_filter(max_cents: int | None, min_cents: int | None) -> Price
     return PriceFilter(max_cents=cap, min_cents=floor)
 
 
+def _normalize_hub_tag(tag: str | None) -> str | None:
+    """Normalize a selected Moxfield hub tag id without aliases."""
+    if not tag:
+        return None
+    return tag.strip().lower().replace("-", "_")
+
+
 async def build_stage(
     pool: asyncpg.Pool,
     deck_id: UUID,
@@ -536,14 +536,14 @@ async def build_stage(
     all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
 
     query_text, base_tags = stage_retrieval_query(resolved_stage, deck.description)
-    deck_archetype_tags = normalize_edhrec_tags(list(deck.archetype_tags or []))
-    required_edhrec_tag: str | None = None
-    excluded_edhrec_tags: frozenset[str] | None = None
+    deck_archetype_tags = list(deck.archetype_tags or [])
+    required_hub_tag: str | None = None
+    excluded_hub_tags: frozenset[str] | None = None
     if resolved_stage == "theme" and deck_archetype_tags:
-        normalized_theme_tag = normalize_edhrec_tags([theme_tag])[0] if theme_tag else None
+        normalized_theme_tag = _normalize_hub_tag(theme_tag) if theme_tag else None
         if theme_tag == _THEME_ETC_TAG:
             query_tags = base_tags
-            excluded_edhrec_tags = frozenset(deck_archetype_tags)
+            excluded_hub_tags = frozenset(deck_archetype_tags)
             query_text = f"{query_text} commander staples support"
         else:
             if normalized_theme_tag not in deck_archetype_tags:
@@ -556,7 +556,7 @@ async def build_stage(
                 )
             active_theme_tag = normalized_theme_tag
             query_tags = [active_theme_tag]
-            required_edhrec_tag = active_theme_tag
+            required_hub_tag = active_theme_tag
             query_text = f"{query_text} {active_theme_tag.replace('_', ' ')}"
         prefer_keywords = True
     elif deck_archetype_tags:
@@ -602,8 +602,8 @@ async def build_stage(
         bracket=deck.bracket,
         type_filter=type_filter,
         prefer_keywords=prefer_keywords,
-        required_edhrec_tag=required_edhrec_tag,
-        excluded_edhrec_tags=excluded_edhrec_tags,
+        required_hub_tag=required_hub_tag,
+        excluded_hub_tags=excluded_hub_tags,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
 

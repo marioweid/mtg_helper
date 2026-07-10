@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS cards (
     released_at     DATE,
     edhrec_rank     INTEGER,
     tags            TEXT[] NOT NULL DEFAULT '{}',
-    edhrec_tags      TEXT[] NOT NULL DEFAULT '{}',
+    hub_tags        TEXT[] NOT NULL DEFAULT '{}',
     mtgjson_tags     TEXT[] NOT NULL DEFAULT '{}',
     traits          TEXT[] NOT NULL DEFAULT '{}',
     card_types      TEXT[] NOT NULL DEFAULT '{}',
@@ -124,19 +124,42 @@ CREATE INDEX IF NOT EXISTS idx_mtgjson_keywords_category
     ON mtgjson_keywords (category, label);
 
 -- ============================================================
--- EDHREC TAG / THEME CATALOG
+-- MOXFIELD HUB CATALOG + CARD MEMBERSHIP
 -- ============================================================
-CREATE TABLE IF NOT EXISTS edhrec_tags (
-    slug          TEXT PRIMARY KEY,
-    tag           TEXT UNIQUE NOT NULL,
-    label         TEXT NOT NULL,
-    category      TEXT NOT NULL DEFAULT 'theme',
-    deck_count    INTEGER,
-    fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE TABLE IF NOT EXISTS moxfield_hubs (
+    id                INTEGER PRIMARY KEY,
+    slug              TEXT UNIQUE NOT NULL,
+    tag               TEXT UNIQUE NOT NULL,
+    name              TEXT NOT NULL,
+    description       TEXT,
+    shows_in_decklist BOOLEAN NOT NULL DEFAULT false,
+    active            BOOLEAN NOT NULL DEFAULT true,
+    first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    synced_at         TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_edhrec_tags_category
-    ON edhrec_tags (category, label);
+CREATE INDEX IF NOT EXISTS idx_moxfield_hubs_active_name
+    ON moxfield_hubs (active, name);
+
+CREATE TABLE IF NOT EXISTS moxfield_hub_card_stats (
+    hub_id               INTEGER NOT NULL REFERENCES moxfield_hubs(id) ON DELETE CASCADE,
+    card_id              UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    hub_deck_count       INTEGER NOT NULL,
+    baseline_deck_count  INTEGER NOT NULL,
+    hub_deck_pct         REAL NOT NULL,
+    baseline_deck_pct    REAL NOT NULL,
+    synergy_score        REAL NOT NULL,
+    hub_sample_size      INTEGER NOT NULL,
+    baseline_sample_size INTEGER NOT NULL,
+    fetched_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (hub_id, card_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_moxfield_hub_card_stats_card
+    ON moxfield_hub_card_stats (card_id);
+CREATE INDEX IF NOT EXISTS idx_moxfield_hub_card_stats_hub_score
+    ON moxfield_hub_card_stats (hub_id, synergy_score DESC);
 
 -- ============================================================
 -- ACCOUNTS
@@ -328,18 +351,19 @@ CREATE INDEX IF NOT EXISTS idx_collection_cards_card ON collection_cards(card_id
 -- ============================================================
 -- MIGRATIONS (idempotent column additions for existing DBs)
 -- ============================================================
+DROP VIEW IF EXISTS deck_detail_view;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS security_stamp TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS game_changer BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE cards ADD COLUMN IF NOT EXISTS edhrec_tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS hub_tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE cards DROP COLUMN IF EXISTS edhrec_tags;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS mtgjson_tags TEXT[] NOT NULL DEFAULT '{}';
-UPDATE cards SET edhrec_tags = tags WHERE cardinality(edhrec_tags) = 0 AND cardinality(tags) > 0;
 UPDATE cards
 SET mtgjson_tags = tags
 WHERE cardinality(mtgjson_tags) = 0
-  AND cardinality(edhrec_tags) = 0
+  AND cardinality(hub_tags) = 0
   AND cardinality(tags) > 0;
-CREATE INDEX IF NOT EXISTS idx_cards_edhrec_tags ON cards USING GIN (edhrec_tags);
+CREATE INDEX IF NOT EXISTS idx_cards_hub_tags ON cards USING GIN (hub_tags);
 CREATE INDEX IF NOT EXISTS idx_cards_mtgjson_tags ON cards USING GIN (mtgjson_tags);
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE deck_feedback ADD COLUMN IF NOT EXISTS reject_count INT NOT NULL DEFAULT 0;
@@ -439,17 +463,7 @@ BEGIN
 END $$;
 CREATE INDEX IF NOT EXISTS idx_decks_owner_email ON decks (lower(owner_email));
 
--- ============================================================
--- EDHREC COMMANDER RECOMMENDATIONS (cached per commander)
--- ============================================================
-CREATE TABLE IF NOT EXISTS edhrec_commander_recs (
-    commander_id  UUID PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
-    slug          TEXT NOT NULL,
-    payload       JSONB NOT NULL,
-    fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- New ranking weight: per-commander EDHREC inclusion. Heavy default.
+-- Commander-deck inclusion signal. Moxfield top commander decks are the source of truth.
 ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS deck_inclusion REAL NOT NULL DEFAULT 0.20;
 ALTER TABLE account_ranking_weights
@@ -465,27 +479,19 @@ CREATE TABLE IF NOT EXISTS moxfield_commander_recs (
     fetched_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Per-commander Moxfield top-decks inclusion weight. Heavy default so the
--- signal mirrors deck_inclusion (EDHREC) out of the box.
+-- Per-commander Moxfield top-decks inclusion weight.
 ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS moxfield_inclusion REAL NOT NULL DEFAULT 0.20;
 
--- Fraction of each result page reserved for EDHREC/Moxfield trusted cards.
+-- Fraction of each result page reserved for trusted Moxfield cards.
 -- 1.0 = historical "all trusted first"; lower values free slots for the
--- composite (semantic + keyword + FTS) channel so user-supplied chips matter.
+-- composite (keyword + tag + FTS) channel so user-supplied chips matter.
 ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS trusted_quota REAL NOT NULL DEFAULT 1.0;
 
--- ============================================================
--- EDHREC THEME / ARCHETYPE INDEX
--- ============================================================
-CREATE TABLE IF NOT EXISTS edhrec_theme_index (
-    slug         TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    source_type  TEXT NOT NULL DEFAULT 'theme',
-    payload      JSONB NOT NULL,
-    fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+DROP TABLE IF EXISTS edhrec_theme_index;
+DROP TABLE IF EXISTS edhrec_commander_recs;
+DROP TABLE IF EXISTS edhrec_tags;
 
 -- ============================================================
 -- FEATURE FLAGS (runtime toggles; admin-set overrides)
@@ -545,10 +551,7 @@ SELECT
     c.image_uri,
     c.rarity,
     c.tags,
-    CASE
-        WHEN cardinality(c.edhrec_tags) > 0 THEN c.edhrec_tags
-        ELSE c.tags
-    END           AS edhrec_tags,
+    c.hub_tags,
     c.mtgjson_tags,
     CASE
         WHEN (c.prices->>'eur') IS NULL THEN NULL

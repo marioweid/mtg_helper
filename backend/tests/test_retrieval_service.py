@@ -128,7 +128,7 @@ def _make_row(
     edhrec_rank: int | None = 100,
     cmc: float = 2.0,
     color_identity: list[str] | None = None,
-    edhrec_tags: list[str] | None = None,
+    hub_tags: list[str] | None = None,
     card_types: list[str] | None = None,
     traits: list[str] | None = None,
     type_line: str = "Creature",
@@ -140,7 +140,7 @@ def _make_row(
         "color_identity": color_identity or ["G", "B"],
         "type_line": type_line,
         "tags": [],
-        "edhrec_tags": edhrec_tags or [],
+        "hub_tags": hub_tags or [],
         "card_types": card_types or [],
         "subtypes": [],
         "keywords": [],
@@ -149,77 +149,55 @@ def _make_row(
     }
 
 
-def test_theme_rows_allow_normalized_edhrec_tag_membership() -> None:
+def test_theme_rows_allow_hub_tag_membership() -> None:
     rows = [
-        _make_row(_A, edhrec_tags=["artifacts"]),
-        _make_row(_B, edhrec_tags=["etb"]),
-        _make_row(_C, edhrec_tags=[]),
+        _make_row(_A, hub_tags=["artifacts"]),
+        _make_row(_B, hub_tags=["etb"]),
+        _make_row(_C, hub_tags=[]),
     ]
 
-    filtered = _filter_theme_rows(rows, required_edhrec_tag="artifacts")  # type: ignore[arg-type]
+    filtered = _filter_theme_rows(rows, required_hub_tag="artifacts")  # type: ignore[arg-type]
 
     assert [row["id"] for row in filtered] == [_A]
 
 
-def test_theme_rows_allow_legacy_draw_tag_in_card_draw_bucket() -> None:
+def test_theme_rows_requires_exact_hub_membership() -> None:
     rows = [
-        _make_row(_A, edhrec_tags=["draw"]),
-        _make_row(_B, edhrec_tags=["treasure"]),
+        _make_row(_A, hub_tags=["card_draw"]),
+        _make_row(_B, hub_tags=["draw"]),
     ]
 
-    filtered = _filter_theme_rows(rows, required_edhrec_tag="card_draw")  # type: ignore[arg-type]
+    filtered = _filter_theme_rows(rows, required_hub_tag="card_draw")  # type: ignore[arg-type]
 
     assert [row["id"] for row in filtered] == [_A]
 
 
-def test_theme_rows_allow_edhrec_theme_page_card() -> None:
+def test_theme_rows_allow_hub_stats_card() -> None:
     rows = [
-        _make_row(_A, edhrec_tags=[]),
-        _make_row(_B, edhrec_tags=["etb"]),
+        _make_row(_A, hub_tags=[]),
+        _make_row(_B, hub_tags=["etb"]),
     ]
 
     filtered = _filter_theme_rows(
         rows,  # type: ignore[arg-type]
-        required_edhrec_tag="artifacts",
+        required_hub_tag="artifacts",
         allowed_theme_ids=frozenset({_A}),
     )
 
     assert [row["id"] for row in filtered] == [_A]
 
 
-def test_theme_rows_allow_local_artifact_bucket_card() -> None:
-    rows = [
-        _make_row(_A, card_types=["Artifact"], type_line="Artifact Creature"),
-        _make_row(_B, card_types=["Creature"], type_line="Creature"),
-    ]
-
-    filtered = _filter_theme_rows(rows, required_edhrec_tag="artifacts")  # type: ignore[arg-type]
-
-    assert [row["id"] for row in filtered] == [_A]
-
-
-def test_theme_rows_allow_local_etb_trait_card() -> None:
-    rows = [
-        _make_row(_A, traits=["etb"]),
-        _make_row(_B, traits=[]),
-    ]
-
-    filtered = _filter_theme_rows(rows, required_edhrec_tag="etb")  # type: ignore[arg-type]
-
-    assert [row["id"] for row in filtered] == [_A]
-
-
 def test_theme_rows_etc_excludes_normalized_selected_card_tags() -> None:
     rows = [
-        _make_row(_A, edhrec_tags=["artifacts"]),
-        _make_row(_B, edhrec_tags=["etb"]),
-        _make_row(_C, edhrec_tags=["lifegain"]),
-        _make_row(_D, edhrec_tags=[]),
+        _make_row(_A, hub_tags=["artifacts"]),
+        _make_row(_B, hub_tags=["etb"]),
+        _make_row(_C, hub_tags=["lifegain"]),
+        _make_row(_D, hub_tags=[]),
     ]
 
     filtered = _filter_theme_rows(
         rows,  # type: ignore[arg-type]
-        excluded_edhrec_tags=frozenset({"artifacts", "etb"}),
+        excluded_hub_tags=frozenset({"artifacts", "etb"}),
     )
 
     assert [row["id"] for row in filtered] == [_C, _D]
@@ -227,13 +205,13 @@ def test_theme_rows_etc_excludes_normalized_selected_card_tags() -> None:
 
 def test_theme_rows_etc_excludes_selected_theme_page_ids() -> None:
     rows = [
-        _make_row(_A, edhrec_tags=[]),
-        _make_row(_B, edhrec_tags=[]),
+        _make_row(_A, hub_tags=[]),
+        _make_row(_B, hub_tags=[]),
     ]
 
     filtered = _filter_theme_rows(
         rows,  # type: ignore[arg-type]
-        excluded_edhrec_tags=frozenset({"artifacts"}),
+        excluded_hub_tags=frozenset({"artifacts"}),
         excluded_theme_ids=frozenset({_A}),
     )
 
@@ -289,7 +267,7 @@ def test_representation_signal_annotation() -> None:
     assert signal_map[_B] == ["representation"]
 
 
-def test_weighted_score_higher_qdrant_wins() -> None:
+def test_weighted_score_higher_composite_wins() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     scores = _compute_weighted_scores(
         [_A, _B],
@@ -305,7 +283,7 @@ def test_weighted_score_higher_qdrant_wins() -> None:
 
 def test_weighted_score_fts_boosts_synergy() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
-    # Same qdrant score; _A is also in FTS
+    # Same base score; _A is also in FTS.
     scores = _compute_weighted_scores(
         [_A, _B],
         tag_overlaps={},
@@ -367,7 +345,7 @@ def test_weighted_score_skips_missing_rows() -> None:
     assert _B not in scores
 
 
-def test_weighted_score_edhrec_inclusion_boosts_card() -> None:
+def test_weighted_score_hub_inclusion_boosts_card() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     scores = _compute_weighted_scores(
         [_A, _B],
@@ -377,7 +355,7 @@ def test_weighted_score_edhrec_inclusion_boosts_card() -> None:
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
-        edhrec_inclusion={_A: 1.0},
+        hub_inclusion={_A: 1.0},
     )
     assert scores[_A] > scores[_B]
 
@@ -397,7 +375,7 @@ def test_weighted_score_moxfield_inclusion_boosts_card() -> None:
     assert scores[_A] > scores[_B]
 
 
-def test_weighted_score_edhrec_inclusion_none_is_noop() -> None:
+def test_weighted_score_hub_inclusion_none_is_noop() -> None:
     rows = {_A: _make_row(_A), _B: _make_row(_B)}
     base = _compute_weighted_scores(
         [_A, _B],
@@ -416,7 +394,7 @@ def test_weighted_score_edhrec_inclusion_none_is_noop() -> None:
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
         feedback_weights=None,
-        edhrec_inclusion=None,
+        hub_inclusion=None,
     )
     assert base == explicit_none
 
@@ -428,15 +406,15 @@ def _ids(prefix: str, count: int) -> list[UUID]:
     return [UUID(f"{prefix}{i:04x}-0000-0000-0000-000000000000") for i in range(count)]
 
 
-def test_trusted_quota_reserves_low_scoring_edhrec_cards() -> None:
+def test_trusted_quota_reserves_low_scoring_hub_cards() -> None:
     semantic = _ids("aaaa", 30)
     trusted = _ids("bbbb", 8)
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
     scores.update({uid: 0.30 + i * 0.001 for i, uid in enumerate(trusted)})
     cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
-    edhrec = {uid: 0.9 for uid in trusted}
+    hub = {uid: 0.9 for uid in trusted}
 
-    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=20)
+    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=20)
 
     assert len(top) == 20
     assert set(trusted).issubset(set(top)), "all trusted cards must survive truncation"
@@ -480,9 +458,9 @@ def test_trusted_quota_composite_fills_remainder() -> None:
     scores = {uid: 0.5 for uid in trusted}
     scores.update({uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)})
     cards_by_id = {uid: {"id": uid} for uid in [*trusted, *semantic]}
-    edhrec = {uid: 0.7 for uid in trusted}
+    hub = {uid: 0.7 for uid in trusted}
 
-    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=8)
+    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=8)
 
     assert len(top) == 8
     assert set(trusted).issubset(set(top))
@@ -497,11 +475,11 @@ def test_trusted_quota_skips_zero_score_cards() -> None:
     scores = {uid: 0.5 for uid in semantic}
     scores.update({uid: 0.0 for uid in trusted})  # zeroed by strict type filter
     cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
-    edhrec = {uid: 0.9 for uid in trusted}
+    hub = {uid: 0.9 for uid in trusted}
 
     # limit=5 forces composite truncation: zeroed trusted cards rank last and
     # are dropped because the quota pass excludes score==0 entries.
-    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=5)
+    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=5)
 
     assert set(top) == set(semantic), "zeroed trusted cards must not survive"
 
@@ -520,9 +498,9 @@ def test_trusted_quota_picks_highest_inclusion_first() -> None:
     trusted = _ids("bbbb", 4)
     scores = {uid: 0.1 for uid in trusted}
     cards_by_id = {uid: {"id": uid} for uid in trusted}
-    edhrec = {trusted[0]: 0.2, trusted[1]: 0.9, trusted[2]: 0.5, trusted[3]: 0.7}
+    hub = {trusted[0]: 0.2, trusted[1]: 0.9, trusted[2]: 0.5, trusted[3]: 0.7}
 
-    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=4)
+    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=4)
 
     # quota = 4 // 2 = 2; should pick trusted[1] (0.9) and trusted[3] (0.7) first
     assert top[:2] == [trusted[1], trusted[3]]
@@ -532,9 +510,9 @@ def test_trusted_quota_limit_zero_returns_empty() -> None:
     trusted = _ids("bbbb", 3)
     scores = {uid: 0.5 for uid in trusted}
     cards_by_id = {uid: {"id": uid} for uid in trusted}
-    edhrec = {uid: 0.9 for uid in trusted}
+    hub = {uid: 0.9 for uid in trusted}
 
-    assert _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=0) == []
+    assert _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=0) == []
 
 
 def test_trusted_quota_half_split_reserves_half_for_composite() -> None:
@@ -582,9 +560,9 @@ def test_trusted_quota_skips_cards_missing_from_db() -> None:
     # so neither scores nor cards_by_id have entries for the filtered-out trusted.
     scores = {uid: 0.5 for uid in semantic}
     cards_by_id = {uid: {"id": uid} for uid in semantic}
-    edhrec = {uid: 0.9 for uid in trusted}
+    hub = {uid: 0.9 for uid in trusted}
 
-    top = _apply_trusted_quota(scores, edhrec, {}, cards_by_id, limit=10)
+    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=10)
 
     assert set(top) == set(semantic)
 

@@ -20,21 +20,11 @@ class Settings(BaseSettings):
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
     mtgjson_all_printings_url: str = "https://mtgjson.com/api/v5/AllPrintings.json.zip"
     mtgjson_keywords_url: str = "https://mtgjson.com/api/v5/Keywords.json"
-    edhrec_base_url: str = "https://json.edhrec.com/pages/commanders"
     moxfield_base_url: str = "https://api2.moxfield.com"
     archidekt_base_url: str = "https://archidekt.com/api"
 
-    # Qdrant vector search
-    qdrant_url: str = "http://qdrant:6333"
-    qdrant_collection: str = "mtg_cards"
-
     # LLM
     chat_model: str = "gemini-2.5-flash"
-
-    # Embeddings
-    embedding_model: str = "gemini-embedding-001"
-    embedding_dimensions: int = 1536
-    embedding_batch_size: int = 100
 
     # Pagination defaults
     default_limit: int = 20

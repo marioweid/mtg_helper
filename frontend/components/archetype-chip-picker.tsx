@@ -10,7 +10,7 @@ interface Props {
   onChange: (next: string[]) => void;
   suggested?: string[];
   onMechanicTagsLoaded?: (tags: string[]) => void;
-  onEdhrecTagsLoaded?: (tags: string[]) => void;
+  onHubTagsLoaded?: (tags: string[]) => void;
 }
 
 export function ArchetypeChipPicker({
@@ -18,25 +18,25 @@ export function ArchetypeChipPicker({
   onChange,
   suggested,
   onMechanicTagsLoaded,
-  onEdhrecTagsLoaded,
+  onHubTagsLoaded,
 }: Props) {
-  const [edhrecGroups, setEdhrecGroups] = useState<KeywordGroup[] | null>(null);
+  const [hubGroups, setHubGroups] = useState<KeywordGroup[] | null>(null);
   const [keywordGroups, setKeywordGroups] = useState<KeywordGroup[] | null>(null);
   const [keywordError, setKeywordError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setKeywordError(null);
-    Promise.all([apiClient.listEdhrecTags(), apiClient.listOfficialKeywords()])
-      .then(([edhrec, mechanics]) => {
+    Promise.all([apiClient.listHubTags(), apiClient.listOfficialKeywords()])
+      .then(([hubs, mechanics]) => {
         if (!cancelled) {
-          setEdhrecGroups(edhrec);
+          setHubGroups(hubs);
           setKeywordGroups(mechanics);
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setEdhrecGroups([]);
+          setHubGroups([]);
           setKeywordGroups([]);
           setKeywordError(err instanceof Error ? err.message : "Failed to load tags.");
         }
@@ -49,16 +49,16 @@ export function ArchetypeChipPicker({
   const selected = useMemo(() => new Set(value), [value]);
   const suggestedSet = useMemo(() => new Set(suggested ?? []), [suggested]);
   const labels = useMemo(() => {
-    const entries = [...(edhrecGroups ?? []), ...(keywordGroups ?? [])].flatMap((group) =>
+    const entries = [...(hubGroups ?? []), ...(keywordGroups ?? [])].flatMap((group) =>
       group.keywords.map((keyword) => [keyword.tag, keyword.label] as const),
     );
     return new Map<string, string>(entries);
-  }, [edhrecGroups, keywordGroups]);
+  }, [hubGroups, keywordGroups]);
 
   useEffect(() => {
-    if (edhrecGroups === null) return;
-    onEdhrecTagsLoaded?.(edhrecGroups.flatMap((group) => group.keywords.map((kw) => kw.tag)));
-  }, [edhrecGroups, onEdhrecTagsLoaded]);
+    if (hubGroups === null) return;
+    onHubTagsLoaded?.(hubGroups.flatMap((group) => group.keywords.map((kw) => kw.tag)));
+  }, [hubGroups, onHubTagsLoaded]);
 
   useEffect(() => {
     if (keywordGroups === null) return;
@@ -75,8 +75,8 @@ export function ArchetypeChipPicker({
 
   return (
     <div className="space-y-6">
-      {(edhrecGroups === null || keywordGroups === null) && (
-        <p className="text-sm text-gray-500">Loading EDHREC themes...</p>
+      {(hubGroups === null || keywordGroups === null) && (
+        <p className="text-sm text-gray-500">Loading themes...</p>
       )}
       {keywordError && <p className="text-sm text-red-600">{keywordError}</p>}
       {value.length > 0 && (
@@ -98,7 +98,7 @@ export function ArchetypeChipPicker({
           </div>
         </section>
       )}
-      {(edhrecGroups ?? []).map((group) => (
+      {(hubGroups ?? []).map((group) => (
         <section key={group.category}>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
             {group.display_name}

@@ -206,7 +206,6 @@ async def test_analyze_returns_structured_response(mock_pool: MagicMock) -> None
     with agent.override(model=FunctionModel(_final_response)):
         result = await sas.analyze_simulation(
             pool=mock_pool,
-            ai_client=MagicMock(),
             deck=_make_deck(),
             stats=_make_stats(),
         )
@@ -228,7 +227,6 @@ async def test_analyze_runs_card_search_tool(
     with agent.override(model=FunctionModel(_tool_then_final)):
         result = await sas.analyze_simulation(
             pool=mock_pool,
-            ai_client=MagicMock(),
             deck=_make_deck(),
             stats=_make_stats(),
         )
@@ -251,7 +249,6 @@ async def test_analyze_handles_timeout(
     monkeypatch.setattr(agent, "run", _hang)
     result = await sas.analyze_simulation(
         pool=mock_pool,
-        ai_client=MagicMock(),
         deck=_make_deck(),
         stats=_make_stats(),
     )

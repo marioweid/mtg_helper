@@ -45,7 +45,7 @@ Rules:
 - Respect commander color identity; the tool enforces this.
 - Avoid cards already in the deck; the tool enforces this except basic lands.
 - For each upgrade, state the role and likely cut(s) it replaces.
-- Do not use Moxfield, EDHREC top-deck lists, or any decklist-copying source.
+- Do not use top-deck lists or any decklist-copying source.
 - For casual Bracket 2-3 decks, avoid pushing into tutor/combo/staple soup unless requested.
 - Prefer cards that connect to core signal lanes or repair thin lanes.
 - Return a diverse package mix: do not fill every candidate slot from one lane.

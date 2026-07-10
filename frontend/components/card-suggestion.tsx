@@ -27,8 +27,8 @@ function formatEur(cents: number | null): string {
 const SOURCE_CLASSES: Record<string, string> = {
   Tags: "bg-violet-900/40 text-violet-300",
   Text: "bg-sky-900/40 text-sky-300",
-  EDHREC: "bg-orange-900/40 text-orange-300",
-  Moxfield: "bg-cyan-900/40 text-cyan-300",
+  "Moxfield Hub": "bg-orange-900/40 text-orange-300",
+  "Top Commander Pick": "bg-cyan-900/40 text-cyan-300",
   Type: "bg-fuchsia-900/40 text-fuchsia-300",
 };
 

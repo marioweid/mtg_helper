@@ -26,7 +26,6 @@ from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestStats
 from mtg_helper.services.agents._model import make_google_model
 from mtg_helper.services.card_search_tool import search_cards
-from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
@@ -273,7 +272,6 @@ def _enforce_severity_floor(
 
 async def analyze_simulation(
     pool: asyncpg.Pool,
-    ai_client: LLMClient,  # noqa: ARG001 — kept for caller compatibility
     deck: DeckDetailResponse,
     stats: PlaytestStats,
 ) -> SimulationAnalysisResponse:

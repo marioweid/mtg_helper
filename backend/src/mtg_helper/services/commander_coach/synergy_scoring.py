@@ -1,6 +1,6 @@
 """Deterministic synergy scoring for Commander Coach upgrade discovery.
 
-The scorer is intentionally independent from Moxfield/EDHREC decklists. It uses
+The scorer is intentionally independent from external decklists. It uses
 only card text, deck identity, role budgets, and package density so suggestions
 are theme-correct without copying external lists.
 """

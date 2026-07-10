@@ -12,7 +12,6 @@ dependencies = [
     "curl_cffi==0.15.0",
     "google-genai==1.73.1",
     "google-auth==2.49.2",
-    "qdrant-client==1.9.2",
     "pydantic-ai-slim[google]==1.71.0",
     "logfire[fastapi,httpx,pydantic-ai]>=4.0.0,<5",
 ]

@@ -10,7 +10,7 @@ def test_derive_builder_roles_counts_wheels_as_card_draw() -> None:
     assert roles.reasons == {"draw": ["wheels"]}
 
 
-def test_derive_builder_roles_uses_edhrec_and_mtgjson_tags() -> None:
+def test_derive_builder_roles_uses_hub_and_mtgjson_tags() -> None:
     roles = derive_builder_roles(["control"], ["cycling"], "Instant")
 
     assert roles.roles == ["draw", "interaction"]

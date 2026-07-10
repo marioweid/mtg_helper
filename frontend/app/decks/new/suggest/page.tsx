@@ -74,7 +74,7 @@ export default function CommanderSuggestPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [intent, setIntent] = useState<CommanderSuggestIntent>(emptyIntent);
   const [commanders, setCommanders] = useState<CommanderSuggestion[]>([]);
-  const [edhrecTags, setEdhrecTags] = useState<string[]>([]);
+  const [hubTags, setHubTags] = useState<string[]>([]);
   const [mechanicTags, setMechanicTags] = useState<string[]>([]);
   const [stageTargets, setStageTargets] = useState<Record<string, number> | null>(null);
   const [suggestedName, setSuggestedName] = useState<string | null>(null);
@@ -152,9 +152,9 @@ export default function CommanderSuggestPage() {
         <BracketPanel intent={intent} onChange={rerank} />
         <KeywordPanel
           intent={intent}
-          edhrecTags={edhrecTags}
+          hubTags={hubTags}
           mechanicTags={mechanicTags}
-          onEdhrecTagsLoaded={setEdhrecTags}
+          onHubTagsLoaded={setHubTags}
           onMechanicTagsLoaded={setMechanicTags}
           onChange={rerank}
         />
@@ -346,32 +346,32 @@ function BracketPanel({ intent, onChange }: { intent: CommanderSuggestIntent; on
 
 function KeywordPanel({
   intent,
-  edhrecTags,
+  hubTags,
   mechanicTags,
-  onEdhrecTagsLoaded,
+  onHubTagsLoaded,
   onMechanicTagsLoaded,
   onChange,
 }: {
   intent: CommanderSuggestIntent;
-  edhrecTags: string[];
+  hubTags: string[];
   mechanicTags: string[];
-  onEdhrecTagsLoaded: (tags: string[]) => void;
+  onHubTagsLoaded: (tags: string[]) => void;
   onMechanicTagsLoaded: (tags: string[]) => void;
   onChange: Rerank;
 }) {
-  const edhrecSet = useMemo(() => new Set(edhrecTags), [edhrecTags]);
+  const hubSet = useMemo(() => new Set(hubTags), [hubTags]);
   const mechanicSet = useMemo(() => new Set(mechanicTags), [mechanicTags]);
   return (
     <section className={PANEL_CLASS}>
       <h2 className="mb-3 text-sm font-semibold text-white">Inferred themes</h2>
       <ArchetypeChipPicker
         value={[...intent.archetype_tags, ...intent.mechanic_tags]}
-        onEdhrecTagsLoaded={onEdhrecTagsLoaded}
+        onHubTagsLoaded={onHubTagsLoaded}
         onMechanicTagsLoaded={onMechanicTagsLoaded}
         onChange={(tags) =>
           onChange({
             ...intent,
-            archetype_tags: tags.filter((tag) => edhrecSet.has(tag)),
+            archetype_tags: tags.filter((tag) => hubSet.has(tag)),
             mechanic_tags: tags.filter((tag) => mechanicSet.has(tag)),
           })
         }

@@ -205,9 +205,10 @@ async def test_refresh_all_chains_sync_tag(
         phases_seen.append("mtgjson")
         return {"mtgjson_cards_processed": 3, "mtgjson_keywords_processed": 2}
 
-    async def _fake_edhrec(_pool: Any) -> dict[str, Any]:
-        phases_seen.append("edhrec")
-        return {"edhrec_tags_processed": 7}
+    async def _fake_hubs(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        progress("hubs", 7, 7)
+        phases_seen.append("hubs")
+        return {"moxfield_hubs_processed": 7, "moxfield_hub_cards_matched": 42}
 
     async def _fake_tag(_pool: Any, *, progress: Any) -> dict[str, Any]:
         progress("tagging", 5, 5)
@@ -218,7 +219,7 @@ async def test_refresh_all_chains_sync_tag(
     monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _fake_sync)
     monkeypatch.setattr("mtg_helper.routers.admin.mtgjson.run_sync", _fake_mtgjson)
     monkeypatch.setattr(
-        "mtg_helper.routers.admin.edhrec_tag_catalog_service.sync_edhrec_tags", _fake_edhrec
+        "mtg_helper.routers.admin.moxfield_hub_service.sync_hub_card_stats", _fake_hubs
     )
     monkeypatch.setattr("mtg_helper.routers.admin.run_batch_tag", _fake_tag)
 
@@ -232,11 +233,12 @@ async def test_refresh_all_chains_sync_tag(
             break
 
     assert status["status"] == "ok"
-    assert phases_seen == ["schema", "scryfall", "mtgjson", "edhrec", "tag"]
+    assert phases_seen == ["schema", "scryfall", "mtgjson", "hubs", "tag"]
     assert status["result"] == {
         "cards_processed": 5,
         "mtgjson_cards_processed": 3,
         "mtgjson_keywords_processed": 2,
-        "edhrec_tags_processed": 7,
+        "moxfield_hubs_processed": 7,
+        "moxfield_hub_cards_matched": 42,
         "cards_tagged": 5,
     }

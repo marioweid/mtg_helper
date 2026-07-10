@@ -11,7 +11,7 @@ _DEFAULT_POPULARITY: float = 0.10
 _DEFAULT_PERSONAL: float = 0.15
 _DEFAULT_DECK_INCLUSION: float = 0.20
 _DEFAULT_MOXFIELD_INCLUSION: float = 0.20
-# Fraction of each result page reserved for EDHREC/Moxfield trusted cards. The
+# Fraction of each result page reserved for trusted Moxfield cards. The
 # remainder is filled by composite (keyword + FTS) winners, giving
 # user-supplied chips a real exploration channel. 1.0 keeps the historical
 # "every trusted card first" behavior; 0.5 yields a 50/50 mix.

@@ -26,7 +26,7 @@ const DEFAULT_TRUSTED_QUOTA = 1.0;
 const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   semantic: "Keyword Match",
   synergy: "Tag Synergy",
-  popularity: "EDHREC Popularity",
+  popularity: "Global Popularity",
   personal: "Personal Feedback",
   deck_inclusion: "Used in Other Decks",
   moxfield_inclusion: "Moxfield Top Decks",
@@ -35,9 +35,9 @@ const WEIGHT_LABELS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
 const WEIGHT_DESCRIPTIONS: Record<keyof typeof DEFAULT_WEIGHTS, string> = {
   semantic: "Extra weight applied to keyword and tag-based card matches",
   synergy: "How many relevant tags a card shares with the deck",
-  popularity: "How often the card appears anywhere on EDHREC (global rank)",
+  popularity: "How popular the card is globally according to synced card metadata",
   personal: "Your accept/reject history for this deck",
-  deck_inclusion: "How often the card appears in EDHREC decks for your specific commander",
+  deck_inclusion: "How strongly the card fits selected Moxfield hub themes",
   moxfield_inclusion: "Cards from the most-liked Moxfield decks for this commander",
 };
 
@@ -315,8 +315,8 @@ export default function PreferencesPage() {
         <div className="mb-4">
           <h2 className="font-semibold text-white">Suggestion Mix</h2>
           <p className="mt-1 text-sm text-gray-400">
-            How much of each page is reserved for trusted EDHREC/Moxfield cards. Lower it to
-            give your EDHREC themes, mechanics, and deck description a real exploration channel.
+            How much of each page is reserved for trusted Moxfield cards. Lower it to give your
+            hub themes, mechanics, and deck description a real exploration channel.
           </p>
         </div>
         <div>
@@ -325,7 +325,7 @@ export default function PreferencesPage() {
               <span className="text-sm font-medium text-white">Trusted Card Quota</span>
               <p className="text-xs text-gray-500">
                 100% = every trusted card ranks first (legacy). 50% = half popularity-driven,
-                half keyword/semantic. 0% = pure composite ranking.
+                half keyword/tag matching. 0% = pure composite ranking.
               </p>
             </div>
             <span className="ml-4 w-10 text-right text-sm tabular-nums text-indigo-300">

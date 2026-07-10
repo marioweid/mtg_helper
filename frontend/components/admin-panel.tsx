@@ -10,7 +10,7 @@ const JOBS: { id: Job; label: string; path: string; description: string }[] = [
     id: "refresh-all",
     label: "Refresh all",
     path: "/api/v1/admin/refresh-all",
-    description: "Apply schema, sync Scryfall, MTGJSON, EDHREC tags, then re-tag cards.",
+    description: "Apply schema, sync Scryfall, MTGJSON, Moxfield hubs, then re-tag cards.",
   },
   {
     id: "sync",
@@ -20,9 +20,9 @@ const JOBS: { id: Job; label: string; path: string; description: string }[] = [
   },
   {
     id: "tag",
-    label: "Tag cards",
-    path: "/api/v1/admin/tag-cards",
-    description: "Re-classify cards with the rule-based tagger.",
+    label: "Sync hubs",
+    path: "/api/v1/admin/sync-moxfield-hubs",
+    description: "Refresh Moxfield hubs and rebuild theme card membership.",
   },
 ];
 

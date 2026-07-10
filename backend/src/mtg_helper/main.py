@@ -26,9 +26,8 @@ from mtg_helper.routers import (
     snapshots,
     tags,
 )
-from mtg_helper.services import edhrec_tag_catalog_service, mtgjson, scryfall
+from mtg_helper.services import moxfield_hub_service, mtgjson, scryfall
 from mtg_helper.services.admin_jobs import JobRegistry
-from mtg_helper.services.llm_client import LLMClient
 
 _log = logging.getLogger(__name__)
 
@@ -38,12 +37,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
     await apply_schema(app.state.db_pool)
-    app.state.ai_client = LLMClient(
-        api_key=settings.gemini_api_key,
-        chat_model=settings.chat_model,
-        embed_model=settings.embedding_model,
-        embed_dim=settings.embedding_dimensions,
-    )
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
     app.state.coach_jobs = {}
@@ -66,13 +59,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         except Exception:
             _log.exception("MTGJSON keyword sync failed on startup; continuing with fallback data")
 
-    edhrec_tag_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM edhrec_tags")
-    if edhrec_tag_count == 0:
-        _log.info("EDHREC tag catalog is empty - running initial tag sync")
+    hub_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM moxfield_hubs")
+    if hub_count == 0:
+        _log.info("Moxfield hub catalog is empty - running initial hub sync")
         try:
-            await edhrec_tag_catalog_service.ensure_edhrec_tags(app.state.db_pool)
+            await moxfield_hub_service.sync_hubs(app.state.db_pool)
         except Exception:
-            _log.exception("EDHREC tag sync failed on startup; continuing with fallback data")
+            _log.exception("Moxfield hub sync failed on startup; continuing without hub data")
 
     yield
     await close_pool(app.state.db_pool)

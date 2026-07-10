@@ -1,10 +1,10 @@
-"""Tag catalog endpoints for EDHREC themes and MTGJSON mechanics."""
+"""Tag catalog endpoints for Moxfield themes and MTGJSON mechanics."""
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import edhrec_tag_catalog_service
+from mtg_helper.services import moxfield_hub_service
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
@@ -63,9 +63,9 @@ async def list_official_keywords(request: Request) -> DataResponse[list[KeywordG
     )
 
 
-@router.get("/edhrec", response_model=DataResponse[list[KeywordGroup]])
-async def list_edhrec_tags(request: Request) -> DataResponse[list[KeywordGroup]]:
-    """Return the locally synced EDHREC deckbuilding tag catalog."""
+@router.get("/hubs", response_model=DataResponse[list[KeywordGroup]])
+async def list_moxfield_hubs(request: Request) -> DataResponse[list[KeywordGroup]]:
+    """Return the locally synced Moxfield hub catalog."""
     pool = request.app.state.db_pool
-    groups = await edhrec_tag_catalog_service.list_edhrec_tag_groups(pool)
+    groups = await moxfield_hub_service.list_hub_tag_groups(pool)
     return DataResponse(data=[KeywordGroup(**group) for group in groups])

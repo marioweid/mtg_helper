@@ -70,7 +70,7 @@ class CardRepresentation:
         _append_joined(parts, "Mechanical traits", self.traits)
         _append_joined(parts, "Produces tokens", self.token_types)
         if self.edhrec_rank is not None:
-            parts.append(f"EDHREC rank: {self.edhrec_rank}")
+            parts.append(f"Popularity rank: {self.edhrec_rank}")
         return " | ".join(parts)
 
 
@@ -116,7 +116,7 @@ def from_row(row: Any) -> CardRepresentation:
         keywords=list(row["keywords"] or []),
         card_types=list(row["card_types"] or []),
         subtypes=list(row["subtypes"] or []),
-        tags=list((row["edhrec_tags"] if "edhrec_tags" in row.keys() else row["tags"]) or []),
+        tags=list((row["hub_tags"] if "hub_tags" in row.keys() else row["tags"]) or []),
         traits=list(row["traits"] or []),
         token_types=list(row["token_types"] or []),
         mana_value=row["cmc"],

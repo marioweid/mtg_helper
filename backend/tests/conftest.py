@@ -23,22 +23,6 @@ TEST_DB_URL = os.environ.get(
 )
 
 
-def make_mock_llm_client() -> "object":
-    """Build a mock LLMClient with an async ``embed`` method.
-
-    Returns:
-        MagicMock whose ``.embed`` returns one 1536-dim zero vector per input.
-    """
-    from unittest.mock import AsyncMock, MagicMock
-
-    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
-        return [[0.0] * 1536 for _ in texts]
-
-    ai = MagicMock()
-    ai.embed = AsyncMock(side_effect=_embed)
-    return ai
-
-
 SCHEMA_PATH = Path(__file__).parent.parent / "src/mtg_helper/sql/schema.sql"
 
 # Known test cards (scryfall_id, name, color_identity, legality)
@@ -204,7 +188,8 @@ async def _reset_db(_init_db: None) -> None:
     try:
         await conn.execute(
             """
-            TRUNCATE feature_flags, edhrec_commander_recs, moxfield_commander_recs,
+            TRUNCATE feature_flags, moxfield_commander_recs, moxfield_hub_card_stats,
+                moxfield_hubs,
                 collection_cards, collections, account_ranking_weights,
                 deck_snapshot_cards, deck_snapshots, deck_coach_memory,
                 deck_feedback, preferences, deck_cards, decks, accounts CASCADE
@@ -217,7 +202,7 @@ async def _reset_db(_init_db: None) -> None:
             """,
             [str(card["scryfall_id"]) for card in _TEST_CARDS],
         )
-        await conn.execute("UPDATE cards SET tags = ARRAY[]::text[]")
+        await conn.execute("UPDATE cards SET tags = ARRAY[]::text[], hub_tags = ARRAY[]::text[]")
     finally:
         await conn.close()
     from mtg_helper.services import profile_service
@@ -252,8 +237,6 @@ async def client(
     tokens. Tests that need a different account use `create_test_account` or
     `set_current_account` to swap the override.
     """
-    from unittest.mock import AsyncMock, MagicMock
-
     from mtg_helper.auth import (
         get_current_account,
         get_current_admin,
@@ -266,15 +249,9 @@ async def client(
     async def _skip_recommendation_refresh(*_args: object) -> None:
         return None
 
-    monkeypatch.setattr(deck_service, "_safe_edhrec_refresh", _skip_recommendation_refresh)
     monkeypatch.setattr(deck_service, "_safe_moxfield_refresh", _skip_recommendation_refresh)
 
     app.state.db_pool = db_pool
-
-    mock_qdrant = MagicMock()
-    mock_qdrant.search = AsyncMock(return_value=[])
-    app.state.qdrant_client = mock_qdrant
-    app.state.ai_client = make_mock_llm_client()
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
     app.state.coach_jobs = {}

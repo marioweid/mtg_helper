@@ -176,8 +176,8 @@ def _row_to_candidate(row: asyncpg.Record) -> _Candidate:
         edhrec_rank=row["edhrec_rank"],
         game_changer=bool(row["game_changer"]),
     )
-    edhrec_tags = list(row["edhrec_tags"] or []) if "edhrec_tags" in row.keys() else []
-    tags = edhrec_tags or list(row["tags"] or [])
+    hub_tags = list(row["hub_tags"] or []) if "hub_tags" in row.keys() else []
+    tags = hub_tags or list(row["tags"] or [])
     return _Candidate(
         card=card,
         tags=tags,

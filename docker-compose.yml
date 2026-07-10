@@ -1,6 +1,6 @@
-# Local development stack: Postgres + Qdrant + backend (--reload) + frontend
+# Local development stack: Postgres + backend (--reload) + frontend
 # (pnpm dev). Source dirs are mounted for hot-reload; data lives in
-# Docker-managed named volumes (pgdata, qdrantdata).
+# Docker-managed named volumes (pgdata).
 #
 # Boot:        docker compose up -d --build
 # Tail logs:   docker compose logs -f backend frontend
@@ -10,16 +10,6 @@
 # a production frontend build, and weekly Scryfall sync. See docker-compose.prod.yml.
 
 services:
-  qdrant:
-    image: qdrant/qdrant:v1.17
-    restart: always
-    ports:
-      - 6333:6333
-      - 6334:6334
-    volumes:
-      - ./qdrant/production.yaml:/qdrant/config/production.yaml
-      - qdrantdata:/qdrant/storage
-
   postgres:
     image: postgres:16
     env_file:
@@ -54,8 +44,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      qdrant:
-        condition: service_started
     volumes:
       - ./backend/src:/app/src
 
@@ -79,4 +67,3 @@ services:
 
 volumes:
   pgdata:
-  qdrantdata:

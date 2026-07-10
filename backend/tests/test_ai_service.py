@@ -1,7 +1,6 @@
 """Tests for AI deck building endpoints."""
 
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 from httpx import AsyncClient
@@ -52,17 +51,6 @@ def _make_candidate(
         score=score,
         signals=signals,
     )
-
-
-def _make_ai_client() -> MagicMock:
-    """Build a mock LLMClient (embeddings only after the agent migration)."""
-
-    async def _embed(texts: list[str], **_: object) -> list[list[float]]:
-        return [[0.0] * 1536 for _ in texts]
-
-    ai = MagicMock()
-    ai.embed = AsyncMock(side_effect=_embed)
-    return ai
 
 
 async def _create_deck(client: AsyncClient) -> str:
@@ -125,7 +113,6 @@ def test_merge_type_filters_unions_categories_and_propagates_flags() -> None:
 
 async def test_build_stage_returns_200_with_valid_structure(client: AsyncClient) -> None:
     deck_id = await _create_deck(client)
-    app.state.ai_client = _make_ai_client()
 
     resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={})
 
@@ -140,7 +127,6 @@ async def test_build_stage_returns_200_with_valid_structure(client: AsyncClient)
 
 async def test_build_stage_advances_deck_stage(client: AsyncClient) -> None:
     deck_id = await _create_deck(client)
-    app.state.ai_client = _make_ai_client()
 
     await client.post(f"/api/v1/decks/{deck_id}/build", json={})
 
@@ -150,7 +136,6 @@ async def test_build_stage_advances_deck_stage(client: AsyncClient) -> None:
 
 
 async def test_build_stage_deck_not_found(client: AsyncClient) -> None:
-    app.state.ai_client = _make_ai_client()
     resp = await client.post(
         "/api/v1/decks/00000000-0000-0000-0000-000000000000/build",
         json={},
@@ -160,7 +145,6 @@ async def test_build_stage_deck_not_found(client: AsyncClient) -> None:
 
 async def test_build_stage_invalid_stage_returns_422(client: AsyncClient) -> None:
     deck_id = await _create_deck(client)
-    app.state.ai_client = _make_ai_client()
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/build",
         json={"stage": "not_a_valid_stage"},
@@ -171,7 +155,6 @@ async def test_build_stage_invalid_stage_returns_422(client: AsyncClient) -> Non
 async def test_build_stage_suggestion_fields_present(client: AsyncClient) -> None:
     """Each suggestion includes the expected fields from the new CardSuggestion model."""
     deck_id = await _create_deck(client)
-    app.state.ai_client = _make_ai_client()
 
     resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={})
     assert resp.status_code == 200
@@ -192,7 +175,6 @@ async def test_build_stage_suggestion_fields_present(client: AsyncClient) -> Non
 
 async def test_suggest_cards_returns_200(client: AsyncClient) -> None:
     deck_id = await _create_deck(client)
-    app.state.ai_client = _make_ai_client()
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -218,7 +200,6 @@ async def test_feedback_boosting_disabled_build_still_works(client: AsyncClient)
         json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "feedback": "down"},
     )
 
-    app.state.ai_client = _make_ai_client()
     resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={})
     assert resp.status_code == 200
 

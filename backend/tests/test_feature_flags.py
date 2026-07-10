@@ -156,14 +156,11 @@ async def test_optimize_blocked_when_disabled(client: AsyncClient) -> None:
 async def test_optimize_starts_when_enabled(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from unittest.mock import AsyncMock
-
     await _clear_flags(app.state.db_pool)
     deck_id = await _make_deck(client)
     await client.put("/api/v1/admin/feature-flags/optimizer", json={"enabled": True})
 
     app.state.optimizer_jobs = {}
-    app.state.ai_client = AsyncMock()
 
     async def _fake_run_search(*_args: object, **_kwargs: object) -> object:
         return object()
