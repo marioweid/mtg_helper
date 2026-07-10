@@ -93,6 +93,7 @@ async def sync_edhrec_tags(pool: asyncpg.Pool) -> dict[str, Any]:
     tags = await _fetch_tags()
     if not tags:
         tags = fallback_tags()
+    tags = _dedupe_by_tag(tags)
     async with pool.acquire() as conn:
         await _upsert_tags(conn, tags)
     return {"edhrec_tags_processed": len(tags)}
@@ -170,10 +171,10 @@ async def list_edhrec_tag_groups(pool: asyncpg.Pool) -> list[dict[str, Any]]:
 def fallback_tags() -> list[EDHRECTag]:
     """Curated EDHREC tag fallback covering current deckbuilding categories."""
     slugs = set(_FALLBACK_LABELS) | {slug for slugs in TAG_TO_THEME_SLUGS.values() for slug in slugs}
-    return [
+    return _dedupe_by_tag([
         EDHRECTag(slug=slug, tag=_slug_to_tag(slug), label=_FALLBACK_LABELS.get(slug, _label(slug)))
         for slug in sorted(slugs)
-    ]
+    ])
 
 
 async def _fetch_tags() -> list[EDHRECTag]:
@@ -209,19 +210,48 @@ def _parse_tags_html(markup: str) -> list[EDHRECTag]:
 
 
 async def _upsert_tags(conn: asyncpg.Connection, tags: list[EDHRECTag]) -> None:
-    await conn.executemany(
-        """
-        INSERT INTO edhrec_tags (slug, tag, label, category, deck_count, fetched_at)
-        VALUES ($1, $2, $3, $4, $5, now())
-        ON CONFLICT (slug) DO UPDATE SET
-            tag        = EXCLUDED.tag,
-            label      = EXCLUDED.label,
-            category   = EXCLUDED.category,
-            deck_count = EXCLUDED.deck_count,
-            fetched_at = now()
-        """,
-        [(tag.slug, tag.tag, tag.label, tag.category, tag.deck_count) for tag in tags],
-    )
+    rows = [(tag.slug, tag.tag, tag.label, tag.category, tag.deck_count) for tag in tags]
+    async with conn.transaction():
+        await conn.execute(
+            """
+            DELETE FROM edhrec_tags
+            WHERE slug = ANY($1::text[])
+               OR tag = ANY($2::text[])
+            """,
+            [tag.slug for tag in tags],
+            [tag.tag for tag in tags],
+        )
+        await conn.executemany(
+            """
+            INSERT INTO edhrec_tags (slug, tag, label, category, deck_count, fetched_at)
+            VALUES ($1, $2, $3, $4, $5, now())
+            ON CONFLICT (tag) DO UPDATE SET
+                slug       = EXCLUDED.slug,
+                tag        = EXCLUDED.tag,
+                label      = EXCLUDED.label,
+                category   = EXCLUDED.category,
+                deck_count = EXCLUDED.deck_count,
+                fetched_at = now()
+            """,
+            rows,
+        )
+
+
+def _dedupe_by_tag(tags: list[EDHRECTag]) -> list[EDHRECTag]:
+    """Keep one catalog item per canonical tag, preferring richer EDHREC data."""
+    by_tag: dict[str, EDHRECTag] = {}
+    for item in tags:
+        current = by_tag.get(item.tag)
+        if current is None or _tag_quality(item) > _tag_quality(current):
+            by_tag[item.tag] = item
+    return sorted(by_tag.values(), key=lambda item: item.label.lower())
+
+
+def _tag_quality(item: EDHRECTag) -> tuple[int, int, int]:
+    """Rank catalog duplicates by known count, curated label, then shorter slug."""
+    has_count = 1 if item.deck_count is not None else 0
+    known_label = 1 if item.slug in _FALLBACK_LABELS else 0
+    return (has_count, known_label, -len(item.slug))
 
 
 def _slug_to_tag(slug: str) -> str:
