@@ -66,6 +66,14 @@ def test_theme_slugs_for_tags_maps_legacy_draw_shape() -> None:
     assert theme_slugs_for_tags(["draw", "card_advantage", "card_draw"]) == ["card-draw"]
 
 
+def test_theme_slugs_for_tags_normalizes_display_labels() -> None:
+    assert theme_slugs_for_tags(["Card Draw", "Control", "Pingers"]) == [
+        "card-draw",
+        "control",
+        "pingers",
+    ]
+
+
 def test_theme_slugs_for_tags_maps_treasure_to_singular_slug() -> None:
     assert theme_slugs_for_tags(["treasure", "treasures", "treasure_matters"]) == ["treasure"]
 

@@ -18,7 +18,7 @@ def test_derive_builder_roles_uses_edhrec_and_mtgjson_tags() -> None:
 
 
 def test_derive_builder_roles_counts_lands_by_type() -> None:
-    roles = derive_builder_roles([], [], "Legendary Land")
+    roles = derive_builder_roles(["ramp"], [], "Legendary Land")
 
     assert roles.roles == ["lands"]
     assert roles.reasons == {"lands": ["type: land"]}

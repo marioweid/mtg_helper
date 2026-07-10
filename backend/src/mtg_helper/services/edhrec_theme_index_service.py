@@ -17,6 +17,7 @@ import asyncpg
 import httpx
 
 from mtg_helper.config import settings
+from mtg_helper.services.tag_service import normalize_edhrec_tags
 
 _log = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ TAG_TO_THEME_SLUGS: dict[str, tuple[str, ...]] = {
     "draw": ("card-draw",),
     "card_advantage": ("card-draw",),
     "cantrip": ("card-draw",),
+    "control": ("control",),
     "lands_matter": ("lands",),
     "self_mill": ("self-mill",),
 }
@@ -106,7 +108,7 @@ def theme_slugs_for_tags(tags: list[str]) -> list[str]:
     """Return EDHREC theme slugs matching our current deck tags."""
     seen: set[str] = set()
     slugs: list[str] = []
-    for tag in tags:
+    for tag in normalize_edhrec_tags(tags):
         fallback = (tag.replace("_", "-"),)
         for slug in TAG_TO_THEME_SLUGS.get(tag, fallback):
             if slug in seen:

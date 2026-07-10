@@ -81,7 +81,7 @@ def derive_builder_roles(
     reasons: dict[str, list[str]] = {}
 
     if "Land" in (type_line or ""):
-        reasons["lands"] = ["type: land"]
+        return BuilderRoles(roles=["lands"], reasons={"lands": ["type: land"]})
 
     for role, role_tags in _ROLE_TAGS.items():
         matched = sorted(tag_set & role_tags)
