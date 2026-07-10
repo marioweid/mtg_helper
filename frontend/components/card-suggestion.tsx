@@ -47,8 +47,12 @@ export function CardSuggestionCard({
 }: Props) {
   const isHot =
     suggestion.highlight_reasons != null && suggestion.highlight_reasons.length > 0;
+  const hotTitle = isHot
+    ? `Hot pick: ${suggestion.highlight_reasons?.join(", ")}`
+    : "Hot pick";
   const owned = suggestion.owned_in;
   const sources = suggestion.sources ?? [];
+  const isGameChanger = suggestion.game_changer;
 
   return (
     <div
@@ -72,7 +76,7 @@ export function CardSuggestionCard({
             {isHot && (
               <span
                 className="rounded-full bg-black/70 px-1.5 py-0.5 text-base backdrop-blur"
-                title={`Top pick: ${suggestion.highlight_reasons?.join(", ") ?? ""}`}
+                title={hotTitle}
               >
                 🔥
               </span>
@@ -109,8 +113,13 @@ export function CardSuggestionCard({
             <CardHover name={suggestion.name} imageUri={suggestion.image_uri}>
               {suggestion.name}
             </CardHover>
+            {isGameChanger && (
+              <span className="text-[10px] font-semibold text-amber-300" title="Game changer">
+                Game Changer
+              </span>
+            )}
             {isPetCard && <span className="text-red-400 text-xs" title="Pet card">♥</span>}
-            {isHot && <span title="Top pick">🔥</span>}
+            {isHot && <span title={hotTitle}>🔥</span>}
             {inCombo && <span title="Completes a potential combo">⚡</span>}
           </p>
           {suggestion.mana_cost && (
@@ -131,6 +140,14 @@ export function CardSuggestionCard({
         {/* Source chips */}
         {sources.length > 0 && (
           <div className="flex flex-wrap gap-1">
+            {isGameChanger && (
+              <span
+                className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+                title="Game changer"
+              >
+                Game Changer
+              </span>
+            )}
             {sources.map((s) => (
               <span
                 key={s}
@@ -141,6 +158,16 @@ export function CardSuggestionCard({
                 {s}
               </span>
             ))}
+          </div>
+        )}
+        {sources.length === 0 && isGameChanger && (
+          <div className="flex flex-wrap gap-1">
+            <span
+              className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+              title="Game changer"
+            >
+              Game Changer
+            </span>
           </div>
         )}
 

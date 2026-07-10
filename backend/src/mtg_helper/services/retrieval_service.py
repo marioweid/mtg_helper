@@ -122,6 +122,7 @@ class RetrievedCard:
     rarity: str | None
     price_eur_cents: int | None
     score: float
+    game_changer: bool = False
     signals: list[str] = field(default_factory=list)
     edhrec_weight: float = 0.0
     moxfield_weight: float = 0.0
@@ -1812,6 +1813,7 @@ async def retrieve_candidates(
                 toughness=row["toughness"],
                 rarity=row["rarity"],
                 price_eur_cents=row["price_eur_cents"],
+                game_changer=bool(row["game_changer"]),
                 score=scores[uid],
                 signals=signal_map.get(uid, []),
                 edhrec_weight=combined_edhrec.get(uid, 0.0),
@@ -1853,7 +1855,7 @@ async def _fetch_candidates(
                    END AS tags,
                    edhrec_tags,
                    mtgjson_tags,
-                   edhrec_rank, power, toughness, rarity,
+                   edhrec_rank, power, toughness, rarity, game_changer,
                    card_types, subtypes, keywords, traits, token_types,
                    CASE
                        WHEN (prices->>'eur') IS NULL THEN NULL

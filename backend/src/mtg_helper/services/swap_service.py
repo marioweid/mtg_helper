@@ -243,6 +243,7 @@ def _to_swap_candidate(
         owned_in=base.owned_in,
         qualifying_stages=base.qualifying_stages,
         sources=base.sources,
+        game_changer=base.game_changer,
         price_delta_cents=delta,
         function_loss_pct=max(0, min(100, loss_pct)),
         similarity_breakdown=breakdown,

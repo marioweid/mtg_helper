@@ -53,6 +53,7 @@ class CardSuggestion(BaseModel):
     owned_in: list[CollectionMembership] = Field(default_factory=list)
     qualifying_stages: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
+    game_changer: bool = False
 
 
 class BuildResponse(BaseModel):

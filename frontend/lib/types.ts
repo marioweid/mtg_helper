@@ -208,6 +208,7 @@ export interface CardSuggestion {
   owned_in: CollectionMembership[];
   qualifying_stages: string[];
   sources: string[];
+  game_changer: boolean;
 }
 
 export interface BuildResponse {

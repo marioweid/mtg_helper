@@ -182,6 +182,7 @@ def card_from_retrieved(
         owned_in=owned_in,
         qualifying_stages=qualifying_stages,
         sources=_sources_for(card),
+        game_changer=card.game_changer,
     )
 
 
