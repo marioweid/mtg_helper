@@ -229,9 +229,16 @@ _TRIBAL_SUBTYPES: tuple[str, ...] = (
 TAG_VOCAB_VERSION = 3
 
 _EDHREC_TAG_ALIASES: dict[str, str] = {
+    "artifact": "artifacts",
     "token": "tokens",
+    "draw": "card_draw",
+    "card_advantage": "card_draw",
+    "cantrip": "card_draw",
     "plus_one_counters": "plus_one_plus_one_counters",
+    "plus_one_plus_1_counters": "plus_one_plus_one_counters",
+    "plus_1_plus_1_counters": "plus_one_plus_one_counters",
     "treasure_matters": "treasure",
+    "treasures": "treasure",
     "food_matters": "food",
     "clue_matters": "clues",
     "infect_toxic": "infect",

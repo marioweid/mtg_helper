@@ -56,6 +56,20 @@ def test_theme_slugs_for_tags_maps_and_dedupes() -> None:
     ]
 
 
+def test_theme_slugs_for_tags_maps_legacy_plus_one_shape() -> None:
+    assert theme_slugs_for_tags(["plus_one_plus_1_counters"]) == [
+        "plus-1-plus-1-counters"
+    ]
+
+
+def test_theme_slugs_for_tags_maps_legacy_draw_shape() -> None:
+    assert theme_slugs_for_tags(["draw", "card_advantage", "card_draw"]) == ["card-draw"]
+
+
+def test_theme_slugs_for_tags_maps_treasure_to_singular_slug() -> None:
+    assert theme_slugs_for_tags(["treasure", "treasures", "treasure_matters"]) == ["treasure"]
+
+
 def test_normalize_payload_keeps_dynamic_categories() -> None:
     payload = _normalize_payload(_raw_payload(tag="highsynergycards", names=["Blood Artist"]))
     assert payload == {"categories": {"highsynergycards": ["Blood Artist"]}}
@@ -76,6 +90,23 @@ def test_normalize_payload_skips_commander_lists() -> None:
     )
 
     assert payload == {"categories": {"topcards": ["Panharmonicon"]}}
+
+
+def test_normalize_payload_skips_tag_directory_lists() -> None:
+    payload = _normalize_payload(
+        {
+            "container": {
+                "json_dict": {
+                    "cardlists": [
+                        {"tag": "tagsbypopularitysort", "cardviews": [{"name": "Artifacts"}]},
+                        {"tag": "topcards", "cardviews": [{"name": "Hardened Scales"}]},
+                    ]
+                }
+            }
+        }
+    )
+
+    assert payload == {"categories": {"topcards": ["Hardened Scales"]}}
 
 
 def test_normalize_tag_page_extracts_next_data_cardlists() -> None:

@@ -149,7 +149,7 @@ def _make_row(
     }
 
 
-def test_theme_rows_require_edhrec_tag_page_membership() -> None:
+def test_theme_rows_allow_normalized_edhrec_tag_membership() -> None:
     rows = [
         _make_row(_A, edhrec_tags=["artifacts"]),
         _make_row(_B, edhrec_tags=["etb"]),
@@ -158,7 +158,18 @@ def test_theme_rows_require_edhrec_tag_page_membership() -> None:
 
     filtered = _filter_theme_rows(rows, required_edhrec_tag="artifacts")  # type: ignore[arg-type]
 
-    assert filtered == []
+    assert [row["id"] for row in filtered] == [_A]
+
+
+def test_theme_rows_allow_legacy_draw_tag_in_card_draw_bucket() -> None:
+    rows = [
+        _make_row(_A, edhrec_tags=["draw"]),
+        _make_row(_B, edhrec_tags=["treasure"]),
+    ]
+
+    filtered = _filter_theme_rows(rows, required_edhrec_tag="card_draw")  # type: ignore[arg-type]
+
+    assert [row["id"] for row in filtered] == [_A]
 
 
 def test_theme_rows_allow_edhrec_theme_page_card() -> None:
@@ -198,7 +209,7 @@ def test_theme_rows_allow_local_etb_trait_card() -> None:
     assert [row["id"] for row in filtered] == [_A]
 
 
-def test_theme_rows_etc_does_not_use_legacy_card_tags_as_source() -> None:
+def test_theme_rows_etc_excludes_normalized_selected_card_tags() -> None:
     rows = [
         _make_row(_A, edhrec_tags=["artifacts"]),
         _make_row(_B, edhrec_tags=["etb"]),
@@ -211,7 +222,7 @@ def test_theme_rows_etc_does_not_use_legacy_card_tags_as_source() -> None:
         excluded_edhrec_tags=frozenset({"artifacts", "etb"}),
     )
 
-    assert [row["id"] for row in filtered] == [_A, _B, _C, _D]
+    assert [row["id"] for row in filtered] == [_C, _D]
 
 
 def test_theme_rows_etc_excludes_selected_theme_page_ids() -> None:

@@ -5,6 +5,7 @@ from mtg_helper.services.tag_service import (
     classify_token_types,
     classify_traits,
     classify_tribal,
+    normalize_edhrec_tags,
 )
 
 
@@ -141,6 +142,12 @@ def test_token_create_x_tokens() -> None:
 def test_plus_one_counters() -> None:
     tags = _classify("Put a +1/+1 counter on target creature.")
     assert "plus_one_counters" in tags
+
+
+def test_normalize_edhrec_tags_maps_legacy_role_tags() -> None:
+    assert normalize_edhrec_tags(
+        ["draw", "card_advantage", "artifact", "treasures", "plus_one_plus_1_counters"]
+    ) == ["card_draw", "artifacts", "treasure", "plus_one_plus_one_counters"]
 
 
 # ── lifegain ──────────────────────────────────────────────────────────────────

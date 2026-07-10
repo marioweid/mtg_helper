@@ -33,7 +33,7 @@ _FALLBACK_LABELS = {
     "burn": "Burn",
     "ramp": "Ramp",
     "enchantress": "Enchantress",
-    "treasures": "Treasure",
+    "treasure": "Treasure",
     "voltron": "Voltron",
     "mill": "Mill",
     "midrange": "Midrange",
@@ -62,10 +62,15 @@ _FALLBACK_LABELS = {
 }
 
 _TAG_ALIASES = {
+    "artifact": "artifacts",
+    "draw": "card_draw",
+    "card_advantage": "card_draw",
+    "cantrip": "card_draw",
     "lands": "lands_matter",
     "treasures": "treasure",
     "plus_one_counters": "plus_one_plus_one_counters",
     "plus_1_plus_1_counters": "plus_one_plus_one_counters",
+    "plus_one_plus_1_counters": "plus_one_plus_one_counters",
     "infect_toxic": "infect",
     "extra_turn": "extra_turns",
     "card-draw": "card_draw",

@@ -31,18 +31,22 @@ _NEXT_DATA_RE = re.compile(
 # Curated bridge from our current Moxfield-style tags to EDHREC theme slugs.
 # This keeps existing decks working while the EDHREC-native vocabulary grows.
 TAG_TO_THEME_SLUGS: dict[str, tuple[str, ...]] = {
+    "artifact": ("artifacts",),
+    "artifacts": ("artifacts",),
     "aristocrats": ("aristocrats",),
     "sacrifice": ("sacrifice", "aristocrats"),
     "token": ("tokens",),
     "tokens": ("tokens",),
-    "treasure_matters": ("treasures",),
-    "treasure": ("treasures",),
+    "treasure_matters": ("treasure",),
+    "treasure": ("treasure",),
+    "treasures": ("treasure",),
     "food_matters": ("food",),
     "food": ("food",),
     "clue_matters": ("clues",),
     "clues": ("clues",),
     "plus_one_counters": ("plus-1-plus-1-counters",),
     "plus_one_plus_one_counters": ("plus-1-plus-1-counters",),
+    "plus_one_plus_1_counters": ("plus-1-plus-1-counters",),
     "proliferate": ("proliferate",),
     "voltron": ("voltron",),
     "equipment": ("equipment",),
@@ -65,6 +69,9 @@ TAG_TO_THEME_SLUGS: dict[str, tuple[str, ...]] = {
     "etb": ("etb",),
     "pingers": ("pingers",),
     "card_draw": ("card-draw",),
+    "draw": ("card-draw",),
+    "card_advantage": ("card-draw",),
+    "cantrip": ("card-draw",),
     "lands_matter": ("lands",),
     "self_mill": ("self-mill",),
 }
@@ -87,7 +94,12 @@ _CATEGORY_WEIGHTS: dict[str, float] = {
     "lands": 0.55,
 }
 _DEFAULT_CATEGORY_WEIGHT = 0.55
-_COMMANDER_CARDLIST_TAGS = frozenset({"newcommanders", "topcommanders", "commanders"})
+_NON_CARD_CARDLIST_TAGS = frozenset({
+    "newcommanders",
+    "topcommanders",
+    "commanders",
+    "tagsbypopularitysort",
+})
 
 
 def theme_slugs_for_tags(tags: list[str]) -> list[str]:
@@ -120,7 +132,7 @@ def _normalize_payload(raw: dict[str, Any]) -> dict[str, Any]:
     cardlists = raw.get("container", {}).get("json_dict", {}).get("cardlists") or []
     for cardlist in cardlists:
         tag = cardlist.get("tag") or cardlist.get("name") or "cards"
-        if str(tag).lower() in _COMMANDER_CARDLIST_TAGS:
+        if str(tag).lower() in _NON_CARD_CARDLIST_TAGS:
             continue
         names = [cv.get("name") for cv in cardlist.get("cardviews") or [] if cv.get("name")]
         if names:

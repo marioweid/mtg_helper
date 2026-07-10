@@ -16,6 +16,7 @@ from mtg_helper.services import (
     moxfield_recs_service,
     profile_service,
 )
+from mtg_helper.services.tag_service import normalize_edhrec_tags
 
 _log = logging.getLogger(__name__)
 
@@ -1408,20 +1409,31 @@ def _filter_theme_rows(
 
 def _row_matches_local_theme_bucket(row: "asyncpg.Record", tag: str) -> bool:
     """Return True when local structured fields prove theme membership."""
-    if tag in {"artifact", "artifacts"}:
+    normalized_tag = _normalize_theme_tag(tag)
+    row_tags = set(normalize_edhrec_tags(list(row["edhrec_tags"] or row["tags"] or [])))
+    if normalized_tag in row_tags:
+        return True
+    if normalized_tag == "artifacts":
         return "Artifact" in set(row["card_types"] or []) or "Artifact" in (row["type_line"] or "")
-    if tag == "etb":
+    if normalized_tag == "etb":
         return "etb" in set(row["traits"] or [])
     return False
 
 
 def _local_theme_where(tag: str) -> str | None:
     """Return a SQL predicate for deterministic local theme buckets."""
-    if tag in {"artifact", "artifacts"}:
+    normalized_tag = _normalize_theme_tag(tag)
+    if normalized_tag == "artifacts":
         return "('Artifact' = ANY(card_types) OR type_line LIKE '%Artifact%')"
-    if tag == "etb":
+    if normalized_tag == "etb":
         return "'etb' = ANY(traits)"
     return None
+
+
+def _normalize_theme_tag(tag: str) -> str:
+    """Normalize one selected theme tag for local bucket comparisons."""
+    normalized = normalize_edhrec_tags([tag])
+    return normalized[0] if normalized else tag
 
 
 async def _fetch_local_theme_ids(
