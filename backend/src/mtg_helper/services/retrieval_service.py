@@ -262,7 +262,7 @@ _TOKEN_TYPE_NAMES: dict[str, str] = {
 # deck-specific (no tag mapping) and is excluded from auto-membership.
 _STAGE_TAG_MEMBERSHIP: dict[str, frozenset[str]] = {
     "ramp": frozenset({"ramp", "fast_mana", "cost_reduction"}),
-    "draw": frozenset({"draw", "card_draw", "card_selection"}),
+    "draw": frozenset({"draw", "card_draw"}),
     "interaction": frozenset({"interaction"}),
 }
 
@@ -741,14 +741,14 @@ async def _search_tags(
             SELECT id,
                    array_length(
                        ARRAY(
-                           SELECT unnest(hub_tags || mtgjson_tags)
+                           SELECT unnest(tags || mtgjson_tags)
                            INTERSECT
                            SELECT unnest($1::text[])
                        ), 1
                    ) AS overlap
             FROM cards
             WHERE (
-                hub_tags || mtgjson_tags
+                tags || mtgjson_tags
             ) && $1::text[]
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
@@ -763,7 +763,7 @@ async def _search_tags(
                 array_length(
                     ARRAY(
                         SELECT unnest(
-                            hub_tags || mtgjson_tags
+                            tags || mtgjson_tags
                         )
                         INTERSECT
                         SELECT unnest($1::text[])
@@ -1326,12 +1326,25 @@ def _filter_inclusion_by_stage(
     filtered: dict[UUID, float] = {}
     for uid, w in inclusion.items():
         row = cards_by_id.get(uid)
-        if row is None:
-            continue
-        tags = set(row["tags"] or [])
-        if tags & required:
+        if row is not None and _row_matches_stage(row, stage):
             filtered[uid] = w
     return filtered
+
+
+def _filter_rows_by_stage(
+    rows: list["asyncpg.Record"], stage: str | None
+) -> list["asyncpg.Record"]:
+    """Apply the functional role gate to every candidate in a build stage."""
+    if stage is None or stage in {"theme", "bangers"}:
+        return rows
+    return [row for row in rows if _row_matches_stage(row, stage)]
+
+
+def _row_matches_stage(row: "asyncpg.Record", stage: str) -> bool:
+    if stage == "lands":
+        return "Land" in (row["type_line"] or "")
+    required = _STAGE_TAG_MEMBERSHIP.get(stage, frozenset())
+    return not required or bool(set(row["tags"] or []) & required)
 
 
 def _filter_theme_rows(
@@ -1617,6 +1630,7 @@ async def retrieve_candidates(
         allowed_theme_ids=frozenset(hub_inclusion),
         excluded_theme_ids=excluded_theme_ids,
     )
+    rows = _filter_rows_by_stage(rows, stage)
     cards_by_id = {r["id"]: r for r in rows}
 
     # Trusted-card boost only fires when the card actually fits the stage —
@@ -1725,7 +1739,7 @@ async def _fetch_candidates(
             f"""
             SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
                    color_identity, image_uri,
-                   hub_tags AS tags,
+                   tags,
                    hub_tags,
                    mtgjson_tags,
                    edhrec_rank, power, toughness, rarity, game_changer,

@@ -3,6 +3,9 @@
 from decimal import Decimal
 from uuid import UUID
 
+import asyncpg
+import pytest
+
 from mtg_helper.services.retrieval_service import (
     RepresentationQuery,
     TypeFilter,
@@ -11,9 +14,12 @@ from mtg_helper.services.retrieval_service import (
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
+    _filter_inclusion_by_stage,
+    _filter_rows_by_stage,
     _filter_theme_rows,
     _personal_rating,
     _representation_match_score,
+    _search_tags,
     _type_match_score,
     parse_query_tags,
     parse_query_types,
@@ -147,6 +153,68 @@ def _make_row(
         "traits": traits or [],
         "token_types": [],
     }
+
+
+def test_stage_filter_uses_functional_tags_not_theme_tags() -> None:
+    role_card = {**_make_row(_A, hub_tags=["artifacts"]), "tags": ["ramp"]}
+    theme_only = {**_make_row(_B, hub_tags=["ramp"]), "tags": []}
+
+    filtered = _filter_inclusion_by_stage(  # type: ignore[arg-type]
+        {_A: 0.4, _B: 0.9}, {_A: role_card, _B: theme_only}, "ramp"
+    )
+
+    assert filtered == {_A: 0.4}
+
+
+def test_stage_gate_removes_fts_and_theme_cards_without_role() -> None:
+    role_card = {**_make_row(_A, hub_tags=["artifacts"]), "tags": ["draw"]}
+    theme_only = {**_make_row(_B, hub_tags=["draw"]), "tags": []}
+
+    filtered = _filter_rows_by_stage(  # type: ignore[arg-type]
+        [role_card, theme_only], "draw"
+    )
+
+    assert [row["id"] for row in filtered] == [_A]
+
+
+def test_stage_gate_does_not_filter_theme_results() -> None:
+    theme_card = {**_make_row(_A, hub_tags=["artifacts"]), "tags": []}
+
+    filtered = _filter_rows_by_stage([theme_card], "theme")  # type: ignore[arg-type]
+
+    assert filtered == [theme_card]
+
+
+def test_draw_stage_rejects_card_selection_without_draw() -> None:
+    selection_only = {**_make_row(_A), "tags": ["card_selection"]}
+
+    filtered = _filter_rows_by_stage([selection_only], "draw")  # type: ignore[arg-type]
+
+    assert filtered == []
+
+
+@pytest.mark.asyncio
+async def test_tag_search_uses_local_role_tags_not_theme_tags(db_pool: asyncpg.Pool) -> None:
+    async with db_pool.acquire() as conn:
+        role_id = await conn.fetchval("SELECT id FROM cards WHERE name = 'Doubling Season'")
+        theme_id = await conn.fetchval("SELECT id FROM cards WHERE name = 'Rhystic Study'")
+        await conn.execute(
+            """UPDATE cards
+               SET tags = ARRAY['ramp'], hub_tags = '{}', mtgjson_tags = '{}'
+               WHERE id = $1""",
+            role_id,
+        )
+        await conn.execute(
+            """UPDATE cards
+               SET tags = '{}', hub_tags = ARRAY['ramp'], mtgjson_tags = '{}'
+               WHERE id = $1""",
+            theme_id,
+        )
+
+    results = await _search_tags(db_pool, ["ramp"], ["G", "U"], [], limit=10)
+
+    assert role_id in {card_id for card_id, _overlap in results}
+    assert theme_id not in {card_id for card_id, _overlap in results}
 
 
 def test_theme_rows_allow_hub_tag_membership() -> None:
