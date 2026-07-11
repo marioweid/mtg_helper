@@ -25,6 +25,18 @@ type SourceTag = {
 };
 
 type ThemeState = { groups: ThemeGroup[]; source_tags: SourceTag[] };
+type GroupSelection = number | null | undefined;
+type SelectableGroup = Pick<ThemeGroup, "id" | "deleted_at">;
+
+export function resolveSelectedGroup(
+  current: GroupSelection,
+  groups: SelectableGroup[],
+): number | null {
+  const activeGroups = groups.filter((group) => !group.deleted_at);
+  if (current === undefined) return activeGroups[0]?.id ?? null;
+  if (current === null) return null;
+  return activeGroups.some((group) => group.id === current) ? current : null;
+}
 
 async function mutate(path: string, method: string, body?: unknown): Promise<void> {
   const init: RequestInit = { method };
@@ -41,7 +53,7 @@ async function mutate(path: string, method: string, body?: unknown): Promise<voi
 
 export function ThemeManager() {
   const [state, setState] = useState<ThemeState>({ groups: [], source_tags: [] });
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<GroupSelection>(undefined);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState("");
@@ -51,7 +63,7 @@ export function ThemeManager() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const next = (await response.json()) as ThemeState;
     setState(next);
-    setSelectedGroupId((current) => current ?? next.groups.find((group) => !group.deleted_at)?.id ?? null);
+    setSelectedGroupId((current) => resolveSelectedGroup(current, next.groups));
   }, []);
 
   useEffect(() => {
