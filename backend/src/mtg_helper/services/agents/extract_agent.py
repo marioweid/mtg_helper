@@ -17,7 +17,7 @@ from mtg_helper.services.agents._prompts import (
     SANDBOX_RULES,
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
-from mtg_helper.services.moxfield_hub_service import load_hub_prompt_catalog, load_hub_tags
+from mtg_helper.services.theme_service import load_theme_prompt_catalog, load_theme_tags
 
 _TEMPERATURE = 0.3
 _MAX_OUTPUT_TOKENS = 2048
@@ -68,7 +68,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
 
     parts = [
         "You are a Magic: The Gathering Commander deck strategist.",
-        "Your job is to identify a small set of Moxfield hub theme tags",
+        "Your job is to identify a small set of shared deck theme tags",
         "that match the player's deck vision. The downstream retrieval system",
         "uses these tags as the primary card-suggestion signal.",
         "",
@@ -88,7 +88,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
     parts += [
         f"\nPower level: Bracket {deps.bracket} — {bracket_desc}",
         "",
-        "Use Moxfield hub theme tags from this local catalog:",
+        "Use theme tags from this local Moxfield and Archidekt catalog:",
         deps.hub_catalog,
         "",
         "MTGJSON mechanic examples, for context only, include:",
@@ -103,7 +103,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- Reference the commander's specific abilities when picking what to ask.",
         "- The `reply` field holds the conversational text shown to the user.",
         "- Set done=true ONLY when you have enough information.",
-        "- When done=true, populate archetype_tags with Moxfield hub theme tags,",
+        "- When done=true, populate archetype_tags with theme tags from the catalog,",
         "  suggested_name, and stage_targets.",
         "",
         "STAGE TARGET GUIDELINES (defaults are fixed):",
@@ -114,7 +114,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- theme has no fixed target — fills remaining slots",
         "",
         "FORBIDDEN:",
-        "- Do NOT invent tags outside the Moxfield hub catalog.",
+        "- Do NOT invent tags outside the local theme catalog.",
         "- Do NOT write a prose `description` field.",
         "- Do NOT mention internal matching implementation details.",
     ]
@@ -200,7 +200,7 @@ async def extract_turn(
         partner_oracle=partner_oracle,
         bracket=bracket,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
-        hub_catalog=await load_hub_prompt_catalog(pool),
+        hub_catalog=await load_theme_prompt_catalog(pool),
     )
     user_message = message.strip() or "I want to build a deck with this commander."
     result = await get_agent().run(
@@ -209,6 +209,6 @@ async def extract_turn(
         message_history=to_model_messages(trimmed),
     )
     output = result.output
-    allowed = await load_hub_tags(pool)
+    allowed = await load_theme_tags(pool)
     output.archetype_tags = [tag for tag in output.archetype_tags if tag in allowed]
     return output

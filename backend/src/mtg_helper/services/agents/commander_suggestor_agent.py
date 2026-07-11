@@ -19,7 +19,7 @@ from mtg_helper.services.commander_suggestor_service import (
     parse_intent_fallback,
 )
 from mtg_helper.services.keyword_catalog_service import load_keyword_prompt_catalog
-from mtg_helper.services.moxfield_hub_service import load_hub_prompt_catalog
+from mtg_helper.services.theme_service import load_theme_prompt_catalog
 
 _TEMPERATURE = 0.25
 _MAX_OUTPUT_TOKENS = 1536
@@ -57,10 +57,10 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "",
         f"Previous intent JSON: {previous}",
         "",
-        "Emit Moxfield hub theme tags in `archetype_tags`.",
-        "Every `archetype_tags` item must appear in the local Moxfield hub catalog below.",
+        "Emit shared deck theme tags in `archetype_tags`.",
+        "Every `archetype_tags` item must appear in the local theme catalog below.",
         "",
-        "Available local Moxfield hub catalog:",
+        "Available local shared theme catalog:",
         deps.hub_catalog,
         "",
         "Emit official MTGJSON keyword tags only in `mechanic_tags` for exact printed",
@@ -138,7 +138,7 @@ async def suggest_turn(
     deps = CommanderSuggestDeps(
         previous_intent=previous_intent,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
-        hub_catalog=await load_hub_prompt_catalog(pool),
+        hub_catalog=await load_theme_prompt_catalog(pool),
         keyword_catalog=await load_keyword_prompt_catalog(pool),
     )
     try:

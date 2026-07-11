@@ -22,23 +22,25 @@ _IMPERSONATE_TARGET = "chrome"
 _REQUEST_TIMEOUT = 30.0
 _HUB_PAGE_SIZE = 200
 _HUB_DECK_SAMPLE = 10
-_BASELINE_DECK_SAMPLE = 20
+_BASELINE_DECK_SAMPLE = 80
 _DECK_FETCH_CONCURRENCY = 1
 _MIN_HUB_DECKS = 5
 _MIN_HUB_PCT = 0.10
 _MIN_SYNERGY = 0.05
-_BASIC_LANDS = frozenset({
-    "plains",
-    "island",
-    "swamp",
-    "mountain",
-    "forest",
-    "snow-covered plains",
-    "snow-covered island",
-    "snow-covered swamp",
-    "snow-covered mountain",
-    "snow-covered forest",
-})
+_BASIC_LANDS = frozenset(
+    {
+        "plains",
+        "island",
+        "swamp",
+        "mountain",
+        "forest",
+        "snow-covered plains",
+        "snow-covered island",
+        "snow-covered swamp",
+        "snow-covered mountain",
+        "snow-covered forest",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -76,14 +78,25 @@ async def sync_hub_card_stats(
         timeout=_REQUEST_TIMEOUT,
     ) as client:
         hubs = await fetch_hubs(client=client)
-        baseline = await _sample_decks(client, None, _BASELINE_DECK_SAMPLE)
-        baseline_tally = await _tally_decks(client, baseline)
         async with pool.acquire() as conn:
             await _upsert_hubs(conn, hubs)
-        total = len(hubs)
+            stale_hub_ids = await _stale_hub_ids(conn, hubs)
+        stale_hubs = [hub for hub in hubs if hub.id in stale_hub_ids]
+        if not stale_hubs:
+            return {
+                "moxfield_hubs_processed": 0,
+                "moxfield_hubs_skipped": len(hubs),
+                "moxfield_hub_cards_matched": 0,
+                "baseline_decks_sampled": 0,
+                "hub_delay_seconds": settings.moxfield_hub_delay_seconds,
+                "stale_after_hours": settings.moxfield_hub_stale_after_hours,
+            }
+        baseline = await _sample_decks(client, None, _BASELINE_DECK_SAMPLE)
+        baseline_tally = await _tally_decks(client, baseline)
+        total = len(stale_hubs)
         processed = 0
         matched_cards = 0
-        for hub in hubs:
+        for hub in stale_hubs:
             if progress is not None:
                 progress(f"syncing hub {hub.name}", processed, total)
             deck_ids = await _sample_decks(client, hub.name, _HUB_DECK_SAMPLE)
@@ -97,17 +110,66 @@ async def sync_hub_card_stats(
             progress("syncing hubs", total, total)
     await rebuild_card_hub_tags(pool)
     return {
-        "moxfield_hubs_processed": len(hubs),
+        "moxfield_hubs_processed": len(stale_hubs),
+        "moxfield_hubs_skipped": len(hubs) - len(stale_hubs),
         "moxfield_hub_cards_matched": matched_cards,
         "baseline_decks_sampled": len(baseline),
         "hub_delay_seconds": settings.moxfield_hub_delay_seconds,
+        "stale_after_hours": settings.moxfield_hub_stale_after_hours,
+    }
+
+
+async def sync_one_hub_card_stats(
+    pool: asyncpg.Pool,
+    *,
+    hub_ref: str,
+    hub_sample_size: int = _HUB_DECK_SAMPLE,
+    baseline_sample_size: int = _BASELINE_DECK_SAMPLE,
+    deck_ids: list[str] | None = None,
+    baseline_deck_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Refresh card membership for one Moxfield hub."""
+    hub_sample_size = _clamp_sample_size(hub_sample_size)
+    baseline_sample_size = _clamp_sample_size(baseline_sample_size)
+    async with CurlAsyncSession(
+        impersonate=_IMPERSONATE_TARGET,
+        timeout=_REQUEST_TIMEOUT,
+    ) as client:
+        hubs = await fetch_hubs(client=client)
+        hub = _find_hub(hubs, hub_ref)
+        if hub is None:
+            raise ValueError(f"Moxfield hub not found: {hub_ref}")
+        baseline_ids = baseline_deck_ids or await _sample_decks(
+            client,
+            None,
+            baseline_sample_size,
+        )
+        hub_ids = deck_ids or await _sample_decks(client, hub.name, hub_sample_size)
+        baseline_tally = await _tally_decks(client, baseline_ids)
+        hub_tally = await _tally_decks(client, hub_ids)
+        stats = _score_hub_cards(hub_tally, baseline_tally, len(hub_ids), len(baseline_ids))
+        async with pool.acquire() as conn:
+            await _upsert_hubs(conn, hubs)
+        matched_cards = await _store_hub_stats(pool, hub, stats, len(hub_ids), len(baseline_ids))
+    await rebuild_card_hub_tags(pool)
+    return {
+        "moxfield_hubs_processed": 1,
+        "hub": hub.tag,
+        "hub_name": hub.name,
+        "moxfield_hub_cards_matched": matched_cards,
+        "hub_decks_sampled": len(hub_ids),
+        "baseline_decks_sampled": len(baseline_ids),
+        "explicit_hub_decks": deck_ids is not None,
+        "explicit_baseline_decks": baseline_deck_ids is not None,
     }
 
 
 async def load_hub_tags(pool: asyncpg.Pool) -> set[str]:
     """Return active Moxfield hub tag ids."""
     async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT tag FROM moxfield_hubs WHERE active ORDER BY name")
+        rows = await conn.fetch(
+            "SELECT tag FROM moxfield_hubs WHERE active AND enabled ORDER BY name"
+        )
     return {row["tag"] for row in rows}
 
 
@@ -119,14 +181,12 @@ async def load_hub_prompt_catalog(pool: asyncpg.Pool) -> str:
             SELECT h.tag, h.name, count(s.card_id) AS card_count
             FROM moxfield_hubs h
             LEFT JOIN moxfield_hub_card_stats s ON s.hub_id = h.id
-            WHERE h.active
+            WHERE h.active AND h.enabled
             GROUP BY h.id, h.tag, h.name
             ORDER BY h.name
             """
         )
-    return "\n".join(
-        f"- {row['tag']}: {row['name']} ({row['card_count']} cards)" for row in rows
-    )
+    return "\n".join(f"- {row['tag']}: {row['name']} ({row['card_count']} cards)" for row in rows)
 
 
 async def list_hub_tag_groups(pool: asyncpg.Pool) -> list[dict[str, Any]]:
@@ -136,7 +196,7 @@ async def list_hub_tag_groups(pool: asyncpg.Pool) -> list[dict[str, Any]]:
             """
             SELECT tag, name, description
             FROM moxfield_hubs
-            WHERE active
+            WHERE active AND enabled
             ORDER BY name
             """
         )
@@ -149,6 +209,24 @@ async def list_hub_tag_groups(pool: asyncpg.Pool) -> list[dict[str, Any]]:
             ],
         }
     ]
+
+
+async def list_hubs(pool: asyncpg.Pool) -> list[dict[str, Any]]:
+    """Return active Moxfield hubs for admin controls."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT h.id, h.tag, h.name, h.description, h.active, h.enabled,
+                   h.last_seen_at, h.synced_at, h.last_card_sync_at,
+                   count(s.card_id) AS card_count,
+                   max(s.fetched_at) AS last_stat_fetch_at
+            FROM moxfield_hubs h
+            LEFT JOIN moxfield_hub_card_stats s ON s.hub_id = h.id
+            GROUP BY h.id
+            ORDER BY h.name
+            """
+        )
+    return [dict(row) for row in rows]
 
 
 async def score_hubs(
@@ -167,7 +245,7 @@ async def score_hubs(
             JOIN moxfield_hubs h ON h.id = s.hub_id
             JOIN cards c ON c.id = s.card_id
             WHERE h.tag = ANY($1::text[])
-              AND h.active
+              AND h.active AND h.enabled
               AND c.color_identity <@ $2::text[]
               AND c.legalities->>'commander' = 'legal'
               AND COALESCE(c.border_color, '') != 'gold'
@@ -195,7 +273,7 @@ async def rebuild_card_hub_tags(pool: asyncpg.Pool) -> None:
                     SELECT s.card_id, h.tag, max(s.synergy_score) AS score
                     FROM moxfield_hub_card_stats s
                     JOIN moxfield_hubs h ON h.id = s.hub_id
-                    WHERE h.active
+                    WHERE h.active AND h.enabled
                     GROUP BY s.card_id, h.tag
                 ) x
                 GROUP BY card_id
@@ -230,6 +308,42 @@ async def _sleep_between_hubs() -> None:
     delay = max(0.0, settings.moxfield_hub_delay_seconds)
     if delay > 0:
         await asyncio.sleep(delay)
+
+
+def _clamp_sample_size(value: int) -> int:
+    return min(200, max(1, int(value)))
+
+
+def _find_hub(hubs: list[Hub], hub_ref: str) -> Hub | None:
+    needle = hub_ref.strip().lower()
+    if not needle:
+        return None
+    for hub in hubs:
+        if needle in {str(hub.id), hub.tag.lower(), hub.slug.lower(), hub.name.lower()}:
+            return hub
+    return None
+
+
+async def _stale_hub_ids(conn: asyncpg.Connection, hubs: list[Hub]) -> set[int]:
+    ids = [hub.id for hub in hubs]
+    if not ids:
+        return set()
+    stale_after_hours = max(0.0, settings.moxfield_hub_stale_after_hours)
+    rows = await conn.fetch(
+        """
+        SELECT id
+        FROM moxfield_hubs
+        WHERE id = ANY($1::int[])
+          AND enabled
+          AND (
+              last_card_sync_at IS NULL
+              OR last_card_sync_at <= now() - ($2::float * interval '1 hour')
+          )
+        """,
+        ids,
+        stale_after_hours,
+    )
+    return {row["id"] for row in rows}
 
 
 async def _upsert_hubs(conn: asyncpg.Connection, hubs: list[Hub]) -> None:
@@ -338,7 +452,12 @@ async def _store_hub_stats(
     names = list(stats)
     if not names:
         async with pool.acquire() as conn:
-            await conn.execute("DELETE FROM moxfield_hub_card_stats WHERE hub_id = $1", hub.id)
+            async with conn.transaction():
+                await conn.execute("DELETE FROM moxfield_hub_card_stats WHERE hub_id = $1", hub.id)
+                await conn.execute(
+                    "UPDATE moxfield_hubs SET last_card_sync_at = now() WHERE id = $1",
+                    hub.id,
+                )
         return 0
     async with pool.acquire() as conn:
         card_rows = await conn.fetch(
@@ -353,6 +472,10 @@ async def _store_hub_stats(
         ]
         async with conn.transaction():
             await conn.execute("DELETE FROM moxfield_hub_card_stats WHERE hub_id = $1", hub.id)
+            await conn.execute(
+                "UPDATE moxfield_hubs SET last_card_sync_at = now() WHERE id = $1",
+                hub.id,
+            )
             await conn.executemany(
                 """
                 INSERT INTO moxfield_hub_card_stats

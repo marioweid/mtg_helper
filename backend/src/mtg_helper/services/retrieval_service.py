@@ -10,11 +10,7 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.models.ranking_weights import RankingWeights
-from mtg_helper.services import (
-    moxfield_hub_service,
-    moxfield_recs_service,
-    profile_service,
-)
+from mtg_helper.services import moxfield_recs_service, profile_service, theme_service
 
 _log = logging.getLogger(__name__)
 
@@ -1264,7 +1260,7 @@ async def _fetch_inclusion_signals(
     hub_inclusion: dict[UUID, float] = {}
     moxfield_inclusion: dict[UUID, float] = {}
     try:
-        hub_inclusion = await moxfield_hub_service.score_hubs(
+        hub_inclusion = await theme_service.score_themes(
             pool, query_tags, commander_color_identity
         )
     except Exception:
@@ -1583,7 +1579,7 @@ async def retrieve_candidates(
     if excluded_hub_tags:
         try:
             hub_theme_exclusions = set(
-                await moxfield_hub_service.score_hubs(
+                await theme_service.score_themes(
                     pool, list(excluded_hub_tags), commander_color_identity
                 )
             )

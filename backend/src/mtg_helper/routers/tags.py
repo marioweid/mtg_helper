@@ -1,10 +1,10 @@
-"""Tag catalog endpoints for Moxfield themes and MTGJSON mechanics."""
+"""Tag catalog endpoints for shared themes and MTGJSON mechanics."""
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import moxfield_hub_service
+from mtg_helper.services import theme_service
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
@@ -65,7 +65,7 @@ async def list_official_keywords(request: Request) -> DataResponse[list[KeywordG
 
 @router.get("/hubs", response_model=DataResponse[list[KeywordGroup]])
 async def list_moxfield_hubs(request: Request) -> DataResponse[list[KeywordGroup]]:
-    """Return the locally synced Moxfield hub catalog."""
+    """Return shared theme groups through the legacy hubs route."""
     pool = request.app.state.db_pool
-    groups = await moxfield_hub_service.list_hub_tag_groups(pool)
+    groups = await theme_service.list_theme_catalog(pool)
     return DataResponse(data=[KeywordGroup(**group) for group in groups])

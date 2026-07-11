@@ -26,7 +26,13 @@ from mtg_helper.routers import (
     snapshots,
     tags,
 )
-from mtg_helper.services import moxfield_hub_service, mtgjson, scryfall
+from mtg_helper.services import (
+    archidekt_tag_service,
+    moxfield_hub_service,
+    mtgjson,
+    scryfall,
+    theme_service,
+)
 from mtg_helper.services.admin_jobs import JobRegistry
 
 _log = logging.getLogger(__name__)
@@ -59,6 +65,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         except Exception:
             _log.exception("MTGJSON keyword sync failed on startup; continuing with fallback data")
 
+    await _ensure_theme_catalogs(app)
+
+    yield
+    await close_pool(app.state.db_pool)
+
+
+async def _ensure_theme_catalogs(app: FastAPI) -> None:
+    """Populate empty source catalogs and seed conservative shared groups."""
     hub_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM moxfield_hubs")
     if hub_count == 0:
         _log.info("Moxfield hub catalog is empty - running initial hub sync")
@@ -67,8 +81,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         except Exception:
             _log.exception("Moxfield hub sync failed on startup; continuing without hub data")
 
-    yield
-    await close_pool(app.state.db_pool)
+    archidekt_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM archidekt_tags")
+    if archidekt_count == 0:
+        _log.info("Archidekt tag catalog is empty - running initial catalog sync")
+        try:
+            await archidekt_tag_service.sync_tags(app.state.db_pool)
+        except Exception:
+            _log.exception("Archidekt tag sync failed on startup; continuing without tag data")
+    await theme_service.seed_groups(app.state.db_pool)
 
 
 app = FastAPI(title="MTG Helper API", version="0.1.0", lifespan=lifespan)

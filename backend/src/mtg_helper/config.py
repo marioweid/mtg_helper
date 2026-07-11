@@ -22,7 +22,10 @@ class Settings(BaseSettings):
     mtgjson_keywords_url: str = "https://mtgjson.com/api/v5/Keywords.json"
     moxfield_base_url: str = "https://api2.moxfield.com"
     moxfield_hub_delay_seconds: float = 5.0
+    moxfield_hub_stale_after_hours: float = 168.0
     archidekt_base_url: str = "https://archidekt.com/api"
+    archidekt_tag_delay_seconds: float = 1.0
+    archidekt_tag_stale_after_hours: float = 168.0
 
     # LLM
     chat_model: str = "gemini-2.5-flash"

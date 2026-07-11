@@ -134,9 +134,11 @@ CREATE TABLE IF NOT EXISTS moxfield_hubs (
     description       TEXT,
     shows_in_decklist BOOLEAN NOT NULL DEFAULT false,
     active            BOOLEAN NOT NULL DEFAULT true,
+    enabled           BOOLEAN NOT NULL DEFAULT true,
     first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    synced_at         TIMESTAMPTZ
+    synced_at         TIMESTAMPTZ,
+    last_card_sync_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_moxfield_hubs_active_name
@@ -160,6 +162,84 @@ CREATE INDEX IF NOT EXISTS idx_moxfield_hub_card_stats_card
     ON moxfield_hub_card_stats (card_id);
 CREATE INDEX IF NOT EXISTS idx_moxfield_hub_card_stats_hub_score
     ON moxfield_hub_card_stats (hub_id, synergy_score DESC);
+
+-- ============================================================
+-- ARCHIDEKT TAG CATALOG + CARD MEMBERSHIP
+-- ============================================================
+CREATE TABLE IF NOT EXISTS archidekt_tags (
+    id                BIGSERIAL PRIMARY KEY,
+    slug              TEXT UNIQUE NOT NULL,
+    tag               TEXT UNIQUE NOT NULL,
+    name              TEXT NOT NULL,
+    description       TEXT,
+    active            BOOLEAN NOT NULL DEFAULT true,
+    enabled           BOOLEAN NOT NULL DEFAULT true,
+    first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    synced_at         TIMESTAMPTZ,
+    last_card_sync_at TIMESTAMPTZ,
+    last_error        TEXT,
+    last_error_at     TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_archidekt_tags_active_name
+    ON archidekt_tags (active, enabled, name);
+
+CREATE TABLE IF NOT EXISTS archidekt_tag_card_stats (
+    tag_id                BIGINT NOT NULL REFERENCES archidekt_tags(id) ON DELETE CASCADE,
+    card_id               UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    tag_deck_count        INTEGER NOT NULL,
+    baseline_deck_count   INTEGER NOT NULL,
+    tag_deck_pct          REAL NOT NULL,
+    baseline_deck_pct     REAL NOT NULL,
+    synergy_score         REAL NOT NULL,
+    tag_sample_size       INTEGER NOT NULL,
+    baseline_sample_size  INTEGER NOT NULL,
+    fetched_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tag_id, card_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_archidekt_tag_card_stats_card
+    ON archidekt_tag_card_stats (card_id);
+CREATE INDEX IF NOT EXISTS idx_archidekt_tag_card_stats_score
+    ON archidekt_tag_card_stats (tag_id, synergy_score DESC);
+
+-- ============================================================
+-- SHARED, ADMIN-CURATED THEME GROUPS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS theme_groups (
+    id          BIGSERIAL PRIMARY KEY,
+    slug        TEXT UNIQUE NOT NULL,
+    label       TEXT NOT NULL,
+    description TEXT,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    enabled     BOOLEAN NOT NULL DEFAULT true,
+    deleted_at  TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS theme_group_members (
+    id                BIGSERIAL PRIMARY KEY,
+    group_id          BIGINT NOT NULL REFERENCES theme_groups(id) ON DELETE CASCADE,
+    source            TEXT NOT NULL CHECK (source IN ('moxfield', 'archidekt')),
+    moxfield_hub_id   INTEGER REFERENCES moxfield_hubs(id) ON DELETE CASCADE,
+    archidekt_tag_id  BIGINT REFERENCES archidekt_tags(id) ON DELETE CASCADE,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (
+        (source = 'moxfield' AND moxfield_hub_id IS NOT NULL AND archidekt_tag_id IS NULL)
+        OR
+        (source = 'archidekt' AND archidekt_tag_id IS NOT NULL AND moxfield_hub_id IS NULL)
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_member_moxfield_unique
+    ON theme_group_members (moxfield_hub_id) WHERE moxfield_hub_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_member_archidekt_unique
+    ON theme_group_members (archidekt_tag_id) WHERE archidekt_tag_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_theme_groups_visible
+    ON theme_groups (enabled, deleted_at, sort_order, label);
 
 -- ============================================================
 -- ACCOUNTS
@@ -358,6 +438,8 @@ ALTER TABLE cards ADD COLUMN IF NOT EXISTS game_changer BOOLEAN NOT NULL DEFAULT
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS hub_tags TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE cards DROP COLUMN IF EXISTS edhrec_tags;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS mtgjson_tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE moxfield_hubs ADD COLUMN IF NOT EXISTS last_card_sync_at TIMESTAMPTZ;
+ALTER TABLE moxfield_hubs ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
 UPDATE cards
 SET mtgjson_tags = tags
 WHERE cardinality(mtgjson_tags) = 0
