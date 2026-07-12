@@ -217,9 +217,9 @@ function CoachMemoryModal({
       <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-white">Edit Coach memory</h2>
+            <h2 className="text-lg font-semibold text-white">Edit Assistant memory</h2>
             <p className="mt-1 text-sm text-gray-500">
-              These persistent notes are passed to the Coach, Deck Doctor, and validators.
+              These persistent notes guide future MTG Assistant recommendations.
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
@@ -232,7 +232,7 @@ function CoachMemoryModal({
           rows={10}
           maxLength={8000}
           className="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-          placeholder="Ask the Coach what it remembers, or write memory notes here manually."
+          placeholder="Ask the Assistant what it remembers, or write memory notes here manually."
         />
         <div className="mt-2 flex justify-between text-xs text-gray-500">
           <span>{savedAt ? `Saved ${new Date(savedAt).toLocaleString()}` : "Not saved yet"}</span>
@@ -477,7 +477,7 @@ export default function CoachPage() {
       .slice(-6)
       .map((message) => {
         if (message.role === "user") return `User: ${message.content}`;
-        return `Coach: ${message.result.reply}`;
+        return `Assistant: ${message.result.reply}`;
       })
       .join("\n");
     return previous ? `${previous}\nUser: ${next}` : next;
@@ -517,17 +517,17 @@ export default function CoachPage() {
       });
       events.addEventListener("failed", (event) => {
         const data = JSON.parse((event as MessageEvent).data) as { message?: string };
-        setError(data.message ?? "Commander Coach failed");
+        setError(data.message ?? "MTG Assistant failed");
         setLoading(false);
         events.close();
       });
       events.onerror = () => {
-        setError("Commander Coach stream disconnected");
+        setError("MTG Assistant stream disconnected");
         setLoading(false);
         events.close();
       };
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Commander Coach failed");
+      setError(err instanceof ApiError ? err.message : "MTG Assistant failed");
       setLoading(false);
     }
   }
@@ -539,9 +539,9 @@ export default function CoachPage() {
       setMemoryNotes(memory.notes);
       setMemorySavedAt(memory.updated_at);
       setMemoryOpen(false);
-      toast.push("Coach memory saved", "success");
+      toast.push("Assistant memory saved", "success");
     } catch (err) {
-      toast.push(err instanceof ApiError ? err.message : "Failed to save Coach memory", "error");
+      toast.push(err instanceof ApiError ? err.message : "Failed to save Assistant memory", "error");
     } finally {
       setMemorySaving(false);
     }
@@ -635,7 +635,7 @@ export default function CoachPage() {
 
       <div className="shrink-0 px-2 py-2 sm:px-3 lg:px-4">
         <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold text-white">Commander Coach</h1>
+          <h1 className="text-2xl font-bold text-white">MTG Assistant</h1>
           <Link href={`/decks/${deck.id}`} className="truncate text-sm text-gray-400 hover:text-white">
             {deck.name}
           </Link>
@@ -680,16 +680,16 @@ export default function CoachPage() {
 
             {loading && (
               <div className="max-w-2xl rounded-2xl border border-indigo-400/20 bg-indigo-950/20 p-4 text-sm">
-                <div className="mb-2 font-medium text-indigo-100">Coach is working…</div>
+                <div className="mb-2 font-medium text-indigo-100">Assistant is working…</div>
                 <ProgressTimeline events={progress} />
               </div>
             )}
 
             {messages.length === 0 && !loading && (
               <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-5">
-                <h2 className="font-semibold text-white">Ask the Coach</h2>
+                <h2 className="font-semibold text-white">Ask the Assistant</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Run a deck doctor pass, ask for bangers, or request specific constraints like
+                  Ask for deck analysis, strong cards, swaps, or specific constraints like
                   preserving your commander engine.
                 </p>
               </div>
@@ -704,7 +704,7 @@ export default function CoachPage() {
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
                 className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                placeholder="Ask the Coach…"
+                placeholder="Ask the Assistant…"
               />
               <button
                 type="button"

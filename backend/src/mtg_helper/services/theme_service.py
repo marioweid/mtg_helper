@@ -10,18 +10,88 @@ _SEED_GROUPS = (
     (
         "plus_one_plus_one",
         "+1/+1 Counters",
+        "Cards that create, move, multiply, or reward +1/+1 counters on permanents.",
+        ("counters", "+1/+1 counters", "counter synergies"),
         ("plus_one_plus_one", "plus_1_plus_1", "plus_1_plus_1_counters", "plus_counters"),
     ),
-    ("artifacts", "Artifacts", ("artifacts",)),
-    ("aristocrats", "Aristocrats", ("aristocrats",)),
-    ("blink", "Blink", ("blink",)),
-    ("enchantments", "Enchantments", ("enchantments",)),
-    ("equipment", "Equipment", ("equipment",)),
-    ("lifegain", "Lifegain", ("lifegain",)),
-    ("reanimator", "Reanimator", ("reanimator",)),
-    ("spellslinger", "Spellslinger", ("spellslinger",)),
-    ("tokens", "Tokens", ("tokens",)),
-    ("voltron", "Voltron", ("voltron",)),
+    (
+        "artifacts",
+        "Artifacts",
+        "Artifact engines, payoffs, and artifact-matters cards.",
+        ("artifact matters",),
+        ("artifacts",),
+    ),
+    (
+        "aristocrats",
+        "Aristocrats",
+        "Sacrifice creatures or tokens for death triggers and resource advantages.",
+        ("sacrifice", "death triggers"),
+        ("aristocrats",),
+    ),
+    (
+        "blink",
+        "Blink",
+        "Exile and return permanents to reuse enter-the-battlefield abilities.",
+        ("flicker", "etb"),
+        ("blink",),
+    ),
+    (
+        "enchantments",
+        "Enchantments",
+        "Enchantment engines, constellation effects, and enchantment payoffs.",
+        ("enchantress", "constellation"),
+        ("enchantments",),
+    ),
+    (
+        "equipment",
+        "Equipment",
+        "Equipment, attachment support, and equipped-creature payoffs.",
+        ("equipment matters", "armed"),
+        ("equipment",),
+    ),
+    (
+        "lifegain",
+        "Lifegain",
+        "Life-gain enablers and cards that reward gaining or having life.",
+        ("life gain", "life matters"),
+        ("lifegain",),
+    ),
+    (
+        "reanimator",
+        "Reanimator",
+        "Put valuable permanents into graveyards and return them to the battlefield.",
+        ("reanimation", "graveyard recursion"),
+        ("reanimator",),
+    ),
+    (
+        "spellslinger",
+        "Spellslinger",
+        "Cast many instants and sorceries and profit from spell-casting triggers.",
+        ("instants and sorceries", "spell casting"),
+        ("spellslinger",),
+    ),
+    (
+        "tokens",
+        "Tokens",
+        "Create creature or artifact tokens and amplify their board presence or value.",
+        ("go wide", "token matters"),
+        ("tokens",),
+    ),
+    (
+        "voltron",
+        "Voltron",
+        "Concentrate auras, equipment, counters, and protection on one attacker.",
+        ("commander damage", "single attacker"),
+        ("voltron",),
+    ),
+    (
+        "x_spells",
+        "X Spells",
+        "Variable-cost spells whose mana cost or effect contains X, plus mana and "
+        "payoffs that scale them.",
+        ("x-spells", "variable mana", "big x spells", "x cost"),
+        ("x_spells", "x_spells_matter", "x-spells"),
+    ),
 )
 
 
@@ -35,24 +105,28 @@ def normalize_slug(value: str) -> str:
 async def seed_groups(pool: asyncpg.Pool) -> None:
     """Create conservative groups and attach exact normalized matches."""
     async with pool.acquire() as conn, conn.transaction():
-        created_any = False
-        for index, (slug, label, aliases) in enumerate(_SEED_GROUPS):
+        for index, (slug, label, description, search_aliases, source_aliases) in enumerate(
+            _SEED_GROUPS
+        ):
             created = await conn.fetchval(
                 """
-                INSERT INTO theme_groups (slug, label, sort_order)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (slug) DO NOTHING
+                INSERT INTO theme_groups (slug, label, description, aliases, sort_order)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (slug) DO UPDATE SET
+                    description = COALESCE(theme_groups.description, EXCLUDED.description),
+                    aliases = CASE WHEN cardinality(theme_groups.aliases) = 0
+                        THEN EXCLUDED.aliases ELSE theme_groups.aliases END
                 RETURNING id
                 """,
                 slug,
                 label,
+                description,
+                list(search_aliases),
                 index,
             )
             if created is not None:
-                created_any = True
-                await _attach_seed_members(conn, slug, aliases)
-        if created_any:
-            await _migrate_legacy_deck_tags(conn)
+                await _attach_seed_members(conn, slug, source_aliases)
+        await _migrate_legacy_deck_tags(conn)
 
 
 async def _attach_seed_members(
@@ -125,7 +199,14 @@ async def list_theme_catalog(pool: asyncpg.Pool) -> list[dict[str, Any]]:
         {
             "category": f"theme_group:{row['id']}",
             "display_name": row["label"],
-            "keywords": [{"tag": row["slug"], "label": row["label"], "deck_count": None}],
+            "keywords": [
+                {
+                    "tag": row["slug"],
+                    "label": row["label"],
+                    "description": row["description"],
+                    "deck_count": None,
+                }
+            ],
         }
         for row in groups
     ]
@@ -139,19 +220,27 @@ async def list_theme_catalog(pool: asyncpg.Pool) -> list[dict[str, Any]]:
 async def _load_ungrouped(conn: asyncpg.Connection) -> list[dict[str, Any]]:
     rows = await conn.fetch(
         """
-        SELECT 'moxfield:' || h.tag AS tag, h.name AS label
+        SELECT 'moxfield:' || h.tag AS tag, h.name AS label, h.description
         FROM moxfield_hubs h
         LEFT JOIN theme_group_members m ON m.moxfield_hub_id = h.id
         WHERE h.active AND h.enabled AND m.id IS NULL
         UNION ALL
-        SELECT 'archidekt:' || t.tag, t.name
+        SELECT 'archidekt:' || t.tag, t.name, t.description
         FROM archidekt_tags t
         LEFT JOIN theme_group_members m ON m.archidekt_tag_id = t.id
         WHERE t.active AND t.enabled AND m.id IS NULL
         ORDER BY label
         """
     )
-    return [{"tag": row["tag"], "label": row["label"], "deck_count": None} for row in rows]
+    return [
+        {
+            "tag": row["tag"],
+            "label": row["label"],
+            "description": row["description"],
+            "deck_count": None,
+        }
+        for row in rows
+    ]
 
 
 async def load_theme_tags(pool: asyncpg.Pool) -> set[str]:
@@ -164,7 +253,9 @@ async def load_theme_prompt_catalog(pool: asyncpg.Pool) -> str:
     """Return compact selectable theme lines for agent prompts."""
     catalog = await list_theme_catalog(pool)
     return "\n".join(
-        f"- {item['tag']}: {item['label']}" for group in catalog for item in group["keywords"]
+        f"- {item['tag']}: {item['label']} - {item.get('description') or 'No description'}"
+        for group in catalog
+        for item in group["keywords"]
     )
 
 

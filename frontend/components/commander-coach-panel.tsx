@@ -34,7 +34,7 @@ export function CommanderCoachPanel({ deckId }: Props) {
       const res = await apiClient.coachDeck(deckId, { mode: "auto", message });
       setResult(res);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Commander Coach failed");
+      setError(err instanceof ApiError ? err.message : "MTG Assistant failed");
     } finally {
       setLoading(false);
     }
@@ -46,8 +46,8 @@ export function CommanderCoachPanel({ deckId }: Props) {
     <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">Commander Coach</h2>
-          <p className="text-xs text-gray-500">Test UI for the new coach / deck doctor agent.</p>
+          <h2 className="text-sm font-semibold text-white">MTG Assistant</h2>
+          <p className="text-xs text-gray-500">Ask for grounded card and deck advice.</p>
         </div>
         <button
           type="button"
@@ -76,7 +76,7 @@ export function CommanderCoachPanel({ deckId }: Props) {
         <div className="mt-3 space-y-3 text-xs text-gray-300">
           <div className="rounded-md border border-white/10 bg-black/20 p-2">
             <div className="mb-1 text-[11px] uppercase tracking-wide text-gray-500">
-              Coach reply · {result.mode}
+              Assistant reply · {result.mode}
             </div>
             <p>{result.reply}</p>
           </div>

@@ -1,11 +1,10 @@
-"""Persistent per-deck memory for Commander Coach."""
+"""Persistent per-deck memory for MTG Assistant."""
 
 from uuid import UUID
 
 import asyncpg
 
 from mtg_helper.models.ai import CoachMemoryResponse, CommanderCoachRequest, CommanderCoachResponse
-
 
 _EMPTY_SQL = """
 SELECT $1::uuid AS deck_id,
@@ -233,7 +232,6 @@ async def handle_memory_message(
 ) -> CommanderCoachResponse | None:
     """Handle conversational memory read/add/remove commands, if present."""
     text = _latest_user_text(request.message)
-    lower = text.lower()
     memory = await get_memory(pool, deck_id, account_id)
 
     if _is_show_intent(text):
@@ -250,7 +248,9 @@ async def handle_memory_message(
         updated = await upsert_memory(pool, deck_id, account_id, updated_notes)
         return CommanderCoachResponse(
             mode="memory",
-            reply=f"Saved that to this deck's Coach memory.\n\nCurrent memory:\n{updated.notes}",
+            reply=(
+                f"Saved that to this deck's Assistant memory.\n\nCurrent memory:\n{updated.notes}"
+            ),
             coach_memory=updated,
             memory_updated=True,
         )

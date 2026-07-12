@@ -78,7 +78,7 @@ export function CommandBar({ deckId, buildLabel }: Props) {
           href={`/decks/${deckId}/coach`}
           className="flex-1 rounded-lg border border-indigo-400/40 px-4 py-2 text-center text-sm text-indigo-100 transition-colors hover:border-indigo-300 hover:text-white sm:flex-none"
         >
-          Coach
+          Assistant
         </Link>
         <button
           type="button"

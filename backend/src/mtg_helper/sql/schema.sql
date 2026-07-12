@@ -212,12 +212,15 @@ CREATE TABLE IF NOT EXISTS theme_groups (
     slug        TEXT UNIQUE NOT NULL,
     label       TEXT NOT NULL,
     description TEXT,
+    aliases     TEXT[] NOT NULL DEFAULT '{}',
     sort_order  INTEGER NOT NULL DEFAULT 0,
     enabled     BOOLEAN NOT NULL DEFAULT true,
     deleted_at  TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE theme_groups ADD COLUMN IF NOT EXISTS aliases TEXT[] NOT NULL DEFAULT '{}';
 
 CREATE TABLE IF NOT EXISTS theme_group_members (
     id                BIGSERIAL PRIMARY KEY,
