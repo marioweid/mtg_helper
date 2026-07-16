@@ -24,7 +24,7 @@ from mtg_helper.models.ai import (
     DeckIdentityReport,
 )
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import google_model_settings, make_google_model
 from mtg_helper.services.card_search_tool import search_cards
 from mtg_helper.services.commander_coach import pipeline, signal_lanes, synergy_scoring
 
@@ -69,7 +69,7 @@ def _build_agent() -> Agent[UpgradeDeps, CoachUpgradeReport]:
         deps_type=UpgradeDeps,
         output_type=CoachUpgradeReport,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings={"temperature": 0.35, "max_tokens": 6144},
+        model_settings=google_model_settings(max_tokens=6144, temperature=0.35, thinking="medium"),
         retries=1,
     )
 

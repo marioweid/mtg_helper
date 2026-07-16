@@ -18,7 +18,7 @@ from mtg_helper.models.ai import (
     DeckIdentityReport,
 )
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import google_model_settings, make_google_model
 from mtg_helper.services.commander_coach import signal_lanes
 
 _log = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def _build_agent() -> Agent[ChallengerDeps, CoachReviewReport]:
         deps_type=ChallengerDeps,
         output_type=CoachReviewReport,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings={"temperature": 0.1, "max_tokens": 2048},
+        model_settings=google_model_settings(max_tokens=2048, temperature=0.1, thinking="low"),
         retries=1,
     )
 

@@ -15,7 +15,10 @@ from pydantic_ai import Agent
 
 from mtg_helper.models.ai import CommanderCoachRequest
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import (
+    fast_google_model_settings,
+    make_fast_google_model,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -89,11 +92,13 @@ def _deck_context(deck: DeckDetailResponse, memory_notes: str) -> dict[str, obje
 
 def _build_agent() -> Agent[RouterDeps, CoachRoute]:
     return Agent[RouterDeps, CoachRoute](
-        model=make_google_model(),
+        model=make_fast_google_model(),
         deps_type=RouterDeps,
         output_type=CoachRoute,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings={"temperature": 0.0, "max_tokens": 512},
+        model_settings=fast_google_model_settings(
+            max_tokens=512, temperature=0.0, thinking="minimal"
+        ),
         retries=1,
     )
 

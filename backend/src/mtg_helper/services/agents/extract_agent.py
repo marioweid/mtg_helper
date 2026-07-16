@@ -9,7 +9,10 @@ from pydantic_ai import Agent, RunContext
 from mtg_helper.models.ai import KeywordExtractResponse
 from mtg_helper.services import card_service
 from mtg_helper.services.agents._history import to_model_messages
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import (
+    fast_google_model_settings,
+    make_fast_google_model,
+)
 from mtg_helper.services.agents._prompts import (
     BRACKET_DESCRIPTIONS,
     FORCE_FINALIZE_HINT,
@@ -125,13 +128,14 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
 
 def _build_agent() -> Agent[ExtractDeps, KeywordExtractResponse]:
     agent = Agent[ExtractDeps, KeywordExtractResponse](
-        model=make_google_model(),
+        model=make_fast_google_model(),
         deps_type=ExtractDeps,
         output_type=KeywordExtractResponse,
-        model_settings={
-            "temperature": _TEMPERATURE,
-            "max_tokens": _MAX_OUTPUT_TOKENS,
-        },
+        model_settings=fast_google_model_settings(
+            max_tokens=_MAX_OUTPUT_TOKENS,
+            temperature=_TEMPERATURE,
+            thinking="minimal",
+        ),
         retries=1,
     )
 

@@ -24,7 +24,7 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestStats
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import google_model_settings, make_google_model
 from mtg_helper.services.card_search_tool import search_cards
 
 _log = logging.getLogger(__name__)
@@ -110,10 +110,11 @@ def _build_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
         deps_type=_AnalysisDeps,
         output_type=SimulationAnalysisResponse,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings={
-            "temperature": _TEMPERATURE,
-            "max_tokens": _MAX_OUTPUT_TOKENS,
-        },
+        model_settings=google_model_settings(
+            max_tokens=_MAX_OUTPUT_TOKENS,
+            temperature=_TEMPERATURE,
+            thinking="medium",
+        ),
         retries=1,
     )
 

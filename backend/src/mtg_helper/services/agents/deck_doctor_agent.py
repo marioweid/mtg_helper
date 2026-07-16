@@ -16,7 +16,7 @@ from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
 
 from mtg_helper.models.ai import CardSearchHit, CardSearchInput, DeckDoctorResponse
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import google_model_settings, make_google_model
 from mtg_helper.services.card_search_tool import search_cards
 from mtg_helper.services.retrieval_service import card_qualifying_stages
 
@@ -101,7 +101,11 @@ def _build_agent() -> Agent[DoctorDeps, DeckDoctorResponse]:
         deps_type=DoctorDeps,
         output_type=DeckDoctorResponse,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings={"temperature": _TEMPERATURE, "max_tokens": _MAX_OUTPUT_TOKENS},
+        model_settings=google_model_settings(
+            max_tokens=_MAX_OUTPUT_TOKENS,
+            temperature=_TEMPERATURE,
+            thinking="medium",
+        ),
         retries=1,
     )
 

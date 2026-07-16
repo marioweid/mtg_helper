@@ -12,7 +12,6 @@ import asyncpg
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
 
-from mtg_helper.config import settings
 from mtg_helper.models.ai import (
     CommanderCoachRequest,
     CommanderCoachResponse,
@@ -22,7 +21,7 @@ from mtg_helper.models.ai import (
     DoctorSwap,
 )
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import google_model_settings, make_google_model
 from mtg_helper.services.mtg_assistant_tools import (
     BracketReport,
     DeckAnalysis,
@@ -121,15 +120,12 @@ class AssistantDeps:
 
 
 def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
-    model_settings: dict[str, object] = {"max_tokens": 2048}
-    if "gemini-3.5" not in settings.chat_model.lower():
-        model_settings["temperature"] = 0.15
     return Agent[AssistantDeps, AssistantAnswer](
         model=make_google_model(),
         deps_type=AssistantDeps,
         output_type=AssistantAnswer,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings=model_settings,
+        model_settings=google_model_settings(max_tokens=2048, temperature=0.15, thinking="low"),
         retries=1,
         tools=[
             search_themes,

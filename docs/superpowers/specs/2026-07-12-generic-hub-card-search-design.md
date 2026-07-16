@@ -1,13 +1,16 @@
 # Generic Hub-First Card Search Design
 
 **Date:** 2026-07-12
-**Status:** Implemented; Gemini 3.5 default pending comparative evaluation
+**Status:** Implemented; Gemini 3.5 is the production default
 
 The typed `search_cards` contract, hub-first filtering, unchanged-filter global fallback,
 provenance, assistant grounding, and deterministic tests were implemented on 2026-07-16. The
-production default remains `gemini-2.5-flash` until the live intent suite confirms the quality,
-token, latency, compatibility, and cost requirements below. When configured explicitly with a
-Gemini 3.5 model, the assistant omits temperature from its model settings.
+production default changed to `gemini-3.5-flash` on 2026-07-16 after explicit operator approval.
+The comparative intent suite remains recommended for measuring quality, token, latency, and cost
+changes. All agents omit temperature for Gemini 3.5 while preserving `CHAT_MODEL` overrides.
+Lightweight routing, extraction, description, and identity tasks use the configurable `FAST_MODEL`
+(`gemini-3.1-flash-lite` by default); reasoning-heavy agents remain on `CHAT_MODEL`. Each agent also
+sets the lowest explicit thinking level appropriate to its task.
 
 ## Summary
 
@@ -169,7 +172,7 @@ use.
 Migration requirements:
 
 - keep the model configurable through `CHAT_MODEL`;
-- change the production default only after the evaluation passes;
+- retain or roll back the production default based on the post-migration evaluation;
 - remove temperature from Gemini 3.5 model settings because Google no longer recommends it;
 - test low and medium thinking levels, preferring the least expensive setting that meets quality
   criteria;
@@ -219,7 +222,7 @@ arguments. The suite includes X-spells, cheap interaction, creature-only payoffs
 requirements, price limits, and mixed constraints.
 
 Run the same intent suite against Gemini 2.5 Flash and Gemini 3.5 Flash. Record tool accuracy, model
-requests, tokens, latency, and cost before changing the default model.
+requests, tokens, latency, and cost as a post-migration retain-or-rollback decision.
 
 ## Acceptance Criteria
 
@@ -230,5 +233,5 @@ requests, tokens, latency, and cost before changing the default model.
 - Empty hub results trigger the same-filter global fallback and are visibly labeled.
 - Every actionable recommendation is traceable to a current search result.
 - No commander-specific or theme-specific filtering branch is added.
-- Gemini 3.5 becomes the default only after it improves tool-selection quality within accepted token,
-  latency, and cost bounds.
+- The explicitly approved Gemini 3.5 default is retained only if post-migration evaluation confirms
+  acceptable tool-selection quality, tokens, latency, and cost.

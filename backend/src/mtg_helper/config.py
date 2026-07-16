@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     archidekt_tag_stale_after_hours: float = 168.0
 
     # LLM
-    chat_model: str = "gemini-2.5-flash"
+    chat_model: str = "gemini-3.5-flash"
+    fast_model: str = "gemini-3.1-flash-lite"
 
     # Pagination defaults
     default_limit: int = 20

@@ -7,7 +7,10 @@ from pydantic_ai import Agent, RunContext
 
 from mtg_helper.models.ai import CommanderSuggestIntent, CommanderSuggestResponse
 from mtg_helper.services.agents._history import to_model_messages
-from mtg_helper.services.agents._model import make_google_model
+from mtg_helper.services.agents._model import (
+    fast_google_model_settings,
+    make_fast_google_model,
+)
 from mtg_helper.services.agents._prompts import (
     FORCE_FINALIZE_HINT,
     MAX_HISTORY_TURNS,
@@ -99,10 +102,14 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
 
 def _build_agent() -> Agent[CommanderSuggestDeps, CommanderSuggestAgentOutput]:
     agent = Agent[CommanderSuggestDeps, CommanderSuggestAgentOutput](
-        model=make_google_model(),
+        model=make_fast_google_model(),
         deps_type=CommanderSuggestDeps,
         output_type=CommanderSuggestAgentOutput,
-        model_settings={"temperature": _TEMPERATURE, "max_tokens": _MAX_OUTPUT_TOKENS},
+        model_settings=fast_google_model_settings(
+            max_tokens=_MAX_OUTPUT_TOKENS,
+            temperature=_TEMPERATURE,
+            thinking="low",
+        ),
         retries=1,
     )
 
