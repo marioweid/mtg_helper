@@ -12,6 +12,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
 
+from mtg_helper.config import settings
 from mtg_helper.models.ai import (
     CommanderCoachRequest,
     CommanderCoachResponse,
@@ -26,7 +27,6 @@ from mtg_helper.services.mtg_assistant_tools import (
     BracketReport,
     DeckAnalysis,
     LegalityReport,
-    ThemeCardCandidate,
     ThemeMatch,
 )
 from mtg_helper.services.mtg_assistant_tools import (
@@ -39,11 +39,14 @@ from mtg_helper.services.mtg_assistant_tools import (
     check_legality as check_legality_service,
 )
 from mtg_helper.services.mtg_assistant_tools import (
-    find_theme_cards as find_theme_cards_service,
-)
-from mtg_helper.services.mtg_assistant_tools import (
     search_themes as search_themes_service,
 )
+from mtg_helper.services.mtg_card_search import (
+    AssistantCardSearchInput,
+    CardSearchCandidate,
+    CardSearchResult,
+)
+from mtg_helper.services.mtg_card_search import search_cards as search_cards_service
 
 ProgressCb = Callable[[str, str], Awaitable[None]]
 
@@ -58,8 +61,13 @@ their deck or cards are required.
 
 Rules:
 - Never invent a card, legality result, bracket rule, theme membership, or score.
-- Any recommended card MUST come from find_theme_cards in this run. Return its exact scryfall_id.
-- For a thematic request, call search_themes before find_theme_cards.
+- Any recommended card MUST come from search_cards in this run. Return its exact scryfall_id.
+- For a thematic request, call search_themes before search_cards and pass only returned theme tags.
+- Express explicit requirements with search_cards fields; never filter a broad result in prose.
+- mana_cost_symbols matches symbols in the printed mana cost, not symbols or X in oracle text.
+- Distinguish mana cost from mana value, card type from subtype, and theme from constraints.
+- Do not invent numeric meanings for words such as cheap; ask or omit the numeric filter.
+- If search_cards reports global_fallback, tell the user the selected theme had no matching cards.
 - Call analyze_deck for deck diagnosis, cuts, or swaps.
 - Call check_legality for legality questions and check_bracket for bracket questions.
 - Treat brackets as table guidance, not format legality.
@@ -101,7 +109,7 @@ class AssistantDeps:
 
     pool: asyncpg.Pool
     deck: DeckDetailResponse
-    retrieved: dict[UUID, ThemeCardCandidate] = field(default_factory=dict)
+    retrieved: dict[UUID, CardSearchCandidate] = field(default_factory=dict)
     tool_calls: int = 0
 
     def allow_tool(self) -> bool:
@@ -113,16 +121,19 @@ class AssistantDeps:
 
 
 def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
+    model_settings: dict[str, object] = {"max_tokens": 2048}
+    if "gemini-3.5" not in settings.chat_model.lower():
+        model_settings["temperature"] = 0.15
     return Agent[AssistantDeps, AssistantAnswer](
         model=make_google_model(),
         deps_type=AssistantDeps,
         output_type=AssistantAnswer,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings={"temperature": 0.15, "max_tokens": 2048},
+        model_settings=model_settings,
         retries=1,
         tools=[
             search_themes,
-            find_theme_cards,
+            search_cards,
             analyze_deck,
             check_legality,
             check_bracket,
@@ -137,28 +148,18 @@ async def search_themes(ctx: RunContext[AssistantDeps], query: str) -> list[Them
     return await search_themes_service(ctx.deps.pool, query)
 
 
-async def find_theme_cards(
+async def search_cards(
     ctx: RunContext[AssistantDeps],
-    theme_tags: list[str],
-    max_price_eur_cents: int | None = None,
-    roles: list[str] | None = None,
-    limit: int = 8,
-) -> list[ThemeCardCandidate]:
-    """Retrieve legal cards from selected hubs/tags, ranked for this deck."""
+    filters: AssistantCardSearchInput,
+) -> CardSearchResult:
+    """Apply typed filters to a theme-first or global legal card search."""
     if not ctx.deps.allow_tool():
-        return []
-    candidates = await find_theme_cards_service(
-        ctx.deps.pool,
-        ctx.deps.deck,
-        theme_tags,
-        max_price_eur_cents=max_price_eur_cents,
-        roles=roles,
-        limit=limit,
-    )
-    for candidate in candidates:
+        return CardSearchResult(evidence_source="none", message="Tool-call budget exhausted.")
+    result = await search_cards_service(ctx.deps.pool, ctx.deps.deck, filters)
+    for candidate in result.candidates:
         if candidate.card.scryfall_id is not None:
             ctx.deps.retrieved[candidate.card.scryfall_id] = candidate
-    return candidates
+    return result
 
 
 async def analyze_deck(ctx: RunContext[AssistantDeps]) -> DeckAnalysis | None:

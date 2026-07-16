@@ -1,7 +1,13 @@
 # Generic Hub-First Card Search Design
 
 **Date:** 2026-07-12
-**Status:** Approved for implementation planning
+**Status:** Implemented; Gemini 3.5 default pending comparative evaluation
+
+The typed `search_cards` contract, hub-first filtering, unchanged-filter global fallback,
+provenance, assistant grounding, and deterministic tests were implemented on 2026-07-16. The
+production default remains `gemini-2.5-flash` until the live intent suite confirms the quality,
+token, latency, compatibility, and cost requirements below. When configured explicitly with a
+Gemini 3.5 model, the assistant omits temperature from its model settings.
 
 ## Summary
 

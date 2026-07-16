@@ -96,6 +96,9 @@ async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
     assert result.doctor is not None
     assert result.doctor.cuts[0].card_name == "Medium Value Card"
     assert result.doctor.tool_call_count == 1
+    tool_names = {tool.name for tool in model.last_model_request_parameters.function_tools}
+    assert "search_cards" in tool_names
+    assert "find_theme_cards" not in tool_names
 
 
 async def test_signal_lanes_detect_core_commander_packages() -> None:
