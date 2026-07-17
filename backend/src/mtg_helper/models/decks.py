@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import AnyHttpUrl, BaseModel, Field
@@ -95,6 +96,10 @@ class DeckCardItem(BaseModel):
     price_eur_cents: int | None = None
     owned_in: list[CollectionMembership] = Field(default_factory=list)
     game_changer: bool = False
+    deck_fit_score: int | None = Field(default=None, ge=0, le=100)
+    deck_fit_band: Literal["strong", "solid", "weak"] | None = None
+    deck_fit_reasons: list[str] = Field(default_factory=list)
+    deck_fit_protected: bool = False
 
 
 class CommanderCardSummary(BaseModel):

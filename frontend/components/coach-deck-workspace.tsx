@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { CardHover } from "@/components/card-hover";
 import { CardSearch } from "@/components/card-search";
+import { DeckFitIndicator } from "@/components/deck-fit-indicator";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import { ManaCost } from "@/components/mana-cost";
 import { ManaCurve } from "@/components/mana-curve";
@@ -118,7 +119,10 @@ function CardRow({
                 imageUri={card.image_uri}
                 className="font-medium text-white"
               >
-                <span className="block truncate">{card.name}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="block truncate">{card.name}</span>
+                  <DeckFitIndicator card={card} />
+                </span>
               </CardHover>
               {card.type_line && (
                 <div className="mt-0.5 truncate text-[11px] text-gray-500">{card.type_line}</div>

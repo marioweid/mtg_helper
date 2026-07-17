@@ -124,7 +124,12 @@ async def _require_deck(
     account: AccountResponse,
 ) -> DeckDetailResponse:
     email = _require_email(account)
-    deck = await deck_service.get_deck(request.app.state.db_pool, deck_id, email)
+    deck = await deck_service.get_deck(
+        request.app.state.db_pool,
+        deck_id,
+        email,
+        account_id=account.id,
+    )
     if deck is None:
         raise _deck_not_found(deck_id)
     return deck

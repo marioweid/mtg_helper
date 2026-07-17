@@ -94,6 +94,10 @@ export interface DeckCardItem {
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
   game_changer: boolean;
+  deck_fit_score?: number | null;
+  deck_fit_band?: "strong" | "solid" | "weak" | null;
+  deck_fit_reasons?: string[];
+  deck_fit_protected?: boolean;
 }
 
 export interface ManaCurveRecommendation {

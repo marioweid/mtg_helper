@@ -13,6 +13,7 @@ from mtg_helper.models.ai import CardSearchHit
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services import bracket_service
 from mtg_helper.services.commander_coach import pipeline
+from mtg_helper.services.deck_fit_service import WeakCardEvidence, weak_card_evidence
 from mtg_helper.services.theme_service import score_themes
 
 _MAX_THEME_MATCHES = 5
@@ -51,7 +52,7 @@ class DeckAnalysis(BaseModel):
     synergy_summary: str
     priority_roles: list[str] = Field(default_factory=list)
     weak_packages: list[str] = Field(default_factory=list)
-    weak_cards: list[str] = Field(default_factory=list)
+    weak_cards: list[WeakCardEvidence] = Field(default_factory=list)
 
 
 class LegalityIssue(BaseModel):
@@ -180,7 +181,6 @@ def analyze_deck(deck: DeckDetailResponse) -> DeckAnalysis:
     curve = pipeline.analyze_curve(deck)
     roles = pipeline.analyze_role_budget(deck)
     synergy = pipeline.analyze_synergy(deck)
-    weak = pipeline.weak_cards(deck, limit=8)
     return DeckAnalysis(
         mana_summary=mana.summary,
         curve_summary=curve.summary,
@@ -188,7 +188,7 @@ def analyze_deck(deck: DeckDetailResponse) -> DeckAnalysis:
         synergy_summary=synergy.summary,
         priority_roles=roles.priority_roles,
         weak_packages=synergy.weak_packages,
-        weak_cards=[str(item["name"]) for item in weak],
+        weak_cards=weak_card_evidence(deck, limit=8),
     )
 
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { CardHover } from "@/components/card-hover";
+import { DeckFitIndicator } from "@/components/deck-fit-indicator";
 import { ManaCost } from "@/components/mana-cost";
 import { primaryType } from "@/lib/card-types";
 import { STAGE_LABELS } from "@/lib/constants";
@@ -119,6 +120,7 @@ function CompactRow({
           </CardHover>
         </div>
         {isPet && <span className="shrink-0 text-red-400" title="Pet card">♥</span>}
+        <DeckFitIndicator card={card} />
         {inCombo && (
           <span className="shrink-0 text-yellow-300" title="In a combo">⚡</span>
         )}

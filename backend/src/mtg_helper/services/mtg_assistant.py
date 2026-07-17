@@ -68,6 +68,8 @@ Rules:
 - Do not invent numeric meanings for words such as cheap; ask or omit the numeric filter.
 - If search_cards reports global_fallback, tell the user the selected theme had no matching cards.
 - Call analyze_deck for deck diagnosis, cuts, or swaps.
+- For cuts and swaps, prefer the lowest deck-fit scores returned by analyze_deck and explain the
+  provided evidence. Do not propose protected cards as ordinary cuts or alter numeric scores.
 - Call check_legality for legality questions and check_bracket for bracket questions.
 - Treat brackets as table guidance, not format legality.
 - Prefer a few strong, deck-specific recommendations over generic lists.

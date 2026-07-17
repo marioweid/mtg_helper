@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { CardHover } from "@/components/card-hover";
+import {
+  AssistantStarterPrompts,
+  INITIAL_ASSISTANT_PROMPT,
+} from "@/components/assistant-starter-prompts";
 import { CoachDeckWorkspace } from "@/components/coach-deck-workspace";
 import { ManaCost } from "@/components/mana-cost";
 import { DeckDetailSkeleton } from "@/components/skeleton";
@@ -434,9 +438,7 @@ export default function CoachPage() {
   const deckId = params["id"] as string;
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState(
-    "Doctor this deck. Tell me what to cut, what to add, and why.",
-  );
+  const [prompt, setPrompt] = useState(INITIAL_ASSISTANT_PROMPT);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<CommanderCoachProgressEvent[]>([]);
@@ -652,12 +654,6 @@ export default function CoachPage() {
       <div className="grid min-h-0 flex-1 gap-3 px-3 pb-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_460px] lg:px-6">
         <main className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-zinc-950/50">
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
-            {messages.length === 0 && prompt.trim() && (
-              <div className="ml-auto max-w-2xl rounded-2xl bg-indigo-600/20 px-4 py-3 text-sm">
-                {prompt}
-              </div>
-            )}
-
             {messages.map((message, index) =>
               message.role === "user" ? (
                 <div
@@ -686,13 +682,7 @@ export default function CoachPage() {
             )}
 
             {messages.length === 0 && !loading && (
-              <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-5">
-                <h2 className="font-semibold text-white">Ask the Assistant</h2>
-                <p className="mt-2 text-sm text-gray-400">
-                  Ask for deck analysis, strong cards, swaps, or specific constraints like
-                  preserving your commander engine.
-                </p>
-              </div>
+              <AssistantStarterPrompts onSelect={setPrompt} />
             )}
 
           </div>
