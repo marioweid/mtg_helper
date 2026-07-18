@@ -6,8 +6,10 @@ from uuid import uuid4
 
 import pytest
 
+from mtg_helper.models.ai import CardSuggestion, ColorStatus, ManaBaseReport, ManaFixResponse
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.services.mtg_assistant_tools import (
+    _compose_mana_base_analysis,
     _structural_issues,
     _theme_match_score,
     check_bracket,
@@ -32,6 +34,56 @@ def _card(name: str, *, quantity: int = 1, game_changer: bool = False) -> DeckCa
         added_by="user",
         ai_reasoning=None,
         game_changer=game_changer,
+    )
+
+
+def _land(
+    name: str,
+    colors: list[str],
+    *,
+    oracle_text: str = "",
+    quantity: int = 1,
+) -> DeckCardItem:
+    card = _card(name, quantity=quantity)
+    return card.model_copy(
+        update={
+            "mana_cost": None,
+            "cmc": Decimal("0"),
+            "type_line": "Basic Land" if name in {"Forest", "Island"} else "Land",
+            "oracle_text": oracle_text,
+            "color_identity": colors,
+        }
+    )
+
+
+def _mana_fix(suggestions: list[CardSuggestion]) -> ManaFixResponse:
+    return ManaFixResponse(
+        report=ManaBaseReport(
+            total_lands=36,
+            total_colored_pips=30,
+            colors=[ColorStatus(color="G", pip_count=30, source_count=12, target=16, deficit=4)],
+            avg_cmc=3.0,
+            ramp_count=8,
+            recommended_lands=36,
+            land_delta=0,
+        ),
+        suggestions=suggestions,
+    )
+
+
+def _suggestion(name: str) -> CardSuggestion:
+    return CardSuggestion(
+        scryfall_id=uuid4(),
+        name=name,
+        mana_cost=None,
+        type_line="Land",
+        image_uri=None,
+        oracle_text="{T}: Add {G}.",
+        cmc=0,
+        color_identity=["G"],
+        category="lands",
+        reasoning="Adds a needed green source.",
+        synergies=["lands"],
     )
 
 
@@ -83,6 +135,28 @@ def test_structural_legality_rejects_wrong_size_and_duplicates() -> None:
     issues = _structural_issues(deck)
 
     assert {issue.code for issue in issues} == {"deck_size", "singleton"}
+
+
+def test_mana_analysis_pairs_grounded_candidate_with_safe_in_deck_land() -> None:
+    colorless = _land("Reliquary Tower", [], oracle_text="You have no maximum hand size.")
+    green = _land("Forest", ["G"], quantity=12)
+    deck = _deck([colorless, green])
+    candidate = _suggestion("Llanowar Wastes")
+
+    result = _compose_mana_base_analysis(deck, _mana_fix([candidate]))
+
+    assert result.swaps[0].remove_card == "Reliquary Tower"
+    assert result.swaps[0].add.scryfall_id == candidate.scryfall_id
+    assert result.swaps[0].add.name == "Llanowar Wastes"
+
+
+def test_mana_analysis_does_not_remove_a_deficient_color_source() -> None:
+    deck = _deck([_land("Forest", ["G"], quantity=12)])
+
+    result = _compose_mana_base_analysis(deck, _mana_fix([_suggestion("Llanowar Wastes")]))
+
+    assert result.swaps == []
+    assert result.unresolved
 
 
 @pytest.mark.parametrize("bracket", [1, 2])

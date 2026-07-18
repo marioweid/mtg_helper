@@ -9,9 +9,9 @@ from uuid import UUID
 import asyncpg
 from pydantic import BaseModel, Field
 
-from mtg_helper.models.ai import CardSearchHit
-from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services import bracket_service
+from mtg_helper.models.ai import CardSearchHit, CardSuggestion, ManaBaseReport, ManaFixResponse
+from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
+from mtg_helper.services import bracket_service, mana_base_service
 from mtg_helper.services.commander_coach import pipeline
 from mtg_helper.services.deck_fit_service import WeakCardEvidence, weak_card_evidence
 from mtg_helper.services.theme_service import score_themes
@@ -53,6 +53,25 @@ class DeckAnalysis(BaseModel):
     priority_roles: list[str] = Field(default_factory=list)
     weak_packages: list[str] = Field(default_factory=list)
     weak_cards: list[WeakCardEvidence] = Field(default_factory=list)
+
+
+class ManaBaseSwap(BaseModel):
+    """One grounded land-for-land improvement."""
+
+    remove_card: str
+    add: CardSearchHit
+    reason: str
+
+
+class AssistantManaBaseAnalysis(BaseModel):
+    """Bounded mana diagnosis and deterministic land swaps."""
+
+    report: ManaBaseReport
+    recommended_land_range: tuple[int, int]
+    tapped_land_count: int = Field(ge=0)
+    utility_land_count: int = Field(ge=0)
+    swaps: list[ManaBaseSwap] = Field(default_factory=list, max_length=6)
+    unresolved: list[str] = Field(default_factory=list, max_length=5)
 
 
 class LegalityIssue(BaseModel):
@@ -190,6 +209,80 @@ def analyze_deck(deck: DeckDetailResponse) -> DeckAnalysis:
         weak_packages=synergy.weak_packages,
         weak_cards=weak_card_evidence(deck, limit=8),
     )
+
+
+async def analyze_mana_base(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+) -> AssistantManaBaseAnalysis:
+    """Return a deterministic mana diagnosis with grounded land swaps."""
+    fix = await mana_base_service.suggest_mana_fix(pool, deck, account_id=None)
+    return _compose_mana_base_analysis(deck, fix)
+
+
+def _compose_mana_base_analysis(
+    deck: DeckDetailResponse,
+    fix: ManaFixResponse,
+) -> AssistantManaBaseAnalysis:
+    """Pair mana-fix candidates with safe in-deck land removals."""
+    deficient = {status.color for status in fix.report.colors if status.deficit > 0}
+    removable = [
+        card
+        for card in deck.cards
+        if "Land" in (card.type_line or "")
+        and card.quantity > 0
+        and not (set(card.color_identity or []) & deficient)
+    ]
+    removable.sort(key=_land_removal_rank, reverse=True)
+    swaps = [
+        ManaBaseSwap(
+            remove_card=land.name,
+            add=_suggestion_hit(candidate),
+            reason=_mana_swap_reason(land.name, candidate.name, deficient),
+        )
+        for land, candidate in zip(removable[:6], fix.suggestions[:6], strict=False)
+    ]
+    unresolved = list(fix.unresolved)
+    if fix.suggestions and not swaps:
+        unresolved.append("No land can be removed without reducing a deficient color source.")
+    lands = [card for card in deck.cards if "Land" in (card.type_line or "")]
+    recommended = fix.report.recommended_lands
+    return AssistantManaBaseAnalysis(
+        report=fix.report,
+        recommended_land_range=(max(0, recommended - 1), recommended + 1),
+        tapped_land_count=sum(
+            card.quantity
+            for card in lands
+            if "enters the battlefield tapped" in (card.oracle_text or "").lower()
+        ),
+        utility_land_count=sum(card.quantity for card in lands if not card.color_identity),
+        swaps=swaps,
+        unresolved=unresolved[:5],
+    )
+
+
+def _land_removal_rank(card: DeckCardItem) -> tuple[bool, bool]:
+    oracle_text = (card.oracle_text or "").lower()
+    colors = card.color_identity or []
+    return ("enters the battlefield tapped" in oracle_text, not colors)
+
+
+def _suggestion_hit(candidate: CardSuggestion) -> CardSearchHit:
+    return CardSearchHit(
+        scryfall_id=candidate.scryfall_id,
+        name=candidate.name,
+        mana_cost=candidate.mana_cost,
+        cmc=candidate.cmc,
+        type_line=candidate.type_line,
+        oracle_text=candidate.oracle_text,
+        color_identity=list(candidate.color_identity),
+        price_eur_cents=candidate.price_eur_cents,
+    )
+
+
+def _mana_swap_reason(remove: str, add: str, deficient: set[str]) -> str:
+    colors = "/".join(sorted(deficient)) or "needed"
+    return f"Replace {remove} with {add} to add a {colors} source without changing land count."
 
 
 async def check_legality(

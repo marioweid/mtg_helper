@@ -23,6 +23,7 @@ from mtg_helper.models.ai import (
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services.agents._model import google_model_settings, make_google_model
 from mtg_helper.services.mtg_assistant_tools import (
+    AssistantManaBaseAnalysis,
     BracketReport,
     DeckAnalysis,
     LegalityReport,
@@ -30,6 +31,9 @@ from mtg_helper.services.mtg_assistant_tools import (
 )
 from mtg_helper.services.mtg_assistant_tools import (
     analyze_deck as analyze_deck_service,
+)
+from mtg_helper.services.mtg_assistant_tools import (
+    analyze_mana_base as analyze_mana_base_service,
 )
 from mtg_helper.services.mtg_assistant_tools import (
     check_bracket as check_bracket_service,
@@ -42,6 +46,7 @@ from mtg_helper.services.mtg_assistant_tools import (
 )
 from mtg_helper.services.mtg_card_search import (
     AssistantCardSearchInput,
+    CardEvidenceSource,
     CardSearchCandidate,
     CardSearchResult,
 )
@@ -68,6 +73,9 @@ Rules:
 - Do not invent numeric meanings for words such as cheap; ask or omit the numeric filter.
 - If search_cards reports global_fallback, tell the user the selected theme had no matching cards.
 - Call analyze_deck for deck diagnosis, cuts, or swaps.
+- For landbase, land base, mana base, color fixing, or land-swap requests, call
+  analyze_mana_base first. Its swaps are sufficient unless the user asks for constrained or
+  additional alternatives; only then make a follow-up search_cards call.
 - For cuts and swaps, prefer the lowest deck-fit scores returned by analyze_deck and explain the
   provided evidence. Do not propose protected cards as ordinary cuts or alter numeric scores.
 - Call check_legality for legality questions and check_bracket for bracket questions.
@@ -132,6 +140,7 @@ def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
         tools=[
             search_themes,
             search_cards,
+            analyze_mana_base,
             analyze_deck,
             check_legality,
             check_bracket,
@@ -165,6 +174,23 @@ async def analyze_deck(ctx: RunContext[AssistantDeps]) -> DeckAnalysis | None:
     if not ctx.deps.allow_tool():
         return None
     return analyze_deck_service(ctx.deps.deck)
+
+
+async def analyze_mana_base(ctx: RunContext[AssistantDeps]) -> AssistantManaBaseAnalysis | None:
+    """Calculate color-source deficiencies and grounded land-for-land swaps."""
+    if not ctx.deps.allow_tool():
+        return None
+    result = await analyze_mana_base_service(ctx.deps.pool, ctx.deps.deck)
+    for swap in result.swaps:
+        if swap.add.scryfall_id is None:
+            continue
+        ctx.deps.retrieved[swap.add.scryfall_id] = CardSearchCandidate(
+            card=swap.add,
+            evidence_source=CardEvidenceSource.GLOBAL_SEARCH,
+            matched_filters=["mana_base_analysis"],
+            role_matches=["land"],
+        )
+    return result
 
 
 async def check_legality(ctx: RunContext[AssistantDeps]) -> LegalityReport | None:

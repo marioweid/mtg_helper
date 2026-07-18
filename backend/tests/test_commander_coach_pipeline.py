@@ -3,13 +3,14 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import asyncpg
 import pytest
 from pydantic_ai.models.test import TestModel
 
-from mtg_helper.models.ai import CommanderCoachRequest
+from mtg_helper.models.ai import CardSearchHit, ColorStatus, CommanderCoachRequest, ManaBaseReport
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.services import mtg_assistant
 from mtg_helper.services.commander_coach import orchestrator, signal_lanes
@@ -20,6 +21,7 @@ from mtg_helper.services.mtg_assistant import (
     AssistantRecommendation,
     _to_response,
 )
+from mtg_helper.services.mtg_assistant_tools import AssistantManaBaseAnalysis, ManaBaseSwap
 
 pytestmark = pytest.mark.asyncio
 
@@ -99,6 +101,59 @@ async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
     tool_names = {tool.name for tool in model.last_model_request_parameters.function_tools}
     assert "search_cards" in tool_names
     assert "find_theme_cards" not in tool_names
+
+
+async def test_landbase_request_uses_grounded_mana_analysis_tool() -> None:
+    candidate_id = uuid4()
+    analysis = AssistantManaBaseAnalysis(
+        report=ManaBaseReport(
+            total_lands=35,
+            total_colored_pips=30,
+            colors=[ColorStatus(color="G", pip_count=30, source_count=12, target=16, deficit=4)],
+            recommended_lands=36,
+            land_delta=1,
+        ),
+        recommended_land_range=(35, 37),
+        tapped_land_count=0,
+        utility_land_count=0,
+        swaps=[
+            ManaBaseSwap(
+                remove_card="Medium Value Card",
+                add=CardSearchHit(
+                    scryfall_id=candidate_id, name="Llanowar Wastes", type_line="Land"
+                ),
+                reason="Adds a needed green source.",
+            )
+        ],
+    )
+    model = TestModel(
+        call_tools=["analyze_mana_base"],
+        custom_output_args={
+            "mode": "doctor",
+            "reply": "Improve the green source count.",
+            "recommendations": [
+                {
+                    "scryfall_id": candidate_id,
+                    "reason": "Adds a needed green source.",
+                    "replaces": ["Medium Value Card"],
+                }
+            ],
+            "cuts": [],
+        },
+    )
+    with (
+        patch.object(mtg_assistant, "analyze_mana_base_service", AsyncMock(return_value=analysis)),
+        mtg_assistant.get_agent().override(model=model),
+    ):
+        result = await orchestrator.run_coach(
+            None,
+            _deck(),
+            CommanderCoachRequest(message="Can we improve my landbase?"),
+        )
+
+    assert result.doctor is not None
+    assert result.doctor.tool_call_count == 1
+    assert result.doctor.adds[0].card.name == "Llanowar Wastes"
 
 
 async def test_signal_lanes_detect_core_commander_packages() -> None:
