@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { CardHover } from "@/components/card-hover";
 import { OwnedBadge } from "@/components/owned-badge";
+import { PlannedBuyListDialog } from "@/components/planned-buy-list-dialog";
 import { apiClient, ApiError } from "@/lib/api";
 import type {
   CollectionMembership,
@@ -40,6 +42,7 @@ export function PlannedChangesPanel({
   const [collections, setCollections] = useState<CollectionResponse[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [buyListOpen, setBuyListOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,17 +85,11 @@ export function PlannedChangesPanel({
       open={plans.length > 0}
       className="rounded-xl border border-indigo-500/25 bg-indigo-950/15"
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-        <span>
-          <span className="text-sm font-semibold text-white">Planned changes</span>
-          <span className="ml-2 text-xs text-gray-400">
-            {physicalCount} physical → {plannedCount} planned
-          </span>
-        </span>
-        <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs text-indigo-200">
-          {plans.length}
-        </span>
-      </summary>
+      <PlannedSummary
+        physicalCount={physicalCount}
+        plannedCount={plannedCount}
+        planCount={plans.length}
+      />
 
       <div className="border-t border-white/10 px-3 py-3">
         {error && (
@@ -112,6 +109,7 @@ export function PlannedChangesPanel({
               busyId={busyId}
               onRun={run}
               deckId={deckId}
+              onCreateBuyList={() => setBuyListOpen(true)}
             />
             <PlanGroup
               title="Planned cuts"
@@ -125,7 +123,37 @@ export function PlannedChangesPanel({
           </div>
         )}
       </div>
+      <PlannedBuyListDialog
+        open={buyListOpen}
+        deckId={deckId}
+        collections={collections}
+        onClose={() => setBuyListOpen(false)}
+      />
     </details>
+  );
+}
+
+function PlannedSummary({
+  physicalCount,
+  plannedCount,
+  planCount,
+}: {
+  physicalCount: number;
+  plannedCount: number;
+  planCount: number;
+}) {
+  return (
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+      <span>
+        <span className="text-sm font-semibold text-white">Planned changes</span>
+        <span className="ml-2 text-xs text-gray-400">
+          {physicalCount} physical → {plannedCount} planned
+        </span>
+      </span>
+      <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs text-indigo-200">
+        {planCount}
+      </span>
+    </summary>
   );
 }
 
@@ -137,16 +165,37 @@ interface GroupProps {
   busyId: string | null;
   deckId: string;
   onRun: (planId: string, action: () => Promise<unknown>) => Promise<void>;
+  onCreateBuyList?: () => void;
 }
 
-function PlanGroup({ title, tone, plans, collections, busyId, deckId, onRun }: GroupProps) {
+function PlanGroup({
+  title,
+  tone,
+  plans,
+  collections,
+  busyId,
+  deckId,
+  onRun,
+  onCreateBuyList,
+}: GroupProps) {
   if (plans.length === 0) return null;
   const titleColor = tone === "addition" ? "text-emerald-300" : "text-red-300";
   return (
     <section>
-      <h3 className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${titleColor}`}>
-        {title}
-      </h3>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <h3 className={`text-[11px] font-semibold uppercase tracking-wide ${titleColor}`}>
+          {title}
+        </h3>
+        {onCreateBuyList && (
+          <button
+            type="button"
+            onClick={onCreateBuyList}
+            className="rounded border border-emerald-500/30 px-2 py-1 text-[11px] font-medium text-emerald-200 hover:border-emerald-400/60 hover:text-white"
+          >
+            Create buy list
+          </button>
+        )}
+      </div>
       <ul className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10">
         {plans.map((plan) => (
           <PlanRow
@@ -183,7 +232,11 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun }: RowProps) {
   return (
     <li className="grid items-center gap-2 bg-black/10 px-3 py-2 sm:grid-cols-[minmax(180px,1fr)_auto_180px_auto]">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-white">{plan.name}</p>
+        <p className="truncate text-sm font-medium text-white">
+          <CardHover name={plan.name} imageUri={plan.image_uri}>
+            {plan.name}
+          </CardHover>
+        </p>
         {plan.direction === "addition" ? (
           <div className="mt-1 flex flex-wrap gap-1"><OwnedBadge owned={plan.owned_in} /></div>
         ) : (

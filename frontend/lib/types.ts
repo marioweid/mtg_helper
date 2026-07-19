@@ -234,6 +234,10 @@ export interface PlannedDeckChangeUpdate {
   collection_id?: string | null;
 }
 
+export interface PlannedShoppingListRequest {
+  collection_ids: string[];
+}
+
 export interface CardSuggestion {
   scryfall_id: string;
   name: string;

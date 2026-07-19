@@ -243,6 +243,61 @@ async def list_plans(
     return plans
 
 
+async def export_shopping_list(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    email: str,
+    account_id: UUID,
+    collection_ids: list[UUID],
+) -> str:
+    """Build a Cardmarket buy list using inventory from selected collections only."""
+    selected_ids = list(dict.fromkeys(collection_ids))
+    async with pool.acquire() as conn:
+        await _owned_deck(conn, deck_id, email)
+        if selected_ids:
+            owned_count = await conn.fetchval(
+                "SELECT count(*) FROM collections WHERE account_id = $1 AND id = ANY($2::uuid[])",
+                account_id,
+                selected_ids,
+            )
+            if int(owned_count or 0) != len(selected_ids):
+                raise SelectedCollectionError("One or more selected collections were not found")
+        rows = await conn.fetch(
+            """
+            WITH planned AS (
+                SELECT COALESCE(c.oracle_id, c.id) AS oracle_key,
+                       MIN(c.name) AS name,
+                       SUM(p.quantity)::int AS planned_quantity
+                FROM deck_card_plans p
+                JOIN cards c ON c.id = p.card_id
+                WHERE p.deck_id = $1 AND p.direction = 'addition'
+                GROUP BY COALESCE(c.oracle_id, c.id)
+            ),
+            owned AS (
+                SELECT COALESCE(c.oracle_id, c.id) AS oracle_key,
+                       SUM(cc.quantity)::int AS owned_quantity
+                FROM collection_cards cc
+                JOIN cards c ON c.id = cc.card_id
+                JOIN collections col ON col.id = cc.collection_id
+                WHERE cc.collection_id = ANY($2::uuid[])
+                  AND col.account_id = $3
+                GROUP BY COALESCE(c.oracle_id, c.id)
+            )
+            SELECT planned.name,
+                   (planned.planned_quantity - COALESCE(owned.owned_quantity, 0))::int
+                       AS missing_quantity
+            FROM planned
+            LEFT JOIN owned USING (oracle_key)
+            WHERE planned.planned_quantity - COALESCE(owned.owned_quantity, 0) > 0
+            ORDER BY lower(planned.name), planned.name
+            """,
+            deck_id,
+            selected_ids,
+            account_id,
+        )
+    return "\n".join(f"{row['missing_quantity']} {row['name']}" for row in rows)
+
+
 async def get_plan(
     pool: asyncpg.Pool,
     deck_id: UUID,

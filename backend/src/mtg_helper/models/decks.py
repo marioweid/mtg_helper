@@ -147,6 +147,12 @@ class PlannedDeckChangeComplete(BaseModel):
     quantity: int = Field(default=1, ge=1, le=99)
 
 
+class PlannedShoppingListRequest(BaseModel):
+    """Choose which collections count toward a planned-additions buy list."""
+
+    collection_ids: list[UUID] = Field(default_factory=list, max_length=100)
+
+
 class PlannedDeckChange(BaseModel):
     """Pending physical deck change enriched for the shared checklist."""
 

@@ -27,6 +27,7 @@ from mtg_helper.models.decks import (
     PlannedDeckChangeComplete,
     PlannedDeckChangeCreate,
     PlannedDeckChangeUpdate,
+    PlannedShoppingListRequest,
 )
 from mtg_helper.services import (
     bracket_service,
@@ -330,6 +331,27 @@ async def create_planned_change(
     except (PlanNotFoundError, InvalidPlanError) as exc:
         raise _planned_change_error(exc) from exc
     return DataResponse(data=plan)
+
+
+@router.post("/{deck_id}/planned-changes/shopping-list")
+async def export_planned_shopping_list(
+    deck_id: UUID,
+    body: PlannedShoppingListRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> Response:
+    """Export planned-addition deficits using only selected collection inventory."""
+    try:
+        text = await planned_change_service.export_shopping_list(
+            request.app.state.db_pool,
+            deck_id,
+            _require_email(account),
+            account.id,
+            body.collection_ids,
+        )
+    except (PlanNotFoundError, SelectedCollectionError) as exc:
+        raise _planned_change_error(exc) from exc
+    return Response(content=text, media_type="text/plain")
 
 
 @router.patch(

@@ -51,6 +51,7 @@ import type {
   PlannedDeckChange,
   PlannedDeckChangeCreate,
   PlannedDeckChangeUpdate,
+  PlannedShoppingListRequest,
   SimulationAnalysisResponse,
   PreferenceCreate,
   PreferenceResponse,
@@ -236,6 +237,24 @@ export const apiClient = {
 
   listPlannedChanges: (deckId: string) =>
     request<PlannedDeckChange[]>(`/decks/${deckId}/planned-changes`),
+
+  exportPlannedShoppingList: async (deckId: string, body: PlannedShoppingListRequest) => {
+    const res = await fetch(`${CLIENT_BASE}/decks/${deckId}/planned-changes/shopping-list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => ({}))) as {
+        detail?: { code?: string; message?: string };
+      };
+      throw new ApiError(
+        payload.detail?.code ?? "EXPORT_FAILED",
+        payload.detail?.message ?? "Planned buy list export failed",
+      );
+    }
+    return res.text();
+  },
 
   updatePlannedChange: (deckId: string, planId: string, body: PlannedDeckChangeUpdate) =>
     request<PlannedDeckChange>(`/decks/${deckId}/planned-changes/${planId}`, {
