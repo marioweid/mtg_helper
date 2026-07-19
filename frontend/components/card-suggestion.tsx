@@ -226,7 +226,7 @@ export function CardSuggestionCard({
       {status === "accepted" && (
         <div className="flex items-center justify-between border-t border-green-500/20 px-3 py-2">
           <span className="text-xs font-medium text-green-400">
-            ✓ Added{isBasicLand && quantity > 1 ? ` ×${quantity}` : ""}
+            ✓ Planned{isBasicLand && quantity > 1 ? ` ×${quantity}` : ""}
           </span>
           {onRemove && (
             <button
@@ -246,7 +246,7 @@ export function CardSuggestionCard({
               onClick={onAddBack}
               className="text-xs text-gray-400 hover:text-green-400 transition-colors"
             >
-              Add
+              Plan addition
             </button>
           )}
         </div>

@@ -117,7 +117,7 @@ function SuggestionRow({
           disabled={busy}
           className="shrink-0 rounded border border-emerald-500/40 px-2 py-0.5 text-xs text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
         >
-          {busy ? "Adding…" : "Add"}
+          {busy ? "Planning…" : "Plan addition"}
         </button>
       )}
     </li>

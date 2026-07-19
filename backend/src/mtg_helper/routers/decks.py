@@ -23,6 +23,10 @@ from mtg_helper.models.decks import (
     DeckSummary,
     DeckUpdate,
     DeckUrlImportRequest,
+    PlannedDeckChange,
+    PlannedDeckChangeComplete,
+    PlannedDeckChangeCreate,
+    PlannedDeckChangeUpdate,
 )
 from mtg_helper.services import (
     bracket_service,
@@ -30,6 +34,7 @@ from mtg_helper.services import (
     deck_service,
     deck_url_import_service,
     import_service,
+    planned_change_service,
 )
 from mtg_helper.services.combo_service import ComboFetchError
 from mtg_helper.services.deck_service import (
@@ -40,6 +45,12 @@ from mtg_helper.services.deck_service import (
 from mtg_helper.services.deck_url_import_service import (
     DeckFetchError,
     UnsupportedDeckUrlError,
+)
+from mtg_helper.services.planned_change_service import (
+    InsufficientQuantityError,
+    InvalidPlanError,
+    PlanNotFoundError,
+    SelectedCollectionError,
 )
 
 router = APIRouter(prefix="/decks", tags=["decks"])
@@ -65,6 +76,21 @@ def _require_email(account: AccountResponse) -> str:
             detail={"code": "EMAIL_REQUIRED", "message": "Account has no email"},
         )
     return account.email
+
+
+def _planned_change_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, PlanNotFoundError):
+        return HTTPException(
+            status_code=404,
+            detail={"code": "PLANNED_CHANGE_NOT_FOUND", "message": str(exc)},
+        )
+    if isinstance(exc, InsufficientQuantityError):
+        return HTTPException(
+            status_code=409,
+            detail={"code": "INSUFFICIENT_QUANTITY", "message": str(exc)},
+        )
+    code = "INVALID_COLLECTION" if isinstance(exc, SelectedCollectionError) else "INVALID_PLAN"
+    return HTTPException(status_code=422, detail={"code": code, "message": str(exc)})
 
 
 @router.get("", response_model=DataResponse[list[DeckSummary]])
@@ -257,6 +283,132 @@ async def delete_deck(
     if not deleted:
         raise _not_found(deck_id)
     return Response(status_code=204)
+
+
+@router.get(
+    "/{deck_id}/planned-changes",
+    response_model=DataResponse[list[PlannedDeckChange]],
+)
+async def list_planned_changes(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[list[PlannedDeckChange]]:
+    """List pending main-deck changes without altering physical composition."""
+    try:
+        plans = await planned_change_service.list_plans(
+            request.app.state.db_pool,
+            deck_id,
+            _require_email(account),
+            account.id,
+        )
+    except PlanNotFoundError as exc:
+        raise _planned_change_error(exc) from exc
+    return DataResponse(data=plans)
+
+
+@router.post(
+    "/{deck_id}/planned-changes",
+    response_model=DataResponse[PlannedDeckChange | None],
+    status_code=201,
+)
+async def create_planned_change(
+    deck_id: UUID,
+    body: PlannedDeckChangeCreate,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[PlannedDeckChange | None]:
+    """Create, increment, or offset a pending main-deck change."""
+    try:
+        plan = await planned_change_service.create_plan(
+            request.app.state.db_pool,
+            deck_id,
+            body,
+            _require_email(account),
+            account.id,
+        )
+    except (PlanNotFoundError, InvalidPlanError) as exc:
+        raise _planned_change_error(exc) from exc
+    return DataResponse(data=plan)
+
+
+@router.patch(
+    "/{deck_id}/planned-changes/{plan_id}",
+    response_model=DataResponse[PlannedDeckChange],
+)
+async def update_planned_change(
+    deck_id: UUID,
+    plan_id: UUID,
+    body: PlannedDeckChangeUpdate,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[PlannedDeckChange]:
+    """Update pending quantity or its optional inline collection selection."""
+    try:
+        plan = await planned_change_service.update_plan(
+            request.app.state.db_pool,
+            deck_id,
+            plan_id,
+            _require_email(account),
+            account.id,
+            quantity=body.quantity,
+            collection_id=body.collection_id,
+            set_collection="collection_id" in body.model_fields_set,
+        )
+    except (PlanNotFoundError, InvalidPlanError, SelectedCollectionError) as exc:
+        raise _planned_change_error(exc) from exc
+    return DataResponse(data=plan)
+
+
+@router.delete("/{deck_id}/planned-changes/{plan_id}", status_code=204)
+async def cancel_planned_change(
+    deck_id: UUID,
+    plan_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+) -> Response:
+    """Cancel a plan without changing physical deck or inventory state."""
+    try:
+        await planned_change_service.cancel_plan(
+            request.app.state.db_pool,
+            deck_id,
+            plan_id,
+            _require_email(account),
+        )
+    except PlanNotFoundError as exc:
+        raise _planned_change_error(exc) from exc
+    return Response(status_code=204)
+
+
+@router.post(
+    "/{deck_id}/planned-changes/{plan_id}/complete",
+    response_model=DataResponse[PlannedDeckChange | None],
+)
+async def complete_planned_change(
+    deck_id: UUID,
+    plan_id: UUID,
+    body: PlannedDeckChangeComplete,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[PlannedDeckChange | None]:
+    """Complete physical copies atomically with an optional collection move."""
+    try:
+        plan = await planned_change_service.complete_plan(
+            request.app.state.db_pool,
+            deck_id,
+            plan_id,
+            body.quantity,
+            _require_email(account),
+            account.id,
+        )
+    except (
+        PlanNotFoundError,
+        InvalidPlanError,
+        SelectedCollectionError,
+        InsufficientQuantityError,
+    ) as exc:
+        raise _planned_change_error(exc) from exc
+    return DataResponse(data=plan)
 
 
 @router.post("/{deck_id}/cards", response_model=DataResponse[DeckCardResponse], status_code=201)

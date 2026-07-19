@@ -432,6 +432,27 @@ CREATE TABLE IF NOT EXISTS collection_cards (
 CREATE INDEX IF NOT EXISTS idx_collection_cards_card ON collection_cards(card_id);
 
 -- ============================================================
+-- PLANNED DECK CHANGES (overlay; never part of physical calculations)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS deck_card_plans (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    deck_id         UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    card_id         UUID NOT NULL REFERENCES cards(id),
+    direction       TEXT NOT NULL CHECK (direction IN ('addition', 'cut')),
+    quantity        INTEGER NOT NULL CHECK (quantity > 0),
+    collection_id   UUID REFERENCES collections(id) ON DELETE SET NULL,
+    categories      TEXT[] NOT NULL DEFAULT '{}',
+    added_by        TEXT NOT NULL DEFAULT 'user' CHECK (added_by IN ('user', 'ai')),
+    ai_reasoning    TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (deck_id, card_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deck_card_plans_deck
+    ON deck_card_plans (deck_id, direction, created_at);
+
+-- ============================================================
 -- MIGRATIONS (idempotent column additions for existing DBs)
 -- ============================================================
 DROP VIEW IF EXISTS deck_detail_view;

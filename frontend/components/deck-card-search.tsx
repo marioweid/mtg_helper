@@ -22,16 +22,19 @@ interface Props {
 export function DeckCardSearch({ deckId, onAdded, placeholder }: Props) {
   const toast = useToast();
   const [adding, setAdding] = useState(false);
+  const [immediate, setImmediate] = useState(false);
 
   async function addCard(card: CardResponse) {
     setAdding(true);
     try {
-      await apiClient.addCard(deckId, {
+      const payload = {
         card_scryfall_id: card.scryfall_id,
         quantity: 1,
-        added_by: "user",
-      });
-      toast.push(`Added ${card.name}`, "success");
+        added_by: "user" as const,
+      };
+      if (immediate) await apiClient.addCardNow(deckId, payload);
+      else await apiClient.addCard(deckId, payload);
+      toast.push(immediate ? `Added ${card.name}` : `Planned ${card.name}`, "success");
       onAdded?.();
     } catch (err) {
       toast.push(err instanceof ApiError ? err.message : "Failed to add card", "error");
@@ -42,16 +45,29 @@ export function DeckCardSearch({ deckId, onAdded, placeholder }: Props) {
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <h3 className="mb-2 text-sm font-semibold text-white">Add card</h3>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-white">
+          {immediate ? "Add card now" : "Plan addition"}
+        </h3>
+        <button
+          type="button"
+          onClick={() => setImmediate((current) => !current)}
+          className="text-xs text-gray-500 hover:text-white"
+        >
+          {immediate ? "Use planning" : "Add now instead"}
+        </button>
+      </div>
       <p className="mb-3 text-xs text-gray-400">
-        Type to search the card pool. Selecting a card adds it to the deck.
+        {immediate
+          ? "Selecting a card changes the physical deck immediately."
+          : "Selecting a card queues it without changing the physical deck."}
       </p>
       <CardSearch
-        placeholder={placeholder ?? "Search cards to add..."}
+        placeholder={placeholder ?? "Search cards to plan..."}
         onSelect={(card) => void addCard(card)}
         commanderLegal
       />
-      {adding && <p className="mt-2 text-xs text-gray-500">Adding…</p>}
+      {adding && <p className="mt-2 text-xs text-gray-500">Planning…</p>}
     </div>
   );
 }

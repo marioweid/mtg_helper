@@ -8,11 +8,13 @@ import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardHover } from "@/components/card-hover";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
+import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import {
   type CardSuggestion,
   type CollectionResponse,
   type DeckCardItem,
   type DeckManaCurve,
+  type PlannedDeckChange,
 } from "@/lib/types";
 import { CATEGORY_ORDER, STAGE_LABELS, STAGE_DEFAULTS, CATEGORY_TARGETS } from "@/lib/constants";
 
@@ -374,6 +376,9 @@ export default function BuildPage() {
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
+  const [plannedChanges, setPlannedChanges] = useState<PlannedDeckChange[]>([]);
+  const [physicalCardCount, setPhysicalCardCount] = useState(1);
+  const [plannedCardCount, setPlannedCardCount] = useState(1);
   const [manaCurve, setManaCurve] = useState<DeckManaCurve | null>(null);
   const [deckCommander, setDeckCommander] = useState<{
     type_line: string | null;
@@ -423,8 +428,14 @@ export default function BuildPage() {
   }, [deckId]);
 
   const acceptedScryfallIds = useMemo(
-    () => new Set(deckCards.map((c) => c.scryfall_id)),
-    [deckCards],
+    () =>
+      new Set([
+        ...deckCards.map((card) => card.scryfall_id),
+        ...plannedChanges
+          .filter((plan) => plan.direction === "addition")
+          .map((plan) => plan.scryfall_id),
+      ]),
+    [deckCards, plannedChanges],
   );
 
   useEffect(() => {
@@ -448,6 +459,9 @@ export default function BuildPage() {
       const deck = await apiClient.getDeck(deckId);
       setDeckCategoryCounts(computeStageCounts(deck.cards));
       setDeckCards(deck.cards);
+      setPlannedChanges(deck.planned_changes);
+      setPhysicalCardCount(deck.physical_card_count);
+      setPlannedCardCount(deck.planned_card_count);
       setManaCurve(deck.mana_curve);
       setDeckCommander(deck.commander_card ?? null);
       setDeckBracket(deck.bracket ?? null);
@@ -468,6 +482,9 @@ export default function BuildPage() {
         setDeckColorIdentity(deck.commander_color_identity.join(","));
         setDeckCategoryCounts(computeStageCounts(deck.cards));
         setDeckCards(deck.cards);
+        setPlannedChanges(deck.planned_changes);
+        setPhysicalCardCount(deck.physical_card_count);
+        setPlannedCardCount(deck.planned_card_count);
         setManaCurve(deck.mana_curve);
         setDeckCommander(deck.commander_card ?? null);
         setDeckBracket(deck.bracket ?? null);
@@ -828,15 +845,19 @@ export default function BuildPage() {
   }
 
   async function handleSetQuantity(scryfallId: string, quantity: number) {
+    const card = deckCards.find((item) => item.scryfall_id === scryfallId);
+    if (!card || quantity === card.quantity) return;
     try {
-      if (quantity < 1) {
-        await apiClient.removeCard(deckId, scryfallId);
-      } else {
-        await apiClient.updateCardQuantity(deckId, scryfallId, quantity);
-      }
+      await apiClient.planCard(deckId, {
+        card_scryfall_id: scryfallId,
+        direction: quantity > card.quantity ? "addition" : "cut",
+        quantity: Math.abs(quantity - card.quantity),
+        categories: card.categories,
+        added_by: card.added_by === "ai" ? "ai" : "user",
+      });
       void refreshDeck();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update quantity");
+      alert(err instanceof Error ? err.message : "Failed to plan quantity");
     }
   }
 
@@ -916,6 +937,16 @@ export default function BuildPage() {
         <Link href={`/decks/${deckId}`} className="text-sm text-gray-400 hover:text-white transition-colors">
           View deck
         </Link>
+      </div>
+
+      <div className="mb-4">
+        <PlannedChangesPanel
+          deckId={deckId}
+          plans={plannedChanges}
+          physicalCount={physicalCardCount}
+          plannedCount={plannedCardCount}
+          onChanged={refreshDeck}
+        />
       </div>
 
       {/* Collection filter panel — always visible so the build-from-owned toggle is discoverable. */}

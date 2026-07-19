@@ -262,15 +262,8 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
 
   async function applyOneSwap(swap: ProposedSwap) {
     const original = deckCards.find((c) => c.scryfall_id === swap.out_scryfall_id);
-    const quantity = original?.quantity ?? 1;
     const categories = original?.categories ?? [];
-    // Swap a single copy: decrement a multi-copy source (e.g. basic lands)
-    // rather than deleting the whole stack, matching the backend sim.
-    if (quantity > 1) {
-      await apiClient.updateCardQuantity(deckId, swap.out_scryfall_id, quantity - 1);
-    } else {
-      await apiClient.removeCard(deckId, swap.out_scryfall_id);
-    }
+    await apiClient.removeCard(deckId, swap.out_scryfall_id);
     await apiClient.addCard(deckId, {
       card_scryfall_id: swap.in_scryfall_id,
       quantity: 1,
@@ -415,7 +408,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
             disabled={applying || applyingKey !== null}
             className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {applying ? "Applying…" : `Apply all ${proposal.swaps.length}`}
+            {applying ? "Planning…" : `Plan all ${proposal.swaps.length}`}
           </button>
           <button
             type="button"
@@ -561,7 +554,7 @@ function ProposalView({
                   disabled={busy || applyingKey !== null}
                   className="ml-auto rounded border border-emerald-400/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-50"
                 >
-                  {applyingKey === swap.out_scryfall_id ? "Applying…" : "Apply"}
+                  {applyingKey === swap.out_scryfall_id ? "Planning…" : "Plan swap"}
                 </button>
               </div>
               <p className="mt-1 text-gray-400">{swap.reason}</p>

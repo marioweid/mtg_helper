@@ -7,6 +7,7 @@ import { CardDetailModal } from "@/components/card-detail-modal";
 import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
 import { OptimizerPanel } from "@/components/playtest/optimizer-panel";
 import { PlaytestStatsPanel } from "@/components/playtest/stats-panel";
+import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
 import type { DeckCardItem, DeckDetailResponse } from "@/lib/types";
@@ -74,15 +75,19 @@ export default function SimulatePage({ params }: PageProps) {
   }
 
   async function handleSetQuantity(scryfallId: string, quantity: number) {
+    const card = deck?.cards.find((item) => item.scryfall_id === scryfallId);
+    if (!card || quantity === card.quantity) return;
     try {
-      if (quantity < 1) {
-        await apiClient.removeCard(deckId, scryfallId);
-      } else {
-        await apiClient.updateCardQuantity(deckId, scryfallId, quantity);
-      }
+      await apiClient.planCard(deckId, {
+        card_scryfall_id: scryfallId,
+        direction: quantity > card.quantity ? "addition" : "cut",
+        quantity: Math.abs(quantity - card.quantity),
+        categories: card.categories,
+        added_by: card.added_by === "ai" ? "ai" : "user",
+      });
       await loadDeck();
     } catch (err) {
-      toast.push(err instanceof ApiError ? err.message : "Failed to update quantity", "error");
+      toast.push(err instanceof ApiError ? err.message : "Failed to plan quantity", "error");
     }
   }
 
@@ -133,6 +138,16 @@ export default function SimulatePage({ params }: PageProps) {
         <p className="rounded-lg border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
           {error}
         </p>
+      )}
+
+      {deck && (
+        <PlannedChangesPanel
+          deckId={deckId}
+          plans={deck.planned_changes}
+          physicalCount={deck.physical_card_count}
+          plannedCount={deck.planned_card_count}
+          onChanged={loadDeck}
+        />
       )}
 
       <PlaytestStatsPanel deckId={deckId} />

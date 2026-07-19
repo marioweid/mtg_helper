@@ -584,15 +584,17 @@ async def build_ownership_map(
                 FROM cards
                 WHERE scryfall_id = ANY($2::uuid[])
             )
-            SELECT DISTINCT ic.scryfall_id AS scryfall_id,
+            SELECT ic.scryfall_id AS scryfall_id,
                    c.id AS collection_id,
-                   c.name AS collection_name
+                   c.name AS collection_name,
+                   SUM(cc.quantity)::int AS quantity
             FROM input_cards ic
             JOIN cards owned_cards
               ON COALESCE(owned_cards.oracle_id, owned_cards.id) = ic.oracle_key
             JOIN collection_cards cc ON cc.card_id = owned_cards.id
             JOIN collections c ON c.id = cc.collection_id
             WHERE c.account_id = $1
+            GROUP BY ic.scryfall_id, c.id, c.name
             """,
             account_id,
             scryfall_ids,
@@ -600,7 +602,11 @@ async def build_ownership_map(
     result: dict[UUID, list[CollectionMembership]] = {}
     for row in rows:
         result.setdefault(row["scryfall_id"], []).append(
-            CollectionMembership(id=row["collection_id"], name=row["collection_name"])
+            CollectionMembership(
+                id=row["collection_id"],
+                name=row["collection_name"],
+                quantity=row["quantity"],
+            )
         )
     return result
 

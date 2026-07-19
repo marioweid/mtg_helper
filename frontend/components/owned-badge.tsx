@@ -20,9 +20,9 @@ export function OwnedBadge({ owned, showUnowned = true }: Props) {
         <span
           key={c.id}
           className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-[10px] text-emerald-300"
-          title="Owned in this collection"
+          title={`${c.quantity} owned in this collection`}
         >
-          ✓ {c.name}
+          ✓ {c.name} ×{c.quantity}
         </span>
       ))}
       {owned.length > 2 && (

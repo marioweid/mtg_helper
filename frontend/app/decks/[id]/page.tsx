@@ -34,6 +34,7 @@ import { DeckStats } from "@/components/deck-stats";
 import { GameChangerBadge } from "@/components/game-changer-badge";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
+import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
 import {
@@ -202,15 +203,19 @@ export default function DeckDetailPage() {
 
   async function handleSetQuantity(scryfallId: string, quantity: number) {
     if (!deck) return;
-    if (quantity < 1) {
-      await handleRemoveCard(scryfallId);
-      return;
-    }
+    const card = deck.cards.find((item) => item.scryfall_id === scryfallId);
+    if (!card || quantity === card.quantity) return;
     try {
-      await apiClient.updateCardQuantity(deck.id, scryfallId, quantity);
+      await apiClient.planCard(deck.id, {
+        card_scryfall_id: scryfallId,
+        direction: quantity > card.quantity ? "addition" : "cut",
+        quantity: Math.abs(quantity - card.quantity),
+        categories: card.categories,
+        added_by: card.added_by === "ai" ? "ai" : "user",
+      });
       await load();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Failed to update quantity", "error");
+      toast.push(err instanceof Error ? err.message : "Failed to plan quantity", "error");
     }
   }
 
@@ -271,6 +276,16 @@ export default function DeckDetailPage() {
         onCancelEditDescription={() => setEditingDescription(false)}
         onDelete={() => void handleDeleteDeck()}
       />
+
+      <div className="mb-6">
+        <PlannedChangesPanel
+          deckId={deck.id}
+          plans={deck.planned_changes}
+          physicalCount={deck.physical_card_count}
+          plannedCount={deck.planned_card_count}
+          onChanged={load}
+        />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* Card list / combos */}

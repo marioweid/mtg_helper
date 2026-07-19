@@ -3,6 +3,7 @@
 import { CardHover } from "@/components/card-hover";
 import { DeckFitIndicator } from "@/components/deck-fit-indicator";
 import { ManaCost } from "@/components/mana-cost";
+import { PlannedCutBadge } from "@/components/planned-cut-badge";
 import { primaryType } from "@/lib/card-types";
 import { STAGE_LABELS } from "@/lib/constants";
 import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
@@ -121,6 +122,7 @@ function CompactRow({
         </div>
         {isPet && <span className="shrink-0 text-red-400" title="Pet card">♥</span>}
         <DeckFitIndicator card={card} />
+        <PlannedCutBadge quantity={card.planned_cut_quantity} />
         {inCombo && (
           <span className="shrink-0 text-yellow-300" title="In a combo">⚡</span>
         )}
@@ -151,8 +153,8 @@ function CompactRow({
             e.stopPropagation();
             onRemove(card.scryfall_id);
           }}
-          title={`Cut ${card.name}`}
-          aria-label={`Cut ${card.name}`}
+          title={`Plan cut for ${card.name}`}
+          aria-label={`Plan cut for ${card.name}`}
           className="shrink-0 rounded px-1 text-xs text-red-400/70 opacity-0 hover:text-red-300 group-hover:opacity-100 focus:opacity-100"
         >
           ✗

@@ -97,6 +97,11 @@ function DeckGridSection({ type, cards, onCardClick, comboCardIds, onSetQuantity
                   ⚡
                 </span>
               ) : null}
+              {card.planned_cut_quantity > 0 ? (
+                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-red-950/90 px-2 py-0.5 text-[10px] text-red-200 backdrop-blur">
+                  Planned cut ×{card.planned_cut_quantity}
+                </span>
+              ) : null}
             </button>
             {isBasicLand(card) && onSetQuantity ? (
               <div

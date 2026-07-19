@@ -29,6 +29,7 @@ class CollectionMembership(BaseModel):
 
     id: UUID
     name: str
+    quantity: int = 1
 
 
 class CardSuggestion(BaseModel):

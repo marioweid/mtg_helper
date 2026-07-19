@@ -169,7 +169,7 @@ function CardRow({
                 onClick={() => void onRemove(card.scryfall_id)}
                 className="rounded border border-red-400/30 px-2 py-0.5 text-[11px] text-red-200"
               >
-                Cut
+                Plan cut
               </button>
             </div>
           </div>
@@ -228,7 +228,7 @@ export function CoachDeckWorkspace({
 
       <section className="shrink-0 rounded-xl border border-white/10 bg-white/[0.03] p-3">
         <CardSearch
-          placeholder="+ Add card…"
+          placeholder="+ Plan addition…"
           commanderLegal
           onSelect={(card) => void onAddCard(card)}
         />

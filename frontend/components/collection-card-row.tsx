@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { CardHover } from "@/components/card-hover";
 import { apiClient, ApiError } from "@/lib/api";
-import type { CollectionCardItem } from "@/lib/types";
+import type { CollectionCardItem, DeckSummary } from "@/lib/types";
 
 interface Props {
   collectionId: string;
   card: CollectionCardItem;
   onChanged: () => void;
+  decks?: DeckSummary[];
 }
 
-export function CollectionCardRow({ collectionId, card, onChanged }: Props) {
+export function CollectionCardRow({ collectionId, card, onChanged, decks = [] }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +41,23 @@ export function CollectionCardRow({ collectionId, card, onChanged }: Props) {
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Remove failed");
+      setBusy(false);
+    }
+  }
+
+  async function planForDeck(deckId: string) {
+    if (!deckId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.planCard(deckId, {
+        card_scryfall_id: card.scryfall_id,
+        direction: "addition",
+        quantity: 1,
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Planning failed");
+    } finally {
       setBusy(false);
     }
   }
@@ -75,6 +93,22 @@ export function CollectionCardRow({ collectionId, card, onChanged }: Props) {
         <span className="rounded bg-yellow-900/40 px-2 py-0.5 text-xs text-yellow-300">Foil</span>
       )}
       {card.condition && <span className="text-xs text-gray-500">{card.condition}</span>}
+      {decks.length > 0 && (
+        <select
+          value=""
+          disabled={busy}
+          aria-label={`Plan ${card.name} for a deck`}
+          onChange={(event) => void planForDeck(event.target.value)}
+          className="max-w-40 rounded border border-indigo-500/30 bg-gray-900 px-2 py-1 text-xs text-indigo-200"
+        >
+          <option value="">Plan for deck…</option>
+          {decks.map((deck) => (
+            <option key={deck.id} value={deck.id}>
+              {deck.name}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="flex items-center gap-1">
         <button
           onClick={() => void setQuantity(card.quantity - 1)}

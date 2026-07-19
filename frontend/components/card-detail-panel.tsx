@@ -1,7 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
 import { OracleText } from "@/components/mana-cost";
+import { PlannedCutBadge } from "@/components/planned-cut-badge";
 import { SwapPanel } from "@/components/swap-panel";
+import { apiClient } from "@/lib/api";
 import { CATEGORY_ORDER, STAGE_LABELS } from "@/lib/constants";
 import type { DeckCardItem } from "@/lib/types";
 
@@ -41,6 +45,23 @@ export function CardDetailPanel({
   onSwapped,
   showImage,
 }: Props) {
+  const [removingNow, setRemovingNow] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  async function removeNow() {
+    if (!deckId) return;
+    setRemovingNow(true);
+    setRemoveError(null);
+    try {
+      await apiClient.removeCardNow(deckId, card.scryfall_id);
+      await onSwapped?.();
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : "Failed to remove card");
+    } finally {
+      setRemovingNow(false);
+    }
+  }
+
   function toggleCategory(cat: string) {
     if (!onSetCategories) return;
     const has = card.categories.includes(cat);
@@ -60,6 +81,9 @@ export function CardDetailPanel({
         />
       ) : null}
       <div className="flex flex-1 flex-col gap-3">
+        <div className="flex flex-wrap gap-1">
+          <PlannedCutBadge quantity={card.planned_cut_quantity} />
+        </div>
         {card.type_line ? (
           <p className="text-xs text-gray-500">{card.type_line}</p>
         ) : null}
@@ -136,14 +160,24 @@ export function CardDetailPanel({
         ) : null}
 
         {onRemove ? (
-          <div className="flex">
+          <div className="flex flex-wrap justify-end gap-2">
             <button
               onClick={() => onRemove(card.scryfall_id)}
-              className="ml-auto rounded border border-red-500/40 px-2 py-1 text-xs text-red-400 transition-colors hover:border-red-500/70 hover:text-red-300"
-              aria-label={`Remove ${card.name}`}
+              className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-300 transition-colors hover:border-red-500/70"
+              aria-label={`Plan cut for ${card.name}`}
             >
-              Remove
+              Plan cut
             </button>
+            {deckId && (
+              <button
+                onClick={() => void removeNow()}
+                disabled={removingNow}
+                className="rounded border border-white/15 px-2 py-1 text-xs text-gray-400 hover:text-white disabled:opacity-40"
+              >
+                {removingNow ? "Removing…" : "Remove now"}
+              </button>
+            )}
+            {removeError && <p className="w-full text-right text-xs text-red-400">{removeError}</p>}
           </div>
         ) : null}
       </div>

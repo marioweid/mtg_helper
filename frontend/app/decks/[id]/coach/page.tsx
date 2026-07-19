@@ -11,6 +11,7 @@ import {
 } from "@/components/assistant-starter-prompts";
 import { CoachDeckWorkspace } from "@/components/coach-deck-workspace";
 import { ManaCost } from "@/components/mana-cost";
+import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { DeckDetailSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
@@ -553,10 +554,10 @@ export default function CoachPage() {
     setBusy(`add:${card.scryfall_id}`);
     try {
       await apiClient.addCard(deckId, { card_scryfall_id: card.scryfall_id, added_by: "user" });
-      toast.push(`Added ${card.name}`, "success");
+      toast.push(`Planned ${card.name}`, "success");
       await load();
     } catch (err) {
-      toast.push(err instanceof ApiError ? err.message : "Failed to add card", "error");
+      toast.push(err instanceof ApiError ? err.message : "Failed to plan card", "error");
     } finally {
       setBusy(null);
     }
@@ -570,10 +571,10 @@ export default function CoachPage() {
     setBusy(`add:${card.scryfall_id}`);
     try {
       await apiClient.addCard(deckId, { card_scryfall_id: card.scryfall_id, added_by: "ai" });
-      toast.push(`Added ${card.name}`, "success");
+      toast.push(`Planned ${card.name}`, "success");
       await load();
     } catch (err) {
-      toast.push(err instanceof ApiError ? err.message : "Failed to add card", "error");
+      toast.push(err instanceof ApiError ? err.message : "Failed to plan card", "error");
     } finally {
       setBusy(null);
     }
@@ -588,7 +589,7 @@ export default function CoachPage() {
     setBusy(`cut:${card.scryfall_id}`);
     try {
       await apiClient.removeCard(deckId, card.scryfall_id);
-      toast.push(`Cut ${name}`, "success");
+      toast.push(`Planned cut for ${name}`, "success");
       await load();
     } catch (err) {
       toast.push(err instanceof ApiError ? err.message : "Failed to cut card", "error");
@@ -609,13 +610,26 @@ export default function CoachPage() {
           await apiClient.addCard(deckId, { card_scryfall_id: card.scryfall_id, added_by: "ai" });
         }
       }
-      toast.push("Applied swap", "success");
+      toast.push("Planned swap", "success");
       await load();
     } catch (err) {
       toast.push(err instanceof ApiError ? err.message : "Failed to apply swap", "error");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function planQuantity(scryfallId: string, quantity: number) {
+    const card = deck?.cards.find((item) => item.scryfall_id === scryfallId);
+    if (!card || quantity === card.quantity) return;
+    await apiClient.planCard(deckId, {
+      card_scryfall_id: scryfallId,
+      direction: quantity > card.quantity ? "addition" : "cut",
+      quantity: Math.abs(quantity - card.quantity),
+      categories: card.categories,
+      added_by: card.added_by === "ai" ? "ai" : "user",
+    });
+    await load();
   }
 
   if (error && !deck) return <p className="text-red-400">{error}</p>;
@@ -648,6 +662,15 @@ export default function CoachPage() {
           >
             Edit memory
           </button>
+        </div>
+        <div className="mt-2">
+          <PlannedChangesPanel
+            deckId={deck.id}
+            plans={deck.planned_changes}
+            physicalCount={deck.physical_card_count}
+            plannedCount={deck.planned_card_count}
+            onChanged={load}
+          />
         </div>
       </div>
 
@@ -716,9 +739,7 @@ export default function CoachPage() {
             stageTargets={stageTargets}
             manaCurve={deck.mana_curve}
             onRemove={(scryfallId) => void apiClient.removeCard(deck.id, scryfallId).then(load)}
-            onSetQuantity={(scryfallId, quantity) =>
-              void apiClient.updateCardQuantity(deck.id, scryfallId, quantity).then(load)
-            }
+            onSetQuantity={(scryfallId, quantity) => void planQuantity(scryfallId, quantity)}
             onAddCard={(card) => void addSearchCard(card)}
           />
         </aside>

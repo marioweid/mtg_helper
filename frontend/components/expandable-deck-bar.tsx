@@ -140,10 +140,10 @@ export function ExpandableDeckBar({
           quantity: 1,
           added_by: "user",
         });
-        toast.push(`Added ${card.name}`, "success");
+        toast.push(`Planned ${card.name}`, "success");
         onCardAdded?.();
       } catch (err) {
-        toast.push(err instanceof ApiError ? err.message : "Failed to add card", "error");
+        toast.push(err instanceof ApiError ? err.message : "Failed to plan card", "error");
       }
     },
     [deckId, onCardAdded, toast],

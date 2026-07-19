@@ -5,7 +5,12 @@ import { use, useCallback, useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
 import { CardSearch } from "@/components/card-search";
 import { CollectionCardRow } from "@/components/collection-card-row";
-import type { CardResponse, CollectionCardItem, CollectionResponse } from "@/lib/types";
+import type {
+  CardResponse,
+  CollectionCardItem,
+  CollectionResponse,
+  DeckSummary,
+} from "@/lib/types";
 
 const PAGE_SIZE = 50;
 
@@ -43,6 +48,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [renameValue, setRenameValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [decks, setDecks] = useState<DeckSummary[]>([]);
 
   const loadCollection = useCallback(async () => {
     try {
@@ -76,6 +82,13 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   useEffect(() => {
     void loadCards();
   }, [loadCards]);
+
+  useEffect(() => {
+    void apiClient
+      .listDecks({ limit: 100 })
+      .then(setDecks)
+      .catch(() => setDecks([]));
+  }, []);
 
   async function handleAdd(card: CardResponse) {
     setError(null);
@@ -366,6 +379,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
               key={`${card.card_id}-${card.set_code}-${card.collector_number}-${card.foil}`}
               collectionId={id}
               card={card}
+              decks={decks}
               onChanged={() => void refresh()}
             />
           ))}

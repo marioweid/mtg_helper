@@ -48,6 +48,9 @@ import type {
   PaginationMeta,
   PlaytestSimulateRequest,
   PlaytestStats,
+  PlannedDeckChange,
+  PlannedDeckChangeCreate,
+  PlannedDeckChangeUpdate,
   SimulationAnalysisResponse,
   PreferenceCreate,
   PreferenceResponse,
@@ -213,10 +216,45 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  addCard: (deckId: string, body: DeckCardAdd) =>
+  addCardNow: (deckId: string, body: DeckCardAdd) =>
     request<DeckCardResponse>(`/decks/${deckId}/cards`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+
+  planCard: (deckId: string, body: PlannedDeckChangeCreate) =>
+    request<PlannedDeckChange | null>(`/decks/${deckId}/planned-changes`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  addCard: (deckId: string, body: DeckCardAdd) =>
+    request<PlannedDeckChange | null>(`/decks/${deckId}/planned-changes`, {
+      method: "POST",
+      body: JSON.stringify({ ...body, direction: "addition" }),
+    }),
+
+  listPlannedChanges: (deckId: string) =>
+    request<PlannedDeckChange[]>(`/decks/${deckId}/planned-changes`),
+
+  updatePlannedChange: (deckId: string, planId: string, body: PlannedDeckChangeUpdate) =>
+    request<PlannedDeckChange>(`/decks/${deckId}/planned-changes/${planId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  completePlannedChange: (deckId: string, planId: string, quantity = 1) =>
+    request<PlannedDeckChange | null>(
+      `/decks/${deckId}/planned-changes/${planId}/complete`,
+      { method: "POST", body: JSON.stringify({ quantity }) },
+    ),
+
+  cancelPlannedChange: (deckId: string, planId: string) =>
+    fetch(`${CLIENT_BASE}/decks/${deckId}/planned-changes/${planId}`, {
+      method: "DELETE",
+    }).then((res) => {
+      if (!res.ok && res.status !== 204)
+        throw new ApiError("DELETE_FAILED", "Failed to cancel planned change");
     }),
 
   deleteDeck: (deckId: string) =>
@@ -246,11 +284,21 @@ export const apiClient = {
         throw new ApiError("UPDATE_FAILED", "Failed to update card quantity");
     }),
 
-  removeCard: (deckId: string, scryfallId: string) =>
+  removeCardNow: (deckId: string, scryfallId: string) =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/cards/${scryfallId}`, {
       method: "DELETE",
     }).then((res) => {
       if (!res.ok && res.status !== 204) throw new ApiError("DELETE_FAILED", "Failed to remove card");
+    }),
+
+  removeCard: (deckId: string, scryfallId: string) =>
+    request<PlannedDeckChange | null>(`/decks/${deckId}/planned-changes`, {
+      method: "POST",
+      body: JSON.stringify({
+        card_scryfall_id: scryfallId,
+        direction: "cut",
+        quantity: 1,
+      }),
     }),
 
   // Snapshots + Comparison

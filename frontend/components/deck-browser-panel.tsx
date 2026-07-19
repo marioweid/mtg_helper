@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CardHover } from "@/components/card-hover";
 import { DeckCompactColumns } from "@/components/deck-compact-columns";
+import { PlannedCutBadge } from "@/components/planned-cut-badge";
 import {
   applyDeckFilter,
   DeckFilterBar,
@@ -69,6 +70,7 @@ function CardRow({
               ⚡
             </span>
           )}
+          <PlannedCutBadge quantity={card.planned_cut_quantity} />
         </div>
         {tags.length > 0 && (
           <div className="mt-0.5 flex flex-wrap gap-1 text-[10px] text-indigo-300/80">
@@ -87,8 +89,8 @@ function CardRow({
       <button
         type="button"
         onClick={onCut}
-        title={`Cut ${card.name}`}
-        aria-label={`Cut ${card.name}`}
+        title={`Plan cut for ${card.name}`}
+        aria-label={`Plan cut for ${card.name}`}
         className="ml-1 shrink-0 self-center rounded border border-red-500/30 px-1.5 py-0.5 text-[11px] text-red-300 hover:bg-red-500/10"
       >
         ✗
@@ -171,7 +173,7 @@ export function DeckBrowserPanel({
         {lastCut && (
           <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs">
             <span className="truncate text-gray-300">
-              Cut{" "}
+              Planned cut for{" "}
               <CardHover name={lastCut.name} imageUri={lastCut.image_uri} className="text-white">
                 {lastCut.name}
               </CardHover>

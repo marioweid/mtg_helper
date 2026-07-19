@@ -98,6 +98,7 @@ export interface DeckCardItem {
   deck_fit_band?: "strong" | "solid" | "weak" | null;
   deck_fit_reasons?: string[];
   deck_fit_protected?: boolean;
+  planned_cut_quantity: number;
 }
 
 export interface ManaCurveRecommendation {
@@ -147,6 +148,9 @@ export interface DeckDetailResponse {
   archetype_tags: string[];
   mana_curve: DeckManaCurve | null;
   cards: DeckCardItem[];
+  physical_card_count: number;
+  planned_card_count: number;
+  planned_changes: PlannedDeckChange[];
 }
 
 export interface DeckCreate {
@@ -191,6 +195,43 @@ export interface DeckCardResponse {
 export interface CollectionMembership {
   id: string;
   name: string;
+  quantity: number;
+}
+
+export type PlannedChangeDirection = "addition" | "cut";
+
+export interface PlannedDeckChange {
+  id: string;
+  deck_id: string;
+  card_id: string;
+  scryfall_id: string;
+  name: string;
+  image_uri: string | null;
+  direction: PlannedChangeDirection;
+  quantity: number;
+  collection_id: string | null;
+  physical_quantity: number;
+  projected_quantity: number;
+  categories: string[];
+  added_by: "user" | "ai";
+  ai_reasoning: string | null;
+  owned_in: CollectionMembership[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlannedDeckChangeCreate {
+  card_scryfall_id: string;
+  direction: PlannedChangeDirection;
+  quantity?: number;
+  categories?: string[];
+  added_by?: "user" | "ai";
+  ai_reasoning?: string | null;
+}
+
+export interface PlannedDeckChangeUpdate {
+  quantity?: number;
+  collection_id?: string | null;
 }
 
 export interface CardSuggestion {

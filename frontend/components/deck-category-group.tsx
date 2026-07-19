@@ -7,6 +7,7 @@ import { CardDetailPanel } from "@/components/card-detail-panel";
 import { CardHover } from "@/components/card-hover";
 import { ManaCost } from "@/components/mana-cost";
 import { OwnedBadge } from "@/components/owned-badge";
+import { PlannedCutBadge } from "@/components/planned-cut-badge";
 import { STAGE_LABELS } from "@/lib/constants";
 import { bucketReason, bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
 
@@ -164,6 +165,7 @@ export function DeckCategoryGroup({
                           ⚡
                         </span>
                       )}
+                      <PlannedCutBadge quantity={card.planned_cut_quantity} />
                     </p>
                     {(tags.length > 0 || card.owned_in.length > 0) && (
                       <div className="mt-1 flex flex-wrap gap-1">

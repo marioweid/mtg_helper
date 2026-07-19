@@ -100,6 +100,7 @@ class DeckCardItem(BaseModel):
     deck_fit_band: Literal["strong", "solid", "weak"] | None = None
     deck_fit_reasons: list[str] = Field(default_factory=list)
     deck_fit_protected: bool = False
+    planned_cut_quantity: int = 0
 
 
 class CommanderCardSummary(BaseModel):
@@ -120,6 +121,52 @@ class CommanderCardSummary(BaseModel):
     hub_tags: list[str] = Field(default_factory=list)
     mtgjson_tags: list[str] = Field(default_factory=list)
     game_changer: bool = False
+
+
+class PlannedDeckChangeCreate(BaseModel):
+    """Create or offset a pending main-deck change."""
+
+    card_scryfall_id: UUID
+    direction: Literal["addition", "cut"]
+    quantity: int = Field(default=1, ge=1, le=99)
+    categories: list[str] = Field(default_factory=list, max_length=10)
+    added_by: Literal["user", "ai"] = "user"
+    ai_reasoning: str | None = None
+
+
+class PlannedDeckChangeUpdate(BaseModel):
+    """Change a pending quantity or optional collection selection."""
+
+    quantity: int | None = Field(default=None, ge=1, le=99)
+    collection_id: UUID | None = None
+
+
+class PlannedDeckChangeComplete(BaseModel):
+    """Complete one or more copies of a pending change."""
+
+    quantity: int = Field(default=1, ge=1, le=99)
+
+
+class PlannedDeckChange(BaseModel):
+    """Pending physical deck change enriched for the shared checklist."""
+
+    id: UUID
+    deck_id: UUID
+    card_id: UUID
+    scryfall_id: UUID
+    name: str
+    image_uri: str | None
+    direction: Literal["addition", "cut"]
+    quantity: int
+    collection_id: UUID | None
+    physical_quantity: int
+    projected_quantity: int
+    categories: list[str] = Field(default_factory=list)
+    added_by: Literal["user", "ai"]
+    ai_reasoning: str | None
+    owned_in: list[CollectionMembership] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
 
 
 class DeckDetailResponse(BaseModel):
@@ -143,6 +190,9 @@ class DeckDetailResponse(BaseModel):
     archetype_tags: list[str] = Field(default_factory=list)
     mana_curve: DeckManaCurve | None = None
     cards: list[DeckCardItem]
+    physical_card_count: int = 0
+    planned_card_count: int = 0
+    planned_changes: list[PlannedDeckChange] = Field(default_factory=list)
 
 
 class DeckCardAdd(BaseModel):

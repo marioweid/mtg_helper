@@ -17,11 +17,13 @@ from mtg_helper.models.decks import (
     DeckResponse,
     DeckSummary,
     DeckUpdate,
+    PlannedDeckChange,
 )
 from mtg_helper.services import (
     collection_service,
     deck_fit_service,
     mana_curve_service,
+    planned_change_service,
     preference_service,
 )
 from mtg_helper.services.builder_roles import derive_builder_roles
@@ -156,6 +158,27 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+async def _planned_state(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    cards: list[DeckCardItem],
+    partner_id: UUID | None,
+    email: str | None,
+    account_id: UUID | None,
+) -> tuple[list[PlannedDeckChange], int, int]:
+    physical = sum(card.quantity for card in cards) + 1 + (1 if partner_id else 0)
+    if account_id is None or email is None:
+        return [], physical, physical
+    plans = await planned_change_service.list_plans(pool, deck_id, email, account_id)
+    cuts = {plan.card_id: plan.quantity for plan in plans if plan.direction == "cut"}
+    for card in cards:
+        card.planned_cut_quantity = cuts.get(card.card_id, 0)
+    projected = physical + sum(
+        plan.quantity if plan.direction == "addition" else -plan.quantity for plan in plans
+    )
+    return plans, physical, projected
 
 
 async def _assert_owner(conn: asyncpg.Connection, deck_id: UUID, email: str) -> None:
@@ -383,6 +406,14 @@ async def get_deck(
         protected_names.update(preferences["pet_cards"])
 
     mana_curve = await mana_curve_service.deck_curve(pool, deck_row["commander_id"], cards)
+    planned_changes, physical_card_count, planned_card_count = await _planned_state(
+        pool,
+        deck_id,
+        cards,
+        deck_row["partner_id"],
+        email,
+        account_id,
+    )
 
     deck = DeckDetailResponse(
         id=deck_row["id"],
@@ -403,6 +434,9 @@ async def get_deck(
         archetype_tags=list(deck_row["archetype_tags"] or []),
         mana_curve=mana_curve,
         cards=cards,
+        physical_card_count=physical_card_count,
+        planned_card_count=planned_card_count,
+        planned_changes=planned_changes,
     )
     try:
         await deck_fit_service.enrich_deck_fit(
@@ -564,6 +598,11 @@ async def add_card_to_deck(
         card_identity = await _get_color_identity(conn, card_id)
         _check_color_identity(card_identity, commander_identity)
 
+        old_quantity = await conn.fetchval(
+            "SELECT quantity FROM deck_cards WHERE deck_id = $1 AND card_id = $2",
+            deck_id,
+            card_id,
+        )
         row = await conn.fetchrow(
             """
             INSERT INTO deck_cards (deck_id, card_id, quantity, categories, added_by, ai_reasoning)
@@ -588,6 +627,11 @@ async def add_card_to_deck(
 
         card_row = await conn.fetchrow("SELECT scryfall_id, name FROM cards WHERE id = $1", card_id)
 
+    added_quantity = max(0, data.quantity - int(old_quantity or 0))
+    if added_quantity:
+        await planned_change_service.consume_immediate_plan(
+            pool, deck_id, card_id, "addition", added_quantity
+        )
     return DeckCardResponse(
         deck_card_id=row["id"],
         deck_id=row["deck_id"],
@@ -761,13 +805,30 @@ async def update_deck_card_quantity(
         card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
         if card_row is None:
             return False
+        old_quantity = await conn.fetchval(
+            "SELECT quantity FROM deck_cards WHERE deck_id = $1 AND card_id = $2",
+            deck_id,
+            card_row["id"],
+        )
         result = await conn.execute(
             "UPDATE deck_cards SET quantity = $3 WHERE deck_id = $1 AND card_id = $2",
             deck_id,
             card_row["id"],
             quantity,
         )
-    return result == "UPDATE 1"
+    if result != "UPDATE 1":
+        return False
+    previous = int(old_quantity or 0)
+    if quantity > previous:
+        await planned_change_service.consume_immediate_plan(
+            pool, deck_id, card_row["id"], "addition", quantity - previous
+        )
+    elif quantity < previous:
+        await planned_change_service.consume_immediate_plan(
+            pool, deck_id, card_row["id"], "cut", previous - quantity
+        )
+    await planned_change_service.clamp_cut_plan(pool, deck_id, card_row["id"], quantity)
+    return True
 
 
 async def remove_card_from_deck(
@@ -802,4 +863,9 @@ async def remove_card_from_deck(
             deck_id,
             card_row["id"],
         )
-    return result == "DELETE 1"
+    if result != "DELETE 1":
+        return False
+    await planned_change_service.consume_immediate_plan(
+        pool, deck_id, card_row["id"], "cut"
+    )
+    return True
