@@ -232,6 +232,7 @@ infra/terraform/terraform.tfvars
 infra/terraform/tfplan
 **/.env.prod
 docs/superpowers
+.superpowers/
 
 # Local Codex app/thread configuration
 .codex/config.toml
