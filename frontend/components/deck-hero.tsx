@@ -56,7 +56,7 @@ export function DeckHero({
   return (
     <section
       aria-label="Deck hero"
-      className="relative mb-8 overflow-hidden rounded-2xl border border-white/10 min-h-[260px] sm:min-h-[320px]"
+      className="relative mb-6 min-h-[220px] overflow-hidden rounded-2xl border border-indigo-400/15 sm:min-h-[250px]"
       style={{ background: commander?.image_uri ? "#0b0d12" : gradient, boxShadow: shadow }}
     >
       {commander?.image_uri ? (
@@ -64,19 +64,24 @@ export function DeckHero({
           src={commander.image_uri}
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full object-cover object-top opacity-80"
+          width={488}
+          height={680}
+          fetchPriority="high"
+          className="absolute inset-0 h-full w-full object-cover object-[center_20%] opacity-60"
         />
       ) : null}
 
       <div
         aria-hidden
-        className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent"
+        className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/20"
       />
 
       {partner?.image_uri ? (
         <img
           src={partner.image_uri}
           alt={partner.name}
+          width={488}
+          height={680}
           className="absolute right-4 top-4 hidden h-24 w-auto rounded-lg border border-white/20 shadow-xl sm:block sm:h-32"
         />
       ) : null}
@@ -90,9 +95,9 @@ export function DeckHero({
         {deleting ? "Deleting…" : "Delete deck"}
       </button>
 
-      <div className="relative flex h-full flex-col justify-end gap-3 p-5 sm:p-6">
+      <div className="relative flex min-h-[220px] flex-col justify-end gap-3 p-5 sm:min-h-[250px] sm:p-6">
         <div className="flex flex-col gap-3">
-          <h1 className="pr-28 text-2xl font-bold leading-tight text-white drop-shadow sm:text-3xl">
+          <h1 className="text-wrap-balance pr-28 text-2xl font-bold leading-tight text-white drop-shadow sm:text-3xl">
             {name}
           </h1>
 
@@ -100,10 +105,13 @@ export function DeckHero({
             <div className="flex flex-col gap-2">
               <textarea
                 value={draftDescription}
+                name="deck-description"
+                autoComplete="off"
+                aria-label="Deck description"
                 onChange={(e) => onDraftChange(e.target.value)}
                 rows={3}
-                className="w-full max-w-2xl resize-none rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 backdrop-blur focus:border-indigo-400 focus:outline-none"
-                placeholder="Describe the deck strategy..."
+                className="w-full max-w-2xl resize-none rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 backdrop-blur focus-visible:border-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+                placeholder="Describe the deck strategy…"
               />
               <div className="flex gap-2">
                 <button

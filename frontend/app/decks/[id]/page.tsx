@@ -12,6 +12,7 @@ import { ComboTab } from "@/components/combo-tab";
 import { DeckHistoryPanel } from "@/components/deck-history-panel";
 import type { ComboListResponse } from "@/lib/types";
 import { CommandBar } from "@/components/command-bar";
+import { CardWorkspaceToolbar } from "@/components/card-workspace-toolbar";
 import { CommanderSection } from "@/components/commander-section";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { DeckCompactColumns } from "@/components/deck-compact-columns";
@@ -22,10 +23,14 @@ import {
   type SortMode,
 } from "@/components/deck-filter-bar";
 import {
+  getDeckGroup,
   getDeckSort,
   getDeckView,
+  getWorkspaceView,
+  setDeckGroup,
   setDeckSort,
-  setDeckView,
+  setWorkspaceView,
+  type CardWorkspaceView,
 } from "@/lib/deck-view-prefs";
 import { DeckGrid } from "@/components/deck-grid";
 import { DeckHero } from "@/components/deck-hero";
@@ -44,10 +49,9 @@ import {
   type DeckDetailResponse,
 } from "@/lib/types";
 
-type ViewMode = "tags" | "types" | "grid";
+type GroupMode = "tag" | "type";
 type DeckTab = "cards" | "combos" | "history";
 
-const VIEW_MODES: readonly ViewMode[] = ["tags", "types", "grid"];
 const SORT_MODES: readonly SortMode[] = ["default", "name", "cmc", "price"];
 
 function colorIdentityFromCards(cards: DeckCardItem[]): string[] {
@@ -72,7 +76,8 @@ export default function DeckDetailPage() {
   const [draftDescription, setDraftDescription] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("tags");
+  const [viewMode, setViewMode] = useState<CardWorkspaceView>("grid");
+  const [groupMode, setGroupMode] = useState<GroupMode>("type");
   const [tab, setTab] = useState<DeckTab>("cards");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -98,9 +103,19 @@ export default function DeckDetailPage() {
 
   // Restore the per-deck view mode + sort the user last chose.
   useEffect(() => {
-    const storedView = getDeckView(deckId);
-    if (storedView && (VIEW_MODES as readonly string[]).includes(storedView)) {
-      setViewMode(storedView as ViewMode);
+    const workspaceView = getWorkspaceView(`deck:${deckId}`);
+    const legacyView = getDeckView(deckId);
+    if (workspaceView) {
+      setViewMode(workspaceView);
+    } else if (legacyView === "grid") {
+      setViewMode("grid");
+    } else if (legacyView === "tags" || legacyView === "types") {
+      setViewMode("list");
+      setGroupMode(legacyView === "tags" ? "tag" : "type");
+    }
+    const storedGroup = getDeckGroup(deckId);
+    if (storedGroup === "tag" || storedGroup === "type") {
+      setGroupMode(storedGroup);
     }
     const storedSort = getDeckSort(deckId);
     if (storedSort && (SORT_MODES as readonly string[]).includes(storedSort)) {
@@ -108,9 +123,14 @@ export default function DeckDetailPage() {
     }
   }, [deckId]);
 
-  function handleViewModeChange(mode: ViewMode) {
+  function handleViewModeChange(mode: CardWorkspaceView) {
     setViewMode(mode);
-    setDeckView(deckId, mode);
+    setWorkspaceView(`deck:${deckId}`, mode);
+  }
+
+  function handleGroupModeChange(mode: GroupMode) {
+    setGroupMode(mode);
+    setDeckGroup(deckId, mode);
   }
 
   function handleFilterChange(next: DeckFilter) {
@@ -317,31 +337,6 @@ export default function DeckDetailPage() {
 
           {tab === "cards" && (
             <>
-              {deck.cards.length > 0 && (
-                <div
-                  role="group"
-                  aria-label="Deck view mode"
-                  className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-xs"
-                >
-                  {VIEW_MODES.map((mode) => {
-                    const active = viewMode === mode;
-                    return (
-                      <button
-                        key={mode}
-                        onClick={() => handleViewModeChange(mode)}
-                        aria-pressed={active}
-                        className={`px-3 py-1.5 capitalize transition-colors ${
-                          active
-                            ? "bg-indigo-600 text-white"
-                            : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
               <div className="flex flex-wrap items-start gap-3">
                 <div className="flex-1 min-w-[220px]">
                   <BracketSelector
@@ -358,13 +353,37 @@ export default function DeckDetailPage() {
               </div>
               <DeckCardSearch deckId={deck.id} onAdded={() => void load()} />
               {deck.cards.length > 0 && (
-                <DeckFilterBar
-                  value={filter}
-                  onChange={handleFilterChange}
+                <CardWorkspaceToolbar
+                  view={viewMode}
+                  onViewChange={handleViewModeChange}
                   resultCount={totalCardCount(visibleCards)}
-                  totalCount={deckTotal(deck)}
-                  availableColors={deck.commander_color_identity}
-                />
+                  totalCount={totalCardCount(deck.cards)}
+                >
+                  <DeckFilterBar
+                    value={filter}
+                    onChange={handleFilterChange}
+                    resultCount={totalCardCount(visibleCards)}
+                    totalCount={totalCardCount(deck.cards)}
+                    availableColors={deck.commander_color_identity}
+                  />
+                  <div role="group" aria-label="Group cards by" className="flex gap-1 px-1">
+                    {(["type", "tag"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => handleGroupModeChange(mode)}
+                        aria-pressed={groupMode === mode}
+                        className={`min-h-11 touch-manipulation rounded-lg px-3 text-xs font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                          groupMode === mode
+                            ? "bg-indigo-500/20 text-indigo-200"
+                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        Group: {mode}
+                      </button>
+                    ))}
+                  </div>
+                </CardWorkspaceToolbar>
               )}
               <CommanderSection
                 commander={deck.commander_card}
@@ -376,11 +395,13 @@ export default function DeckDetailPage() {
                   onCardClick={setSelectedCardId}
                   comboCardIds={comboCardIds}
                   onSetQuantity={handleSetQuantity}
+                  onRemove={handleRemoveCard}
+                  groupBy={groupMode}
                 />
               ) : (
                 <DeckCompactColumns
                   cards={visibleCards}
-                  groupBy={viewMode === "tags" ? "tag" : "type"}
+                  groupBy={groupMode}
                   onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
                   onRemove={handleRemoveCard}
                   onSetQuantity={handleSetQuantity}

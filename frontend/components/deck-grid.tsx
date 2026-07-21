@@ -1,137 +1,215 @@
 "use client";
 
+import { VisualCardGrid, VisualCardTile } from "@/components/visual-card-grid";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
-import { totalCardCount, type DeckCardItem } from "@/lib/types";
+import { STAGE_LABELS } from "@/lib/constants";
+import { bucketsFor, totalCardCount, type DeckCardItem } from "@/lib/types";
+
+const EUR_FORMATTER = new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" });
 
 interface Props {
   cards: DeckCardItem[];
   onCardClick: (deckCardId: string) => void;
-  comboCardIds?: Set<string>;
-  onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
+  comboCardIds?: Set<string> | undefined;
+  onSetQuantity?: ((scryfallId: string, quantity: number) => void | Promise<void>) | undefined;
+  onRemove?: ((scryfallId: string) => void) | undefined;
+  groupBy?: "type" | "tag";
 }
 
 function isBasicLand(card: DeckCardItem): boolean {
   return !!card.type_line?.includes("Basic Land");
 }
 
-/**
- * Visual deck view: cards grouped under a heading per primary type, laid out
- * as a non-overlapping responsive grid so each full card (and its printed
- * text) is readable. Hover keeps the existing floating popover; click opens a
- * detail modal at the page level.
- */
-export function DeckGrid({ cards, onCardClick, comboCardIds, onSetQuantity }: Props) {
-  const groups = groupByPrimaryType(cards);
-  const types = sortedPrimaryTypes(groups);
+export function DeckGrid({
+  cards,
+  onCardClick,
+  comboCardIds,
+  onSetQuantity,
+  onRemove,
+  groupBy = "type",
+}: Props) {
+  const groups = buildGridGroups(cards, groupBy);
 
   if (cards.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-6">
-      {types.map((type) => (
+    <div className="flex flex-col gap-7">
+      {groups.map((group) => (
         <DeckGridSection
-          key={type}
-          type={type}
-          cards={groups[type] ?? []}
+          key={group.key}
+          type={group.label}
+          cards={group.cards}
           onCardClick={onCardClick}
           comboCardIds={comboCardIds}
           onSetQuantity={onSetQuantity}
+          onRemove={onRemove}
         />
       ))}
     </div>
   );
 }
 
-interface SectionProps {
-  type: string;
-  cards: DeckCardItem[];
-  onCardClick: (deckCardId: string) => void;
-  comboCardIds?: Set<string> | undefined;
-  onSetQuantity?: ((scryfallId: string, quantity: number) => void | Promise<void>) | undefined;
+function buildGridGroups(cards: DeckCardItem[], groupBy: "type" | "tag") {
+  if (groupBy === "type") {
+    const groups = groupByPrimaryType(cards);
+    return sortedPrimaryTypes(groups).map((type) => ({
+      key: type,
+      label: type,
+      cards: groups[type] ?? [],
+    }));
+  }
+
+  const groups = new Map<string, DeckCardItem[]>();
+  for (const card of cards) {
+    for (const tag of bucketsFor(card)) {
+      groups.set(tag, [...(groups.get(tag) ?? []), card]);
+    }
+  }
+  return [...groups.entries()]
+    .map(([key, items]) => ({ key, label: STAGE_LABELS[key] ?? key, cards: items }))
+    .sort((a, b) => b.cards.length - a.cards.length || a.label.localeCompare(b.label));
 }
 
-function DeckGridSection({ type, cards, onCardClick, comboCardIds, onSetQuantity }: SectionProps) {
+interface SectionProps extends Props {
+  type: string;
+}
+
+function DeckGridSection({
+  type,
+  cards,
+  onCardClick,
+  comboCardIds,
+  onSetQuantity,
+  onRemove,
+}: SectionProps) {
   if (cards.length === 0) return null;
+
   return (
-    <section className="flex flex-col">
-      <header className="mb-2 flex items-baseline justify-between border-b border-white/10 pb-1">
+    <section>
+      <header className="mb-3 flex items-baseline justify-between border-b border-white/10 pb-2">
         <h3 className="text-sm font-semibold text-white">{type}</h3>
-        <span className="text-xs text-gray-500">{totalCardCount(cards)}</span>
+        <span className="text-xs tabular-nums text-gray-500">{totalCardCount(cards)}</span>
       </header>
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <VisualCardGrid>
         {cards.map((card) => (
-          <li key={card.deck_card_id} className="relative">
-            <button
-              type="button"
-              onClick={() => onCardClick(card.deck_card_id)}
-              title={card.name}
-              className="block w-full overflow-hidden rounded-[4.5%] focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              aria-label={`Open ${card.name}`}
-            >
-              {card.image_uri ? (
-                <img
-                  src={card.image_uri}
-                  alt={card.name}
-                  className="block w-full rounded-[4.5%] shadow-md"
-                />
-              ) : (
-                <span className="flex aspect-[5/7] w-full items-center justify-center rounded-[4.5%] border border-white/10 bg-white/5 px-2 text-center text-xs text-gray-400">
-                  {card.name}
-                </span>
-              )}
-              {card.quantity > 1 ? (
-                <span className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur">
-                  ×{card.quantity}
-                </span>
-              ) : null}
-              {card.price_eur_cents != null ? (
-                <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-emerald-300 backdrop-blur tabular-nums">
-                  €{(card.price_eur_cents / 100).toFixed(2)}
-                </span>
-              ) : null}
-              {comboCardIds?.has(card.scryfall_id) ? (
-                <span
-                  className="absolute left-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-sm text-yellow-300 backdrop-blur"
-                  title="Part of an active or near-complete combo"
-                >
-                  ⚡
-                </span>
-              ) : null}
-              {card.planned_cut_quantity > 0 ? (
-                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-red-950/90 px-2 py-0.5 text-[10px] text-red-200 backdrop-blur">
-                  Planned cut ×{card.planned_cut_quantity}
-                </span>
-              ) : null}
-            </button>
-            {isBasicLand(card) && onSetQuantity ? (
-              <div
-                className="absolute bottom-1.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/80 px-1.5 py-0.5 backdrop-blur"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={() => void onSetQuantity(card.scryfall_id, card.quantity - 1)}
-                  aria-label="Decrease quantity"
-                  className="h-5 w-5 rounded text-sm text-gray-200 hover:text-white"
-                >
-                  −
-                </button>
-                <span className="min-w-[1.5rem] text-center text-xs tabular-nums text-white">
-                  {card.quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void onSetQuantity(card.scryfall_id, card.quantity + 1)}
-                  aria-label="Increase quantity"
-                  className="h-5 w-5 rounded text-sm text-gray-200 hover:text-white"
-                >
-                  +
-                </button>
-              </div>
-            ) : null}
-          </li>
+          <VisualCardTile
+            key={card.deck_card_id}
+            name={card.name}
+            imageUri={card.image_uri}
+            onOpen={() => onCardClick(card.deck_card_id)}
+            badges={<DeckTileBadges card={card} inCombo={comboCardIds?.has(card.scryfall_id)} />}
+            footer={
+              <DeckTileFooter
+                card={card}
+                onOpen={() => onCardClick(card.deck_card_id)}
+                onSetQuantity={onSetQuantity}
+                onRemove={onRemove}
+              />
+            }
+          />
         ))}
-      </ul>
+      </VisualCardGrid>
     </section>
+  );
+}
+
+function DeckTileBadges({ card, inCombo }: { card: DeckCardItem; inCombo?: boolean | undefined }) {
+  return (
+    <>
+      {card.quantity > 1 ? (
+        <span className="absolute right-2 top-2 rounded-full bg-black/80 px-2 py-1 text-xs font-semibold text-white backdrop-blur">
+          ×{card.quantity}
+        </span>
+      ) : null}
+      {inCombo ? (
+        <span className="absolute left-2 top-2 rounded-full bg-black/80 px-2 py-1 text-xs text-amber-300 backdrop-blur">
+          Combo
+        </span>
+      ) : null}
+      {card.price_eur_cents != null ? (
+        <span className="absolute bottom-2 left-2 rounded-full bg-black/80 px-2 py-1 text-xs font-medium text-emerald-300 backdrop-blur tabular-nums">
+          {EUR_FORMATTER.format(card.price_eur_cents / 100)}
+        </span>
+      ) : null}
+      {card.planned_cut_quantity > 0 ? (
+        <span className="absolute bottom-2 right-2 rounded-full bg-red-950/90 px-2 py-1 text-[10px] text-red-200 backdrop-blur">
+          Cut ×{card.planned_cut_quantity}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+interface FooterProps {
+  card: DeckCardItem;
+  onOpen: () => void;
+  onSetQuantity?: Props["onSetQuantity"];
+  onRemove?: Props["onRemove"];
+}
+
+function DeckTileFooter({ card, onOpen, onSetQuantity, onRemove }: FooterProps) {
+  const showQuantity = isBasicLand(card) && onSetQuantity;
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block w-full truncate text-left text-sm font-medium text-white hover:text-indigo-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >
+        {card.name}
+      </button>
+      <div className="flex min-h-9 items-center justify-between gap-2">
+        <span className="truncate text-[11px] text-gray-500">{card.type_line}</span>
+        {showQuantity ? (
+          <div className="flex shrink-0 items-center rounded-lg border border-white/10 bg-black/25">
+            <QuantityButton
+              label={`Decrease ${card.name}`}
+              onClick={() => void onSetQuantity(card.scryfall_id, card.quantity - 1)}
+            >
+              −
+            </QuantityButton>
+            <span className="min-w-7 text-center text-xs tabular-nums text-white">
+              {card.quantity}
+            </span>
+            <QuantityButton
+              label={`Increase ${card.name}`}
+              onClick={() => void onSetQuantity(card.scryfall_id, card.quantity + 1)}
+            >
+              +
+            </QuantityButton>
+          </div>
+        ) : onRemove ? (
+          <button
+            type="button"
+            onClick={() => onRemove(card.scryfall_id)}
+            aria-label={`Plan cut for ${card.name}`}
+            className="min-h-11 shrink-0 touch-manipulation rounded-lg border border-red-500/30 px-2 text-xs text-red-300 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          >
+            Plan Cut
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function QuantityButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="min-h-11 min-w-11 touch-manipulation text-gray-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+    >
+      {children}
+    </button>
   );
 }

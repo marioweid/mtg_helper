@@ -3,8 +3,16 @@
 import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
+import { CardWorkspaceToolbar } from "@/components/card-workspace-toolbar";
 import { CardSearch } from "@/components/card-search";
+import { CollectionCardGrid } from "@/components/collection-card-grid";
 import { CollectionCardRow } from "@/components/collection-card-row";
+import { useToast } from "@/components/toast";
+import {
+  getWorkspaceView,
+  setWorkspaceView,
+  type CardWorkspaceView,
+} from "@/lib/deck-view-prefs";
 import type {
   CardResponse,
   CollectionCardItem,
@@ -34,6 +42,7 @@ function parseEurInput(raw: string): number | null | "invalid" {
 
 export default function CollectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const toast = useToast();
   const [collection, setCollection] = useState<CollectionResponse | null>(null);
   const [cards, setCards] = useState<CollectionCardItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -49,6 +58,8 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
+  const [view, setView] = useState<CardWorkspaceView>("grid");
+  const [busyCardId, setBusyCardId] = useState<string | null>(null);
 
   const loadCollection = useCallback(async () => {
     try {
@@ -89,6 +100,15 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
       .then(setDecks)
       .catch(() => setDecks([]));
   }, []);
+
+  useEffect(() => {
+    setView(getWorkspaceView(`collection:${id}`) ?? "grid");
+  }, [id]);
+
+  function handleViewChange(next: CardWorkspaceView) {
+    setView(next);
+    setWorkspaceView(`collection:${id}`, next);
+  }
 
   async function handleAdd(card: CardResponse) {
     setError(null);
@@ -175,6 +195,52 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     await Promise.all([loadCollection(), loadCards()]);
   }
 
+  async function handleSetQuantity(card: CollectionCardItem, quantity: number) {
+    if (quantity < 1) {
+      await handleRemove(card);
+      return;
+    }
+    setBusyCardId(card.card_id);
+    try {
+      await apiClient.updateCollectionCard(id, card.card_id, { quantity });
+      await refresh();
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Update failed", "error");
+    } finally {
+      setBusyCardId(null);
+    }
+  }
+
+  async function handleRemove(card: CollectionCardItem) {
+    if (!window.confirm(`Remove ${card.name} from this collection?`)) return;
+    setBusyCardId(card.card_id);
+    try {
+      await apiClient.removeCollectionCard(id, card.card_id);
+      await refresh();
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Remove failed", "error");
+    } finally {
+      setBusyCardId(null);
+    }
+  }
+
+  async function handlePlanForDeck(card: CollectionCardItem, deckId: string) {
+    if (!deckId) return;
+    setBusyCardId(card.card_id);
+    try {
+      await apiClient.planCard(deckId, {
+        card_scryfall_id: card.scryfall_id,
+        direction: "addition",
+        quantity: 1,
+      });
+      toast.push(`Planned ${card.name}`, "success");
+    } catch (err) {
+      toast.push(err instanceof ApiError ? err.message : "Planning failed", "error");
+    } finally {
+      setBusyCardId(null);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
 
@@ -194,9 +260,12 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
               <input
                 type="text"
                 value={renameValue}
+                name="collection-name"
+                autoComplete="off"
+                aria-label="Collection name"
                 onChange={(e) => setRenameValue(e.target.value)}
                 autoFocus
-                className="rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-2xl font-bold text-white focus:border-indigo-500 focus:outline-none sm:text-3xl"
+                className="rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-2xl font-bold text-white focus-visible:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50 sm:text-3xl"
               />
               <button
                 onClick={() => void handleRename()}
@@ -259,7 +328,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
       <section className="mb-6 rounded-xl border border-white/10 bg-white/5 p-4">
         <h2 className="mb-3 text-sm font-medium text-gray-300">Add card</h2>
-        <CardSearch placeholder="Search by name..." onSelect={(c) => void handleAdd(c)} />
+        <CardSearch placeholder="Search by name…" onSelect={(c) => void handleAdd(c)} />
       </section>
 
       <details
@@ -319,24 +388,30 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
                 Min €
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={minPriceDraft}
+                  name="minimum-price"
+                  autoComplete="off"
                   onChange={(e) => setMinPriceDraft(e.target.value)}
                   placeholder="0.00"
-                  className="w-24 rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
+                  className="w-24 rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus-visible:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
                 />
               </label>
               <label className="flex items-center gap-1 text-xs text-gray-400">
                 Max €
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={maxPriceDraft}
+                  name="maximum-price"
+                  autoComplete="off"
                   onChange={(e) => setMaxPriceDraft(e.target.value)}
                   placeholder="blank = no cap"
-                  className="w-32 rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
+                  className="w-32 rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus-visible:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
                 />
               </label>
               <button
@@ -364,23 +439,43 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
         </div>
       </details>
 
+      <div className="mb-5">
+        <CardWorkspaceToolbar
+          view={view}
+          onViewChange={handleViewChange}
+          resultCount={cards.length}
+          totalCount={total}
+        />
+      </div>
+
       {cards.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/20 py-16 text-center text-gray-500">
           {total === 0 && !filtersActive
             ? "No cards yet. Add via search or import a CSV."
             : filtersActive
               ? "No cards match the current filters."
-              : "Loading..."}
+              : "Loading…"}
         </div>
+      ) : view === "grid" ? (
+        <CollectionCardGrid
+          cards={cards}
+          decks={decks}
+          busy={busyCardId !== null}
+          onSetQuantity={handleSetQuantity}
+          onRemove={handleRemove}
+          onPlanForDeck={handlePlanForDeck}
+        />
       ) : (
         <ul className="rounded-xl border border-white/10 bg-white/5">
           {cards.map((card) => (
             <CollectionCardRow
               key={`${card.card_id}-${card.set_code}-${card.collector_number}-${card.foil}`}
-              collectionId={id}
               card={card}
               decks={decks}
-              onChanged={() => void refresh()}
+              busy={busyCardId === card.card_id}
+              onSetQuantity={handleSetQuantity}
+              onRemove={handleRemove}
+              onPlanForDeck={handlePlanForDeck}
             />
           ))}
         </ul>

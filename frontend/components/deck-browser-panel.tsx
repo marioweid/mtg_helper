@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CardHover } from "@/components/card-hover";
+import { CardWorkspaceToolbar } from "@/components/card-workspace-toolbar";
 import { DeckCompactColumns } from "@/components/deck-compact-columns";
+import { DeckGrid } from "@/components/deck-grid";
 import { PlannedCutBadge } from "@/components/planned-cut-badge";
 import {
   applyDeckFilter,
@@ -11,6 +13,11 @@ import {
   type DeckFilter,
 } from "@/components/deck-filter-bar";
 import { STAGE_LABELS } from "@/lib/constants";
+import {
+  getWorkspaceView,
+  setWorkspaceView,
+  type CardWorkspaceView,
+} from "@/lib/deck-view-prefs";
 import { bucketsFor, type CardResponse, type DeckCardItem, totalCardCount } from "@/lib/types";
 
 type GroupMode = "type" | "tag" | "flat";
@@ -34,6 +41,7 @@ interface Props {
   /** When set, the filter input also searches the card pool and lets the user add matches. */
   onAddCard?: (card: CardResponse) => void | Promise<void>;
   commanderLegal?: boolean;
+  workspaceScope?: string;
 }
 
 function CardRow({
@@ -109,6 +117,7 @@ export function DeckBrowserPanel({
   comboCardIds,
   onAddCard,
   commanderLegal,
+  workspaceScope = "builder",
 }: Props) {
   const [filter, setFilter] = useState<DeckFilter>({
     query: "",
@@ -116,8 +125,13 @@ export function DeckBrowserPanel({
     sort: "default",
   });
   const [group, setGroup] = useState<GroupMode>("type");
+  const [view, setView] = useState<CardWorkspaceView>("grid");
   const [lastCut, setLastCut] = useState<DeckCardItem | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setView(getWorkspaceView(workspaceScope) ?? "grid");
+  }, [workspaceScope]);
 
   useEffect(() => {
     return () => {
@@ -143,34 +157,15 @@ export function DeckBrowserPanel({
   const filtered = useMemo(() => applyDeckFilter(cards, filter), [cards, filter]);
   const total = totalCardCount(cards);
 
+  function handleViewChange(next: CardWorkspaceView) {
+    setView(next);
+    if (next === "grid" && group === "flat") setGroup("type");
+    setWorkspaceView(workspaceScope, next);
+  }
+
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div
-          role="group"
-          aria-label="Group cards by"
-          className="inline-flex w-fit overflow-hidden rounded-md border border-white/10 text-[11px]"
-        >
-          {GROUP_OPTIONS.map((opt) => {
-            const active = group === opt.key;
-            return (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => setGroup(opt.key)}
-                aria-pressed={active}
-                className={`px-2.5 py-1 capitalize transition-colors ${
-                  active
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-        {lastCut && (
+      {lastCut && (
           <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs">
             <span className="truncate text-gray-300">
               Planned cut for{" "}
@@ -186,21 +181,62 @@ export function DeckBrowserPanel({
               Undo
             </button>
           </div>
-        )}
-      </div>
+      )}
 
-      <DeckFilterBar
-        value={filter}
-        onChange={setFilter}
+      <CardWorkspaceToolbar
+        view={view}
+        onViewChange={handleViewChange}
         resultCount={totalCardCount(filtered)}
         totalCount={total}
-        {...(onAddCard ? { onAddCard } : {})}
-        {...(commanderLegal ? { commanderLegal } : {})}
-      />
+      >
+        <DeckFilterBar
+          value={filter}
+          onChange={setFilter}
+          resultCount={totalCardCount(filtered)}
+          totalCount={total}
+          {...(onAddCard ? { onAddCard } : {})}
+          {...(commanderLegal ? { commanderLegal } : {})}
+        />
+        <div role="group" aria-label="Group cards by" className="flex flex-wrap gap-1 px-1">
+          {GROUP_OPTIONS.filter((option) => view === "list" || option.key !== "flat").map((opt) => {
+            const active = group === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setGroup(opt.key)}
+                aria-pressed={active}
+                className={`min-h-11 touch-manipulation rounded-lg px-2.5 text-[11px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                  active
+                    ? "bg-indigo-500/20 text-indigo-200"
+                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                }`}
+              >
+                Group: {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </CardWorkspaceToolbar>
 
       <div className="-mr-1 flex-1 overflow-y-auto pr-1">
         {filtered.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-gray-500">No cards match.</p>
+        ) : view === "grid" ? (
+          <DeckGrid
+            cards={filtered}
+            onCardClick={(deckCardId) => {
+              const card = filtered.find((item) => item.deck_card_id === deckCardId);
+              if (card) onCardClick?.(card);
+            }}
+            onRemove={(scryfallId) => {
+              const card = filtered.find((item) => item.scryfall_id === scryfallId);
+              if (card) handleCut(card);
+            }}
+            {...(onSetQuantity ? { onSetQuantity } : {})}
+            {...(comboCardIds ? { comboCardIds } : {})}
+            groupBy={group === "tag" ? "tag" : "type"}
+          />
         ) : group === "flat" ? (
           <ul>
             {filtered.map((card) => (

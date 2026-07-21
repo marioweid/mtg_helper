@@ -4,6 +4,10 @@
 
 const VIEW_KEY = (deckId: string) => `deck-view:${deckId}`;
 const SORT_KEY = (deckId: string) => `deck-sort:${deckId}`;
+const GROUP_KEY = (deckId: string) => `deck-group:${deckId}`;
+const WORKSPACE_VIEW_KEY = (scope: string) => `card-workspace-view:${scope}`;
+
+export type CardWorkspaceView = "grid" | "list";
 
 function read(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -37,4 +41,21 @@ export function getDeckSort(deckId: string): string | null {
 
 export function setDeckSort(deckId: string, sort: string): void {
   write(SORT_KEY(deckId), sort);
+}
+
+export function getDeckGroup(deckId: string): string | null {
+  return read(GROUP_KEY(deckId));
+}
+
+export function setDeckGroup(deckId: string, group: string): void {
+  write(GROUP_KEY(deckId), group);
+}
+
+export function getWorkspaceView(scope: string): CardWorkspaceView | null {
+  const value = read(WORKSPACE_VIEW_KEY(scope));
+  return value === "grid" || value === "list" ? value : null;
+}
+
+export function setWorkspaceView(scope: string, view: CardWorkspaceView): void {
+  write(WORKSPACE_VIEW_KEY(scope), view);
 }
