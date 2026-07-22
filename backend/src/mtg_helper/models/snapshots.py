@@ -34,7 +34,7 @@ class SnapshotSummary(BaseModel):
     id: UUID
     deck_id: UUID
     label: str | None
-    source: Literal["manual", "auto_stage"]
+    source: Literal["manual", "auto_stage", "revision"]
     stage: str
     deck_name: str
     bracket: int | None
@@ -48,7 +48,7 @@ class SnapshotResponse(BaseModel):
     id: UUID
     deck_id: UUID
     label: str | None
-    source: Literal["manual", "auto_stage"]
+    source: Literal["manual", "auto_stage", "revision"]
     stage: str
     deck_name: str
     bracket: int | None
@@ -63,7 +63,7 @@ class SnapshotDetailResponse(BaseModel):
     id: UUID
     deck_id: UUID
     label: str | None
-    source: Literal["manual", "auto_stage"]
+    source: Literal["manual", "auto_stage", "revision"]
     stage: str
     deck_name: str
     bracket: int | None

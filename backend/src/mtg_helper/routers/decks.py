@@ -36,6 +36,7 @@ from mtg_helper.services import (
     deck_url_import_service,
     import_service,
     planned_change_service,
+    revision_service,
 )
 from mtg_helper.services.combo_service import ComboFetchError
 from mtg_helper.services.deck_service import (
@@ -53,6 +54,7 @@ from mtg_helper.services.planned_change_service import (
     PlanNotFoundError,
     SelectedCollectionError,
 )
+from mtg_helper.services.revision_service import RevisionCommand
 
 router = APIRouter(prefix="/decks", tags=["decks"])
 
@@ -415,14 +417,29 @@ async def complete_planned_change(
 ) -> DataResponse[PlannedDeckChange | None]:
     """Complete physical copies atomically with an optional collection move."""
     try:
-        plan = await planned_change_service.complete_plan(
+        command = RevisionCommand(
+            plan_ids=[plan_id],
+            title=None,
+            source="single_plan",
+            quantities={plan_id: body.quantity},
+        )
+        await revision_service.apply_revision(
             request.app.state.db_pool,
             deck_id,
-            plan_id,
-            body.quantity,
+            command,
             _require_email(account),
             account.id,
         )
+        try:
+            plan = await planned_change_service.get_plan(
+                request.app.state.db_pool,
+                deck_id,
+                plan_id,
+                _require_email(account),
+                account.id,
+            )
+        except PlanNotFoundError:
+            plan = None
     except (
         PlanNotFoundError,
         InvalidPlanError,

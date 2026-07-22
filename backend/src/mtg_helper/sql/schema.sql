@@ -364,7 +364,7 @@ CREATE TABLE IF NOT EXISTS deck_snapshots (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     deck_id         UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
     label           TEXT,
-    source          TEXT NOT NULL CHECK (source IN ('manual', 'auto_stage')),
+    source          TEXT NOT NULL CHECK (source IN ('manual', 'auto_stage', 'revision')),
     stage           TEXT NOT NULL,
     deck_name       TEXT NOT NULL,
     bracket         INTEGER,
@@ -453,6 +453,39 @@ CREATE INDEX IF NOT EXISTS idx_deck_card_plans_deck
     ON deck_card_plans (deck_id, direction, created_at);
 
 -- ============================================================
+-- DECK REVISIONS (atomic applications of selected planned changes)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS deck_revisions (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    deck_id             UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    title               TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
+    note                TEXT CHECK (note IS NULL OR char_length(note) <= 2000),
+    source              TEXT NOT NULL CHECK (source IN ('selected_plans', 'single_plan')),
+    before_snapshot_id  UUID NOT NULL REFERENCES deck_snapshots(id),
+    after_snapshot_id   UUID NOT NULL REFERENCES deck_snapshots(id),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_deck_revisions_deck
+    ON deck_revisions (deck_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS deck_revision_changes (
+    revision_id         UUID NOT NULL REFERENCES deck_revisions(id) ON DELETE CASCADE,
+    card_id             UUID NOT NULL REFERENCES cards(id),
+    card_name           TEXT NOT NULL,
+    direction           TEXT NOT NULL CHECK (direction IN ('addition', 'cut')),
+    quantity            INTEGER NOT NULL CHECK (quantity > 0),
+    categories          TEXT[] NOT NULL DEFAULT '{}',
+    added_by            TEXT NOT NULL CHECK (added_by IN ('user', 'ai')),
+    ai_reasoning        TEXT,
+    collection_id       UUID REFERENCES collections(id) ON DELETE SET NULL,
+    collection_name     TEXT,
+    plan_created_at     TIMESTAMPTZ NOT NULL,
+    plan_updated_at     TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (revision_id, card_id)
+);
+
+-- ============================================================
 -- MIGRATIONS (idempotent column additions for existing DBs)
 -- ============================================================
 DROP VIEW IF EXISTS deck_detail_view;
@@ -472,6 +505,9 @@ WHERE cardinality(mtgjson_tags) = 0
 CREATE INDEX IF NOT EXISTS idx_cards_hub_tags ON cards USING GIN (hub_tags);
 CREATE INDEX IF NOT EXISTS idx_cards_mtgjson_tags ON cards USING GIN (mtgjson_tags);
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE deck_snapshots DROP CONSTRAINT IF EXISTS deck_snapshots_source_check;
+ALTER TABLE deck_snapshots ADD CONSTRAINT deck_snapshots_source_check
+    CHECK (source IN ('manual', 'auto_stage', 'revision'));
 ALTER TABLE deck_feedback ADD COLUMN IF NOT EXISTS reject_count INT NOT NULL DEFAULT 0;
 ALTER TABLE deck_feedback DROP CONSTRAINT IF EXISTS deck_feedback_feedback_check;
 ALTER TABLE deck_feedback ADD CONSTRAINT deck_feedback_feedback_check

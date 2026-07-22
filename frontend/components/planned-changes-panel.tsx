@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { ApplyRevisionDialog } from "@/components/apply-revision-dialog";
 import { CardHover } from "@/components/card-hover";
 import { OwnedBadge } from "@/components/owned-badge";
 import { PlannedBuyListDialog } from "@/components/planned-buy-list-dialog";
@@ -43,6 +44,8 @@ export function PlannedChangesPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buyListOpen, setBuyListOpen] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +62,11 @@ export function PlannedChangesPanel({
     };
   }, []);
 
+  useEffect(() => {
+    const available = new Set(plans.map((plan) => plan.id));
+    setSelectedIds((current) => new Set([...current].filter((id) => available.has(id))));
+  }, [plans]);
+
   const grouped = useMemo(
     () => ({
       additions: plans.filter((plan) => plan.direction === "addition"),
@@ -66,6 +74,31 @@ export function PlannedChangesPanel({
     }),
     [plans],
   );
+  const selectedPlans = useMemo(
+    () => plans.filter((plan) => selectedIds.has(plan.id)),
+    [plans, selectedIds],
+  );
+
+  const toggleSelected = (planId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(planId)) next.delete(planId);
+      else next.add(planId);
+      return next;
+    });
+  };
+
+  const toggleGroup = (groupPlans: PlannedDeckChange[]) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      const allSelected = groupPlans.every((plan) => next.has(plan.id));
+      for (const plan of groupPlans) {
+        if (allSelected) next.delete(plan.id);
+        else next.add(plan.id);
+      }
+      return next;
+    });
+  };
 
   async function run(planId: string, action: () => Promise<unknown>) {
     setBusyId(planId);
@@ -101,6 +134,19 @@ export function PlannedChangesPanel({
           <p className="px-1 py-2 text-xs text-gray-500">No pending additions or cuts.</p>
         ) : (
           <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-indigo-500/20 bg-indigo-950/20 px-3 py-2">
+              <span className="text-xs text-indigo-200">
+                {selectedPlans.length} selected
+              </span>
+              <button
+                type="button"
+                disabled={selectedPlans.length === 0}
+                onClick={() => setRevisionOpen(true)}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+              >
+                Apply selected
+              </button>
+            </div>
             <PlanGroup
               title="Planned additions"
               tone="addition"
@@ -110,6 +156,9 @@ export function PlannedChangesPanel({
               onRun={run}
               deckId={deckId}
               onCreateBuyList={() => setBuyListOpen(true)}
+              selectedIds={selectedIds}
+              onToggle={toggleSelected}
+              onToggleAll={() => toggleGroup(grouped.additions)}
             />
             <PlanGroup
               title="Planned cuts"
@@ -119,6 +168,9 @@ export function PlannedChangesPanel({
               busyId={busyId}
               onRun={run}
               deckId={deckId}
+              selectedIds={selectedIds}
+              onToggle={toggleSelected}
+              onToggleAll={() => toggleGroup(grouped.cuts)}
             />
           </div>
         )}
@@ -128,6 +180,19 @@ export function PlannedChangesPanel({
         deckId={deckId}
         collections={collections}
         onClose={() => setBuyListOpen(false)}
+      />
+      <ApplyRevisionDialog
+        open={revisionOpen}
+        deckId={deckId}
+        plans={selectedPlans}
+        physicalCount={physicalCount}
+        collections={collections}
+        onClose={() => setRevisionOpen(false)}
+        onApplied={async () => {
+          setRevisionOpen(false);
+          setSelectedIds(new Set());
+          await onChanged();
+        }}
       />
     </details>
   );
@@ -166,6 +231,9 @@ interface GroupProps {
   deckId: string;
   onRun: (planId: string, action: () => Promise<unknown>) => Promise<void>;
   onCreateBuyList?: () => void;
+  selectedIds: Set<string>;
+  onToggle: (planId: string) => void;
+  onToggleAll: () => void;
 }
 
 function PlanGroup({
@@ -177,6 +245,9 @@ function PlanGroup({
   deckId,
   onRun,
   onCreateBuyList,
+  selectedIds,
+  onToggle,
+  onToggleAll,
 }: GroupProps) {
   if (plans.length === 0) return null;
   const titleColor = tone === "addition" ? "text-emerald-300" : "text-red-300";
@@ -186,6 +257,14 @@ function PlanGroup({
         <h3 className={`text-[11px] font-semibold uppercase tracking-wide ${titleColor}`}>
           {title}
         </h3>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleAll}
+            className="text-[11px] text-gray-400 hover:text-white"
+          >
+            {plans.every((plan) => selectedIds.has(plan.id)) ? "Clear" : "Select all"}
+          </button>
         {onCreateBuyList && (
           <button
             type="button"
@@ -195,6 +274,7 @@ function PlanGroup({
             Create buy list
           </button>
         )}
+        </div>
       </div>
       <ul className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10">
         {plans.map((plan) => (
@@ -206,6 +286,8 @@ function PlanGroup({
             busy={busyId === plan.id}
             deckId={deckId}
             onRun={onRun}
+            selected={selectedIds.has(plan.id)}
+            onToggle={() => onToggle(plan.id)}
           />
         ))}
       </ul>
@@ -220,9 +302,11 @@ interface RowProps {
   busy: boolean;
   deckId: string;
   onRun: GroupProps["onRun"];
+  selected: boolean;
+  onToggle: () => void;
 }
 
-function PlanRow({ plan, tone, collections, busy, deckId, onRun }: RowProps) {
+function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onToggle }: RowProps) {
   const options = collectionOptions(plan, collections);
   const updateQuantity = (quantity: number) =>
     onRun(plan.id, () => apiClient.updatePlannedChange(deckId, plan.id, { quantity }));
@@ -230,7 +314,14 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun }: RowProps) {
     onRun(plan.id, () => apiClient.completePlannedChange(deckId, plan.id, 1));
 
   return (
-    <li className="grid items-center gap-2 bg-black/10 px-3 py-2 sm:grid-cols-[minmax(180px,1fr)_auto_180px_auto]">
+    <li className="grid items-center gap-2 bg-black/10 px-3 py-2 sm:grid-cols-[auto_minmax(180px,1fr)_auto_180px_auto]">
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggle}
+        aria-label={`Select ${plan.name} for revision`}
+        className="h-4 w-4 accent-indigo-500"
+      />
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-white">
           <CardHover name={plan.name} imageUri={plan.image_uri}>

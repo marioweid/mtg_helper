@@ -17,7 +17,7 @@ from mtg_helper.models.snapshots import (
     SnapshotSummary,
 )
 from mtg_helper.services import snapshot_service
-from mtg_helper.services.snapshot_service import SnapshotNotFoundError
+from mtg_helper.services.snapshot_service import SnapshotNotFoundError, SnapshotValidationError
 
 router = APIRouter(tags=["snapshots"])
 
@@ -118,6 +118,11 @@ async def delete_snapshot(
         await snapshot_service.delete_snapshot(request.app.state.db_pool, snapshot_id, email=email)
     except SnapshotNotFoundError as e:
         raise _not_found(str(e))
+    except SnapshotValidationError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "SNAPSHOT_PROTECTED", "message": str(e)},
+        ) from e
     return Response(status_code=204)
 
 

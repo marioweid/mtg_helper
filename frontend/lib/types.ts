@@ -960,7 +960,46 @@ export interface CollectionImportResponse {
 }
 
 // Deck Snapshots + Comparison
-export type SnapshotSource = "manual" | "auto_stage";
+export type SnapshotSource = "manual" | "auto_stage" | "revision";
+
+export type DeckRevisionSource = "selected_plans" | "single_plan";
+
+export interface DeckRevisionChange {
+  card_id: string;
+  card_name: string;
+  direction: "addition" | "cut";
+  quantity: number;
+  categories: string[];
+  added_by: "user" | "ai";
+  ai_reasoning: string | null;
+  collection_id: string | null;
+  collection_name: string | null;
+  plan_created_at: string;
+  plan_updated_at: string;
+}
+
+export interface DeckRevision {
+  id: string;
+  deck_id: string;
+  title: string;
+  note: string | null;
+  source: DeckRevisionSource;
+  before_snapshot_id: string;
+  after_snapshot_id: string;
+  created_at: string;
+  changes: DeckRevisionChange[];
+}
+
+export interface DeckRevisionCreate {
+  title: string;
+  note?: string | null;
+  plan_ids: string[];
+}
+
+export interface DeckRevisionUpdate {
+  title?: string;
+  note?: string | null;
+}
 
 export interface SnapshotSummary {
   id: string;

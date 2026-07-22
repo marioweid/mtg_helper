@@ -27,6 +27,9 @@ import type {
   DeckImportResponse,
   DeckUrlImportRequest,
   DeckResponse,
+  DeckRevision,
+  DeckRevisionCreate,
+  DeckRevisionUpdate,
   DeckSummary,
   DeckUpdate,
   DescribeRequest,
@@ -267,6 +270,24 @@ export const apiClient = {
       `/decks/${deckId}/planned-changes/${planId}/complete`,
       { method: "POST", body: JSON.stringify({ quantity }) },
     ),
+
+  applyDeckRevision: (deckId: string, body: DeckRevisionCreate) =>
+    request<DeckRevision>(`/decks/${deckId}/revisions`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  listDeckRevisions: (deckId: string) =>
+    request<DeckRevision[]>(`/decks/${deckId}/revisions`),
+
+  getDeckRevision: (revisionId: string) =>
+    request<DeckRevision>(`/revisions/${revisionId}`),
+
+  updateDeckRevision: (revisionId: string, body: DeckRevisionUpdate) =>
+    request<DeckRevision>(`/revisions/${revisionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   cancelPlannedChange: (deckId: string, planId: string) =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/planned-changes/${planId}`, {

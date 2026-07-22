@@ -29,6 +29,10 @@ class SnapshotNotFoundError(ValueError):
     """Raised when a snapshot does not exist or is not owned by the caller."""
 
 
+class SnapshotValidationError(ValueError):
+    """Raised when a snapshot operation is not permitted."""
+
+
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -120,7 +124,7 @@ def _row_to_card(row: asyncpg.Record) -> SnapshotCardItem:
     )
 
 
-async def _insert_snapshot(
+async def insert_snapshot(
     conn: asyncpg.Connection,
     deck_id: UUID,
     *,
@@ -189,7 +193,7 @@ async def create_snapshot(
     """
     async with pool.acquire() as conn, conn.transaction():
         await _assert_deck_owner(conn, deck_id, email)
-        row = await _insert_snapshot(conn, deck_id, label=label, source=source)
+        row = await insert_snapshot(conn, deck_id, label=label, source=source)
     return _row_to_response(row)
 
 
@@ -205,7 +209,7 @@ async def create_auto_snapshot(
     """
     try:
         async with pool.acquire() as conn, conn.transaction():
-            row = await _insert_snapshot(
+            row = await insert_snapshot(
                 conn, deck_id, label=f"entered {new_stage}", source="auto_stage"
             )
         return _row_to_response(row)
@@ -230,7 +234,7 @@ async def list_snapshots(
                    COALESCE((SELECT SUM(quantity) FROM deck_snapshot_cards c
                              WHERE c.snapshot_id = s.id), 0) AS card_count
             FROM deck_snapshots s
-            WHERE s.deck_id = $1
+            WHERE s.deck_id = $1 AND s.source <> 'revision'
             ORDER BY s.created_at DESC
             """,
             deck_id,
@@ -287,6 +291,9 @@ async def delete_snapshot(
     """Delete a snapshot. Owner-scoped."""
     async with pool.acquire() as conn:
         await _assert_snapshot_owner(conn, snapshot_id, email)
+        source = await conn.fetchval("SELECT source FROM deck_snapshots WHERE id = $1", snapshot_id)
+        if source == "revision":
+            raise SnapshotValidationError("Revision snapshots cannot be deleted")
         await conn.execute("DELETE FROM deck_snapshots WHERE id = $1", snapshot_id)
 
 
