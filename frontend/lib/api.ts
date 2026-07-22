@@ -85,7 +85,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...((options?.headers as Record<string, string> | undefined) ?? {}),
+    ...(options?.headers as Record<string, string> | undefined),
   };
   // Server-side (RSC) calls bypass the Next proxy and hit BACKEND_ORIGIN
   // directly, so they must inject the bearer token themselves.
@@ -535,6 +535,10 @@ export const apiClient = {
       type?: string | null;
       min_price_cents?: number | null;
       max_price_cents?: number | null;
+      search?: string | null;
+      sort?: "name" | "price" | "quantity";
+      direction?: "asc" | "desc";
+      group?: "none" | "type" | "set";
     },
   ) => {
     const qs = new URLSearchParams();
@@ -545,6 +549,10 @@ export const apiClient = {
       qs.set("min_price_cents", String(params.min_price_cents));
     if (params?.max_price_cents != null)
       qs.set("max_price_cents", String(params.max_price_cents));
+    if (params?.search) qs.set("search", params.search);
+    if (params?.sort) qs.set("sort", params.sort);
+    if (params?.direction) qs.set("direction", params.direction);
+    if (params?.group) qs.set("group", params.group);
     const q = qs.toString();
     return fetch(`${CLIENT_BASE}/collections/${id}/cards${q ? `?${q}` : ""}`).then(async (res) => {
       if (!res.ok) throw new ApiError("FETCH_FAILED", "Failed to load cards");

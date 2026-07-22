@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { useToast } from "@/components/toast";
 import { apiClient } from "@/lib/api";
 import { BRACKET_LABELS } from "@/lib/constants";
 import type { DeckImportResponse } from "@/lib/types";
@@ -23,7 +22,6 @@ type Mode = "text" | "url";
 
 export default function ImportDeckPage() {
   const router = useRouter();
-  const toast = useToast();
   const [mode, setMode] = useState<Mode>("text");
 
   // Shared

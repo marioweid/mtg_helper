@@ -137,8 +137,10 @@ export function DeckHero({
                 <span className="text-sm italic text-gray-300/80">No description</span>
               )}
               <button
+                type="button"
                 onClick={onStartEditDescription}
-                className="ml-1 flex-shrink-0 text-xs text-gray-300 transition-colors hover:text-white"
+                aria-label="Edit deck description"
+                className="ml-1 flex-shrink-0 rounded text-xs text-gray-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                 title="Edit description"
               >
                 ✎

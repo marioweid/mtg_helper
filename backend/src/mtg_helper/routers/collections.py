@@ -1,5 +1,6 @@
 """Collection CRUD, card list, CSV import/export endpoints."""
 
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -79,22 +80,31 @@ async def delete_collection(collection_id: UUID, request: Request) -> Response:
 async def list_cards(
     collection_id: UUID,
     request: Request,
+    *,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     type: str | None = Query(default=None, max_length=64),
     min_price_cents: int | None = Query(default=None, ge=0),
     max_price_cents: int | None = Query(default=None, ge=0),
+    search: str | None = Query(default=None, max_length=200),
+    sort: Literal["name", "price", "quantity"] = "name",
+    direction: Literal["asc", "desc"] = "asc",
+    group: Literal["none", "type", "set"] = "none",
 ) -> DataResponse[list[CollectionCardItem]]:
-    """List cards in a collection with pagination and optional type/price filters."""
+    """List collection cards with server-side filtering, grouping, and sorting."""
     try:
         items, total = await collection_service.list_cards(
             request.app.state.db_pool,
             collection_id,
-            limit,
-            offset,
+            limit=limit,
+            offset=offset,
             type_filter=type,
             min_price_cents=min_price_cents,
             max_price_cents=max_price_cents,
+            search=search,
+            sort=sort,
+            direction=direction,
+            group=group,
         )
     except CollectionNotFoundError:
         raise _not_found(collection_id)

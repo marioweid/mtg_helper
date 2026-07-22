@@ -15,6 +15,10 @@ import {
 import { STAGE_LABELS } from "@/lib/constants";
 import {
   getWorkspaceView,
+  getWorkspaceGroup,
+  getWorkspaceSort,
+  setWorkspaceGroup,
+  setWorkspaceSort,
   setWorkspaceView,
   type CardWorkspaceView,
 } from "@/lib/deck-view-prefs";
@@ -99,7 +103,7 @@ function CardRow({
         onClick={onCut}
         title={`Plan cut for ${card.name}`}
         aria-label={`Plan cut for ${card.name}`}
-        className="ml-1 shrink-0 self-center rounded border border-red-500/30 px-1.5 py-0.5 text-[11px] text-red-300 hover:bg-red-500/10"
+        className="ml-1 min-h-11 min-w-11 shrink-0 touch-manipulation self-center rounded border border-red-500/30 px-1.5 text-[11px] text-red-300 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
       >
         ✗
       </button>
@@ -130,7 +134,19 @@ export function DeckBrowserPanel({
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setView(getWorkspaceView(workspaceScope) ?? "grid");
+    const storedView = getWorkspaceView(workspaceScope) ?? "grid";
+    setView(storedView);
+    const storedGroup = getWorkspaceGroup(workspaceScope);
+    const validStoredGroup =
+      storedGroup === "type" || storedGroup === "tag" || storedGroup === "flat";
+    setGroup(validStoredGroup && !(storedView === "grid" && storedGroup === "flat") ? storedGroup : "type");
+    const storedSort = getWorkspaceSort(workspaceScope);
+    const validStoredSort =
+      storedSort === "default" ||
+      storedSort === "name" ||
+      storedSort === "cmc" ||
+      storedSort === "price";
+    setFilter((current) => ({ ...current, sort: validStoredSort ? storedSort : "default" }));
   }, [workspaceScope]);
 
   useEffect(() => {
@@ -159,14 +175,31 @@ export function DeckBrowserPanel({
 
   function handleViewChange(next: CardWorkspaceView) {
     setView(next);
-    if (next === "grid" && group === "flat") setGroup("type");
+    if (next === "grid" && group === "flat") {
+      setGroup("type");
+      setWorkspaceGroup(workspaceScope, "type");
+    }
     setWorkspaceView(workspaceScope, next);
+  }
+
+  function handleFilterChange(next: DeckFilter) {
+    setFilter(next);
+    setWorkspaceSort(workspaceScope, next.sort);
+  }
+
+  function handleGroupChange(next: GroupMode) {
+    setGroup(next);
+    setWorkspaceGroup(workspaceScope, next);
   }
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
       {lastCut && (
-          <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs"
+          >
             <span className="truncate text-gray-300">
               Planned cut for{" "}
               <CardHover name={lastCut.name} imageUri={lastCut.image_uri} className="text-white">
@@ -191,7 +224,7 @@ export function DeckBrowserPanel({
       >
         <DeckFilterBar
           value={filter}
-          onChange={setFilter}
+          onChange={handleFilterChange}
           resultCount={totalCardCount(filtered)}
           totalCount={total}
           {...(onAddCard ? { onAddCard } : {})}
@@ -204,7 +237,7 @@ export function DeckBrowserPanel({
               <button
                 key={opt.key}
                 type="button"
-                onClick={() => setGroup(opt.key)}
+                onClick={() => handleGroupChange(opt.key)}
                 aria-pressed={active}
                 className={`min-h-11 touch-manipulation rounded-lg px-2.5 text-[11px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
                   active

@@ -130,13 +130,16 @@ export function DeckFilterBar({
       <div ref={searchWrapRef} className="relative min-w-[160px] flex-1">
         <input
           type="text"
+          name="deck-card-filter"
+          autoComplete="off"
+          aria-label={onAddCard ? "Filter deck or search for a card to add" : "Filter deck cards"}
           value={value.query}
           onChange={(e) => onChange({ ...value, query: e.target.value })}
           onFocus={() => {
             if (poolResults.length > 0) setPoolOpen(true);
           }}
           placeholder={onAddCard ? "Filter deck or search to add…" : "Filter by name…"}
-          className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-sm text-white placeholder-gray-500 focus:border-indigo-400 focus:outline-none"
+          className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-sm text-white placeholder-gray-500 focus-visible:border-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
         />
         {onAddCard && poolLoading && (
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -156,6 +159,9 @@ export function DeckFilterBar({
                     <img
                       src={card.image_uri}
                       alt={card.name}
+                      width={28}
+                      height={40}
+                      loading="lazy"
                       className="h-10 w-7 flex-shrink-0 rounded object-cover"
                     />
                   )}
@@ -185,7 +191,7 @@ export function DeckFilterBar({
               type="button"
               onClick={() => toggleColor(c.key)}
               aria-pressed={active}
-              className={`h-7 w-7 rounded-full text-xs font-bold transition-all ${sym.bg} ${sym.text} ${
+              className={`h-7 w-7 rounded-full text-xs font-bold transition-[transform,opacity,box-shadow] motion-reduce:transition-none ${sym.bg} ${sym.text} ${
                 active
                   ? "scale-110 ring-2 ring-white/90 shadow-md"
                   : "opacity-45 hover:opacity-90"

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { use, useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
 import { CardWorkspaceToolbar } from "@/components/card-workspace-toolbar";
 import { CardSearch } from "@/components/card-search";
@@ -21,6 +22,24 @@ import type {
 } from "@/lib/types";
 
 const PAGE_SIZE = 50;
+type CollectionSort = "name" | "price" | "quantity";
+type SortDirection = "asc" | "desc";
+type CollectionGroup = "none" | "type" | "set";
+
+const SORT_OPTIONS: readonly { value: string; label: string }[] = [
+  { value: "name:asc", label: "Name: A–Z" },
+  { value: "name:desc", label: "Name: Z–A" },
+  { value: "price:asc", label: "Price: Low–High" },
+  { value: "price:desc", label: "Price: High–Low" },
+  { value: "quantity:asc", label: "Quantity: Low–High" },
+  { value: "quantity:desc", label: "Quantity: High–Low" },
+];
+
+const GROUP_OPTIONS: readonly { value: CollectionGroup; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "type", label: "Type" },
+  { value: "set", label: "Set" },
+];
 
 const TYPE_OPTIONS = [
   "Creature",
@@ -40,18 +59,79 @@ function parseEurInput(raw: string): number | null | "invalid" {
   return eur > 0 ? Math.round(eur * 100) : null;
 }
 
+function primaryType(typeLine: string | null): string {
+  const value = typeLine ?? "";
+  for (const type of [...TYPE_OPTIONS, "Battle"] as const) {
+    if (value.includes(type)) return type;
+  }
+  return "Other";
+}
+
+function groupCards(cards: CollectionCardItem[], group: CollectionGroup) {
+  if (group === "none") return [{ key: "all", label: null, cards }];
+  const sections = new Map<string, CollectionCardItem[]>();
+  for (const card of cards) {
+    const key = group === "type" ? primaryType(card.type_line) : card.set_code.toUpperCase() || "Unknown Set";
+    const section = sections.get(key) ?? [];
+    section.push(card);
+    sections.set(key, section);
+  }
+  return [...sections].map(([key, sectionCards]) => ({ key, label: key, cards: sectionCards }));
+}
+
+function validSort(value: string | null): CollectionSort {
+  return value === "price" || value === "quantity" ? value : "name";
+}
+
+function validDirection(value: string | null): SortDirection {
+  return value === "desc" ? "desc" : "asc";
+}
+
+function validGroup(value: string | null): CollectionGroup {
+  return value === "type" || value === "set" ? value : "none";
+}
+
+function priceFromQuery(value: string): number | null {
+  const parsed = parseEurInput(value);
+  return parsed === "invalid" ? null : parsed;
+}
+
+function offsetFromQuery(value: string | null): number {
+  const page = Math.max(1, Number.parseInt(value ?? "1", 10) || 1);
+  return (page - 1) * PAGE_SIZE;
+}
+
 export default function CollectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const toast = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialMinPrice = searchParams.get("min_price") ?? "";
+  const initialMaxPrice = searchParams.get("max_price") ?? "";
+  const initialSearch = searchParams.get("search") ?? "";
   const [collection, setCollection] = useState<CollectionResponse | null>(null);
   const [cards, setCards] = useState<CollectionCardItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [minPriceCents, setMinPriceCents] = useState<number | null>(null);
-  const [maxPriceCents, setMaxPriceCents] = useState<number | null>(null);
-  const [minPriceDraft, setMinPriceDraft] = useState("");
-  const [maxPriceDraft, setMaxPriceDraft] = useState("");
+  const [offset, setOffset] = useState(() => offsetFromQuery(searchParams.get("page")));
+  const [typeFilter, setTypeFilter] = useState<string | null>(() => searchParams.get("type"));
+  const [minPriceCents, setMinPriceCents] = useState<number | null>(() =>
+    priceFromQuery(initialMinPrice),
+  );
+  const [maxPriceCents, setMaxPriceCents] = useState<number | null>(() =>
+    priceFromQuery(initialMaxPrice),
+  );
+  const [minPriceDraft, setMinPriceDraft] = useState(initialMinPrice);
+  const [maxPriceDraft, setMaxPriceDraft] = useState(initialMaxPrice);
+  const [searchDraft, setSearchDraft] = useState(initialSearch);
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [sort, setSort] = useState<CollectionSort>(() => validSort(searchParams.get("sort")));
+  const [direction, setDirection] = useState<SortDirection>(() =>
+    validDirection(searchParams.get("direction")),
+  );
+  const [group, setGroup] = useState<CollectionGroup>(() =>
+    validGroup(searchParams.get("group")),
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -60,6 +140,21 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [view, setView] = useState<CardWorkspaceView>("grid");
   const [busyCardId, setBusyCardId] = useState<string | null>(null);
+  const cardsRequestRef = useRef(0);
+
+  const replaceQuery = useCallback(
+    (updates: Record<string, string | null>, resetPage = true) => {
+      const next = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (value) next.set(key, value);
+        else next.delete(key);
+      }
+      if (resetPage) next.delete("page");
+      const query = next.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   const loadCollection = useCallback(async () => {
     try {
@@ -71,6 +166,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   }, [id]);
 
   const loadCards = useCallback(async () => {
+    const requestId = ++cardsRequestRef.current;
     try {
       const result = await apiClient.listCollectionCards(id, {
         limit: PAGE_SIZE,
@@ -78,13 +174,47 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
         type: typeFilter,
         min_price_cents: minPriceCents,
         max_price_cents: maxPriceCents,
+        search: searchQuery,
+        sort,
+        direction,
+        group,
       });
+      if (requestId !== cardsRequestRef.current) return;
       setCards(result.data);
       setTotal(result.meta.total);
     } catch (err) {
+      if (requestId !== cardsRequestRef.current) return;
       setError(err instanceof ApiError ? err.message : "Failed to load cards");
     }
-  }, [id, offset, typeFilter, minPriceCents, maxPriceCents]);
+  }, [id, offset, typeFilter, minPriceCents, maxPriceCents, searchQuery, sort, direction, group]);
+
+  useEffect(() => {
+    const nextSearch = searchParams.get("search") ?? "";
+    const minPrice = searchParams.get("min_price") ?? "";
+    const maxPrice = searchParams.get("max_price") ?? "";
+    setSearchDraft(nextSearch);
+    setSearchQuery(nextSearch);
+    setTypeFilter(searchParams.get("type"));
+    setMinPriceDraft(minPrice);
+    setMaxPriceDraft(maxPrice);
+    setMinPriceCents(priceFromQuery(minPrice));
+    setMaxPriceCents(priceFromQuery(maxPrice));
+    setSort(validSort(searchParams.get("sort")));
+    setDirection(validDirection(searchParams.get("direction")));
+    setGroup(validGroup(searchParams.get("group")));
+    setOffset(offsetFromQuery(searchParams.get("page")));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const next = searchDraft.trim();
+      if (next === searchQuery) return;
+      setSearchQuery(next);
+      setOffset(0);
+      replaceQuery({ search: next || null });
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [replaceQuery, searchDraft, searchQuery]);
 
   useEffect(() => {
     void loadCollection();
@@ -115,6 +245,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     try {
       await apiClient.addCollectionCard(id, { scryfall_id: card.scryfall_id, quantity: 1 });
       setOffset(0);
+      replaceQuery({ page: null }, false);
       await Promise.all([loadCollection(), loadCards()]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to add card");
@@ -124,6 +255,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   function selectType(next: string | null) {
     setOffset(0);
     setTypeFilter(next);
+    replaceQuery({ type: next });
   }
 
   function applyPriceFilter() {
@@ -141,6 +273,10 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     setOffset(0);
     setMinPriceCents(nextMin);
     setMaxPriceCents(nextMax);
+    replaceQuery({
+      min_price: nextMin == null ? null : minPriceDraft.trim(),
+      max_price: nextMax == null ? null : maxPriceDraft.trim(),
+    });
   }
 
   function clearFilters() {
@@ -150,6 +286,32 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     setMaxPriceCents(null);
     setMinPriceDraft("");
     setMaxPriceDraft("");
+    replaceQuery({ type: null, min_price: null, max_price: null });
+  }
+
+  function handleSortChange(value: string) {
+    const [nextSort, nextDirection] = value.split(":");
+    const resolvedSort = validSort(nextSort ?? null);
+    const resolvedDirection = validDirection(nextDirection ?? null);
+    setSort(resolvedSort);
+    setDirection(resolvedDirection);
+    setOffset(0);
+    replaceQuery({
+      sort: resolvedSort === "name" ? null : resolvedSort,
+      direction: resolvedDirection === "asc" ? null : resolvedDirection,
+    });
+  }
+
+  function handleGroupChange(next: CollectionGroup) {
+    setGroup(next);
+    setOffset(0);
+    replaceQuery({ group: next === "none" ? null : next });
+  }
+
+  function goToPage(page: number) {
+    const nextPage = Math.max(1, page);
+    setOffset((nextPage - 1) * PAGE_SIZE);
+    replaceQuery({ page: nextPage === 1 ? null : String(nextPage) }, false);
   }
 
   const filtersActive =
@@ -243,6 +405,8 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const cardGroups = groupCards(cards, group);
+  const workspaceFiltered = filtersActive || searchQuery.length > 0;
 
   return (
     <div>
@@ -445,46 +609,112 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
           onViewChange={handleViewChange}
           resultCount={cards.length}
           totalCount={total}
-        />
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              name="collection-card-search"
+              autoComplete="off"
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+              aria-label="Search cards in this collection"
+              placeholder="Search collection…"
+              className="min-h-11 min-w-[180px] flex-1 rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white placeholder-gray-500 focus-visible:border-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+            />
+            <select
+              value={`${sort}:${direction}`}
+              name="collection-card-sort"
+              aria-label="Sort collection cards"
+              onChange={(event) => handleSortChange(event.target.value)}
+              className="min-h-11 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div
+            role="group"
+            aria-label="Group collection cards by"
+            className="flex flex-wrap items-center gap-1"
+          >
+            {GROUP_OPTIONS.map((option) => {
+              const active = group === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => handleGroupChange(option.value)}
+                  className={`min-h-11 touch-manipulation rounded-lg px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                    active
+                      ? "bg-indigo-500/20 text-indigo-200"
+                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  }`}
+                >
+                  Group: {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </CardWorkspaceToolbar>
       </div>
 
       {cards.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/20 py-16 text-center text-gray-500">
-          {total === 0 && !filtersActive
+          {total === 0 && !workspaceFiltered
             ? "No cards yet. Add via search or import a CSV."
-            : filtersActive
+            : workspaceFiltered
               ? "No cards match the current filters."
               : "Loading…"}
         </div>
-      ) : view === "grid" ? (
-        <CollectionCardGrid
-          cards={cards}
-          decks={decks}
-          busy={busyCardId !== null}
-          onSetQuantity={handleSetQuantity}
-          onRemove={handleRemove}
-          onPlanForDeck={handlePlanForDeck}
-        />
       ) : (
-        <ul className="rounded-xl border border-white/10 bg-white/5">
-          {cards.map((card) => (
-            <CollectionCardRow
-              key={`${card.card_id}-${card.set_code}-${card.collector_number}-${card.foil}`}
-              card={card}
-              decks={decks}
-              busy={busyCardId === card.card_id}
-              onSetQuantity={handleSetQuantity}
-              onRemove={handleRemove}
-              onPlanForDeck={handlePlanForDeck}
-            />
+        <div className="space-y-6">
+          {cardGroups.map((section) => (
+            <section key={section.key} aria-label={section.label ?? "Collection cards"}>
+              {section.label ? (
+                <h2 className="mb-2 text-sm font-semibold text-gray-300">
+                  {section.label}
+                  <span className="ml-2 tabular-nums text-xs font-normal text-gray-500">
+                    {section.cards.length}
+                  </span>
+                </h2>
+              ) : null}
+              {view === "grid" ? (
+                <CollectionCardGrid
+                  cards={section.cards}
+                  decks={decks}
+                  busy={busyCardId !== null}
+                  onSetQuantity={handleSetQuantity}
+                  onRemove={handleRemove}
+                  onPlanForDeck={handlePlanForDeck}
+                />
+              ) : (
+                <ul className="rounded-xl border border-white/10 bg-white/5">
+                  {section.cards.map((card) => (
+                    <CollectionCardRow
+                      key={`${card.card_id}-${card.set_code}-${card.collector_number}-${card.foil}`}
+                      card={card}
+                      decks={decks}
+                      busy={busyCardId === card.card_id}
+                      onSetQuantity={handleSetQuantity}
+                      onRemove={handleRemove}
+                      onPlanForDeck={handlePlanForDeck}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
           <button
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            onClick={() => goToPage(currentPage - 1)}
             disabled={offset === 0}
             className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 hover:bg-white/10 disabled:opacity-40"
           >
@@ -494,7 +724,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             Page {currentPage} of {totalPages}
           </span>
           <button
-            onClick={() => setOffset(offset + PAGE_SIZE)}
+            onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage >= totalPages}
             className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 hover:bg-white/10 disabled:opacity-40"
           >

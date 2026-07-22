@@ -311,11 +311,16 @@ def _row_to_card_item(row: asyncpg.Record) -> CollectionCardItem:
 async def list_cards(
     pool: asyncpg.Pool,
     collection_id: UUID,
+    *,
     limit: int = 50,
     offset: int = 0,
     type_filter: str | None = None,
     min_price_cents: int | None = None,
     max_price_cents: int | None = None,
+    search: str | None = None,
+    sort: str = "name",
+    direction: str = "asc",
+    group: str = "none",
 ) -> tuple[list[CollectionCardItem], int]:
     """List cards in a collection with pagination and optional filters.
 
@@ -328,6 +333,10 @@ async def list_cards(
         min_price_cents: Optional inclusive lower bound on Scryfall EUR price (cents).
         max_price_cents: Optional inclusive upper bound on Scryfall EUR price (cents).
             When either price bound is set, cards without an EUR price are excluded.
+        search: Optional case-insensitive card-name substring.
+        sort: Sort field: name, price, or quantity.
+        direction: Sort direction: ascending or descending.
+        group: Leading grouping order: none, primary type, or set code.
 
     Returns:
         Tuple of (items, total count) reflecting the filtered set.
@@ -336,8 +345,9 @@ async def list_cards(
         CollectionNotFoundError: If the collection does not exist.
     """
     filter_sql, filter_params = _build_collection_card_filter(
-        type_filter, min_price_cents, max_price_cents
+        type_filter, min_price_cents, max_price_cents, search
     )
+    order_sql = _collection_card_order(sort, direction, group)
     async with pool.acquire() as conn:
         exists = await conn.fetchval("SELECT 1 FROM collections WHERE id = $1", collection_id)
         if exists is None:
@@ -353,7 +363,7 @@ async def list_cards(
             FROM collection_cards cc
             JOIN cards c ON cc.card_id = c.id
             WHERE cc.collection_id = $1{filter_sql}
-            ORDER BY c.name ASC
+            ORDER BY {order_sql}
             LIMIT ${len(base_params) + 1} OFFSET ${len(base_params) + 2}
             """,
             *list_params,
@@ -374,6 +384,7 @@ def _build_collection_card_filter(
     type_filter: str | None,
     min_price_cents: int | None,
     max_price_cents: int | None,
+    search: str | None,
 ) -> tuple[str, list[object]]:
     """Build the WHERE-clause fragment + params for collection card filters.
 
@@ -383,6 +394,10 @@ def _build_collection_card_filter(
     clauses: list[str] = []
     params: list[object] = []
     next_pos = 2
+    if search and search.strip():
+        params.append(f"%{search.strip()}%")
+        clauses.append(f"AND c.name ILIKE ${next_pos}")
+        next_pos += 1
     if type_filter:
         params.append(f"%{type_filter}%")
         clauses.append(f"AND c.type_line ILIKE ${next_pos}")
@@ -398,6 +413,49 @@ def _build_collection_card_filter(
             clauses.append(f"AND ((c.prices->>'eur')::numeric * 100) <= ${next_pos}")
             next_pos += 1
     return (" " + " ".join(clauses) if clauses else ""), params
+
+
+_PRIMARY_TYPE_SQL = """CASE
+    WHEN c.type_line ILIKE '%Creature%' THEN 'Creature'
+    WHEN c.type_line ILIKE '%Instant%' THEN 'Instant'
+    WHEN c.type_line ILIKE '%Sorcery%' THEN 'Sorcery'
+    WHEN c.type_line ILIKE '%Artifact%' THEN 'Artifact'
+    WHEN c.type_line ILIKE '%Enchantment%' THEN 'Enchantment'
+    WHEN c.type_line ILIKE '%Planeswalker%' THEN 'Planeswalker'
+    WHEN c.type_line ILIKE '%Battle%' THEN 'Battle'
+    WHEN c.type_line ILIKE '%Land%' THEN 'Land'
+    ELSE 'Other'
+END"""
+
+
+def _collection_card_order(sort: str, direction: str, group: str) -> str:
+    """Return an allowlisted ORDER BY fragment for collection pagination."""
+    sort_expressions = {
+        "name": "lower(c.name)",
+        "price": "((c.prices->>'eur')::numeric)",
+        "quantity": "cc.quantity",
+    }
+    group_expressions = {
+        "none": None,
+        "type": _PRIMARY_TYPE_SQL,
+        "set": "upper(COALESCE(NULLIF(cc.set_code, ''), 'Unknown Set'))",
+    }
+    sort_expression = sort_expressions.get(sort, sort_expressions["name"])
+    group_expression = group_expressions.get(group)
+    order_direction = "DESC" if direction == "desc" else "ASC"
+    parts = [f"{sort_expression} {order_direction} NULLS LAST"]
+    if group_expression:
+        parts.insert(0, f"{group_expression} ASC")
+    parts.extend(
+        [
+            "lower(c.name) ASC",
+            "cc.card_id ASC",
+            "cc.set_code ASC",
+            "cc.collector_number ASC",
+            "cc.foil ASC",
+        ]
+    )
+    return ", ".join(parts)
 
 
 async def _resolve_add_target(pool: asyncpg.Pool, data: CollectionCardAdd) -> UUID:
