@@ -7,8 +7,9 @@
 ## Objective
 
 Show the exact card image when a user hovers or taps a card recorded in deck revision history, and
-replace the keyword editor's long vertical group catalog with searchable, one-group-at-a-time
-navigation. Keyword selection and persistence semantics remain unchanged.
+replace the keyword editor's long vertical group catalog with searchable direct theme chips,
+ungrouped themes, and collapsible official keyword categories. Keyword selection and persistence
+semantics remain unchanged.
 
 ## Revision Card Preview
 
@@ -25,31 +26,36 @@ longer works, `CardHover` retains its existing lazy-resolution and unavailable-i
 ## Searchable Keyword Browser
 
 The `ArchetypeChipPicker` keeps the Selected section at the top so current choices are always
-visible and removable. The theme and advanced-mechanic catalogs are normalized into one ordered
-list of selectable groups. Advanced mechanic groups retain an explicit label prefix so their
-source remains clear.
+visible and removable. It then renders one global search field followed by three semantic tiers:
 
-Below Selected, the picker renders:
+1. **Theme groups:** every active group created in the admin panel is already represented by one
+   stable selectable slug, so these groups render directly as toggle chips without another
+   navigation layer;
+2. **Ungrouped themes:** enabled Moxfield and Archidekt tags without an admin group render together
+   as an always-visible chip cloud below the admin-defined groups;
+3. **Official keywords:** MTGJSON ability words, keyword abilities, and keyword actions retain their
+   category headings and render in collapsible sections.
 
-1. one search input matching group display names and individual keyword labels;
-2. one compact top-level group selector containing only groups that match the current search;
-3. one keyword-chip panel for the active group.
+The global search matches display labels and stored tag values across all three tiers. It filters
+chips inside each section while preserving tier order and highlights matches. Sections with no
+matches disappear during search; when nothing matches, the picker shows one explicit empty result.
+Clearing search restores the full catalog without changing selected keywords.
 
-Only the active group's chips are rendered. Searching for a group name keeps all of that group's
-chips visible. Searching for a keyword keeps its containing group available and visually
-highlights matching chips. If the active group is absent from filtered results, the first matching
-group becomes active. Clearing the search restores the complete group selector without changing
-selected keywords. When no groups match, the picker shows an explicit empty result.
+Official keyword categories are collapsed by default. A category opens automatically when it
+contains a selected keyword or a search match, and users may otherwise open or close categories
+independently. Admin-defined groups and ungrouped themes remain directly visible because they are
+the primary deck-theme choices.
 
-The selector shows each group's display name and selected/total keyword counts to make populated
-groups easy to recognize. Loading and API error behavior remain as they are today. The picker API,
-deck update request, keyword tags, suggested states, and selection order do not change.
+Selected, suggested, and search-matching chips retain distinct styling. Loading and API error
+behavior remain as they are today. The picker API, deck update request, keyword tags, suggested
+states, selection order, admin data, and persistence do not change.
 
 ## Accessibility and Responsive Behavior
 
-The search input and group selector have visible labels. Keyboard users can search, choose a group,
-and toggle chips using native controls. The single active panel uses the same layout on desktop and
-mobile, avoiding horizontal tab overflow and long page scrolling.
+The search input and section controls have visible labels. Keyboard users can search, expand
+official categories, and toggle chips using native controls. Wrapping chip clouds use the same
+layout on desktop and mobile, while collapsed official categories prevent excessive initial
+scrolling.
 
 ## Failure Behavior
 
