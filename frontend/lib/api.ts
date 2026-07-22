@@ -68,6 +68,8 @@ import type {
   SuggestResponse,
   SwapRequest,
   SwapResponse,
+  TopPicksResponse,
+  TopPickSource,
 } from "@/lib/types";
 
 const CLIENT_BASE =
@@ -175,6 +177,9 @@ export const apiClient = {
     }),
 
   getDeck: (id: string) => request<DeckDetailResponse>(`/decks/${id}`),
+
+  getTopPicks: (deckId: string, source: TopPickSource = "combined") =>
+    request<TopPicksResponse>(`/decks/${deckId}/top-picks?source=${source}`),
 
   getDeckCombos: (id: string) => request<ComboListResponse>(`/decks/${id}/combos`),
 

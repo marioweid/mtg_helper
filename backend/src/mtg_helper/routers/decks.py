@@ -29,6 +29,7 @@ from mtg_helper.models.decks import (
     PlannedDeckChangeUpdate,
     PlannedShoppingListRequest,
 )
+from mtg_helper.models.top_picks import TopPickSource, TopPicksResponse
 from mtg_helper.services import (
     bracket_service,
     combo_service,
@@ -37,6 +38,7 @@ from mtg_helper.services import (
     import_service,
     planned_change_service,
     revision_service,
+    top_picks_service,
 )
 from mtg_helper.services.combo_service import ComboFetchError
 from mtg_helper.services.deck_service import (
@@ -55,6 +57,7 @@ from mtg_helper.services.planned_change_service import (
     SelectedCollectionError,
 )
 from mtg_helper.services.revision_service import RevisionCommand
+from mtg_helper.services.top_picks_service import TopPicksNotFoundError
 
 router = APIRouter(prefix="/decks", tags=["decks"])
 
@@ -209,6 +212,27 @@ async def get_deck(
     if deck is None:
         raise _not_found(deck_id)
     return DataResponse(data=deck)
+
+
+@router.get("/{deck_id}/top-picks", response_model=DataResponse[TopPicksResponse])
+async def get_top_picks(
+    deck_id: UUID,
+    request: Request,
+    account: CurrentAccount,
+    source: TopPickSource = Query(default="combined"),
+) -> DataResponse[TopPicksResponse]:
+    """Return commander-specific card-frequency recommendations."""
+    try:
+        picks = await top_picks_service.get_top_picks(
+            request.app.state.db_pool,
+            deck_id,
+            _require_email(account),
+            account.id,
+            source,
+        )
+    except TopPicksNotFoundError as exc:
+        raise _not_found(deck_id) from exc
+    return DataResponse(data=picks)
 
 
 @router.get(

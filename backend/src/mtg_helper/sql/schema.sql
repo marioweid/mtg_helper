@@ -621,6 +621,12 @@ CREATE TABLE IF NOT EXISTS moxfield_commander_recs (
     fetched_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS archidekt_commander_recs (
+    commander_id  UUID PRIMARY KEY REFERENCES cards(id) ON DELETE CASCADE,
+    payload       JSONB NOT NULL,
+    fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Per-commander Moxfield top-decks inclusion weight.
 ALTER TABLE account_ranking_weights
     ADD COLUMN IF NOT EXISTS moxfield_inclusion REAL NOT NULL DEFAULT 0.20;

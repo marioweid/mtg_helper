@@ -1002,6 +1002,44 @@ export interface DeckRevisionUpdate {
   note?: string | null;
 }
 
+export type TopPickSource = "combined" | "moxfield" | "archidekt";
+
+export interface TopPickSourceSummary {
+  source: "moxfield" | "archidekt";
+  deck_count: number;
+  fetched_at: string | null;
+  stale: boolean;
+  error: string | null;
+}
+
+export interface TopPickCard {
+  card_id: string;
+  scryfall_id: string;
+  name: string;
+  mana_cost: string | null;
+  type_line: string | null;
+  image_uri: string | null;
+  price_eur_cents: number | null;
+  combined_score: number;
+  moxfield_count: number;
+  moxfield_sample_size: number;
+  moxfield_rate: number;
+  archidekt_count: number;
+  archidekt_sample_size: number;
+  archidekt_rate: number;
+  physical_quantity: number;
+  plan_direction: "addition" | "cut" | null;
+  planned_quantity: number;
+  owned_in: CollectionMembership[];
+}
+
+export interface TopPicksResponse {
+  commander_name: string;
+  source: TopPickSource;
+  sources: TopPickSourceSummary[];
+  picks: TopPickCard[];
+}
+
 export interface SnapshotSummary {
   id: string;
   deck_id: string;
