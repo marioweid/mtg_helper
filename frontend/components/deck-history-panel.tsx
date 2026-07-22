@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { CardHover } from "@/components/card-hover";
 import { apiClient, ApiError } from "@/lib/api";
 import type { DeckRevision, SnapshotSummary } from "@/lib/types";
 
@@ -104,7 +105,10 @@ function RevisionItem({
           {revision.changes.map((change) => (
             <li key={change.card_id} className="flex items-center justify-between gap-3 py-2 text-sm">
               <span className={change.direction === "addition" ? "text-emerald-300" : "text-red-300"}>
-                {change.direction === "addition" ? "+" : "−"}{change.quantity} {change.card_name}
+                {change.direction === "addition" ? "+" : "−"}{change.quantity}{" "}
+                <CardHover name={change.card_name} imageUri={change.image_uri}>
+                  {change.card_name}
+                </CardHover>
               </span>
               <span className="text-xs text-gray-500">{change.collection_name ?? "no collection"}</span>
             </li>

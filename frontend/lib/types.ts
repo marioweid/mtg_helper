@@ -967,6 +967,7 @@ export type DeckRevisionSource = "selected_plans" | "single_plan";
 export interface DeckRevisionChange {
   card_id: string;
   card_name: string;
+  image_uri: string | null;
   direction: "addition" | "cut";
   quantity: number;
   categories: string[];

@@ -185,6 +185,7 @@ def _change_from_row(row: asyncpg.Record) -> DeckRevisionChange:
     return DeckRevisionChange(
         card_id=row["card_id"],
         card_name=row["card_name"],
+        image_uri=row["image_uri"],
         direction=row["direction"],
         quantity=row["quantity"],
         categories=list(row["categories"] or []),
@@ -205,9 +206,11 @@ async def _hydrate_revisions(
         return []
     change_rows = await conn.fetch(
         """
-        SELECT * FROM deck_revision_changes
-        WHERE revision_id = ANY($1::uuid[])
-        ORDER BY direction, card_name
+        SELECT changes.*, cards.image_uri
+        FROM deck_revision_changes changes
+        JOIN cards ON cards.id = changes.card_id
+        WHERE changes.revision_id = ANY($1::uuid[])
+        ORDER BY changes.direction, changes.card_name
         """,
         [row["id"] for row in rows],
     )

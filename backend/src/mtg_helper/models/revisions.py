@@ -53,6 +53,7 @@ class DeckRevisionChange(BaseModel):
 
     card_id: UUID
     card_name: str
+    image_uri: str | None = None
     direction: Literal["addition", "cut"]
     quantity: int
     categories: list[str] = Field(default_factory=list)
