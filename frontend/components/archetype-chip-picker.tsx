@@ -13,32 +13,19 @@ interface Props {
   onHubTagsLoaded?: (tags: string[]) => void;
 }
 
-interface BrowserGroup extends KeywordGroup {
-  key: string;
-  label: string;
-  kind: "theme" | "mechanic";
-}
-
 function normalize(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
-function groupMatches(group: BrowserGroup, query: string): boolean {
-  if (!query) return true;
+function keywordMatches(keyword: KeywordChip, query: string): boolean {
   return (
-    normalize(group.label).includes(query) ||
-    group.keywords.some(
-      (keyword) =>
-        normalize(keyword.label).includes(query) || normalize(keyword.tag).includes(query),
-    )
+    normalize(keyword.label).includes(query) || normalize(keyword.tag).includes(query)
   );
 }
 
-function keywordMatches(keyword: KeywordChip, query: string): boolean {
-  return Boolean(
-    query &&
-      (normalize(keyword.label).includes(query) || normalize(keyword.tag).includes(query)),
-  );
+function filteredKeywords(group: KeywordGroup, query: string): KeywordChip[] {
+  if (!query || normalize(group.display_name).includes(query)) return group.keywords;
+  return group.keywords.filter((keyword) => keywordMatches(keyword, query));
 }
 
 export function ArchetypeChipPicker({
@@ -52,7 +39,7 @@ export function ArchetypeChipPicker({
   const [keywordGroups, setKeywordGroups] = useState<KeywordGroup[] | null>(null);
   const [keywordError, setKeywordError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -78,43 +65,33 @@ export function ArchetypeChipPicker({
 
   const selected = useMemo(() => new Set(value), [value]);
   const suggestedSet = useMemo(() => new Set(suggested ?? []), [suggested]);
-  const groups = useMemo<BrowserGroup[]>(
-    () => [
-      ...(hubGroups ?? []).map((group) => ({
-        ...group,
-        key: `theme:${group.category}`,
-        label: group.display_name,
-        kind: "theme" as const,
-      })),
-      ...(keywordGroups ?? []).map((group) => ({
-        ...group,
-        key: `mechanic:${group.category}`,
-        label: `Advanced mechanics — ${group.display_name}`,
-        kind: "mechanic" as const,
-      })),
-    ],
-    [hubGroups, keywordGroups],
-  );
-  const normalizedQuery = normalize(query);
-  const filteredGroups = useMemo(
-    () => groups.filter((group) => groupMatches(group, normalizedQuery)),
-    [groups, normalizedQuery],
-  );
-  const activeGroup =
-    filteredGroups.find((group) => group.key === activeGroupKey) ?? filteredGroups[0] ?? null;
-  const labels = useMemo(
-    () =>
-      new Map(
-        groups.flatMap((group) =>
-          group.keywords.map((keyword) => [keyword.tag, keyword.label] as const),
-        ),
+  const labels = useMemo(() => {
+    const groups = [...(hubGroups ?? []), ...(keywordGroups ?? [])];
+    return new Map(
+      groups.flatMap((group) =>
+        group.keywords.map((keyword) => [keyword.tag, keyword.label] as const),
       ),
-    [groups],
+    );
+  }, [hubGroups, keywordGroups]);
+  const normalizedQuery = normalize(query);
+  const adminGroups = useMemo(
+    () =>
+      (hubGroups ?? [])
+        .filter((group) => group.category.startsWith("theme_group:"))
+        .flatMap((group) => filteredKeywords(group, normalizedQuery)),
+    [hubGroups, normalizedQuery],
   );
-
-  useEffect(() => {
-    if (activeGroup && activeGroup.key !== activeGroupKey) setActiveGroupKey(activeGroup.key);
-  }, [activeGroup, activeGroupKey]);
+  const ungroupedThemes = useMemo(() => {
+    const group = (hubGroups ?? []).find((item) => item.category === "ungrouped");
+    return group ? filteredKeywords(group, normalizedQuery) : [];
+  }, [hubGroups, normalizedQuery]);
+  const officialGroups = useMemo(
+    () =>
+      (keywordGroups ?? [])
+        .map((group) => ({ ...group, keywords: filteredKeywords(group, normalizedQuery) }))
+        .filter((group) => group.keywords.length > 0),
+    [keywordGroups, normalizedQuery],
+  );
 
   useEffect(() => {
     if (hubGroups === null) return;
@@ -132,7 +109,19 @@ export function ArchetypeChipPicker({
     onChange(selected.has(tag) ? value.filter((item) => item !== tag) : [...value, tag]);
   }
 
+  function setCategoryOpen(category: string, open: boolean) {
+    setOpenCategories((current) => {
+      const next = new Set(current);
+      if (open) next.add(category);
+      else next.delete(category);
+      return next;
+    });
+  }
+
   const loading = hubGroups === null || keywordGroups === null;
+  const hasResults =
+    adminGroups.length > 0 || ungroupedThemes.length > 0 || officialGroups.length > 0;
+
   return (
     <div className="space-y-6">
       {loading && <p className="text-sm text-gray-500">Loading themes...</p>}
@@ -140,53 +129,83 @@ export function ArchetypeChipPicker({
       {value.length > 0 && (
         <SelectedKeywords value={value} labels={labels} onToggle={toggle} />
       )}
-      {!loading && groups.length > 0 && (
-        <section className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Find a group or keyword
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search themes and keywords"
-                className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-white placeholder:text-gray-500 focus:border-indigo-400 focus:outline-none"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Top-level group
-              <select
-                value={activeGroup?.key ?? ""}
-                onChange={(event) => setActiveGroupKey(event.target.value)}
-                disabled={filteredGroups.length === 0}
-                className="mt-1.5 w-full rounded-lg border border-white/15 bg-gray-900 px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-white disabled:opacity-50"
-              >
-                {filteredGroups.map((group) => {
-                  const count = group.keywords.filter((item) => selected.has(item.tag)).length;
-                  return (
-                    <option key={group.key} value={group.key}>
-                      {group.label} ({count}/{group.keywords.length})
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-          </div>
-          {activeGroup ? (
-            <KeywordPanel
-              group={activeGroup}
+      {!loading && (
+        <>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Find a theme or keyword
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search themes and keywords"
+              className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-white placeholder:text-gray-500 focus:border-indigo-400 focus:outline-none"
+            />
+          </label>
+          {adminGroups.length > 0 && (
+            <KeywordSection
+              title="Theme groups"
+              description="Curated groups managed in the admin panel"
+              keywords={adminGroups}
               query={normalizedQuery}
               selected={selected}
               suggested={suggestedSet}
               onToggle={toggle}
             />
-          ) : (
+          )}
+          {ungroupedThemes.length > 0 && (
+            <KeywordSection
+              title="Ungrouped themes"
+              description="Moxfield and Archidekt themes not assigned to a group"
+              keywords={ungroupedThemes}
+              query={normalizedQuery}
+              selected={selected}
+              suggested={suggestedSet}
+              onToggle={toggle}
+            />
+          )}
+          {officialGroups.length > 0 && (
+            <section>
+              <SectionHeading
+                title="Official keywords"
+                description="Ability words, keyword abilities, and keyword actions"
+              />
+              <div className="space-y-2">
+                {officialGroups.map((group) => {
+                  const forcedOpen =
+                    Boolean(normalizedQuery) ||
+                    group.keywords.some((keyword) => selected.has(keyword.tag));
+                  return (
+                    <OfficialKeywordGroup
+                      key={group.category}
+                      group={group}
+                      open={forcedOpen || openCategories.has(group.category)}
+                      query={normalizedQuery}
+                      selected={selected}
+                      suggested={suggestedSet}
+                      onToggle={toggle}
+                      onOpenChange={(open) => setCategoryOpen(group.category, open)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          )}
+          {!hasResults && normalizedQuery && (
             <p className="rounded-lg border border-dashed border-white/15 px-4 py-8 text-center text-sm text-gray-500">
-              No groups or keywords match “{query.trim()}”.
+              No themes or keywords match “{query.trim()}”.
             </p>
           )}
-        </section>
+        </>
       )}
+    </div>
+  );
+}
+
+function SectionHeading({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mb-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</h3>
+      <p className="mt-1 text-xs text-gray-500">{description}</p>
     </div>
   );
 }
@@ -202,10 +221,15 @@ function SelectedKeywords({
 }) {
   return (
     <section>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Selected</h3>
+      <SectionHeading title="Selected" description="Click a selected keyword to remove it" />
       <div className="flex flex-wrap gap-2">
         {value.map((tag) => (
-          <button key={tag} type="button" onClick={() => onToggle(tag)} className="rounded-full bg-blue-600 px-3 py-1 text-sm text-white shadow hover:bg-blue-700">
+          <button
+            key={tag}
+            type="button"
+            onClick={() => onToggle(tag)}
+            className="rounded-full bg-blue-600 px-3 py-1 text-sm text-white shadow hover:bg-blue-700"
+          >
             {labels.get(tag) ?? tag.replace(/_/g, " ")} ×
           </button>
         ))}
@@ -214,70 +238,109 @@ function SelectedKeywords({
   );
 }
 
-function KeywordPanel({
-  group,
-  query,
-  selected,
-  suggested,
-  onToggle,
-}: {
-  group: BrowserGroup;
+interface KeywordListProps {
+  keywords: KeywordChip[];
   query: string;
   selected: Set<string>;
   suggested: Set<string>;
   onToggle: (tag: string) => void;
+}
+
+function KeywordSection({
+  title,
+  description,
+  ...listProps
+}: KeywordListProps & { title: string; description: string }) {
+  return (
+    <section>
+      <SectionHeading title={title} description={description} />
+      <KeywordList {...listProps} />
+    </section>
+  );
+}
+
+function OfficialKeywordGroup({
+  group,
+  open,
+  onOpenChange,
+  ...listProps
+}: Omit<KeywordListProps, "keywords"> & {
+  group: KeywordGroup;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/15 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-white">{group.label}</h3>
-        <span className="text-xs text-gray-500">{group.keywords.length} keywords</span>
+    <details
+      open={open}
+      onToggle={(event) => onOpenChange(event.currentTarget.open)}
+      className="rounded-lg border border-white/10 bg-black/15"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-white">
+        <span>{group.display_name}</span>
+        <span className="text-xs font-normal text-gray-500">{group.keywords.length}</span>
+      </summary>
+      <div className="border-t border-white/10 p-4">
+        <KeywordList keywords={group.keywords} {...listProps} />
       </div>
-      <div className="flex flex-wrap gap-2">
-        {group.keywords.map((keyword) => (
-          <KeywordButton
-            key={keyword.tag}
-            keyword={keyword}
-            kind={group.kind}
-            active={selected.has(keyword.tag)}
-            suggested={suggested.has(keyword.tag)}
-            searchMatch={keywordMatches(keyword, query)}
-            onToggle={onToggle}
-          />
-        ))}
-      </div>
+    </details>
+  );
+}
+
+function KeywordList({
+  keywords,
+  query,
+  selected,
+  suggested,
+  onToggle,
+}: KeywordListProps) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {keywords.map((keyword) => (
+        <KeywordButton
+          key={keyword.tag}
+          keyword={keyword}
+          active={selected.has(keyword.tag)}
+          suggested={suggested.has(keyword.tag)}
+          searchMatch={Boolean(query) && keywordMatches(keyword, query)}
+          onToggle={onToggle}
+        />
+      ))}
     </div>
   );
 }
 
 function KeywordButton({
   keyword,
-  kind,
   active,
   suggested,
   searchMatch,
   onToggle,
 }: {
   keyword: KeywordChip;
-  kind: BrowserGroup["kind"];
   active: boolean;
   suggested: boolean;
   searchMatch: boolean;
   onToggle: (tag: string) => void;
 }) {
   const tone = active
-    ? kind === "mechanic"
-      ? "border-violet-500 bg-violet-500/20 text-violet-100"
-      : "border-blue-500 bg-blue-500/20 text-blue-100"
+    ? "border-blue-500 bg-blue-500/20 text-blue-100"
     : searchMatch
       ? "border-cyan-400 bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-400/40"
       : suggested
         ? "border-amber-400/70 bg-amber-500/15 text-amber-100"
         : "border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10";
   return (
-    <button type="button" onClick={() => onToggle(keyword.tag)} className={`rounded-full border px-3 py-1 text-sm transition ${tone}`}>
+    <button
+      type="button"
+      onClick={() => onToggle(keyword.tag)}
+      className={`rounded-full border px-3 py-1 text-sm transition ${tone}`}
+    >
       {keyword.label}
-      {keyword.deck_count ? <span className="ml-1 text-[11px] opacity-70">{formatDeckCount(keyword.deck_count)}</span> : null}
+      {keyword.deck_count ? (
+        <span className="ml-1 text-[11px] opacity-70">
+          {formatDeckCount(keyword.deck_count)}
+        </span>
+      ) : null}
     </button>
   );
 }
