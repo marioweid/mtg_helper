@@ -9,7 +9,7 @@ from mtg_helper.models.decks import (
     PlannedDeckChange,
     PlannedDeckChangeCreate,
 )
-from mtg_helper.services import collection_service
+from mtg_helper.services import card_identity_service, collection_service
 
 
 class PlannedChangeError(ValueError):
@@ -56,15 +56,7 @@ async def _owned_deck(
 
 
 async def _card_by_scryfall(conn: asyncpg.Connection, scryfall_id: UUID) -> asyncpg.Record:
-    row = await conn.fetchrow(
-        """
-        SELECT id, scryfall_id, name, color_identity, set_code,
-               COALESCE(oracle_id, id) AS oracle_key
-        FROM cards
-        WHERE scryfall_id = $1
-        """,
-        scryfall_id,
-    )
+    row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
     if row is None:
         raise InvalidPlanError(f"Card {scryfall_id} not found")
     return row
@@ -140,10 +132,19 @@ async def create_plan(
             data.direction,
             data.quantity,
         )
+        if direction == "addition":
+            limit = card_identity_service.commander_copy_limit(
+                card["type_line"], card["oracle_text"]
+            )
+            projected = card_identity_service.clamp_quantity(
+                physical_quantity + quantity, limit
+            )
+            quantity = projected - physical_quantity
         if direction == "cut" and quantity > physical_quantity:
             raise InvalidPlanError("Planned cut exceeds the physical deck quantity")
-        if direction is None:
-            await conn.execute("DELETE FROM deck_card_plans WHERE id = $1", existing["id"])
+        if direction is None or quantity == 0:
+            if existing:
+                await conn.execute("DELETE FROM deck_card_plans WHERE id = $1", existing["id"])
             return None
         categories = list(data.categories) if direction == "addition" else []
         collection_id = (
@@ -189,6 +190,7 @@ def _row_to_plan(row: asyncpg.Record) -> PlannedDeckChange:
         deck_id=row["deck_id"],
         card_id=row["card_id"],
         scryfall_id=row["scryfall_id"],
+        oracle_id=row["oracle_id"],
         name=row["name"],
         image_uri=row["image_uri"],
         direction=row["direction"],
@@ -205,7 +207,7 @@ def _row_to_plan(row: asyncpg.Record) -> PlannedDeckChange:
 
 
 _PLAN_SELECT = """
-    SELECT p.*, c.scryfall_id, c.name, c.image_uri,
+    SELECT p.*, c.scryfall_id, c.oracle_id, c.name, c.image_uri,
            COALESCE(dc.quantity, 0)::int AS physical_quantity
     FROM deck_card_plans p
     JOIN cards c ON c.id = p.card_id

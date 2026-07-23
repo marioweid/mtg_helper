@@ -102,7 +102,7 @@ def _build_filters(
     search. Color identity is always first, optional exclusions and the
     LLM-supplied filters follow.
     """
-    where: list[str] = ["color_identity <@ $1::text[]"]
+    where: list[str] = ["is_canonical", "color_identity <@ $1::text[]"]
     args: list[object] = [list(deck_color_identity)]
     excludable = [n for n in (exclude_names or []) if n not in _BASIC_LANDS]
     if excludable:

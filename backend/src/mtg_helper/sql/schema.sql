@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS cards (
     border_color    TEXT,
     security_stamp  TEXT,
     game_changer    BOOLEAN NOT NULL DEFAULT false,
+    is_canonical    BOOLEAN NOT NULL DEFAULT false,
     embedded_at     TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -492,6 +493,36 @@ DROP VIEW IF EXISTS deck_detail_view;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS border_color TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS security_stamp TEXT;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS game_changer BOOLEAN NOT NULL DEFAULT false;
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'cards'
+          AND column_name = 'is_canonical'
+    ) THEN
+        ALTER TABLE cards ADD COLUMN is_canonical BOOLEAN NOT NULL DEFAULT false;
+        WITH ranked AS (
+            SELECT id,
+                   row_number() OVER (
+                       PARTITION BY oracle_id
+                       ORDER BY released_at DESC NULLS LAST, scryfall_id
+                   ) AS position
+            FROM cards
+            WHERE oracle_id IS NOT NULL
+        )
+        UPDATE cards c
+        SET is_canonical = ranked.position = 1
+        FROM ranked
+        WHERE c.id = ranked.id;
+        UPDATE cards SET is_canonical = true WHERE oracle_id IS NULL;
+    END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cards_one_canonical_oracle
+    ON cards (oracle_id)
+    WHERE is_canonical AND oracle_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cards_canonical_name
+    ON cards (is_canonical, name);
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS hub_tags TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE cards DROP COLUMN IF EXISTS edhrec_tags;
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS mtgjson_tags TEXT[] NOT NULL DEFAULT '{}';
@@ -688,9 +719,10 @@ SELECT
     dc.categories,
     dc.added_by,
     dc.ai_reasoning,
-    c.id           AS card_id,
-    c.scryfall_id,
-    c.name,
+      c.id           AS card_id,
+      c.scryfall_id,
+      c.oracle_id,
+      c.name,
     c.mana_cost,
     c.cmc,
     c.type_line,

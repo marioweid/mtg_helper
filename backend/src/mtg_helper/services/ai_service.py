@@ -158,6 +158,7 @@ def card_from_retrieved(
 
     return CardSuggestion(
         scryfall_id=card.scryfall_id,
+        oracle_id=card.oracle_id,
         name=card.name,
         mana_cost=card.mana_cost,
         type_line=card.type_line,
@@ -205,7 +206,24 @@ async def _compute_feedback_weights(
 
     async with pool.acquire() as conn:
         feedback_rows = await conn.fetch(
-            "SELECT card_id, feedback, reject_count FROM deck_feedback WHERE deck_id = $1",
+            """
+            SELECT canonical.id AS card_id,
+                   CASE
+                       WHEN bool_or(df.feedback = 'reject') THEN 'reject'
+                       WHEN bool_or(df.feedback = 'up') THEN 'up'
+                       ELSE 'down'
+                   END AS feedback,
+                   SUM(CASE WHEN df.feedback = 'reject'
+                            THEN greatest(df.reject_count, 1) ELSE 0 END)::int AS reject_count
+            FROM deck_feedback df
+            JOIN cards source ON source.id = df.card_id
+            JOIN cards canonical
+              ON COALESCE(canonical.oracle_id, canonical.id)
+               = COALESCE(source.oracle_id, source.id)
+             AND canonical.is_canonical
+            WHERE df.deck_id = $1
+            GROUP BY canonical.id
+            """,
             deck_id,
         )
 
@@ -345,7 +363,7 @@ async def _resolve_exclude_ids(
         return []
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT id FROM cards WHERE LOWER(name) = ANY($1::text[])",
+            "SELECT id FROM cards WHERE is_canonical AND LOWER(name) = ANY($1::text[])",
             [n.lower() for n in exclude],
         )
     return [r["id"] for r in rows]

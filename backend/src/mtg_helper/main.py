@@ -31,6 +31,7 @@ from mtg_helper.services import (
     archidekt_tag_service,
     moxfield_hub_service,
     mtgjson,
+    oracle_duplicate_repair_service,
     scryfall,
     theme_service,
 )
@@ -56,6 +57,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             _log.info("Scryfall sync complete: %s", result)
         except Exception:
             _log.exception("Scryfall sync failed on startup; continuing without card data")
+
+    try:
+        await oracle_duplicate_repair_service.repair_active_decks(app.state.db_pool)
+    except Exception:
+        _log.exception("Oracle card identity repair failed; it will retry on next startup")
 
     keyword_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM mtgjson_keywords")
     if keyword_count == 0:

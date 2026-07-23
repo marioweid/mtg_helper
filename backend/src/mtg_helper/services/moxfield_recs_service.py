@@ -501,6 +501,7 @@ async def score_inclusion(
             SELECT id, oracle_id::text AS oid, color_identity
             FROM cards
             WHERE oracle_id::text = ANY($1::text[])
+              AND is_canonical
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND COALESCE(border_color, '') != 'gold'

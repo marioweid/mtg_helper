@@ -101,6 +101,7 @@ class RetrievedCard:
 
     id: UUID
     scryfall_id: UUID
+    oracle_id: UUID | None
     name: str
     mana_cost: str | None
     cmc: Decimal | None
@@ -750,6 +751,7 @@ async def _search_tags(
             WHERE (
                 tags || mtgjson_tags
             ) && $1::text[]
+              AND is_canonical
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND id != ALL($3::uuid[])
@@ -816,6 +818,7 @@ async def _search_fts(
             FROM cards
             WHERE to_tsvector('english', COALESCE(oracle_text, ''))
                   @@ plainto_tsquery('english', $1)
+              AND is_canonical
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
               AND id != ALL($3::uuid[])
@@ -1689,6 +1692,7 @@ async def retrieve_candidates(
             RetrievedCard(
                 id=row["id"],
                 scryfall_id=row["scryfall_id"],
+                oracle_id=row["oracle_id"],
                 name=row["name"],
                 mana_cost=row["mana_cost"],
                 cmc=row["cmc"],
@@ -1737,7 +1741,7 @@ async def _fetch_candidates(
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             f"""
-            SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
+            SELECT id, scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
                    color_identity, image_uri,
                    tags,
                    hub_tags,
@@ -1750,6 +1754,7 @@ async def _fetch_candidates(
                    END AS price_eur_cents
             FROM cards
             WHERE id = ANY($1::uuid[])
+              AND is_canonical
               AND COALESCE(border_color, '') != 'gold'
               AND COALESCE(security_stamp, '') != 'acorn'
               AND type_line NOT LIKE '%Conspiracy%'

@@ -97,10 +97,10 @@ async def _insert_search_cards(pool: asyncpg.Pool) -> dict[str, UUID]:
                 INSERT INTO cards (
                     scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
                     color_identity, colors, card_types, subtypes, tags, legalities,
-                    prices, edhrec_rank
+                    prices, edhrec_rank, is_canonical
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10,
-                        '{"commander":"legal"}', $11, $12)
+                        '{"commander":"legal"}', $11, $12, true)
                 RETURNING id
                 """,
                 uuid4(),

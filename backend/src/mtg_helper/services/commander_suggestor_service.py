@@ -197,7 +197,9 @@ def parse_intent_fallback(
     """Infer useful intent from obvious words when the LLM is unavailable."""
     merged = previous.model_copy(deep=True) if previous else CommanderSuggestIntent()
     text = message.lower()
-    merged.archetype_tags = _merge_vocab(merged.archetype_tags, _match_hints(text, _ARCHETYPE_HINTS))
+    merged.archetype_tags = _merge_vocab(
+        merged.archetype_tags, _match_hints(text, _ARCHETYPE_HINTS)
+    )
     merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_hints(text, _MECHANIC_HINTS))
     if not merged.archetype_tags:
         merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_plan_mechanics(text))
@@ -299,7 +301,8 @@ async def _fetch_candidates(pool: asyncpg.Pool) -> list[_Candidate]:
             """
             SELECT *
             FROM cards
-            WHERE legalities->>'commander' = 'legal'
+            WHERE is_canonical
+              AND legalities->>'commander' = 'legal'
               AND COALESCE(border_color, '') != 'gold'
               AND COALESCE(security_stamp, '') != 'acorn'
               AND COALESCE(type_line, '') NOT ILIKE '%Conspiracy%'
@@ -490,7 +493,9 @@ def _stage_targets(intent: CommanderSuggestIntent) -> dict[str, int]:
     tags = set(intent.archetype_tags) | set(intent.mechanic_tags)
     if "storm" in tags or "spellslinger" in tags or "magecraft" in tags:
         targets["draw"] = 14
-    if tags & {"graveyard", "self_mill", "reanimator"} or _has_graveyard_keyword(intent.mechanic_tags):
+    if tags & {"graveyard", "self_mill", "reanimator"} or _has_graveyard_keyword(
+        intent.mechanic_tags
+    ):
         targets["interaction"] = 10
     return targets
 

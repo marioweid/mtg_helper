@@ -73,7 +73,7 @@ def _build_where_clauses(params: CardSearchParams) -> tuple[list[str], list[Any]
     Returns:
         A tuple of (clause_strings, bound_values).
     """
-    clauses: list[str] = []
+    clauses: list[str] = ["is_canonical"]
     values: list[Any] = []
 
     if params.q:
@@ -191,6 +191,7 @@ async def resolve_card_by_name(pool: asyncpg.Pool, name: str) -> CardResponse | 
     """
     async with pool.acquire() as conn:
         _legal_filter = (
+            " AND is_canonical"
             " AND legalities->>'commander' = 'legal'"
             " AND COALESCE(border_color, '') != 'gold'"
             " AND COALESCE(security_stamp, '') != 'acorn'"

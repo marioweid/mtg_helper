@@ -158,7 +158,8 @@ def _candidate_sql(term_count: int) -> str:
     return (
         "SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text, "
         "color_identity, tags, ROUND((prices->>'eur')::numeric * 100)::integer "
-        "AS price_eur_cents FROM cards WHERE color_identity <@ $1::text[] "
+        "AS price_eur_cents FROM cards WHERE is_canonical "
+        "AND color_identity <@ $1::text[] "
         "AND name <> ALL($2::text[]) AND legalities->>'commander' = 'legal' "
         "AND type_line NOT ILIKE '%Land%' AND (" + " OR ".join(clauses) + ") "
         "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST LIMIT 1200"

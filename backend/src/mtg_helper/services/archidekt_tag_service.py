@@ -213,7 +213,8 @@ async def _store_stats(
     async with pool.acquire() as conn:
         tag_id = await conn.fetchval("SELECT id FROM archidekt_tags WHERE slug = $1", tag.slug)
         cards = await conn.fetch(
-            "SELECT id, lower(name) AS name FROM cards WHERE lower(name) = ANY($1::text[])",
+            "SELECT id, lower(name) AS name FROM cards "
+            "WHERE is_canonical AND lower(name) = ANY($1::text[])",
             [name.lower() for name in stats],
         )
         card_ids = {row["name"]: row["id"] for row in cards}

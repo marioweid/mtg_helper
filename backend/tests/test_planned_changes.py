@@ -310,7 +310,7 @@ async def test_shopping_list_groups_alternate_printings_by_oracle(
     response = await _shopping_list(client, deck_id, [binder])
 
     assert response.status_code == 200
-    assert response.text == "1 Sol Ring"
+    assert response.text == ""
 
 
 @pytest.mark.asyncio

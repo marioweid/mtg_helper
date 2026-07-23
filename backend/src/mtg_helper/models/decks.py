@@ -75,6 +75,7 @@ class DeckCardItem(BaseModel):
     deck_card_id: UUID
     card_id: UUID
     scryfall_id: UUID
+    oracle_id: UUID | None = None
     name: str
     mana_cost: str | None
     cmc: Decimal | None
@@ -160,6 +161,7 @@ class PlannedDeckChange(BaseModel):
     deck_id: UUID
     card_id: UUID
     scryfall_id: UUID
+    oracle_id: UUID | None = None
     name: str
     image_uri: str | None
     direction: Literal["addition", "cut"]
@@ -218,6 +220,7 @@ class DeckCardResponse(BaseModel):
     deck_id: UUID
     card_id: UUID
     scryfall_id: UUID
+    oracle_id: UUID | None = None
     name: str
     quantity: int
     categories: list[str]

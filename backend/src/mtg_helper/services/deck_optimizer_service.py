@@ -235,6 +235,7 @@ def _candidate_to_card_item(
         deck_card_id=uuid4(),
         card_id=uuid4(),
         scryfall_id=cand.scryfall_id,
+        oracle_id=cand.oracle_id,
         name=cand.name,
         mana_cost=cand.mana_cost,
         cmc=cmc_value,

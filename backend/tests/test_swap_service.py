@@ -240,10 +240,12 @@ async def test_find_swaps_rejects_basic_land(client: AsyncClient, db_pool: async
         plains_id = await conn.fetchval(
             """
             INSERT INTO cards (scryfall_id, name, color_identity, type_line,
-                cmc, mana_cost, rarity, legalities, colors, keywords, prices, tags)
+                cmc, mana_cost, rarity, legalities, colors, keywords, prices, tags,
+                is_canonical)
             VALUES ($1, 'Plains', ARRAY['W'], 'Basic Land — Plains', 0, '',
                 'common', '{"commander": "legal"}'::jsonb,
-                ARRAY['W'], ARRAY[]::text[], '{"eur": "0.10"}'::jsonb, ARRAY[]::text[])
+                ARRAY['W'], ARRAY[]::text[], '{"eur": "0.10"}'::jsonb,
+                ARRAY[]::text[], true)
             RETURNING id
             """,
             plains_scryfall,

@@ -268,6 +268,7 @@ def _build_filters(
     hub_ids: list[UUID],
 ) -> tuple[list[str], list[object]]:
     where = [
+        "is_canonical",
         "color_identity <@ $1::text[]",
         "legalities->>'commander' = 'legal'",
         "COALESCE(border_color, '') != 'gold'",
@@ -502,6 +503,12 @@ WITH scores AS (
     JOIN archidekt_tags t ON t.id = s.tag_id
     WHERE 'archidekt:' || t.tag = ANY($1::text[]) AND t.active AND t.enabled
 )
-SELECT card_id, max(score) AS score, array_agg(DISTINCT tag ORDER BY tag) AS matched_tags
-FROM scores GROUP BY card_id
+SELECT canonical.id AS card_id, max(scores.score) AS score,
+       array_agg(DISTINCT scores.tag ORDER BY scores.tag) AS matched_tags
+FROM scores
+JOIN cards source ON source.id = scores.card_id
+JOIN cards canonical
+  ON COALESCE(canonical.oracle_id, canonical.id) = COALESCE(source.oracle_id, source.id)
+ AND canonical.is_canonical
+GROUP BY canonical.id
 """

@@ -685,14 +685,20 @@ async def owned_quantities(
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT cards.scryfall_id AS scryfall_id,
+            WITH input_cards AS (
+                SELECT scryfall_id, COALESCE(oracle_id, id) AS oracle_key
+                FROM cards
+                WHERE scryfall_id = ANY($2::uuid[])
+            )
+            SELECT input.scryfall_id,
                    SUM(cc.quantity)::int AS total
-            FROM collection_cards cc
+            FROM input_cards input
+            JOIN cards owned
+              ON COALESCE(owned.oracle_id, owned.id) = input.oracle_key
+            JOIN collection_cards cc ON cc.card_id = owned.id
             JOIN collections c ON c.id = cc.collection_id
-            JOIN cards ON cards.id = cc.card_id
             WHERE c.account_id = $1
-              AND cards.scryfall_id = ANY($2::uuid[])
-            GROUP BY cards.scryfall_id
+            GROUP BY input.scryfall_id
             """,
             account_id,
             scryfall_ids,
@@ -711,10 +717,19 @@ async def get_owned_card_ids_for_collections(
         return frozenset()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT DISTINCT card_id FROM collection_cards WHERE collection_id = ANY($1::uuid[])",
+            """
+            SELECT DISTINCT canonical.id AS card_id
+            FROM collection_cards cc
+            JOIN cards owned ON owned.id = cc.card_id
+            JOIN cards canonical
+              ON COALESCE(canonical.oracle_id, canonical.id)
+               = COALESCE(owned.oracle_id, owned.id)
+             AND canonical.is_canonical
+            WHERE cc.collection_id = ANY($1::uuid[])
+            """,
             list(collection_ids),
         )
-    return frozenset(r["card_id"] for r in rows)
+    return frozenset(row["card_id"] for row in rows)
 
 
 async def _resolve_rows(

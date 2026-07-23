@@ -26,6 +26,7 @@ class TopPickCard(BaseModel):
 
     card_id: UUID
     scryfall_id: UUID
+    oracle_id: UUID | None = None
     name: str
     mana_cost: str | None
     type_line: str | None

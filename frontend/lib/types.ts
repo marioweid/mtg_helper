@@ -28,6 +28,7 @@ export interface AccountUpdate {
 // Cards
 export interface CardResponse {
   scryfall_id: string;
+  oracle_id?: string | null;
   name: string;
   mana_cost: string | null;
   cmc: number | null;
@@ -74,6 +75,7 @@ export interface DeckCardItem {
   deck_card_id: string;
   card_id: string;
   scryfall_id: string;
+  oracle_id?: string | null;
   name: string;
   mana_cost: string | null;
   cmc: number | null;
@@ -185,6 +187,7 @@ export interface DeckCardResponse {
   deck_id: string;
   card_id: string;
   scryfall_id: string;
+  oracle_id?: string | null;
   name: string;
   quantity: number;
   categories: string[];
@@ -205,6 +208,7 @@ export interface PlannedDeckChange {
   deck_id: string;
   card_id: string;
   scryfall_id: string;
+  oracle_id?: string | null;
   name: string;
   image_uri: string | null;
   direction: PlannedChangeDirection;
@@ -240,6 +244,7 @@ export interface PlannedShoppingListRequest {
 
 export interface CardSuggestion {
   scryfall_id: string;
+  oracle_id?: string | null;
   name: string;
   mana_cost: string | null;
   type_line: string | null;
@@ -1015,6 +1020,7 @@ export interface TopPickSourceSummary {
 export interface TopPickCard {
   card_id: string;
   scryfall_id: string;
+  oracle_id?: string | null;
   name: string;
   mana_cost: string | null;
   type_line: string | null;

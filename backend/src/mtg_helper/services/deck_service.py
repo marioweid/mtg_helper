@@ -20,6 +20,7 @@ from mtg_helper.models.decks import (
     PlannedDeckChange,
 )
 from mtg_helper.services import (
+    card_identity_service,
     collection_service,
     deck_fit_service,
     mana_curve_service,
@@ -133,6 +134,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         deck_card_id=row["deck_card_id"],
         card_id=row["card_id"],
         scryfall_id=row["scryfall_id"],
+        oracle_id=row["oracle_id"] if "oracle_id" in row.keys() else None,
         name=row["name"],
         mana_cost=row["mana_cost"],
         cmc=row["cmc"],
@@ -200,7 +202,7 @@ async def _resolve_scryfall_id(conn: asyncpg.Connection, scryfall_id: UUID) -> U
     Raises:
         CardNotFoundError: If the card is not in the local DB.
     """
-    row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
+    row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
     if row is None:
         raise CardNotFoundError(f"Card with Scryfall ID {scryfall_id} not found")
     return row["id"]
@@ -594,6 +596,13 @@ async def add_card_to_deck(
             raise DeckNotFoundError(f"Deck {deck_id} not found")
 
         card_id = await _resolve_scryfall_id(conn, data.card_scryfall_id)
+        card = await card_identity_service.canonical_card_by_id(conn, card_id)
+        if card is None:
+            raise CardNotFoundError(f"Card with Scryfall ID {data.card_scryfall_id} not found")
+        copy_limit = card_identity_service.commander_copy_limit(
+            card["type_line"], card["oracle_text"]
+        )
+        quantity = card_identity_service.clamp_quantity(data.quantity, copy_limit)
         commander_identity = await _get_color_identity(conn, deck_row["commander_id"])
         card_identity = await _get_color_identity(conn, card_id)
         _check_color_identity(card_identity, commander_identity)
@@ -619,15 +628,17 @@ async def add_card_to_deck(
             """,
             deck_id,
             card_id,
-            data.quantity,
+            quantity,
             list(data.categories),
             data.added_by,
             data.ai_reasoning,
         )
 
-        card_row = await conn.fetchrow("SELECT scryfall_id, name FROM cards WHERE id = $1", card_id)
+        card_row = await conn.fetchrow(
+            "SELECT scryfall_id, oracle_id, name FROM cards WHERE id = $1", card_id
+        )
 
-    added_quantity = max(0, data.quantity - int(old_quantity or 0))
+    added_quantity = max(0, quantity - int(old_quantity or 0))
     if added_quantity:
         await planned_change_service.consume_immediate_plan(
             pool, deck_id, card_id, "addition", added_quantity
@@ -637,8 +648,9 @@ async def add_card_to_deck(
         deck_id=row["deck_id"],
         card_id=row["card_id"],
         scryfall_id=card_row["scryfall_id"],
+        oracle_id=card_row["oracle_id"],
         name=card_row["name"],
-        quantity=data.quantity,
+        quantity=quantity,
         categories=list(data.categories),
         added_by=data.added_by,
     )
@@ -761,7 +773,7 @@ async def update_deck_card_categories(
                 await _assert_owner(conn, deck_id, email)
             except DeckNotFoundError:
                 return False
-        card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
+        card_row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
         if card_row is None:
             return False
         result = await conn.execute(
@@ -802,8 +814,14 @@ async def update_deck_card_quantity(
                 await _assert_owner(conn, deck_id, email)
             except DeckNotFoundError:
                 return False
-        card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
+        card_row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
         if card_row is None:
+            return False
+        copy_limit = card_identity_service.commander_copy_limit(
+            card_row["type_line"], card_row["oracle_text"]
+        )
+        quantity = card_identity_service.clamp_quantity(quantity, copy_limit)
+        if quantity < 1:
             return False
         old_quantity = await conn.fetchval(
             "SELECT quantity FROM deck_cards WHERE deck_id = $1 AND card_id = $2",
@@ -855,7 +873,7 @@ async def remove_card_from_deck(
                 await _assert_owner(conn, deck_id, email)
             except DeckNotFoundError:
                 return False
-        card_row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
+        card_row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
         if card_row is None:
             return False
         result = await conn.execute(

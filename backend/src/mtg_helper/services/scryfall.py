@@ -278,6 +278,25 @@ async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -
     )
 
 
+async def _switch_canonical_rows(
+    conn: asyncpg.Connection,
+    cards: list[dict[str, Any]],
+) -> None:
+    """Atomically select the current bulk representatives as canonical."""
+    oracle_ids = list({card["oracle_id"] for card in cards if card["oracle_id"] is not None})
+    scryfall_ids = [card["scryfall_id"] for card in cards]
+    if oracle_ids:
+        await conn.execute(
+            "UPDATE cards SET is_canonical = false WHERE oracle_id = ANY($1::uuid[])",
+            oracle_ids,
+        )
+    if scryfall_ids:
+        await conn.execute(
+            "UPDATE cards SET is_canonical = true WHERE scryfall_id = ANY($1::uuid[])",
+            scryfall_ids,
+        )
+
+
 async def run_sync(
     pool: asyncpg.Pool,
     progress: "ProgressCb | None" = None,
@@ -312,12 +331,20 @@ async def run_sync(
 
     total = len(relevant)
     _log.info("Upserting %d Commander-relevant cards", total)
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn, conn.transaction():
         for i in range(0, total, _BATCH_SIZE):
             await _upsert_batch(conn, relevant[i : i + _BATCH_SIZE])
             done = min(i + _BATCH_SIZE, total)
             cb("upserting", done, total)
             _log.info("Upserted %d / %d cards", done, total)
+        await _switch_canonical_rows(conn, relevant)
+
+    from mtg_helper.services import oracle_duplicate_repair_service
+
+    try:
+        await oracle_duplicate_repair_service.repair_active_decks(pool)
+    except Exception:
+        _log.exception("Oracle card identity repair failed after Scryfall sync")
 
     return {
         "cards_processed": total,

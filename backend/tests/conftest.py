@@ -150,8 +150,9 @@ async def _setup_schema() -> None:
                 """
                 INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, oracle_text,
                     type_line, cmc, mana_cost, rarity, set_code, legalities,
-                    power, toughness, colors, keywords, prices)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                    power, toughness, colors, keywords, prices, is_canonical)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                        $15, $16, true)
                 ON CONFLICT (scryfall_id) DO NOTHING
                 """,
                 card["scryfall_id"],

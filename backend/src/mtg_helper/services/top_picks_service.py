@@ -151,7 +151,7 @@ async def _load_card_rows(
     return list(
         await conn.fetch(
             """
-            SELECT c.id, c.scryfall_id, c.oracle_id::text AS oracle_id, c.name,
+            SELECT c.id, c.scryfall_id, c.oracle_id, c.name,
                    c.mana_cost, c.type_line, c.image_uri,
                    CASE WHEN c.prices->>'eur' IS NULL THEN NULL
                         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
@@ -163,6 +163,7 @@ async def _load_card_rows(
             LEFT JOIN deck_cards dc ON dc.deck_id = $1 AND dc.card_id = c.id
             LEFT JOIN deck_card_plans p ON p.deck_id = $1 AND p.card_id = c.id
             WHERE (c.oracle_id::text = ANY($2::text[]) OR lower(c.name) = ANY($3::text[]))
+              AND c.is_canonical
               AND c.color_identity <@ $4::text[]
               AND c.legalities->>'commander' = 'legal'
               AND COALESCE(c.border_color, '') != 'gold'
@@ -195,13 +196,15 @@ def _row_to_pick(
     mox_state: _SourceState,
     arch_state: _SourceState,
 ) -> TopPickCard:
-    mox_count = int((mox_state.payload.get("by_oracle") or {}).get(row["oracle_id"], 0))
+    oracle_id = str(row["oracle_id"]) if row["oracle_id"] else None
+    mox_count = int((mox_state.payload.get("by_oracle") or {}).get(oracle_id, 0))
     arch_count = int((arch_state.payload.get("by_name") or {}).get(row["name"].casefold(), 0))
     mox_rate = mox_count / mox_state.sample_size if mox_state.sample_size else 0.0
     arch_rate = arch_count / arch_state.sample_size if arch_state.sample_size else 0.0
     return TopPickCard(
         card_id=row["id"],
         scryfall_id=row["scryfall_id"],
+        oracle_id=row["oracle_id"],
         name=row["name"],
         mana_cost=row["mana_cost"],
         type_line=row["type_line"],

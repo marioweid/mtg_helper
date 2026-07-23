@@ -5,6 +5,7 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.models.feedback import FeedbackCreate, FeedbackResponse
+from mtg_helper.services import card_identity_service
 
 
 class DeckNotFoundError(ValueError):
@@ -54,8 +55,8 @@ async def add_feedback(pool: asyncpg.Pool, deck_id: UUID, data: FeedbackCreate) 
         if not deck_exists:
             raise DeckNotFoundError(f"Deck {deck_id} not found")
 
-        card_row = await conn.fetchrow(
-            "SELECT id, name FROM cards WHERE scryfall_id = $1", data.card_scryfall_id
+        card_row = await card_identity_service.canonical_card_by_scryfall(
+            conn, data.card_scryfall_id
         )
         if card_row is None:
             raise CardNotFoundError(f"Card with Scryfall ID {data.card_scryfall_id} not found")

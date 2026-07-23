@@ -51,11 +51,11 @@ async def _insert_card(
             INSERT INTO cards (
                 scryfall_id, oracle_id, name, color_identity, colors, oracle_text,
                 type_line, cmc, mana_cost, rarity, set_code, legalities, prices,
-                tags, keywords, traits, token_types, edhrec_rank
+                tags, keywords, traits, token_types, edhrec_rank, is_canonical
             )
             VALUES (
                 $1, $2, $3, $4, $4, $5, $6, 4, '{2}{B}{G}', 'mythic', 'test',
-                $7, '{}', $8, $9, $10, '{}', $11
+                $7, '{}', $8, $9, $10, '{}', $11, true
             )
             ON CONFLICT (scryfall_id) DO UPDATE
             SET oracle_text = EXCLUDED.oracle_text,

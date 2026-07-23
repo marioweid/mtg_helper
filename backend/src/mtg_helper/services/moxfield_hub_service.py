@@ -240,18 +240,22 @@ async def score_hubs(
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT s.card_id, max(s.synergy_score) AS score
+            SELECT canonical.id AS card_id, max(s.synergy_score) AS score
             FROM moxfield_hub_card_stats s
             JOIN moxfield_hubs h ON h.id = s.hub_id
-            JOIN cards c ON c.id = s.card_id
+            JOIN cards source ON source.id = s.card_id
+            JOIN cards canonical
+              ON COALESCE(canonical.oracle_id, canonical.id)
+               = COALESCE(source.oracle_id, source.id)
+             AND canonical.is_canonical
             WHERE h.tag = ANY($1::text[])
               AND h.active AND h.enabled
-              AND c.color_identity <@ $2::text[]
-              AND c.legalities->>'commander' = 'legal'
-              AND COALESCE(c.border_color, '') != 'gold'
-              AND COALESCE(c.security_stamp, '') != 'acorn'
-              AND c.type_line NOT LIKE '%Conspiracy%'
-            GROUP BY s.card_id
+              AND canonical.color_identity <@ $2::text[]
+              AND canonical.legalities->>'commander' = 'legal'
+              AND COALESCE(canonical.border_color, '') != 'gold'
+              AND COALESCE(canonical.security_stamp, '') != 'acorn'
+              AND canonical.type_line NOT LIKE '%Conspiracy%'
+            GROUP BY canonical.id
             """,
             tags,
             commander_color_identity,
@@ -461,7 +465,7 @@ async def _store_hub_stats(
         return 0
     async with pool.acquire() as conn:
         card_rows = await conn.fetch(
-            "SELECT id, name FROM cards WHERE lower(name) = ANY($1::text[])",
+            "SELECT id, name FROM cards WHERE is_canonical AND lower(name) = ANY($1::text[])",
             [name.lower() for name in names],
         )
         cards_by_name = {row["name"].lower(): row["id"] for row in card_rows}

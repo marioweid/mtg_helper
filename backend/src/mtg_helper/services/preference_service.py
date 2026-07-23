@@ -5,6 +5,7 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.models.preferences import PreferenceCreate, PreferenceResponse
+from mtg_helper.services import card_identity_service
 
 _PET_WEIGHT = 1.5
 _AVOID_WEIGHT = 0.1
@@ -55,8 +56,8 @@ async def create_preference(
         card_id: UUID | None = None
         card_name: str | None = None
         if data.card_scryfall_id is not None:
-            card_row = await conn.fetchrow(
-                "SELECT id, name FROM cards WHERE scryfall_id = $1", data.card_scryfall_id
+            card_row = await card_identity_service.canonical_card_by_scryfall(
+                conn, data.card_scryfall_id
             )
             if card_row is None:
                 raise CardNotFoundError(f"Card with Scryfall ID {data.card_scryfall_id} not found")
@@ -237,9 +238,17 @@ async def get_card_preference_weights(
     """
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT card_id, preference_type FROM preferences "
-            "WHERE account_id = $1 AND preference_type IN ('pet_card', 'avoid_card') "
-            "AND card_id IS NOT NULL",
+            """
+            SELECT canonical.id AS card_id, p.preference_type
+            FROM preferences p
+            JOIN cards source ON source.id = p.card_id
+            JOIN cards canonical
+              ON COALESCE(canonical.oracle_id, canonical.id)
+               = COALESCE(source.oracle_id, source.id)
+             AND canonical.is_canonical
+            WHERE p.account_id = $1
+              AND p.preference_type IN ('pet_card', 'avoid_card')
+            """,
             account_id,
         )
     weights: dict[UUID, float] = {}

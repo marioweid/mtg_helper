@@ -4,6 +4,7 @@ import { useReducer, useEffect, useCallback, useMemo, useRef, useState } from "r
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient, ApiError } from "@/lib/api";
+import { cardIdentity } from "@/lib/card-identity";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardHover } from "@/components/card-hover";
 import { CardDetailModal } from "@/components/card-detail-modal";
@@ -101,6 +102,19 @@ function isBasicLand(suggestion: CardSuggestion): boolean {
   return suggestion.type_line?.includes("Basic Land") ?? false;
 }
 
+function uniqueSuggestions(
+  suggestions: CardSuggestion[],
+  excluded: ReadonlySet<string> = new Set(),
+): CardSuggestion[] {
+  const seen = new Set(excluded);
+  return suggestions.filter((suggestion) => {
+    const identity = cardIdentity(suggestion);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
 const BASIC_LAND_NAMES = ["Forest", "Island", "Plains", "Mountain", "Swamp", "Wastes"] as const;
 
 const COLOR_TO_BASIC: Record<string, string> = {
@@ -188,16 +202,11 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       };
     }
     case "LOAD_SUCCESS": {
-      const seen = new Set<string>();
-      const deduped = action.suggestions.filter((s) => {
-        if (seen.has(s.scryfall_id)) return false;
-        seen.add(s.scryfall_id);
-        return true;
-      });
+      const deduped = uniqueSuggestions(action.suggestions);
       const statuses: Record<string, SuggestionStatus> = {};
-      for (const s of deduped) statuses[s.scryfall_id] = "pending";
-      const bufferIds = new Set(deduped.map((s) => s.scryfall_id));
-      const buffer = action.buffer.filter((s) => !bufferIds.has(s.scryfall_id));
+      for (const s of deduped) statuses[cardIdentity(s)] = "pending";
+      const bufferIds = new Set(deduped.map(cardIdentity));
+      const buffer = uniqueSuggestions(action.buffer, bufferIds);
       return {
         ...state,
         stages: {
@@ -220,24 +229,19 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     }
     case "LOAD_MORE_SUCCESS": {
       const existing = state.stages[action.stage]!;
-      const existingIds = new Set(existing.suggestions.map((s) => s.scryfall_id));
-      const seenNew = new Set<string>();
-      const newSuggestions = action.suggestions.filter((s) => {
-        if (existingIds.has(s.scryfall_id) || seenNew.has(s.scryfall_id)) return false;
-        seenNew.add(s.scryfall_id);
-        return true;
-      });
+      const existingIds = new Set(existing.suggestions.map(cardIdentity));
+      const newSuggestions = uniqueSuggestions(action.suggestions, existingIds);
       const newStatuses: Record<string, SuggestionStatus> = { ...existing.statuses };
-      for (const s of newSuggestions) newStatuses[s.scryfall_id] = "pending";
+      for (const s of newSuggestions) newStatuses[cardIdentity(s)] = "pending";
       const mergedUnresolved = [
         ...existing.unresolved,
         ...action.unresolved.filter((u) => !existing.unresolved.includes(u)),
       ];
       const allIds = new Set([
         ...existingIds,
-        ...newSuggestions.map((s) => s.scryfall_id),
+        ...newSuggestions.map(cardIdentity),
       ]);
-      const newBuffer = action.buffer.filter((s) => !allIds.has(s.scryfall_id));
+      const newBuffer = uniqueSuggestions(action.buffer, allIds);
       const exhausted = newSuggestions.length === 0 && newBuffer.length === 0;
       const newOffset =
         existing.suggestions.length + newSuggestions.length + newBuffer.length;
@@ -288,11 +292,13 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     }
     case "REJECT_AND_REPLACE": {
       const stage = state.stages[action.stage]!;
-      const filtered = stage.suggestions.filter((s) => s.scryfall_id !== action.scryfallId);
+      const filtered = stage.suggestions.filter(
+        (s) => cardIdentity(s) !== action.scryfallId,
+      );
       const [replacement, ...remainingBuffer] = stage.buffer;
       const newStatuses: Record<string, SuggestionStatus> = { ...stage.statuses };
       delete newStatuses[action.scryfallId];
-      if (replacement) newStatuses[replacement.scryfall_id] = "pending";
+      if (replacement) newStatuses[cardIdentity(replacement)] = "pending";
       return {
         ...state,
         stages: {
@@ -427,13 +433,13 @@ export default function BuildPage() {
     }
   }, [deckId]);
 
-  const acceptedScryfallIds = useMemo(
+  const acceptedCardIds = useMemo(
     () =>
       new Set([
-        ...deckCards.map((card) => card.scryfall_id),
+        ...deckCards.map(cardIdentity),
         ...plannedChanges
           .filter((plan) => plan.direction === "addition")
-          .map((plan) => plan.scryfall_id),
+          .map(cardIdentity),
       ]),
     [deckCards, plannedChanges],
   );
@@ -750,9 +756,10 @@ export default function BuildPage() {
   }
 
   async function handleAccept(stage: string, suggestion: CardSuggestion) {
-    dispatch({ type: "SET_STATUS", stage, scryfallId: suggestion.scryfall_id, status: "accepted" });
+    const identity = cardIdentity(suggestion);
+    dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "accepted" });
     const stageState = state.stages[stage]!;
-    const qty = isBasicLand(suggestion) ? (stageState.quantities[suggestion.scryfall_id] ?? 1) : undefined;
+    const qty = isBasicLand(suggestion) ? (stageState.quantities[identity] ?? 1) : undefined;
     try {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
@@ -764,20 +771,21 @@ export default function BuildPage() {
       void refreshDeck();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add card");
-      dispatch({ type: "SET_STATUS", stage, scryfallId: suggestion.scryfall_id, status: "pending" });
+      dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "pending" });
     }
   }
 
   async function handleReject(stage: string, suggestion: CardSuggestion) {
+    const identity = cardIdentity(suggestion);
     dispatch({
       type: "REJECT_AND_REPLACE",
       stage,
-      scryfallId: suggestion.scryfall_id,
+      scryfallId: identity,
       cardName: suggestion.name,
     });
     setGlobalRejectedIds((prev) => {
       const next = new Set(prev);
-      next.add(suggestion.scryfall_id);
+      next.add(identity);
       return next;
     });
     setGlobalRejectedNames((prev) =>
@@ -794,20 +802,22 @@ export default function BuildPage() {
   }
 
   async function handleRemoveAccepted(stage: string, suggestion: CardSuggestion) {
-    dispatch({ type: "SET_STATUS", stage, scryfallId: suggestion.scryfall_id, status: "pending" });
+    const identity = cardIdentity(suggestion);
+    dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "pending" });
     try {
       await apiClient.removeCard(deckId, suggestion.scryfall_id);
       void refreshDeck();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to remove card");
-      dispatch({ type: "SET_STATUS", stage, scryfallId: suggestion.scryfall_id, status: "accepted" });
+      dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "accepted" });
     }
   }
 
   async function handleAddRejected(stage: string, suggestion: CardSuggestion) {
-    dispatch({ type: "SET_STATUS", stage, scryfallId: suggestion.scryfall_id, status: "accepted" });
+    const identity = cardIdentity(suggestion);
+    dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "accepted" });
     const stageState = state.stages[stage]!;
-    const qty = isBasicLand(suggestion) ? (stageState.quantities[suggestion.scryfall_id] ?? 1) : undefined;
+    const qty = isBasicLand(suggestion) ? (stageState.quantities[identity] ?? 1) : undefined;
     try {
       await apiClient.addCard(deckId, {
         card_scryfall_id: suggestion.scryfall_id,
@@ -819,7 +829,7 @@ export default function BuildPage() {
       void refreshDeck();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add card");
-      dispatch({ type: "SET_STATUS", stage, scryfallId: suggestion.scryfall_id, status: "rejected" });
+      dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "rejected" });
     }
   }
 
@@ -917,14 +927,15 @@ export default function BuildPage() {
   );
 
   function isHiddenCrossStage(s: CardSuggestion, status: SuggestionStatus): boolean {
-    if (globalRejectedIds.has(s.scryfall_id) && status !== "rejected") return true;
-    if (acceptedScryfallIds.has(s.scryfall_id) && status !== "accepted") return true;
+    const identity = cardIdentity(s);
+    if (globalRejectedIds.has(identity) && status !== "rejected") return true;
+    if (acceptedCardIds.has(identity) && status !== "accepted") return true;
     return false;
   }
 
   const filteredSuggestions = activeStageState
     ? activeStageState.suggestions.filter((s) => {
-        const status = activeStageState.statuses[s.scryfall_id] ?? "pending";
+        const status = activeStageState.statuses[cardIdentity(s)] ?? "pending";
         if (isHiddenCrossStage(s, status)) return false;
         return true;
       })
@@ -1406,9 +1417,9 @@ export default function BuildPage() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {filteredSuggestions.map((s) => (
                   <CardSuggestionCard
-                    key={s.scryfall_id}
+                    key={cardIdentity(s)}
                     suggestion={s}
-                    status={activeStageState.statuses[s.scryfall_id] ?? "pending"}
+                    status={activeStageState.statuses[cardIdentity(s)] ?? "pending"}
                     onAccept={() => void handleAccept(activeStageKey, s)}
                     onReject={() => void handleReject(activeStageKey, s)}
                     onRemove={() => void handleRemoveAccepted(activeStageKey, s)}
@@ -1416,12 +1427,12 @@ export default function BuildPage() {
                     isPetCard={petCardNames.has(s.name)}
                     isBasicLand={isBasicLand(s)}
                     inCombo={comboCardNames.has(s.name.toLowerCase())}
-                    quantity={activeStageState.quantities[s.scryfall_id] ?? 1}
+                    quantity={activeStageState.quantities[cardIdentity(s)] ?? 1}
                     onQuantityChange={(qty) =>
                       dispatch({
                         type: "SET_QUANTITY",
                         stage: activeStageKey,
-                        scryfallId: s.scryfall_id,
+                        scryfallId: cardIdentity(s),
                         quantity: qty,
                       })
                     }
