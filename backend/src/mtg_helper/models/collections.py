@@ -86,10 +86,11 @@ class CollectionCardUpdate(BaseModel):
 
 
 class CollectionImportRequest(BaseModel):
-    """Request body for importing a Moxfield CSV."""
+    """Request body for importing a supported collection CSV."""
 
     csv: str = Field(min_length=1, max_length=10_000_000)
     mode: Literal["merge", "replace"] = "merge"
+    format: Literal["moxfield", "manabox"] = "moxfield"
 
 
 class CollectionImportResponse(BaseModel):

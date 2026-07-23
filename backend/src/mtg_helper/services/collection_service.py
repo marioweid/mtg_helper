@@ -1,11 +1,11 @@
-"""Collection CRUD, Moxfield CSV import/export, and printing resolution."""
+"""Collection CRUD, CSV import/export, and printing resolution."""
 
 import csv
 import io
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from uuid import UUID
 
 import asyncpg
@@ -57,7 +57,7 @@ class CardNotFoundError(ValueError):
 
 @dataclass
 class ParsedCollectionRow:
-    """A single row parsed from a Moxfield CSV."""
+    """A normalized row parsed from a supported collection CSV."""
 
     name: str
     quantity: int
@@ -69,6 +69,7 @@ class ParsedCollectionRow:
     tags: list[str]
     purchase_price: Decimal | None
     last_modified: datetime | None
+    scryfall_id: UUID | None = None
 
 
 def _parse_int(value: str, default: int = 1) -> int:
@@ -78,20 +79,20 @@ def _parse_int(value: str, default: int = 1) -> int:
         return default
 
 
-def _parse_decimal(value: str) -> Decimal | None:
+def _parse_bool(value: str) -> bool:
+    """Parse common CSV boolean and foil markers."""
+    v = (value or "").strip().lower()
+    return v in {"true", "foil", "etched", "1", "yes"}
+
+
+def _parse_uuid(value: str) -> UUID | None:
     stripped = (value or "").strip()
     if not stripped:
         return None
     try:
-        return Decimal(stripped)
-    except (InvalidOperation, ValueError):
+        return UUID(stripped)
+    except ValueError:
         return None
-
-
-def _parse_bool(value: str) -> bool:
-    """Moxfield uses 'True'/'False' for boolean fields; also accept 'foil', '1'."""
-    v = (value or "").strip().lower()
-    return v in {"true", "foil", "1", "yes"}
 
 
 def _parse_datetime(value: str) -> datetime | None:
@@ -151,7 +152,7 @@ def parse_moxfield_csv(text: str) -> list[ParsedCollectionRow]:
                 condition=(raw.get("Condition") or "").strip() or None,
                 language=(raw.get("Language") or "").strip() or None,
                 tags=_parse_tags(raw.get("Tags") or ""),
-                purchase_price=_parse_decimal(raw.get("Purchase Price") or ""),
+                purchase_price=None,
                 last_modified=_parse_datetime(raw.get("Last Modified") or ""),
             )
         )
@@ -159,6 +160,63 @@ def parse_moxfield_csv(text: str) -> list[ParsedCollectionRow]:
     if not rows:
         raise ValueError("CSV contained no valid card rows.")
     return rows
+
+
+def parse_manabox_csv(text: str) -> list[ParsedCollectionRow]:
+    """Parse a ManaBox-exported CSV into normalized collection rows.
+
+    Args:
+        text: Raw ManaBox CSV text pasted or uploaded by the user.
+
+    Returns:
+        Parsed collection rows.
+
+    Raises:
+        ValueError: If required headers are missing or no valid rows exist.
+    """
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        raise ValueError("ManaBox CSV is empty or missing a header row.")
+    required = {"Name", "Quantity"}
+    if not required.issubset(reader.fieldnames):
+        raise ValueError("ManaBox CSV must include 'Name' and 'Quantity' columns.")
+
+    rows: list[ParsedCollectionRow] = []
+    for raw in reader:
+        name = (raw.get("Name") or "").strip()
+        if not name:
+            continue
+        quantity = _parse_int(raw.get("Quantity") or "", default=1)
+        if quantity <= 0:
+            continue
+        rows.append(
+            ParsedCollectionRow(
+                name=name,
+                quantity=quantity,
+                set_code=(raw.get("Set code") or "").strip(),
+                collector_number=(raw.get("Collector number") or "").strip(),
+                foil=_parse_bool(raw.get("Foil") or ""),
+                condition=(raw.get("Condition") or "").strip() or None,
+                language=(raw.get("Language") or "").strip() or None,
+                tags=[],
+                purchase_price=None,
+                last_modified=None,
+                scryfall_id=_parse_uuid(raw.get("Scryfall ID") or ""),
+            )
+        )
+
+    if not rows:
+        raise ValueError("ManaBox CSV contained no valid card rows.")
+    return rows
+
+
+def parse_collection_csv(text: str, csv_format: str) -> list[ParsedCollectionRow]:
+    """Dispatch CSV parsing to the explicitly selected collection format."""
+    if csv_format == "moxfield":
+        return parse_moxfield_csv(text)
+    if csv_format == "manabox":
+        return parse_manabox_csv(text)
+    raise ValueError(f"Unsupported collection CSV format: {csv_format}")
 
 
 async def _assert_account_exists(conn: asyncpg.Connection, account_id: UUID) -> None:
@@ -735,7 +793,7 @@ async def get_owned_card_ids_for_collections(
 async def _resolve_rows(
     pool: asyncpg.Pool, rows: list[ParsedCollectionRow]
 ) -> tuple[list[tuple[ParsedCollectionRow, UUID]], list[str]]:
-    """Resolve parsed rows to internal card UUIDs via name matching.
+    """Resolve parsed rows by exact Scryfall ID, then by card name.
 
     Returns:
         Tuple of (resolved pairs, unresolved names).
@@ -743,7 +801,11 @@ async def _resolve_rows(
     resolved: list[tuple[ParsedCollectionRow, UUID]] = []
     unresolved: list[str] = []
     for row in rows:
-        card = await card_service.resolve_card_by_name(pool, row.name)
+        card = None
+        if row.scryfall_id is not None:
+            card = await card_service.get_card_by_scryfall_id(pool, row.scryfall_id)
+        if card is None:
+            card = await card_service.resolve_card_by_name(pool, row.name)
         if card is None:
             unresolved.append(row.name)
             continue
@@ -847,9 +909,13 @@ async def _replace_rows(
 
 
 async def import_csv(
-    pool: asyncpg.Pool, collection_id: UUID, csv_text: str, mode: str
+    pool: asyncpg.Pool,
+    collection_id: UUID,
+    csv_text: str,
+    mode: str,
+    csv_format: str = "moxfield",
 ) -> CollectionImportResponse:
-    """Import a Moxfield CSV into a collection.
+    """Import a supported CSV into a collection.
 
     Modes:
         merge: upsert rows; existing printings have quantity added.
@@ -860,6 +926,7 @@ async def import_csv(
         collection_id: Target collection UUID.
         csv_text: Raw CSV text.
         mode: 'merge' or 'replace'.
+        csv_format: Explicit source format ('moxfield' or 'manabox').
 
     Returns:
         CollectionImportResponse with per-operation counts and unresolved names.
@@ -868,7 +935,7 @@ async def import_csv(
         CollectionNotFoundError: If the collection does not exist.
         ValueError: If the CSV is malformed or empty.
     """
-    parsed = parse_moxfield_csv(csv_text)
+    parsed = parse_collection_csv(csv_text, csv_format)
     resolved, unresolved = await _resolve_rows(pool, parsed)
 
     async with pool.acquire() as conn:
@@ -885,7 +952,8 @@ async def import_csv(
                 removed = 0
 
     _log.info(
-        "Imported CSV into collection %s: imported=%d updated=%d removed=%d unresolved=%d",
+        "Imported %s CSV into collection %s: imported=%d updated=%d removed=%d unresolved=%d",
+        csv_format,
         collection_id,
         imported,
         updated,

@@ -183,10 +183,14 @@ async def import_csv(
     body: CollectionImportRequest,
     request: Request,
 ) -> DataResponse[CollectionImportResponse]:
-    """Import a Moxfield CSV into a collection (merge or replace)."""
+    """Import a supported CSV into a collection (merge or replace)."""
     try:
         result = await collection_service.import_csv(
-            request.app.state.db_pool, collection_id, body.csv, body.mode
+            request.app.state.db_pool,
+            collection_id,
+            body.csv,
+            body.mode,
+            body.format,
         )
     except CollectionNotFoundError:
         raise _not_found(collection_id)

@@ -5,14 +5,33 @@ import { use, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
 import { apiClient, ApiError } from "@/lib/api";
-import type { CollectionImportResponse } from "@/lib/types";
+import type { CollectionImportFormat, CollectionImportResponse } from "@/lib/types";
 
 type Mode = "merge" | "replace";
+
+const FORMAT_COPY: Record<
+  CollectionImportFormat,
+  { label: string; description: string; placeholder: string }
+> = {
+  moxfield: {
+    label: "Moxfield",
+    description: "Upload a Moxfield CSV export, or paste the contents below.",
+    placeholder: `"Count","Name","Edition","Collector Number"\n"1","Sol Ring","c19","255"`,
+  },
+  manabox: {
+    label: "ManaBox",
+    description: "Upload a ManaBox collection CSV export, or paste the contents below.",
+    placeholder:
+      "Name,Set code,Collector number,Foil,Quantity,Scryfall ID\n" +
+      "Sol Ring,C19,221,normal,1,d1d2c466-3f2a-4dd5-96f7-ffd69a7a81ee",
+  },
+};
 
 export default function ImportCollectionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [csv, setCsv] = useState("");
   const [mode, setMode] = useState<Mode>("merge");
+  const [format, setFormat] = useState<CollectionImportFormat>("moxfield");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CollectionImportResponse | null>(null);
@@ -35,7 +54,7 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
     setError(null);
     setResult(null);
     try {
-      const res = await apiClient.importCollectionCsv(id, { csv, mode });
+      const res = await apiClient.importCollectionCsv(id, { csv, mode, format });
       setResult(res);
     } catch (err) {
       if (err instanceof ApiError && err.code === "PARSE_ERROR") {
@@ -116,10 +135,32 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-1 font-semibold text-white">Moxfield CSV</h2>
-          <p className="mb-4 text-xs text-gray-500">
-            Upload a Moxfield CSV export, or paste the contents below. Cards are matched by name.
-          </p>
+          <h2 className="mb-3 font-semibold text-white">CSV Format</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.keys(FORMAT_COPY) as CollectionImportFormat[]).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={format === option}
+                onClick={() => {
+                  setFormat(option);
+                  setError(null);
+                }}
+                className={`rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+                  format === option
+                    ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
+                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
+                }`}
+              >
+                <span className="font-medium">{FORMAT_COPY[option].label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+          <h2 className="mb-1 font-semibold text-white">{FORMAT_COPY[format].label} CSV</h2>
+          <p className="mb-4 text-xs text-gray-500">{FORMAT_COPY[format].description}</p>
 
           <div className="mb-3">
             <label
@@ -140,7 +181,7 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
           <textarea
             value={csv}
             onChange={(e) => setCsv(e.target.value)}
-            placeholder={`"Count","Name","Edition","Collector Number"\n"1","Sol Ring","c19","255"`}
+            placeholder={FORMAT_COPY[format].placeholder}
             rows={18}
             spellCheck={false}
             className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y font-mono"

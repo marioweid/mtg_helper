@@ -952,9 +952,12 @@ export interface CollectionCardUpdate {
   purchase_price?: string | null;
 }
 
+export type CollectionImportFormat = "moxfield" | "manabox";
+
 export interface CollectionImportRequest {
   csv: string;
   mode: "merge" | "replace";
+  format: CollectionImportFormat;
 }
 
 export interface CollectionImportResponse {
