@@ -62,15 +62,31 @@ export function TopPicksPanel({ deckId, onPlanChanged }: Props) {
     setBusyId(pick.card_id);
     setError(null);
     try {
-      await apiClient.planCard(deckId, {
+      const plan = await apiClient.planCard(deckId, {
         card_scryfall_id: pick.scryfall_id,
         direction: "addition",
         quantity: 1,
         categories: ["theme"],
         added_by: "user",
       });
-      await onPlanChanged();
-      await load();
+      setResult((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          picks: current.picks.map((item) =>
+            item.card_id === pick.card_id
+              ? {
+                  ...item,
+                  plan_direction: "addition",
+                  planned_quantity: plan?.quantity ?? item.planned_quantity + 1,
+                }
+              : item,
+          ),
+        };
+      });
+      void Promise.resolve(onPlanChanged()).catch(() => {
+        // The Top Picks state is already current; the parent can refresh on its next update.
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to plan card addition");
     } finally {

@@ -8,6 +8,7 @@ import { cardIdentity } from "@/lib/card-identity";
 import { CardSuggestionCard } from "@/components/card-suggestion";
 import { CardHover } from "@/components/card-hover";
 import { CardDetailModal } from "@/components/card-detail-modal";
+import { BuilderFiltersDropdown } from "@/components/builder-filters-dropdown";
 import { ExpandableDeckBar } from "@/components/expandable-deck-bar";
 import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import {
@@ -124,29 +125,6 @@ const COLOR_TO_BASIC: Record<string, string> = {
   R: "Mountain",
   G: "Forest",
 };
-
-const PRIMARY_TYPE_OPTIONS = [
-  "Creature",
-  "Instant",
-  "Sorcery",
-  "Artifact",
-  "Enchantment",
-  "Planeswalker",
-  "Land",
-  "Battle",
-] as const;
-
-const SUBTYPE_OPTIONS = [
-  "Equipment",
-  "Aura",
-  "Vehicle",
-  "Saga",
-  "Background",
-  "Class",
-  "Food",
-  "Treasure",
-  "Clue",
-] as const;
 
 function basicLandsForIdentity(identity: string): readonly string[] {
   const colors = identity
@@ -404,13 +382,10 @@ export default function BuildPage() {
   const themeTabs = useMemo(() => [...archetypeTags, THEME_ETC_TAG], [archetypeTags]);
   const [maxPriceCents, setMaxPriceCents] = useState<number | null>(null);
   const [minPriceCents, setMinPriceCents] = useState<number | null>(null);
-  const [pricePanelOpen, setPricePanelOpen] = useState(false);
   const [pricePanelDraft, setPricePanelDraft] = useState("");
   const [pricePanelMinDraft, setPricePanelMinDraft] = useState("");
   const [cardTypeFilters, setCardTypeFilters] = useState<string[]>([]);
   const [subtypeFilters, setSubtypeFilters] = useState<string[]>([]);
-  const [typePanelOpen, setTypePanelOpen] = useState(false);
-  const totalTypeFilters = cardTypeFilters.length + subtypeFilters.length;
   const [globalRejectedIds, setGlobalRejectedIds] = useState<Set<string>>(new Set());
   const [globalRejectedNames, setGlobalRejectedNames] = useState<string[]>([]);
   const [comboCardNames, setComboCardNames] = useState<Set<string>>(new Set());
@@ -755,6 +730,16 @@ export default function BuildPage() {
     setMinPriceCents(null);
   }
 
+  function clearAllSuggestionFilters() {
+    if (selectedCollectionIds.length > 0) clearAllCollections();
+    setPricePanelDraft("");
+    setPricePanelMinDraft("");
+    setMaxPriceCents(null);
+    setMinPriceCents(null);
+    setCardTypeFilters([]);
+    setSubtypeFilters([]);
+  }
+
   async function handleAccept(stage: string, suggestion: CardSuggestion) {
     const identity = cardIdentity(suggestion);
     dispatch({ type: "SET_STATUS", stage, scryfallId: identity, status: "accepted" });
@@ -960,256 +945,27 @@ export default function BuildPage() {
         />
       </div>
 
-      {/* Collection filter panel — always visible so the build-from-owned toggle is discoverable. */}
-      {collections.length > 0 && (
-        <div className="mb-4 rounded-xl border border-white/10 bg-white/5">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={selectedCollectionIds.length > 0}
-                onClick={toggleOwnedOnly}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                  selectedCollectionIds.length > 0 ? "bg-indigo-600" : "bg-white/10"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                    selectedCollectionIds.length > 0 ? "translate-x-5" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
-              <span className="text-sm font-medium text-white">Build from owned cards only</span>
-            </label>
-            {selectedCollectionIds.length > 0 && (
-              <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
-                {selectedCollectionIds.length}/{collections.length} collections
-              </span>
-            )}
-          </div>
-          {selectedCollectionIds.length > 0 && (
-            <div className="border-t border-white/10 px-4 py-3">
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {collections.map((c) => {
-                  const checked = selectedCollectionIds.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => toggleCollection(c.id)}
-                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                        checked
-                          ? "bg-indigo-600 text-white hover:bg-indigo-500"
-                          : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200"
-                      }`}
-                      title={`${c.card_count} cards`}
-                    >
-                      {checked ? "✓ " : ""}
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={selectAllCollections}
-                  className="text-xs text-gray-400 hover:text-white transition-colors"
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  onClick={clearAllCollections}
-                  className="text-xs text-gray-400 hover:text-white transition-colors"
-                >
-                  Clear
-                </button>
-                <span className="text-xs text-gray-500">
-                  Suggestions are restricted to cards you own in the selected collections.
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Price cap panel */}
-      <details
-        open={pricePanelOpen}
-        onToggle={(e) => setPricePanelOpen((e.target as HTMLDetailsElement).open)}
-        className="mb-4 rounded-xl border border-white/10 bg-white/5"
-      >
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-white hover:bg-white/5 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <span>Price range (EUR)</span>
-            {(minPriceCents != null || maxPriceCents != null) && (
-              <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
-                {minPriceCents != null ? `€${(minPriceCents / 100).toFixed(2)}` : "€0.00"}
-                {" – "}
-                {maxPriceCents != null ? `€${(maxPriceCents / 100).toFixed(2)}` : "∞"}
-              </span>
-            )}
-          </span>
-          <span className="text-xs text-gray-400">{pricePanelOpen ? "▲" : "▼"}</span>
-        </summary>
-        <div className="border-t border-white/10 px-4 py-3">
-          <p className="mb-3 text-xs text-gray-400">
-            Restrict suggestions to a nonfoil Scryfall EUR price range. Leave either side blank to
-            omit that bound (min blank = €0, max blank = no cap). Cards without a EUR price are
-            excluded. Applies to this session only and reloads all stages; it resets when you
-            reopen the page.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1 text-xs text-gray-400">
-              Min €
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={pricePanelMinDraft}
-                onChange={(e) => setPricePanelMinDraft(e.target.value)}
-                placeholder="0.00"
-                className="w-24 rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
-              />
-            </label>
-            <label className="flex items-center gap-1 text-xs text-gray-400">
-              Max €
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={pricePanelDraft}
-                onChange={(e) => setPricePanelDraft(e.target.value)}
-                placeholder="blank = no cap"
-                className="w-32 rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={handleSavePriceCap}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition-colors"
-            >
-              Apply
-            </button>
-            {(maxPriceCents != null || minPriceCents != null) && (
-              <button
-                type="button"
-                onClick={clearPriceCap}
-                className="text-xs text-gray-400 hover:text-white transition-colors"
-              >
-                Clear range
-              </button>
-            )}
-          </div>
-        </div>
-      </details>
-
-      {/* Type filter panel */}
-      <details
-        open={typePanelOpen}
-        onToggle={(e) => setTypePanelOpen((e.target as HTMLDetailsElement).open)}
-        className="mb-4 rounded-xl border border-white/10 bg-white/5"
-      >
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-white hover:bg-white/5 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <span>Card type filter</span>
-            {totalTypeFilters > 0 && (
-              <span className="rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-200">
-                {totalTypeFilters} active
-              </span>
-            )}
-          </span>
-          <span className="text-xs text-gray-400">{typePanelOpen ? "▲" : "▼"}</span>
-        </summary>
-        <div className="border-t border-white/10 px-4 py-3 space-y-4">
-          <p className="text-xs text-gray-400">
-            Restrict suggestions by primary type and/or subtype. Cards must match at least one
-            selection in every active group (e.g. Creature + Equipment = creature-equipment hybrids).
-            Triggers a refetch.
-          </p>
-
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Primary type
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {PRIMARY_TYPE_OPTIONS.map((t) => {
-                const active = cardTypeFilters.includes(t);
-                return (
-                  <label
-                    key={t}
-                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                      active
-                        ? "border-indigo-500 bg-indigo-600/30 text-indigo-100"
-                        : "border-white/10 text-gray-300 hover:border-white/20 hover:text-white"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={() =>
-                        setCardTypeFilters((prev) =>
-                          active ? prev.filter((x) => x !== t) : [...prev, t],
-                        )
-                      }
-                      className="h-3 w-3 accent-indigo-500"
-                    />
-                    {t}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Subtype
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {SUBTYPE_OPTIONS.map((t) => {
-                const active = subtypeFilters.includes(t);
-                return (
-                  <label
-                    key={t}
-                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                      active
-                        ? "border-indigo-500 bg-indigo-600/30 text-indigo-100"
-                        : "border-white/10 text-gray-300 hover:border-white/20 hover:text-white"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={() =>
-                        setSubtypeFilters((prev) =>
-                          active ? prev.filter((x) => x !== t) : [...prev, t],
-                        )
-                      }
-                      className="h-3 w-3 accent-indigo-500"
-                    />
-                    {t}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {totalTypeFilters > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setCardTypeFilters([]);
-                setSubtypeFilters([]);
-              }}
-              className="text-xs text-gray-400 underline-offset-2 hover:text-white hover:underline"
-            >
-              Clear all filters
-            </button>
-          )}
-        </div>
-      </details>
+      <BuilderFiltersDropdown
+        collections={collections}
+        selectedCollectionIds={selectedCollectionIds}
+        minPriceCents={minPriceCents}
+        maxPriceCents={maxPriceCents}
+        minPriceDraft={pricePanelMinDraft}
+        maxPriceDraft={pricePanelDraft}
+        cardTypes={cardTypeFilters}
+        subtypes={subtypeFilters}
+        onToggleOwnedOnly={toggleOwnedOnly}
+        onToggleCollection={toggleCollection}
+        onSelectAllCollections={selectAllCollections}
+        onClearCollections={clearAllCollections}
+        onMinPriceDraftChange={setPricePanelMinDraft}
+        onMaxPriceDraftChange={setPricePanelDraft}
+        onApplyPrice={handleSavePriceCap}
+        onClearPrice={clearPriceCap}
+        onCardTypesChange={setCardTypeFilters}
+        onSubtypesChange={setSubtypeFilters}
+        onClearAll={clearAllSuggestionFilters}
+      />
 
       {/* Stage tab bar */}
       <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl bg-white/5 p-1">

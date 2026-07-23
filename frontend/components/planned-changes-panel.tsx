@@ -114,10 +114,7 @@ export function PlannedChangesPanel({
   }
 
   return (
-    <details
-      open={plans.length > 0}
-      className="rounded-xl border border-indigo-500/25 bg-indigo-950/15"
-    >
+    <details className="rounded-xl border border-indigo-500/25 bg-indigo-950/15">
       <PlannedSummary
         physicalCount={physicalCount}
         plannedCount={plannedCount}
