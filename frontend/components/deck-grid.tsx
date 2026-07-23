@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { VisualCardGrid, VisualCardTile } from "@/components/visual-card-grid";
 import { groupByPrimaryType, sortedPrimaryTypes } from "@/lib/card-types";
 import { STAGE_LABELS } from "@/lib/constants";
@@ -14,6 +15,8 @@ interface Props {
   onSetQuantity?: ((scryfallId: string, quantity: number) => void | Promise<void>) | undefined;
   onRemove?: ((scryfallId: string) => void) | undefined;
   groupBy?: "type" | "tag";
+  collapsedGroups?: ReadonlySet<string>;
+  onToggleGroup?: (groupKey: string) => void;
 }
 
 function isBasicLand(card: DeckCardItem): boolean {
@@ -27,6 +30,8 @@ export function DeckGrid({
   onSetQuantity,
   onRemove,
   groupBy = "type",
+  collapsedGroups,
+  onToggleGroup,
 }: Props) {
   const groups = buildGridGroups(cards, groupBy);
 
@@ -43,6 +48,8 @@ export function DeckGrid({
           comboCardIds={comboCardIds}
           onSetQuantity={onSetQuantity}
           onRemove={onRemove}
+          collapsed={collapsedGroups?.has(group.key) ?? false}
+          {...(onToggleGroup ? { onToggle: () => onToggleGroup(group.key) } : {})}
         />
       ))}
     </div>
@@ -72,6 +79,8 @@ function buildGridGroups(cards: DeckCardItem[], groupBy: "type" | "tag") {
 
 interface SectionProps extends Props {
   type: string;
+  collapsed: boolean;
+  onToggle?: () => void;
 }
 
 function DeckGridSection({
@@ -81,34 +90,63 @@ function DeckGridSection({
   comboCardIds,
   onSetQuantity,
   onRemove,
+  collapsed,
+  onToggle,
 }: SectionProps) {
+  const contentId = useId();
   if (cards.length === 0) return null;
 
   return (
     <section>
-      <header className="mb-3 flex items-baseline justify-between border-b border-white/10 pb-2">
-        <h3 className="text-sm font-semibold text-white">{type}</h3>
-        <span className="text-xs tabular-nums text-gray-500">{totalCardCount(cards)}</span>
+      <header className="mb-3 border-b border-white/10 pb-2">
+        {onToggle ? (
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            aria-controls={contentId}
+            onClick={onToggle}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span className="flex items-center gap-2">
+              <span aria-hidden="true" className="text-xs text-gray-500">
+                {collapsed ? "▶" : "▼"}
+              </span>
+              <span className="text-sm font-semibold text-white">{type}</span>
+            </span>
+            <span className="text-xs tabular-nums text-gray-500">{totalCardCount(cards)}</span>
+          </button>
+        ) : (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-white">{type}</span>
+            <span className="text-xs tabular-nums text-gray-500">{totalCardCount(cards)}</span>
+          </div>
+        )}
       </header>
-      <VisualCardGrid>
-        {cards.map((card) => (
-          <VisualCardTile
-            key={card.deck_card_id}
-            name={card.name}
-            imageUri={card.image_uri}
-            onOpen={() => onCardClick(card.deck_card_id)}
-            badges={<DeckTileBadges card={card} inCombo={comboCardIds?.has(card.scryfall_id)} />}
-            footer={
-              <DeckTileFooter
-                card={card}
+      <div id={contentId} hidden={collapsed}>
+        {!collapsed && (
+          <VisualCardGrid>
+            {cards.map((card) => (
+              <VisualCardTile
+                key={card.deck_card_id}
+                name={card.name}
+                imageUri={card.image_uri}
                 onOpen={() => onCardClick(card.deck_card_id)}
-                onSetQuantity={onSetQuantity}
-                onRemove={onRemove}
+                badges={
+                  <DeckTileBadges card={card} inCombo={comboCardIds?.has(card.scryfall_id)} />
+                }
+                footer={
+                  <DeckTileFooter
+                    card={card}
+                    onOpen={() => onCardClick(card.deck_card_id)}
+                    onSetQuantity={onSetQuantity}
+                    onRemove={onRemove}
+                  />
+                }
               />
-            }
-          />
-        ))}
-      </VisualCardGrid>
+            ))}
+          </VisualCardGrid>
+        )}
+      </div>
     </section>
   );
 }

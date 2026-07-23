@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { CardHover } from "@/components/card-hover";
 import { DeckFitIndicator } from "@/components/deck-fit-indicator";
 import { ManaCost } from "@/components/mana-cost";
@@ -18,6 +19,8 @@ interface Props {
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
+  collapsedGroups?: ReadonlySet<string>;
+  onToggleGroup?: (groupKey: string) => void;
 }
 
 function isBasicLand(card: DeckCardItem): boolean {
@@ -172,6 +175,8 @@ export function DeckCompactColumns({
   onSetQuantity,
   petCardNames,
   comboCardIds,
+  collapsedGroups,
+  onToggleGroup,
 }: Props) {
   if (cards.length === 0) {
     return (
@@ -183,17 +188,77 @@ export function DeckCompactColumns({
   return (
     <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
       {groups.map((g) => (
-        <section key={g.key} className="min-w-0 break-inside-avoid">
-          <header className="mb-1 flex items-baseline justify-between border-b border-white/10 px-1 pb-1">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-300">
-              {g.label}
-            </h3>
-            <span className="text-xs tabular-nums text-gray-500">
-              {totalCardCount(g.items)}
+        <CompactGroup
+          key={g.key}
+          group={g}
+          collapsed={collapsedGroups?.has(g.key) ?? false}
+          {...(onToggleGroup ? { onToggle: () => onToggleGroup(g.key) } : {})}
+          {...(onCardClick ? { onCardClick } : {})}
+          {...(onRemove ? { onRemove } : {})}
+          {...(onSetQuantity ? { onSetQuantity } : {})}
+          {...(petCardNames ? { petCardNames } : {})}
+          {...(comboCardIds ? { comboCardIds } : {})}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface CompactGroupProps extends Omit<Props, "cards" | "groupBy"> {
+  group: Group;
+  collapsed: boolean;
+  onToggle?: () => void;
+}
+
+function CompactGroup({
+  group,
+  collapsed,
+  onToggle,
+  onCardClick,
+  onRemove,
+  onSetQuantity,
+  petCardNames,
+  comboCardIds,
+}: CompactGroupProps) {
+  const contentId = useId();
+  return (
+    <section className="min-w-0 break-inside-avoid">
+      <header className="mb-1 border-b border-white/10 px-1 pb-1">
+        {onToggle ? (
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            aria-controls={contentId}
+            onClick={onToggle}
+            className="flex w-full items-baseline justify-between text-left"
+          >
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="text-[10px] text-gray-500">
+                {collapsed ? "▶" : "▼"}
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-300">
+                {group.label}
+              </span>
             </span>
-          </header>
+            <span className="text-xs tabular-nums text-gray-500">
+              {totalCardCount(group.items)}
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-300">
+              {group.label}
+            </span>
+            <span className="text-xs tabular-nums text-gray-500">
+              {totalCardCount(group.items)}
+            </span>
+          </div>
+        )}
+      </header>
+      <div id={contentId} hidden={collapsed}>
+        {!collapsed && (
           <ul className="flex flex-col">
-            {g.items.map((card) => (
+            {group.items.map((card) => (
               <CompactRow
                 key={card.deck_card_id}
                 card={card}
@@ -205,8 +270,8 @@ export function DeckCompactColumns({
               />
             ))}
           </ul>
-        </section>
-      ))}
-    </div>
+        )}
+      </div>
+    </section>
   );
 }

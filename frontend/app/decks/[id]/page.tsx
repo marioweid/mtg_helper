@@ -79,6 +79,10 @@ export default function DeckDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<CardWorkspaceView>("grid");
   const [groupMode, setGroupMode] = useState<GroupMode>("type");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<GroupMode, Set<string>>>(() => ({
+    type: new Set(),
+    tag: new Set(),
+  }));
   const [tab, setTab] = useState<DeckTab>("cards");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -132,6 +136,15 @@ export default function DeckDetailPage() {
   function handleGroupModeChange(mode: GroupMode) {
     setGroupMode(mode);
     setDeckGroup(deckId, mode);
+  }
+
+  function handleToggleGroup(groupKey: string) {
+    setCollapsedGroups((current) => {
+      const nextForMode = new Set(current[groupMode]);
+      if (nextForMode.has(groupKey)) nextForMode.delete(groupKey);
+      else nextForMode.add(groupKey);
+      return { ...current, [groupMode]: nextForMode };
+    });
   }
 
   function handleFilterChange(next: DeckFilter) {
@@ -398,6 +411,8 @@ export default function DeckDetailPage() {
                   onSetQuantity={handleSetQuantity}
                   onRemove={handleRemoveCard}
                   groupBy={groupMode}
+                  collapsedGroups={collapsedGroups[groupMode]}
+                  onToggleGroup={handleToggleGroup}
                 />
               ) : (
                 <DeckCompactColumns
@@ -408,6 +423,8 @@ export default function DeckDetailPage() {
                   onSetQuantity={handleSetQuantity}
                   petCardNames={petCardNames}
                   comboCardIds={comboCardIds}
+                  collapsedGroups={collapsedGroups[groupMode]}
+                  onToggleGroup={handleToggleGroup}
                 />
               )}
               {deck.cards.length === 0 && (
