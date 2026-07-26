@@ -41,11 +41,14 @@ services:
       # Override the localhost DATABASE_URL from backend/.env — inside the
       # container, the database lives at the ``postgres`` service hostname.
       DATABASE_URL: postgresql://mtg:mtg_dev@postgres:5432/mtg_helper
+      # Test suite (docker compose exec backend uv run --extra dev pytest -q).
+      TEST_DATABASE_URL: postgresql://mtg:mtg_dev@postgres:5432/mtg_helper_test
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
+      - ./backend/tests:/app/tests
 
   frontend:
     build:

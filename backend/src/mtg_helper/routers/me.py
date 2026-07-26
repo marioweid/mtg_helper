@@ -7,13 +7,19 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse, AccountUpdate
-from mtg_helper.models.collections import CollectionCreate, CollectionResponse
+from mtg_helper.models.collections import (
+    CollectionCreate,
+    CollectionFromUrlRequest,
+    CollectionFromUrlResponse,
+    CollectionResponse,
+)
 from mtg_helper.models.common import DataResponse
 from mtg_helper.models.preferences import PreferenceCreate, PreferenceResponse
 from mtg_helper.models.ranking_weights import RankingWeightsResponse, RankingWeightsUpdate
 from mtg_helper.services import (
     account_service,
     collection_service,
+    collection_url_import_service,
     preference_service,
     ranking_weight_service,
 )
@@ -21,6 +27,10 @@ from mtg_helper.services.collection_service import (
     AccountNotFoundError as CollectionAccountNotFoundError,
 )
 from mtg_helper.services.collection_service import DuplicateCollectionNameError
+from mtg_helper.services.collection_url_import_service import (
+    BinderFetchError,
+    UnsupportedBinderUrlError,
+)
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -141,3 +151,40 @@ async def create_collection(
             status_code=409, detail={"code": "DUPLICATE_COLLECTION", "message": str(e)}
         ) from e
     return DataResponse(data=item)
+
+
+@router.post(
+    "/collections/import-url",
+    response_model=DataResponse[CollectionFromUrlResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_collection_from_url(
+    body: CollectionFromUrlRequest,
+    account: CurrentAccount,
+    request: Request,
+) -> DataResponse[CollectionFromUrlResponse]:
+    """Create a collection from a public Moxfield binder URL and import its cards.
+
+    The collection is named after the binder unless ``name`` is given. The
+    link is not stored; re-importing later is a manual, one-shot operation.
+    """
+    try:
+        collection, result = await collection_url_import_service.import_new_from_url(
+            request.app.state.db_pool,
+            body.url,
+            account.id,
+            name=body.name,
+        )
+    except DuplicateCollectionNameError as e:
+        raise HTTPException(
+            status_code=409, detail={"code": "DUPLICATE_COLLECTION", "message": str(e)}
+        ) from e
+    except UnsupportedBinderUrlError as e:
+        raise HTTPException(
+            status_code=422, detail={"code": "UNSUPPORTED_URL", "message": str(e)}
+        ) from e
+    except BinderFetchError as e:
+        raise HTTPException(
+            status_code=502, detail={"code": "UPSTREAM_FETCH_FAILED", "message": str(e)}
+        ) from e
+    return DataResponse(data=CollectionFromUrlResponse(collection=collection, import_=result))

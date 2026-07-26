@@ -5,7 +5,7 @@ import io
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 import asyncpg
@@ -95,6 +95,16 @@ def _parse_uuid(value: str) -> UUID | None:
         return None
 
 
+def _parse_price(value: str) -> Decimal | None:
+    stripped = (value or "").strip()
+    if not stripped:
+        return None
+    try:
+        return Decimal(stripped)
+    except InvalidOperation:
+        return None
+
+
 def _parse_datetime(value: str) -> datetime | None:
     stripped = (value or "").strip()
     if not stripped:
@@ -152,7 +162,7 @@ def parse_moxfield_csv(text: str) -> list[ParsedCollectionRow]:
                 condition=(raw.get("Condition") or "").strip() or None,
                 language=(raw.get("Language") or "").strip() or None,
                 tags=_parse_tags(raw.get("Tags") or ""),
-                purchase_price=None,
+                purchase_price=_parse_price(raw.get("Purchase Price") or ""),
                 last_modified=_parse_datetime(raw.get("Last Modified") or ""),
             )
         )
@@ -908,6 +918,68 @@ async def _replace_rows(
     return len(resolved), removed
 
 
+async def import_rows(
+    pool: asyncpg.Pool,
+    collection_id: UUID,
+    rows: list[ParsedCollectionRow],
+    mode: str,
+    source: str = "csv",
+) -> CollectionImportResponse:
+    """Resolve parsed collection rows and persist them into a collection.
+
+    Shared persistence pipeline for every collection import source (CSV text,
+    Moxfield binder URLs). Resolution prefers exact Scryfall IDs and falls
+    back to card-name matching.
+
+    Modes:
+        merge: upsert rows; existing printings have quantity added.
+        replace: delete all rows in the collection, then insert parsed rows.
+
+    Args:
+        pool: asyncpg connection pool.
+        collection_id: Target collection UUID.
+        rows: Parsed rows from any import source.
+        mode: 'merge' or 'replace'.
+        source: Label used in log lines ('moxfield-csv', 'moxfield-url', ...).
+
+    Returns:
+        CollectionImportResponse with per-operation counts and unresolved names.
+
+    Raises:
+        CollectionNotFoundError: If the collection does not exist.
+    """
+    resolved, unresolved = await _resolve_rows(pool, rows)
+
+    async with pool.acquire() as conn:
+        exists = await conn.fetchval("SELECT 1 FROM collections WHERE id = $1", collection_id)
+        if exists is None:
+            raise CollectionNotFoundError(f"Collection {collection_id} not found")
+
+        async with conn.transaction():
+            if mode == "replace":
+                imported, removed = await _replace_rows(conn, collection_id, resolved)
+                updated = 0
+            else:
+                imported, updated = await _merge_rows(conn, collection_id, resolved)
+                removed = 0
+
+    _log.info(
+        "Imported %s rows into collection %s: imported=%d updated=%d removed=%d unresolved=%d",
+        source,
+        collection_id,
+        imported,
+        updated,
+        removed,
+        len(unresolved),
+    )
+    return CollectionImportResponse(
+        imported=imported,
+        updated=updated,
+        removed=removed,
+        unresolved=unresolved,
+    )
+
+
 async def import_csv(
     pool: asyncpg.Pool,
     collection_id: UUID,
@@ -916,10 +988,6 @@ async def import_csv(
     csv_format: str = "moxfield",
 ) -> CollectionImportResponse:
     """Import a supported CSV into a collection.
-
-    Modes:
-        merge: upsert rows; existing printings have quantity added.
-        replace: delete all rows in the collection, then insert parsed rows.
 
     Args:
         pool: asyncpg connection pool.
@@ -936,36 +1004,7 @@ async def import_csv(
         ValueError: If the CSV is malformed or empty.
     """
     parsed = parse_collection_csv(csv_text, csv_format)
-    resolved, unresolved = await _resolve_rows(pool, parsed)
-
-    async with pool.acquire() as conn:
-        exists = await conn.fetchval("SELECT 1 FROM collections WHERE id = $1", collection_id)
-        if exists is None:
-            raise CollectionNotFoundError(f"Collection {collection_id} not found")
-
-        async with conn.transaction():
-            if mode == "replace":
-                imported, removed = await _replace_rows(conn, collection_id, resolved)
-                updated = 0
-            else:
-                imported, updated = await _merge_rows(conn, collection_id, resolved)
-                removed = 0
-
-    _log.info(
-        "Imported %s CSV into collection %s: imported=%d updated=%d removed=%d unresolved=%d",
-        csv_format,
-        collection_id,
-        imported,
-        updated,
-        removed,
-        len(unresolved),
-    )
-    return CollectionImportResponse(
-        imported=imported,
-        updated=updated,
-        removed=removed,
-        unresolved=unresolved,
-    )
+    return await import_rows(pool, collection_id, parsed, mode, source=f"{csv_format}-csv")
 
 
 def _format_bool(value: bool) -> str:

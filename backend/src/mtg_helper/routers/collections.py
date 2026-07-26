@@ -14,13 +14,18 @@ from mtg_helper.models.collections import (
     CollectionImportResponse,
     CollectionResponse,
     CollectionUpdate,
+    CollectionUrlImportRequest,
 )
 from mtg_helper.models.common import DataResponse, PaginationMeta
-from mtg_helper.services import collection_service
+from mtg_helper.services import collection_service, collection_url_import_service
 from mtg_helper.services.collection_service import (
     CardNotFoundError,
     CollectionNotFoundError,
     DuplicateCollectionNameError,
+)
+from mtg_helper.services.collection_url_import_service import (
+    BinderFetchError,
+    UnsupportedBinderUrlError,
 )
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -196,6 +201,34 @@ async def import_csv(
         raise _not_found(collection_id)
     except ValueError as e:
         raise HTTPException(status_code=422, detail={"code": "PARSE_ERROR", "message": str(e)})
+    return DataResponse(data=result)
+
+
+@router.post(
+    "/{collection_id}/import-url",
+    response_model=DataResponse[CollectionImportResponse],
+)
+async def import_url(
+    collection_id: UUID,
+    body: CollectionUrlImportRequest,
+    request: Request,
+) -> DataResponse[CollectionImportResponse]:
+    """Import a public Moxfield binder into a collection via its URL (merge or replace)."""
+    try:
+        result = await collection_url_import_service.import_from_url(
+            request.app.state.db_pool,
+            collection_id,
+            body.url,
+            body.mode,
+        )
+    except CollectionNotFoundError:
+        raise _not_found(collection_id)
+    except UnsupportedBinderUrlError as e:
+        raise HTTPException(status_code=422, detail={"code": "UNSUPPORTED_URL", "message": str(e)})
+    except BinderFetchError as e:
+        raise HTTPException(
+            status_code=502, detail={"code": "UPSTREAM_FETCH_FAILED", "message": str(e)}
+        )
     return DataResponse(data=result)
 
 

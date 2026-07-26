@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CollectionCreate(BaseModel):
@@ -100,3 +100,26 @@ class CollectionImportResponse(BaseModel):
     updated: int
     removed: int
     unresolved: list[str]
+
+
+class CollectionUrlImportRequest(BaseModel):
+    """Request body for importing a Moxfield binder URL into a collection."""
+
+    url: str = Field(min_length=1, max_length=2048)
+    mode: Literal["merge", "replace"] = "merge"
+
+
+class CollectionFromUrlRequest(BaseModel):
+    """Request body for creating a collection from a Moxfield binder URL."""
+
+    url: str = Field(min_length=1, max_length=2048)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class CollectionFromUrlResponse(BaseModel):
+    """Created collection plus the import outcome for a URL-based import."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    collection: CollectionResponse
+    import_: CollectionImportResponse = Field(alias="import")
