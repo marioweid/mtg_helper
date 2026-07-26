@@ -967,6 +967,21 @@ export interface CollectionImportResponse {
   unresolved: string[];
 }
 
+export interface CollectionUrlImportRequest {
+  url: string;
+  mode: "merge" | "replace";
+}
+
+export interface CollectionFromUrlRequest {
+  url: string;
+  name?: string;
+}
+
+export interface CollectionFromUrlResponse {
+  collection: CollectionResponse;
+  import: CollectionImportResponse;
+}
+
 // Deck Snapshots + Comparison
 export type SnapshotSource = "manual" | "auto_stage" | "revision";
 

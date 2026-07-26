@@ -13,10 +13,13 @@ import type {
   CollectionCardItem,
   CollectionCardUpdate,
   CollectionCreate,
+  CollectionFromUrlRequest,
+  CollectionFromUrlResponse,
   CollectionImportRequest,
   CollectionImportResponse,
   CollectionResponse,
   CollectionUpdate,
+  CollectionUrlImportRequest,
   ComparisonKind,
   DeckCardAdd,
   DeckCompareResponse,
@@ -606,6 +609,18 @@ export const apiClient = {
 
   importCollectionCsv: (id: string, body: CollectionImportRequest) =>
     request<CollectionImportResponse>(`/collections/${id}/import`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  importCollectionUrl: (id: string, body: CollectionUrlImportRequest) =>
+    request<CollectionImportResponse>(`/collections/${id}/import-url`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  createCollectionFromUrl: (body: CollectionFromUrlRequest) =>
+    request<CollectionFromUrlResponse>(`/me/collections/import-url`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

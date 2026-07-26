@@ -8,6 +8,12 @@ import { apiClient, ApiError } from "@/lib/api";
 import type { CollectionImportFormat, CollectionImportResponse } from "@/lib/types";
 
 type Mode = "merge" | "replace";
+type Source = "csv" | "link";
+
+const SOURCE_COPY: Record<Source, { label: string; hint: string }> = {
+  csv: { label: "CSV", hint: "Upload or paste a Moxfield / ManaBox export." },
+  link: { label: "Moxfield link", hint: "Paste a public binder URL." },
+};
 
 const FORMAT_COPY: Record<
   CollectionImportFormat,
@@ -29,7 +35,9 @@ const FORMAT_COPY: Record<
 
 export default function ImportCollectionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const [source, setSource] = useState<Source>("csv");
   const [csv, setCsv] = useState("");
+  const [url, setUrl] = useState("");
   const [mode, setMode] = useState<Mode>("merge");
   const [format, setFormat] = useState<CollectionImportFormat>("moxfield");
   const [submitting, setSubmitting] = useState(false);
@@ -46,15 +54,22 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!csv.trim()) {
+    if (source === "csv" && !csv.trim()) {
       setError("Paste or upload a CSV first.");
+      return;
+    }
+    if (source === "link" && !url.trim()) {
+      setError("Paste a Moxfield binder link first.");
       return;
     }
     setSubmitting(true);
     setError(null);
     setResult(null);
     try {
-      const res = await apiClient.importCollectionCsv(id, { csv, mode, format });
+      const res =
+        source === "csv"
+          ? await apiClient.importCollectionCsv(id, { csv, mode, format })
+          : await apiClient.importCollectionUrl(id, { url: url.trim(), mode });
       setResult(res);
     } catch (err) {
       if (err instanceof ApiError && err.code === "PARSE_ERROR") {
@@ -110,6 +125,7 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
             onClick={() => {
               setResult(null);
               setCsv("");
+              setUrl("");
             }}
             className="rounded-lg border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
           >
@@ -129,11 +145,55 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
         ← Collection
       </Link>
       <PageHeader
-        title="Import CSV"
-        subtitle="Paste your collection export or upload a file. Merge adds to what's already here; replace wipes first."
+        title="Import cards"
+        subtitle="Import from a CSV export or a public Moxfield binder link. Merge adds to what's already here; replace wipes first."
       />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+          <h2 className="mb-3 font-semibold text-white">Source</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.keys(SOURCE_COPY) as Source[]).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={source === option}
+                onClick={() => {
+                  setSource(option);
+                  setError(null);
+                }}
+                className={`rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+                  source === option
+                    ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
+                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
+                }`}
+              >
+                <p className="font-medium">{SOURCE_COPY[option].label}</p>
+                <p className="mt-0.5 text-xs text-gray-500">{SOURCE_COPY[option].hint}</p>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {source === "link" && (
+          <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+            <h2 className="mb-1 font-semibold text-white">Moxfield binder link</h2>
+            <p className="mb-4 text-xs text-gray-500">
+              Public binders only. The link is not stored — re-import later to refresh.
+            </p>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://moxfield.com/binders/..."
+              spellCheck={false}
+              className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </section>
+        )}
+
+        {source === "csv" && (
+          <>
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
           <h2 className="mb-3 font-semibold text-white">CSV Format</h2>
           <div className="grid grid-cols-2 gap-2">
@@ -187,6 +247,8 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
             className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y font-mono"
           />
         </section>
+          </>
+        )}
 
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
           <h2 className="mb-3 font-semibold text-white">Import Mode</h2>
