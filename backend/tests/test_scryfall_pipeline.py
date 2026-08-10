@@ -1,11 +1,18 @@
 """Tests for the Scryfall bulk data pipeline."""
 
+import gzip
+import json
 from typing import Any
+
+import httpx
+import pytest
 
 from mtg_helper.services.scryfall import (
     _extract_image_uri,
+    _fetch_bulk_data_url,
     _is_commander_relevant,
     _map_card,
+    _parse_bulk_cards,
     parse_type_line,
 )
 
@@ -33,6 +40,55 @@ def _make_card(**kwargs: Any) -> dict[str, Any]:
         "edhrec_rank": 500,
     }
     return {**defaults, **kwargs}
+
+
+async def test_fetch_bulk_data_url_uses_jsonl_download_uri() -> None:
+    download_uri = "https://data.scryfall.example/oracle-cards.jsonl.gz"
+    metadata = {
+        "data": [
+            {
+                "type": "oracle_cards",
+                "jsonl_download_uri": download_uri,
+            }
+        ]
+    }
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=metadata))
+
+    async with httpx.AsyncClient(transport=transport) as client:
+        assert await _fetch_bulk_data_url(client) == download_uri
+
+
+async def test_fetch_bulk_data_url_rejects_missing_jsonl_uri() -> None:
+    metadata = {"data": [{"type": "oracle_cards"}]}
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=metadata))
+
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(ValueError, match="missing jsonl_download_uri"):
+            await _fetch_bulk_data_url(client)
+
+
+def test_parse_bulk_cards_reads_gzip_jsonl() -> None:
+    cards = [_make_card(id="first"), _make_card(id="second")]
+    jsonl = b"\n".join(json.dumps(card).encode() for card in cards)
+
+    assert _parse_bulk_cards(gzip.compress(jsonl)) == cards
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"not gzip data",
+        gzip.compress(b"not json"),
+    ],
+)
+def test_parse_bulk_cards_rejects_invalid_download(content: bytes) -> None:
+    with pytest.raises(ValueError, match="not valid gzip-compressed JSONL"):
+        _parse_bulk_cards(content)
+
+
+def test_parse_bulk_cards_rejects_non_object_line() -> None:
+    with pytest.raises(ValueError, match="line 1 is not a card object"):
+        _parse_bulk_cards(gzip.compress(b"[]"))
 
 
 def test_map_card_basic_fields() -> None:

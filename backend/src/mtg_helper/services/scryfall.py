@@ -1,5 +1,7 @@
 """Scryfall bulk data pipeline: download, parse, and upsert cards into PostgreSQL."""
 
+import gzip
+import io
 import json
 import logging
 import time
@@ -181,7 +183,7 @@ def _is_commander_playable(card: dict[str, Any]) -> bool:
 
 
 async def _fetch_bulk_data_url(client: httpx.AsyncClient) -> str:
-    """Fetch the download URL for the oracle_cards bulk data file.
+    """Fetch the JSONL download URL for the oracle_cards bulk data file.
 
     Args:
         client: httpx async client.
@@ -190,16 +192,39 @@ async def _fetch_bulk_data_url(client: httpx.AsyncClient) -> str:
         Download URL string.
 
     Raises:
-        ValueError: If the oracle_cards entry is not found.
+        ValueError: If the oracle_cards entry or its download URL is missing.
     """
     response = await client.get(settings.scryfall_bulk_data_url)
     response.raise_for_status()
     entries = response.json().get("data", [])
     for entry in entries:
         if entry.get("type") == "oracle_cards":
-            return entry["download_uri"]
+            download_uri = entry.get("jsonl_download_uri")
+            if isinstance(download_uri, str) and download_uri:
+                return download_uri
+            msg = "oracle_cards bulk data entry is missing jsonl_download_uri"
+            raise ValueError(msg)
     msg = "oracle_cards bulk data entry not found in Scryfall response"
     raise ValueError(msg)
+
+
+def _parse_bulk_cards(content: bytes) -> list[dict[str, Any]]:
+    """Parse a gzip-compressed Scryfall JSONL payload."""
+    cards: list[dict[str, Any]] = []
+    try:
+        with gzip.GzipFile(fileobj=io.BytesIO(content), mode="rb") as archive:
+            for line_number, line in enumerate(archive, start=1):
+                if not line.strip():
+                    continue
+                card = json.loads(line)
+                if not isinstance(card, dict):
+                    msg = f"Scryfall JSONL line {line_number} is not a card object"
+                    raise ValueError(msg)
+                cards.append(card)
+    except (gzip.BadGzipFile, EOFError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        msg = "Scryfall oracle_cards download is not valid gzip-compressed JSONL"
+        raise ValueError(msg) from exc
+    return cards
 
 
 async def _upsert_batch(conn: asyncpg.Connection, batch: list[dict[str, Any]]) -> None:
@@ -301,7 +326,7 @@ async def run_sync(
     pool: asyncpg.Pool,
     progress: "ProgressCb | None" = None,
 ) -> dict[str, Any]:
-    """Download Scryfall oracle_cards bulk data and upsert into the cards table.
+    """Download Scryfall oracle_cards JSONL data and upsert into the cards table.
 
     Args:
         pool: asyncpg connection pool.
@@ -322,7 +347,7 @@ async def run_sync(
         download_url = await _fetch_bulk_data_url(client)
         response = await client.get(download_url)
         response.raise_for_status()
-        all_cards: list[dict[str, Any]] = response.json()
+        all_cards = _parse_bulk_cards(response.content)
 
     cb("filtering", 0, len(all_cards))
     relevant = [
