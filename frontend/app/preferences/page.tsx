@@ -7,18 +7,15 @@ import { PreferenceForm } from "@/components/preference-form";
 import { PreferenceList } from "@/components/preference-list";
 import { Skeleton } from "@/components/skeleton";
 import { ToggleSwitch } from "@/components/toggle-switch";
-import type {
-  PreferenceResponse,
-  RankingWeightsResponse,
-} from "@/lib/types";
+import type { PreferenceResponse, RankingWeightsResponse } from "@/lib/types";
 
 const DEFAULT_WEIGHTS = {
   semantic: 0.25,
   synergy: 0.22,
-  popularity: 0.10,
+  popularity: 0.1,
   personal: 0.15,
-  deck_inclusion: 0.20,
-  moxfield_inclusion: 0.20,
+  deck_inclusion: 0.2,
+  moxfield_inclusion: 0.2,
 };
 
 const DEFAULT_TRUSTED_QUOTA = 1.0;
@@ -179,14 +176,10 @@ export default function PreferencesPage() {
     );
   }
 
-  const boostingPref = preferences.find(
-    (p) => p.preference_type === "feedback_boosting",
-  );
+  const boostingPref = preferences.find((p) => p.preference_type === "feedback_boosting");
   const isBoosting = boostingPref !== undefined;
 
-  const profilePref = preferences.find(
-    (p) => p.preference_type === "user_profile_boosting",
-  );
+  const profilePref = preferences.find((p) => p.preference_type === "user_profile_boosting");
   const isProfileEnabled = profilePref !== undefined;
 
   async function handleProfileToggle() {
@@ -239,8 +232,7 @@ export default function PreferencesPage() {
           <div>
             <h2 className="font-semibold text-white">Feedback Boosting</h2>
             <p className="mt-1 text-sm text-gray-400">
-              Re-rank AI suggestions based on your thumbs up/down and pet/avoid card
-              preferences.
+              Re-rank AI suggestions based on your thumbs up/down and pet/avoid card preferences.
             </p>
           </div>
           <ToggleSwitch
@@ -284,7 +276,9 @@ export default function PreferencesPage() {
         </p>
         <div className="flex flex-col gap-5">
           {(Object.keys(DEFAULT_WEIGHTS) as Array<keyof typeof DEFAULT_WEIGHTS>).map((key) => {
-            const pct = Math.round((rankingWeights ? draftWeights[key] : DEFAULT_WEIGHTS[key]) * 100);
+            const pct = Math.round(
+              (rankingWeights ? draftWeights[key] : DEFAULT_WEIGHTS[key]) * 100,
+            );
             return (
               <div key={key}>
                 <div className="mb-1.5 flex items-center justify-between">
@@ -315,8 +309,8 @@ export default function PreferencesPage() {
         <div className="mb-4">
           <h2 className="font-semibold text-white">Suggestion Mix</h2>
           <p className="mt-1 text-sm text-gray-400">
-            How much of each page is reserved for trusted Moxfield cards. Lower it to give your
-            hub themes, mechanics, and deck description a real exploration channel.
+            How much of each page is reserved for trusted Moxfield cards. Lower it to give your hub
+            themes, mechanics, and deck description a real exploration channel.
           </p>
         </div>
         <div>
@@ -324,8 +318,8 @@ export default function PreferencesPage() {
             <div>
               <span className="text-sm font-medium text-white">Trusted Card Quota</span>
               <p className="text-xs text-gray-500">
-                100% = every trusted card ranks first (legacy). 50% = half popularity-driven,
-                half keyword/tag matching. 0% = pure composite ranking.
+                100% = every trusted card ranks first (legacy). 50% = half popularity-driven, half
+                keyword/tag matching. 0% = pure composite ranking.
               </p>
             </div>
             <span className="ml-4 w-10 text-right text-sm tabular-nums text-indigo-300">
@@ -358,10 +352,7 @@ export default function PreferencesPage() {
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-6">
         <h2 className="mb-4 font-semibold text-white">Your Preferences</h2>
-        <PreferenceList
-          preferences={preferences}
-          onDeleted={() => void loadPreferences()}
-        />
+        <PreferenceList preferences={preferences} onDeleted={() => void loadPreferences()} />
       </section>
     </div>
   );

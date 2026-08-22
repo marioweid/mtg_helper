@@ -205,7 +205,7 @@ async def suggest_cards(
             account.id,
             email,
             body.prompt,
-            body.count,
+            count=body.count,
             collection_ids=body.collection_ids,
             max_price_cents=body.max_price_cents,
             min_price_cents=body.min_price_cents,
@@ -633,7 +633,7 @@ async def describe_deck(
             body.partner_scryfall_id,
             body.bracket,
             [{"role": m.role, "content": m.content} for m in body.history],
-            body.message,
+            message=body.message,
         )
     except CommanderNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
@@ -659,7 +659,7 @@ async def extract_keywords(
             body.partner_scryfall_id,
             body.bracket,
             [{"role": m.role, "content": m.content} for m in body.history],
-            body.message,
+            message=body.message,
         )
     except CommanderNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})

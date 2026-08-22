@@ -8,6 +8,7 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.models.mana_curve import DeckManaCurve, ManaCurveRecommendation
+
 BUCKETS: tuple[str, ...] = ("0", "1", "2", "3", "4", "5", "6", "7+")
 MIN_MOXFIELD_DECKS = 5
 

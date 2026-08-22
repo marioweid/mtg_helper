@@ -45,11 +45,8 @@ export function CardSuggestionCard({
   quantity = 1,
   onQuantityChange,
 }: Props) {
-  const isHot =
-    suggestion.highlight_reasons != null && suggestion.highlight_reasons.length > 0;
-  const hotTitle = isHot
-    ? `Hot pick: ${suggestion.highlight_reasons?.join(", ")}`
-    : "Hot pick";
+  const isHot = suggestion.highlight_reasons != null && suggestion.highlight_reasons.length > 0;
+  const hotTitle = isHot ? `Hot pick: ${suggestion.highlight_reasons?.join(", ")}` : "Hot pick";
   const owned = suggestion.owned_in;
   const sources = suggestion.sources ?? [];
   const isGameChanger = suggestion.game_changer;
@@ -118,7 +115,11 @@ export function CardSuggestionCard({
                 Game Changer
               </span>
             )}
-            {isPetCard && <span className="text-red-400 text-xs" title="Pet card">♥</span>}
+            {isPetCard && (
+              <span className="text-red-400 text-xs" title="Pet card">
+                ♥
+              </span>
+            )}
             {isHot && <span title={hotTitle}>🔥</span>}
             {inCombo && <span title="Completes a potential combo">⚡</span>}
           </p>
@@ -127,12 +128,8 @@ export function CardSuggestionCard({
               <ManaCost cost={suggestion.mana_cost} />
             </p>
           )}
-          {suggestion.type_line && (
-            <p className="text-xs text-gray-400">{suggestion.type_line}</p>
-          )}
-          <p className="text-xs text-gray-300 mt-1">
-            {formatEur(suggestion.price_eur_cents)}
-          </p>
+          {suggestion.type_line && <p className="text-xs text-gray-400">{suggestion.type_line}</p>}
+          <p className="text-xs text-gray-300 mt-1">{formatEur(suggestion.price_eur_cents)}</p>
         </div>
       )}
 

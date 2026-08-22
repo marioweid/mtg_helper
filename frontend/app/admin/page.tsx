@@ -13,8 +13,8 @@ export default async function AdminPage() {
       <header>
         <h1 className="text-2xl font-bold text-white">Admin</h1>
         <p className="text-sm text-gray-400">
-          Signed in as <span className="font-mono">{email}</span>. Card pipeline
-          jobs run server-side and may take a minute.
+          Signed in as <span className="font-mono">{email}</span>. Card pipeline jobs run
+          server-side and may take a minute.
         </p>
       </header>
       <AdminPanel />

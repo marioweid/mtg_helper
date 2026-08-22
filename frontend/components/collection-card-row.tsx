@@ -46,7 +46,9 @@ export function CollectionCardRow({
       )}
       <div className="min-w-[180px] flex-1">
         <p className="truncate text-sm font-medium text-white">
-          <CardHover name={card.name} imageUri={card.image_uri}>{card.name}</CardHover>
+          <CardHover name={card.name} imageUri={card.image_uri}>
+            {card.name}
+          </CardHover>
         </p>
         <p className="truncate text-xs text-gray-500">
           {card.type_line ?? ""}
@@ -58,18 +60,8 @@ export function CollectionCardRow({
         </p>
         <CollectionMetadata card={card} />
       </div>
-      <CollectionDeckSelect
-        card={card}
-        decks={decks}
-        busy={busy}
-        onPlanForDeck={onPlanForDeck}
-      />
-      <QuantityControls
-        card={card}
-        busy={busy}
-        onSetQuantity={onSetQuantity}
-        onRemove={onRemove}
-      />
+      <CollectionDeckSelect card={card} decks={decks} busy={busy} onPlanForDeck={onPlanForDeck} />
+      <QuantityControls card={card} busy={busy} onSetQuantity={onSetQuantity} onRemove={onRemove} />
     </li>
   );
 }
@@ -115,7 +107,9 @@ export function CollectionDeckSelect({
     >
       <option value="">Plan for deck…</option>
       {decks.map((deck) => (
-        <option key={deck.id} value={deck.id}>{deck.name}</option>
+        <option key={deck.id} value={deck.id}>
+          {deck.name}
+        </option>
       ))}
     </select>
   );

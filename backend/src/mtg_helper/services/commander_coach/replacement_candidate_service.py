@@ -75,9 +75,7 @@ def _deck_colors(deck: DeckDetailResponse) -> list[str]:
 
 def _target_terms(target: DeckCardItem, deck: DeckDetailResponse, complaint: str) -> set[str]:
     terms = (
-        set(target.tags or [])
-        | set(target.categories or [])
-        | set(target.qualifying_stages or [])
+        set(target.tags or []) | set(target.categories or []) | set(target.qualifying_stages or [])
     )
     terms.update(deck.archetype_tags or [])
     terms.update(_words(target.oracle_text) & _ROLE_TERMS)
@@ -88,6 +86,15 @@ def _target_terms(target: DeckCardItem, deck: DeckDetailResponse, complaint: str
     if "food_matters" in terms:
         terms.update({"food", "token", "sacrifice"})
     return terms
+
+
+def _cmc_score(target: DeckCardItem, row: asyncpg.Record) -> tuple[float, list[str]]:
+    if target.cmc is None or row["cmc"] is None:
+        return 0.0, []
+    cmc_delta = abs(float(target.cmc) - float(row["cmc"]))
+    score = max(0.0, 3.0 - cmc_delta)
+    signals = ["similar mana value"] if cmc_delta <= 1 else []
+    return score, signals
 
 
 def _lane_and_score(
@@ -109,11 +116,9 @@ def _lane_and_score(
         score += len(overlap) * 3.0
         signals.append("matches " + ", ".join(sorted(overlap)[:5]))
 
-    if target.cmc is not None and row["cmc"] is not None:
-        cmc_delta = abs(float(target.cmc) - float(row["cmc"]))
-        score += max(0.0, 3.0 - cmc_delta)
-        if cmc_delta <= 1:
-            signals.append("similar mana value")
+    cmc_score, cmc_signals = _cmc_score(target, row)
+    score += cmc_score
+    signals.extend(cmc_signals)
 
     flexible = row_terms & _FLEX_TERMS
     if len(flexible) >= 2:

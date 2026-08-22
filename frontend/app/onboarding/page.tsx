@@ -52,7 +52,12 @@ export default function OnboardingPage() {
       });
       router.push(`/decks/${res.deck.id}/build`);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Quickstart failed.";
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Quickstart failed.";
       setError(message);
       setSubmitting(false);
     }

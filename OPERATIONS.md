@@ -8,10 +8,14 @@ Two files. The base file is local-dev only; the prod file is a standalone Portai
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | Local dev. Postgres + Qdrant + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in Docker-managed named volumes. |
+| `docker-compose.yml` | Local dev. Postgres + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in a Docker-managed named volume. |
 | `docker-compose.prod.yml` | Standalone production/Portainer stack. Uses host data under `${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}`, production frontend build, and weekly `scryfall-sync`. |
 
-The production file intentionally does **not** use Compose merge tags (`!reset`, `!override`) so it works with current Portainer Git stacks. It publishes only the frontend to `127.0.0.1:${FRONTEND_PORT:-3000}` by default; point the homeserver's existing reverse proxy / Cloudflare Tunnel there. The `scryfall-sync` cron is prod-only; locally you trigger card sync from the Admin page when you want fresh data.
+The production file intentionally does **not** use Compose merge tags (`!reset`, `!override`) so it
+works with current Portainer Git stacks. It publishes only the frontend to
+`127.0.0.1:${FRONTEND_PORT:-3001}` by default; point the homeserver's existing reverse proxy /
+Cloudflare Tunnel there. The `scryfall-sync` cron is prod-only; locally you trigger card sync from
+the Admin page when you want fresh data.
 
 ## Portainer setup summary
 
@@ -34,9 +38,9 @@ sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
 ```bash
 # Required once: copy env template and fill in keys
 cp backend/.env.example backend/.env
-$EDITOR backend/.env   # set GEMINI_API_KEY; INTERNAL_API_TOKEN if you'll hit admin endpoints
+$EDITOR backend/.env   # set OPENAI_API_KEY; INTERNAL_API_TOKEN if you'll hit admin endpoints
 
-# bring everything up (postgres, qdrant, backend, frontend)
+# bring everything up (postgres, backend, frontend)
 docker compose up -d --build
 
 # tail logs
@@ -46,9 +50,11 @@ docker compose logs -f backend frontend
 docker compose down
 ```
 
-Ports: backend `:8000`, frontend `:3000`, postgres `:5432`, qdrant `:6333`.
+Ports: backend `:8000`, frontend `:3000`, postgres `:5432`.
 
-> No root `.env` is needed locally — `INTERNAL_API_TOKEN` only matters if you call `/api/v1/admin/*` endpoints, and the backend reads it from `backend/.env`.
+> Local Compose loads `backend/.env` into the backend service and overrides `DATABASE_URL` with the
+> `postgres` service hostname. The file is runtime-only and is not copied into images. No root
+> `.env` is needed locally. `INTERNAL_API_TOKEN` only matters for `/api/v1/admin/*` endpoints.
 
 ## Prod boot with Portainer
 
@@ -67,6 +73,11 @@ sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
    - Leave `FRONTEND_BIND_ADDR=127.0.0.1` unless the tunnel/proxy runs on another host.
 4. Deploy the stack.
 5. Point the existing homeserver tunnel/proxy at `http://127.0.0.1:${FRONTEND_PORT}`.
+
+Compose uses the stack environment only for interpolation and forwards each variable to the service
+that needs it. In particular, `OPENAI_API_KEY` is available only to `backend`; PostgreSQL receives
+only its database settings, `frontend` receives only URL/auth settings, and `scryfall-sync` receives
+only `INTERNAL_API_TOKEN`.
 
 CLI equivalent for testing on the server:
 

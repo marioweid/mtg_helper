@@ -142,9 +142,7 @@ export function DeckFilterBar({
           className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-sm text-white placeholder-gray-500 focus-visible:border-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
         />
         {onAddCard && poolLoading && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-            …
-          </span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">…</span>
         )}
         {onAddCard && poolOpen && poolResults.length > 0 && (
           <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-white/10 bg-gray-900 shadow-xl">
@@ -192,9 +190,7 @@ export function DeckFilterBar({
               onClick={() => toggleColor(c.key)}
               aria-pressed={active}
               className={`h-7 w-7 rounded-full text-xs font-bold transition-[transform,opacity,box-shadow] motion-reduce:transition-none ${sym.bg} ${sym.text} ${
-                active
-                  ? "scale-110 ring-2 ring-white/90 shadow-md"
-                  : "opacity-45 hover:opacity-90"
+                active ? "scale-110 ring-2 ring-white/90 shadow-md" : "opacity-45 hover:opacity-90"
               }`}
               title={`Show only ${c.label} cards`}
             >
@@ -258,8 +254,7 @@ export function applyDeckFilter(cards: DeckCardItem[], filter: DeckFilter): Deck
     sorted.sort(
       (a, b) =>
         (a.price_eur_cents ?? Number.POSITIVE_INFINITY) -
-          (b.price_eur_cents ?? Number.POSITIVE_INFINITY) ||
-        a.name.localeCompare(b.name),
+          (b.price_eur_cents ?? Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name),
     );
   }
   return sorted;

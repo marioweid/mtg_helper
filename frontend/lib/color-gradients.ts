@@ -70,16 +70,13 @@ export function colorIdentityShadow(
   intensity: "subtle" | "normal" = "normal",
 ): string {
   const subtle = intensity === "subtle";
-  const baseDrop = subtle
-    ? "0 6px 18px rgba(0, 0, 0, 0.5)"
-    : "0 12px 32px rgba(0, 0, 0, 0.55)";
+  const baseDrop = subtle ? "0 6px 18px rgba(0, 0, 0, 0.5)" : "0 12px 32px rgba(0, 0, 0, 0.55)";
   const sorted = sortWUBRG(colors.filter((c) => c in SHADOW_HEX));
   if (sorted.length === 0) return baseDrop;
 
   const radius = subtle ? 8 : 14;
   const blur = subtle ? 22 : 42;
-  const alpha =
-    sorted.length === 1 ? (subtle ? "80" : "cc") : subtle ? "66" : "bb";
+  const alpha = sorted.length === 1 ? (subtle ? "80" : "cc") : subtle ? "66" : "bb";
 
   const glows = sorted.map((c, i) => {
     // Spread the glows around the element. Single color sits behind centred;

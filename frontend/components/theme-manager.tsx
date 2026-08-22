@@ -73,8 +73,12 @@ export function ThemeManager() {
   const visibleTags = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return state.source_tags.filter((tag) => {
-      const inSelected = selectedGroupId === null ? tag.group_id === null : tag.group_id === selectedGroupId;
-      return inSelected && (!needle || `${tag.name} ${tag.tag} ${tag.source}`.toLowerCase().includes(needle));
+      const inSelected =
+        selectedGroupId === null ? tag.group_id === null : tag.group_id === selectedGroupId;
+      return (
+        inSelected &&
+        (!needle || `${tag.name} ${tag.tag} ${tag.source}`.toLowerCase().includes(needle))
+      );
     });
   }, [query, selectedGroupId, state.source_tags]);
 
@@ -102,7 +106,9 @@ export function ThemeManager() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-white">Theme groups</h2>
-          <p className="text-sm text-gray-400">Group Moxfield hubs and Archidekt tags without changing code.</p>
+          <p className="text-sm text-gray-400">
+            Group Moxfield hubs and Archidekt tags without changing code.
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -118,7 +124,11 @@ export function ThemeManager() {
             placeholder="New group name"
             className="rounded border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
           />
-          <button type="button" onClick={() => void createGroup()} className="rounded bg-blue-600 px-3 py-2 text-sm text-white">
+          <button
+            type="button"
+            onClick={() => void createGroup()}
+            className="rounded bg-blue-600 px-3 py-2 text-sm text-white"
+          >
             Create
           </button>
         </div>
@@ -136,27 +146,75 @@ export function ThemeManager() {
             Ungrouped
           </button>
           {state.groups.map((group) => (
-            <div key={group.id} className={`rounded border border-white/10 p-2 ${group.deleted_at ? "opacity-50" : ""}`}>
-              <button type="button" onClick={() => setSelectedGroupId(group.id)} className="w-full text-left text-sm text-white">
+            <div
+              key={group.id}
+              className={`rounded border border-white/10 p-2 ${group.deleted_at ? "opacity-50" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedGroupId(group.id)}
+                className="w-full text-left text-sm text-white"
+              >
                 {group.label}
               </button>
               <div className="mt-2 flex gap-2 text-xs">
                 {group.deleted_at ? (
-                  <button type="button" onClick={() => void run(() => mutate(`/api/v1/admin/theme-groups/${group.id}/restore`, "POST"))} className="text-green-300">Restore</button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void run(() =>
+                        mutate(`/api/v1/admin/theme-groups/${group.id}/restore`, "POST"),
+                      )
+                    }
+                    className="text-green-300"
+                  >
+                    Restore
+                  </button>
                 ) : (
                   <>
-                    <button type="button" onClick={() => {
-                      const label = window.prompt("Group name", group.label)?.trim();
-                      if (label) void run(() => mutate(`/api/v1/admin/theme-groups/${group.id}`, "PATCH", { label }));
-                    }} className="text-blue-300">Rename</button>
-                    <button type="button" onClick={() => void run(() => mutate(`/api/v1/admin/theme-groups/${group.id}`, "PATCH", { enabled: !group.enabled }))} className="text-yellow-300">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const label = window.prompt("Group name", group.label)?.trim();
+                        if (label)
+                          void run(() =>
+                            mutate(`/api/v1/admin/theme-groups/${group.id}`, "PATCH", { label }),
+                          );
+                      }}
+                      className="text-blue-300"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void run(() =>
+                          mutate(`/api/v1/admin/theme-groups/${group.id}`, "PATCH", {
+                            enabled: !group.enabled,
+                          }),
+                        )
+                      }
+                      className="text-yellow-300"
+                    >
                       {group.enabled ? "Disable" : "Enable"}
                     </button>
-                    <button type="button" onClick={() => {
-                      if (window.confirm(`Delete ${group.label}? Its tags will become ungrouped.`)) {
-                        void run(() => mutate(`/api/v1/admin/theme-groups/${group.id}`, "PATCH", { delete: true }));
-                      }
-                    }} className="text-red-300">Delete</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(`Delete ${group.label}? Its tags will become ungrouped.`)
+                        ) {
+                          void run(() =>
+                            mutate(`/api/v1/admin/theme-groups/${group.id}`, "PATCH", {
+                              delete: true,
+                            }),
+                          );
+                        }
+                      }}
+                      className="text-red-300"
+                    >
+                      Delete
+                    </button>
                   </>
                 )}
               </div>
@@ -173,29 +231,54 @@ export function ThemeManager() {
           />
           <div className="max-h-[34rem] space-y-2 overflow-y-auto">
             {visibleTags.map((tag) => (
-              <div key={`${tag.source}:${tag.source_id}`} className="flex flex-wrap items-center gap-3 rounded border border-white/10 p-3 text-sm">
-                <span className={`rounded px-2 py-1 text-xs ${tag.source === "moxfield" ? "bg-purple-950 text-purple-200" : "bg-orange-950 text-orange-200"}`}>
+              <div
+                key={`${tag.source}:${tag.source_id}`}
+                className="flex flex-wrap items-center gap-3 rounded border border-white/10 p-3 text-sm"
+              >
+                <span
+                  className={`rounded px-2 py-1 text-xs ${tag.source === "moxfield" ? "bg-purple-950 text-purple-200" : "bg-orange-950 text-orange-200"}`}
+                >
                   {tag.source}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-white">{tag.name}</p>
-                  <p className="text-xs text-gray-500">{tag.tag} · {Number(tag.card_count).toLocaleString()} cards</p>
+                  <p className="text-xs text-gray-500">
+                    {tag.tag} · {Number(tag.card_count).toLocaleString()} cards
+                  </p>
                 </div>
                 <select
                   value={tag.group_id ?? ""}
-                  onChange={(event) => void run(() => mutate("/api/v1/admin/theme-membership", "PUT", {
-                    source: tag.source,
-                    source_id: Number(tag.source_id),
-                    group_id: event.target.value ? Number(event.target.value) : null,
-                  }))}
+                  onChange={(event) =>
+                    void run(() =>
+                      mutate("/api/v1/admin/theme-membership", "PUT", {
+                        source: tag.source,
+                        source_id: Number(tag.source_id),
+                        group_id: event.target.value ? Number(event.target.value) : null,
+                      }),
+                    )
+                  }
                   className="rounded border border-white/10 bg-black/40 px-2 py-1 text-white"
                 >
                   <option value="">Ungrouped</option>
-                  {state.groups.filter((group) => !group.deleted_at).map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
+                  {state.groups
+                    .filter((group) => !group.deleted_at)
+                    .map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.label}
+                      </option>
+                    ))}
                 </select>
                 <button
                   type="button"
-                  onClick={() => void run(() => mutate(`/api/v1/admin/theme-sources/${tag.source}/${tag.source_id}`, "PATCH", { enabled: !tag.enabled }))}
+                  onClick={() =>
+                    void run(() =>
+                      mutate(
+                        `/api/v1/admin/theme-sources/${tag.source}/${tag.source_id}`,
+                        "PATCH",
+                        { enabled: !tag.enabled },
+                      ),
+                    )
+                  }
                   className={`rounded px-2 py-1 text-xs ${tag.enabled ? "bg-green-950 text-green-300" : "bg-gray-800 text-gray-400"}`}
                 >
                   {tag.enabled ? "Enabled" : "Disabled"}
@@ -203,11 +286,15 @@ export function ThemeManager() {
                 {tag.source === "archidekt" && (
                   <button
                     type="button"
-                    onClick={() => void run(() => mutate("/api/v1/admin/sync-archidekt-tag", "POST", {
-                      tag_ref: tag.tag,
-                      tag_sample_size: 10,
-                      baseline_sample_size: 80,
-                    }))}
+                    onClick={() =>
+                      void run(() =>
+                        mutate("/api/v1/admin/sync-archidekt-tag", "POST", {
+                          tag_ref: tag.tag,
+                          tag_sample_size: 10,
+                          baseline_sample_size: 80,
+                        }),
+                      )
+                    }
                     className="rounded border border-white/10 px-2 py-1 text-xs text-blue-300"
                   >
                     Sync

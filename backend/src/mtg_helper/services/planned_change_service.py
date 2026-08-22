@@ -136,9 +136,7 @@ async def create_plan(
             limit = card_identity_service.commander_copy_limit(
                 card["type_line"], card["oracle_text"]
             )
-            projected = card_identity_service.clamp_quantity(
-                physical_quantity + quantity, limit
-            )
+            projected = card_identity_service.clamp_quantity(physical_quantity + quantity, limit)
             quantity = projected - physical_quantity
         if direction == "cut" and quantity > physical_quantity:
             raise InvalidPlanError("Planned cut exceeds the physical deck quantity")
@@ -579,6 +577,7 @@ async def complete_plan(
     deck_id: UUID,
     plan_id: UUID,
     quantity: int,
+    *,
     email: str,
     account_id: UUID,
 ) -> PlannedDeckChange | None:

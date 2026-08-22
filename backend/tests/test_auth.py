@@ -1,10 +1,13 @@
 """Tests for the Google ID-token auth dependency and admin gate."""
 
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
+from starlette.requests import Request
 
 from mtg_helper import auth as auth_mod
 from mtg_helper.auth import (
@@ -18,21 +21,29 @@ from mtg_helper.main import app
 pytestmark = pytest.mark.asyncio
 
 
-def _fake_request(db_pool: object) -> object:
+@pytest.mark.no_db
+async def test_google_oauth_verifier_uses_configured_audience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The AI provider migration must not replace Google OIDC verification."""
+    monkeypatch.setattr(settings, "google_oauth_client_id", "google-client-id")
+    claims = {"sub": "google-sub", "email": "user@example.com"}
+
+    with patch.object(auth_mod.id_token, "verify_oauth2_token", return_value=claims) as verify:
+        result = auth_mod._verify_id_token("google-id-token")
+
+    assert result == claims
+    verify.assert_called_once_with(
+        "google-id-token",
+        auth_mod._google_request,
+        "google-client-id",
+    )
+
+
+def _fake_request(db_pool: object) -> Request:
     """Build a minimal Request stand-in with `app.state.db_pool`."""
-
-    class _State:
-        pass
-
-    class _App:
-        state = _State()
-
-    class _Req:
-        app = _App()
-
-    req = _Req()
-    req.app.state.db_pool = db_pool
-    return req
+    app_stub = SimpleNamespace(state=SimpleNamespace(db_pool=db_pool))
+    return cast(Request, SimpleNamespace(app=app_stub))
 
 
 async def test_get_current_account_creates_row_on_first_login(client: AsyncClient) -> None:
@@ -175,7 +186,7 @@ async def test_internal_token_bypasses_admin_gate(client: AsyncClient) -> None:
 
     req = _fake_request(app.state.db_pool)
     await auth_mod.require_admin_or_internal(
-        request=req,  # type: ignore[arg-type]
+        request=req,
         x_internal_token="secret-token-xyz",
         authorization=None,
     )
@@ -188,7 +199,7 @@ async def test_internal_token_mismatch_falls_through_to_admin(client: AsyncClien
 
     with pytest.raises(HTTPException) as exc:
         await auth_mod.require_admin_or_internal(
-            request=_fake_request(app.state.db_pool),  # type: ignore[arg-type]
+            request=_fake_request(app.state.db_pool),
             x_internal_token="wrong",
             authorization=None,
         )
@@ -202,7 +213,7 @@ async def test_internal_token_disabled_when_unset(client: AsyncClient) -> None:
 
     with pytest.raises(HTTPException) as exc:
         await auth_mod.require_admin_or_internal(
-            request=_fake_request(app.state.db_pool),  # type: ignore[arg-type]
+            request=_fake_request(app.state.db_pool),
             x_internal_token="",
             authorization=None,
         )

@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  findGameChangers,
-  gameChangerLimit,
-} from "@/lib/game-changers";
+import { findGameChangers, gameChangerLimit } from "@/lib/game-changers";
 import type { DeckCardItem } from "@/lib/types";
 
 interface Props {

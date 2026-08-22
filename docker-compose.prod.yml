@@ -25,9 +25,6 @@ services:
   postgres:
     image: postgres:16
     restart: unless-stopped
-    env_file:
-      - path: ./.env
-        required: false
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mtg_helper}
       POSTGRES_USER: ${POSTGRES_USER:-mtg}
@@ -44,9 +41,6 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    env_file:
-      - path: ./.env
-        required: false
     command:
       [
         "uv",
@@ -60,7 +54,8 @@ services:
       ]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-mtg}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-mtg_helper}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set}
+      SCRYFALL_BULK_DATA_URL: ${SCRYFALL_BULK_DATA_URL:-https://api.scryfall.com/bulk-data}
       GOOGLE_OAUTH_CLIENT_ID: ${AUTH_GOOGLE_ID:?AUTH_GOOGLE_ID must be set}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
@@ -78,9 +73,6 @@ services:
       context: ./frontend
       target: runner
     restart: unless-stopped
-    env_file:
-      - path: ./.env
-        required: false
     command: ["sh", "-c", "pnpm exec next start -p $${PORT:-3001}"]
     ports:
       - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3001}:${PORT:-3001}"
@@ -101,9 +93,6 @@ services:
   scryfall-sync:
     image: alpine/curl:latest
     restart: unless-stopped
-    env_file:
-      - path: ./.env
-        required: false
     environment:
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
     entrypoint: >

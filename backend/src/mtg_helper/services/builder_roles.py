@@ -10,47 +10,53 @@ from dataclasses import dataclass, field
 _ROLE_ORDER = ("ramp", "draw", "interaction", "lands")
 
 _ROLE_TAGS: dict[str, frozenset[str]] = {
-    "ramp": frozenset({
-        "ramp",
-        "fast_mana",
-        "cost_reduction",
-        "treasure",
-        "treasures",
-        "treasure_matters",
-        "mana_rock",
-        "mana_dork",
-        "mana",
-    }),
-    "draw": frozenset({
-        "draw",
-        "card_draw",
-        "card_advantage",
-        "card_selection",
-        "cantrip",
-        "wheels",
-        "wheel",
-        "cycling",
-        "investigate",
-        "clue",
-        "clues",
-        "curiosity",
-        "looting",
-        "impulse_draw",
-    }),
-    "interaction": frozenset({
-        "interaction",
-        "removal",
-        "board_wipe",
-        "counterspell",
-        "counter",
-        "protection",
-        "control",
-        "stax",
-        "graveyard_hate",
-        "land_destruction",
-        "bounce",
-        "discard",
-    }),
+    "ramp": frozenset(
+        {
+            "ramp",
+            "fast_mana",
+            "cost_reduction",
+            "treasure",
+            "treasures",
+            "treasure_matters",
+            "mana_rock",
+            "mana_dork",
+            "mana",
+        }
+    ),
+    "draw": frozenset(
+        {
+            "draw",
+            "card_draw",
+            "card_advantage",
+            "card_selection",
+            "cantrip",
+            "wheels",
+            "wheel",
+            "cycling",
+            "investigate",
+            "clue",
+            "clues",
+            "curiosity",
+            "looting",
+            "impulse_draw",
+        }
+    ),
+    "interaction": frozenset(
+        {
+            "interaction",
+            "removal",
+            "board_wipe",
+            "counterspell",
+            "counter",
+            "protection",
+            "control",
+            "stax",
+            "graveyard_hate",
+            "land_destruction",
+            "bounce",
+            "discard",
+        }
+    ),
 }
 
 

@@ -24,7 +24,8 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.models.playtest import PlaytestStats
-from mtg_helper.services.agents._model import google_model_settings, make_google_model
+from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
+from mtg_helper.services.agents._usage import log_run_usage
 from mtg_helper.services.card_search_tool import search_cards
 
 _log = logging.getLogger(__name__)
@@ -35,7 +36,6 @@ _MAX_TOOL_CALLS = 10
 _REQUEST_LIMIT = _MAX_TOOL_CALLS + 2
 _WALL_CLOCK_SECONDS = 60.0
 
-_TEMPERATURE = 0.55
 _MAX_OUTPUT_TOKENS = 8192
 
 _SYSTEM_PROMPT = """You are a high-level Magic: The Gathering Commander deck-building consultant.
@@ -106,14 +106,13 @@ def _build_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
     key from settings is captured at the time the app boots.
     """
     agent = Agent[_AnalysisDeps, SimulationAnalysisResponse](
-        model=make_google_model(),
+        model=make_openai_model(),
         deps_type=_AnalysisDeps,
         output_type=SimulationAnalysisResponse,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings=google_model_settings(
+        model_settings=openai_model_settings(
             max_tokens=_MAX_OUTPUT_TOKENS,
-            temperature=_TEMPERATURE,
-            thinking="medium",
+            reasoning="low",
         ),
         retries=1,
     )
@@ -153,9 +152,7 @@ _AGENT: Agent[_AnalysisDeps, SimulationAnalysisResponse] | None = None
 
 
 def _get_agent() -> Agent[_AnalysisDeps, SimulationAnalysisResponse]:
-    """Lazy singleton — building the provider eagerly at import time fails
-    when settings.gemini_api_key is unset (test env).
-    """
+    """Return the lazily constructed OpenAI Responses analysis agent."""
     global _AGENT
     if _AGENT is None:
         _AGENT = _build_agent()
@@ -296,7 +293,16 @@ async def analyze_simulation(
     )
     try:
         result = await asyncio.wait_for(
-            agent.run(prompt, deps=deps, usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT)),
+            agent.run(
+                prompt,
+                deps=deps,
+                usage_limits=UsageLimits(
+                    request_limit=_REQUEST_LIMIT,
+                    tool_calls_limit=_MAX_TOOL_CALLS,
+                    input_tokens_limit=96_000,
+                    output_tokens_limit=16_000,
+                ),
+            ),
             timeout=_WALL_CLOCK_SECONDS,
         )
     except TimeoutError:
@@ -324,6 +330,7 @@ async def analyze_simulation(
             ),
             tool_call_count=calls,
         )
+    log_run_usage("simulation_analysis", "analyze", result.usage())
     elapsed = time.monotonic() - started
     output = result.output
     output.tool_call_count = deps.tool_call_count[0]

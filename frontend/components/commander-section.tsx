@@ -18,9 +18,7 @@ interface Props {
  */
 export function CommanderSection({ commander, partner }: Props) {
   const [expanded, setExpanded] = useState(true);
-  const cards = [commander, partner].filter(
-    (c): c is CommanderCardSummary => c !== null,
-  );
+  const cards = [commander, partner].filter((c): c is CommanderCardSummary => c !== null);
   if (cards.length === 0) return null;
 
   return (

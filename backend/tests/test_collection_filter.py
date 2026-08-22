@@ -6,7 +6,6 @@ import asyncpg
 import pytest_asyncio
 from httpx import AsyncClient
 
-from mtg_helper.main import app
 from mtg_helper.services import collection_service
 from tests.conftest import (
     DOUBLING_SEASON_SCRYFALL_ID,
@@ -14,6 +13,7 @@ from tests.conftest import (
     create_test_account,
     create_test_deck,
 )
+
 
 async def _get_card_id(pool: asyncpg.Pool, scryfall_id: UUID) -> UUID:
     async with pool.acquire() as conn:

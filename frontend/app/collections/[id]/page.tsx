@@ -9,11 +9,7 @@ import { CardSearch } from "@/components/card-search";
 import { CollectionCardGrid } from "@/components/collection-card-grid";
 import { CollectionCardRow } from "@/components/collection-card-row";
 import { useToast } from "@/components/toast";
-import {
-  getWorkspaceView,
-  setWorkspaceView,
-  type CardWorkspaceView,
-} from "@/lib/deck-view-prefs";
+import { getWorkspaceView, setWorkspaceView, type CardWorkspaceView } from "@/lib/deck-view-prefs";
 import type {
   CardResponse,
   CollectionCardItem,
@@ -71,7 +67,8 @@ function groupCards(cards: CollectionCardItem[], group: CollectionGroup) {
   if (group === "none") return [{ key: "all", label: null, cards }];
   const sections = new Map<string, CollectionCardItem[]>();
   for (const card of cards) {
-    const key = group === "type" ? primaryType(card.type_line) : card.set_code.toUpperCase() || "Unknown Set";
+    const key =
+      group === "type" ? primaryType(card.type_line) : card.set_code.toUpperCase() || "Unknown Set";
     const section = sections.get(key) ?? [];
     section.push(card);
     sections.set(key, section);
@@ -129,9 +126,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   const [direction, setDirection] = useState<SortDirection>(() =>
     validDirection(searchParams.get("direction")),
   );
-  const [group, setGroup] = useState<CollectionGroup>(() =>
-    validGroup(searchParams.get("group")),
-  );
+  const [group, setGroup] = useState<CollectionGroup>(() => validGroup(searchParams.get("group")));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -314,8 +309,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     replaceQuery({ page: nextPage === 1 ? null : String(nextPage) }, false);
   }
 
-  const filtersActive =
-    typeFilter !== null || minPriceCents != null || maxPriceCents != null;
+  const filtersActive = typeFilter !== null || minPriceCents != null || maxPriceCents != null;
 
   async function handleRename() {
     if (!renameValue.trim() || renameValue.trim() === collection?.name) {

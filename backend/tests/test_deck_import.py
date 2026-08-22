@@ -1,14 +1,56 @@
 """Tests for deck import: parser unit tests and endpoint integration tests."""
 
+from types import SimpleNamespace
+from typing import cast
+from unittest.mock import AsyncMock
+from uuid import UUID
+
+import asyncpg
 import pytest
 from httpx import AsyncClient
 
-from mtg_helper.services.import_service import parse_deck_list
+from mtg_helper.services import deck_service, import_service
+from mtg_helper.services.import_service import ParsedCard, import_parsed_entries, parse_deck_list
 from tests.conftest import (
     create_test_account,
 )
 
 # ── parse_deck_list unit tests ────────────────────────────────────────────────
+
+
+@pytest.mark.no_db
+async def test_import_reports_deck_missing_after_creation(monkeypatch: pytest.MonkeyPatch) -> None:
+    deck_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    commander = SimpleNamespace(
+        scryfall_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+        color_identity=["G"],
+    )
+    monkeypatch.setattr(
+        import_service.card_service,
+        "resolve_card_by_name",
+        AsyncMock(return_value=commander),
+    )
+    monkeypatch.setattr(
+        import_service.deck_service,
+        "create_deck",
+        AsyncMock(return_value=SimpleNamespace(id=deck_id)),
+    )
+    monkeypatch.setattr(import_service.deck_service, "update_deck", AsyncMock())
+    monkeypatch.setattr(import_service.deck_service, "_fetch_deck", AsyncMock(return_value=None))
+
+    with pytest.raises(
+        deck_service.DeckNotFoundError,
+        match=f"Imported deck {deck_id} disappeared after creation",
+    ):
+        await import_parsed_entries(
+            cast(asyncpg.Pool, object()),
+            commanders=[ParsedCard(name="Test Commander", quantity=1, is_commander=True)],
+            non_commanders=[],
+            name="Vanishing deck",
+            description=None,
+            bracket=3,
+            email="qa@example.invalid",
+        )
 
 
 def test_parse_basic_moxfield_format() -> None:

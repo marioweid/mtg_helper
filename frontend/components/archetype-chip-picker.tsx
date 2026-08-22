@@ -18,9 +18,7 @@ function normalize(value: string): string {
 }
 
 function keywordMatches(keyword: KeywordChip, query: string): boolean {
-  return (
-    normalize(keyword.label).includes(query) || normalize(keyword.tag).includes(query)
-  );
+  return normalize(keyword.label).includes(query) || normalize(keyword.tag).includes(query);
 }
 
 function filteredKeywords(group: KeywordGroup, query: string): KeywordChip[] {
@@ -126,9 +124,7 @@ export function ArchetypeChipPicker({
     <div className="space-y-6">
       {loading && <p className="text-sm text-gray-500">Loading themes...</p>}
       {keywordError && <p className="text-sm text-red-600">{keywordError}</p>}
-      {value.length > 0 && (
-        <SelectedKeywords value={value} labels={labels} onToggle={toggle} />
-      )}
+      {value.length > 0 && <SelectedKeywords value={value} labels={labels} onToggle={toggle} />}
       {!loading && (
         <>
           <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -286,13 +282,7 @@ function OfficialKeywordGroup({
   );
 }
 
-function KeywordList({
-  keywords,
-  query,
-  selected,
-  suggested,
-  onToggle,
-}: KeywordListProps) {
+function KeywordList({ keywords, query, selected, suggested, onToggle }: KeywordListProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {keywords.map((keyword) => (
@@ -337,9 +327,7 @@ function KeywordButton({
     >
       {keyword.label}
       {keyword.deck_count ? (
-        <span className="ml-1 text-[11px] opacity-70">
-          {formatDeckCount(keyword.deck_count)}
-        </span>
+        <span className="ml-1 text-[11px] opacity-70">{formatDeckCount(keyword.deck_count)}</span>
       ) : null}
     </button>
   );

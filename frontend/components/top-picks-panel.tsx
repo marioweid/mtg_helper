@@ -155,9 +155,7 @@ function TopPicksControls(props: TopPicksControlsProps) {
             type="button"
             onClick={() => props.onSourceChange(item)}
             className={`px-3 py-2 text-xs capitalize ${
-              props.source === item
-                ? "bg-indigo-600 text-white"
-                : "text-gray-400 hover:bg-white/5"
+              props.source === item ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-white/5"
             }`}
           >
             {item}

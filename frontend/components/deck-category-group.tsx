@@ -101,9 +101,7 @@ export function DeckCategoryGroup({
     <div
       ref={draggable ? setDropRef : undefined}
       className={`rounded-xl border bg-white/5 transition-colors ${
-        isOver && draggable
-          ? "border-indigo-400 ring-2 ring-indigo-500/40"
-          : "border-white/10"
+        isOver && draggable ? "border-indigo-400 ring-2 ring-indigo-500/40" : "border-white/10"
       }`}
     >
       <button
@@ -155,7 +153,9 @@ export function DeckCategoryGroup({
                         {card.name}
                       </CardHover>
                       {petCardNames?.has(card.name) && (
-                        <span className="text-red-400 flex-shrink-0" title="Pet card">♥</span>
+                        <span className="text-red-400 flex-shrink-0" title="Pet card">
+                          ♥
+                        </span>
                       )}
                       {comboCardIds?.has(card.scryfall_id) && (
                         <span

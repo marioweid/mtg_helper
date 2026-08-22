@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
-from mtg_helper.main import app
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
     JobState,

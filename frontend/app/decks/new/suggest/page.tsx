@@ -8,11 +8,7 @@ import { ManaSymbols } from "@/components/mana-symbols";
 import { PageHeader } from "@/components/page-header";
 import { apiClient } from "@/lib/api";
 import { archetypeLabel, BRACKET_LABELS, COLOR_SYMBOLS } from "@/lib/constants";
-import type {
-  CommanderSuggestIntent,
-  CommanderSuggestion,
-  DescribeMessage,
-} from "@/lib/types";
+import type { CommanderSuggestIntent, CommanderSuggestion, DescribeMessage } from "@/lib/types";
 
 type Message = DescribeMessage;
 type Rerank = (next: CommanderSuggestIntent) => void;
@@ -479,11 +475,7 @@ function CommanderCard({
 
 function CommanderImage({ suggestion }: { suggestion: CommanderSuggestion }) {
   if (!suggestion.card.image_uri) {
-    return (
-      <div className={IMAGE_FALLBACK_CLASS}>
-        {suggestion.card.name}
-      </div>
-    );
+    return <div className={IMAGE_FALLBACK_CLASS}>{suggestion.card.name}</div>;
   }
   return (
     <img
@@ -515,10 +507,7 @@ function ReasonChips({ suggestion }: { suggestion: CommanderSuggestion }) {
         </span>
       ))}
       {suggestion.matched_tags.slice(0, 3).map((tag) => (
-        <span
-          key={tag}
-          className="rounded-full bg-indigo-900/40 px-2 py-1 text-xs text-indigo-200"
-        >
+        <span key={tag} className="rounded-full bg-indigo-900/40 px-2 py-1 text-xs text-indigo-200">
           {archetypeLabel(tag)}
         </span>
       ))}

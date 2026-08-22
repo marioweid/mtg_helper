@@ -8,7 +8,6 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from mtg_helper.main import app
 from mtg_helper.services.retrieval_service import RetrievedCard
 from mtg_helper.services.swap_service import (
     _cmc_proximity,
@@ -26,6 +25,7 @@ from tests.conftest import (
     SOL_RING_SCRYFALL_ID,
     create_test_deck,
 )
+
 
 async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
     async with pool.acquire() as conn:
@@ -105,16 +105,16 @@ class TestCmcProximity:
 
 class TestColorSubset:
     def test_subset(self):
-        assert _color_subset({"G", "W"}, {"G"}) == 1.0
+        assert _color_subset(frozenset({"G", "W"}), frozenset({"G"})) == 1.0
 
     def test_colorless_candidate_fits_anywhere(self):
-        assert _color_subset({"G"}, []) == 1.0
+        assert _color_subset(frozenset({"G"}), []) == 1.0
 
     def test_overlap_only(self):
-        assert _color_subset({"G", "W"}, {"G", "U"}) == 0.5
+        assert _color_subset(frozenset({"G", "W"}), frozenset({"G", "U"})) == 0.5
 
     def test_no_overlap(self):
-        assert _color_subset({"W"}, {"B"}) == 0.0
+        assert _color_subset(frozenset({"W"}), frozenset({"B"})) == 0.0
 
 
 def _retrieved(
@@ -127,6 +127,7 @@ def _retrieved(
     return RetrievedCard(
         id=uuid4(),
         scryfall_id=uuid4(),
+        oracle_id=uuid4(),
         name="X",
         mana_cost="{1}",
         cmc=Decimal(str(cmc)),

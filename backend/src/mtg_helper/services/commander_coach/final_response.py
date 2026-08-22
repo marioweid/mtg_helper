@@ -1,5 +1,7 @@
 """Final response composition for the Commander Coach pipeline."""
 
+from typing import Literal
+
 from mtg_helper.models.ai import (
     AnalysisFinding,
     CoachCurveReport,
@@ -23,6 +25,7 @@ def compose_doctor_response(
     curve: CoachCurveReport,
     cuts: CoachCutReport,
     upgrades: CoachUpgradeReport,
+    *,
     roles: CoachRoleBudgetReport | None = None,
     synergy: CoachSynergyReport | None = None,
 ) -> DeckDoctorResponse:
@@ -38,7 +41,15 @@ def compose_doctor_response(
     ]
     swaps = _swaps(cuts, upgrades)
     return DeckDoctorResponse(
-        summary=_summary(identity, mana, curve, cuts, upgrades, roles, synergy),
+        summary=_summary(
+            identity,
+            mana,
+            curve,
+            cuts,
+            upgrades,
+            roles=roles,
+            synergy=synergy,
+        ),
         game_plan=_game_plan(identity),
         findings=findings,
         cuts=doctor_cuts,
@@ -54,6 +65,7 @@ def _summary(
     curve: CoachCurveReport,
     cuts: CoachCutReport,
     upgrades: CoachUpgradeReport,
+    *,
     roles: CoachRoleBudgetReport | None,
     synergy: CoachSynergyReport | None,
 ) -> str:
@@ -135,8 +147,7 @@ def _identity_findings(identity: DeckIdentityReport) -> list[AnalysisFinding]:
             title="Deck identity tensions",
             detail="; ".join(identity.deck_tension[:4]),
             evidence=(
-                f"Identity: {identity.archetype}; "
-                f"preserve {identity.must_preserve_themes[:5]}"
+                f"Identity: {identity.archetype}; preserve {identity.must_preserve_themes[:5]}"
             ),
         )
     ]
@@ -155,7 +166,7 @@ def _swaps(cuts: CoachCutReport, upgrades: CoachUpgradeReport) -> list[DoctorSwa
     return swaps
 
 
-def _confidence(score: float) -> str:
+def _confidence(score: float) -> Literal["low", "medium", "high"]:
     if score >= 7.5:
         return "high"
     if score >= 5.0:

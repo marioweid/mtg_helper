@@ -19,9 +19,12 @@ from mtg_helper.models.ai import (
     DoctorAdd,
     DoctorCut,
     DoctorSwap,
+    ReplacementOption,
+    TargetedReplacementResponse,
 )
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.services.agents._model import google_model_settings, make_google_model
+from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
+from mtg_helper.services.agents._usage import log_run_usage
 from mtg_helper.services.mtg_assistant_tools import (
     AssistantManaBaseAnalysis,
     BracketReport,
@@ -78,6 +81,9 @@ Rules:
   additional alternatives; only then make a follow-up search_cards call.
 - For cuts and swaps, prefer the lowest deck-fit scores returned by analyze_deck and explain the
   provided evidence. Do not propose protected cards as ordinary cuts or alter numeric scores.
+- For one-card replacement requests, use replacement mode and return the exact target card name
+  from the deck. Set each option's role match and explain any tradeoff. Use keep_reason only when
+  keeping the target is a defensible recommendation.
 - Call check_legality for legality questions and check_bracket for bracket questions.
 - Treat brackets as table guidance, not format legality.
 - Prefer a few strong, deck-specific recommendations over generic lists.
@@ -94,6 +100,8 @@ class AssistantRecommendation(BaseModel):
     scryfall_id: UUID
     reason: str = Field(max_length=500)
     replaces: list[str] = Field(default_factory=list, max_length=3)
+    role_match: Literal["same_role", "role_upgrade", "theme_upgrade", "role_change"] = "same_role"
+    tradeoff: str | None = Field(default=None, max_length=500)
 
 
 class AssistantCut(BaseModel):
@@ -110,6 +118,8 @@ class AssistantAnswer(BaseModel):
     reply: str
     recommendations: list[AssistantRecommendation] = Field(default_factory=list, max_length=8)
     cuts: list[AssistantCut] = Field(default_factory=list, max_length=8)
+    target_card_name: str | None = Field(default=None, max_length=200)
+    keep_reason: str | None = Field(default=None, max_length=500)
 
 
 @dataclass
@@ -131,11 +141,11 @@ class AssistantDeps:
 
 def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
     return Agent[AssistantDeps, AssistantAnswer](
-        model=make_google_model(),
+        model=make_openai_model(),
         deps_type=AssistantDeps,
         output_type=AssistantAnswer,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings=google_model_settings(max_tokens=2048, temperature=0.15, thinking="low"),
+        model_settings=openai_model_settings(max_tokens=2048, reasoning="low"),
         retries=1,
         tools=[
             search_themes,
@@ -237,29 +247,26 @@ async def run_assistant(
                 usage_limits=UsageLimits(
                     request_limit=_REQUEST_LIMIT,
                     tool_calls_limit=_MAX_TOOL_CALLS,
-                    input_tokens_limit=16_000,
-                    output_tokens_limit=4_000,
+                    input_tokens_limit=64_000,
+                    output_tokens_limit=8_000,
                 ),
             ),
             timeout=_TIMEOUT_SECONDS,
         )
+        log_run_usage("mtg_assistant", "answer", result.usage())
         output = result.output
-        usage = result.usage()
-        _log.info(
-            "MTG Assistant completed: tools=%d requests=%d input_tokens=%d output_tokens=%d",
-            deps.tool_calls,
-            usage.requests,
-            usage.input_tokens,
-            usage.output_tokens,
-        )
     except (TimeoutError, UsageLimitExceeded):
         _log.warning("MTG Assistant exceeded its bounded run budget")
         return CommanderCoachResponse(
             mode="chat",
             reply="I hit the assistant's tool or time limit before I could verify an answer.",
         )
-    except Exception:  # noqa: BLE001 - return a recoverable assistant response
-        _log.exception("MTG Assistant run failed")
+    except Exception as exc:  # noqa: BLE001 - return a recoverable assistant response
+        _log.error(
+            "AI run failed: workflow=mtg_assistant operation=answer "
+            "exception_type=%s; using recoverable chat fallback",
+            type(exc).__name__,
+        )
         return CommanderCoachResponse(
             mode="chat",
             reply="I couldn't complete a verified answer. Please try the request again.",
@@ -287,6 +294,8 @@ def _prompt_payload(deck: DeckDetailResponse, request: CommanderCoachRequest) ->
 
 
 def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoachResponse:
+    if output.mode == "chat":
+        return CommanderCoachResponse(mode="chat", reply=output.reply)
     existing = {card.name for card in deps.deck.cards}
     cuts = [cut for cut in output.cuts if cut.card_name in existing]
     recommendations = [
@@ -294,6 +303,33 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         for item in output.recommendations
         if item.scryfall_id in deps.retrieved
     ]
+    if output.mode == "replacement":
+        target = _deck_card_name(output.target_card_name, existing)
+        keep_reason = output.keep_reason.strip() if output.keep_reason else None
+        if target is None or (not recommendations and not keep_reason):
+            return CommanderCoachResponse(mode="chat", reply=output.reply)
+        options = [
+            ReplacementOption(
+                card=candidate.card,
+                reason=item.reason,
+                role_match=item.role_match,
+                tradeoff=item.tradeoff,
+            )
+            for item, candidate in recommendations
+        ]
+        replacement = TargetedReplacementResponse(
+            target_card_name=target,
+            summary=output.reply,
+            keep_reason=keep_reason,
+            best_pick=options[0].card if options else None,
+            options=options,
+            tool_call_count=deps.tool_calls,
+        )
+        return CommanderCoachResponse(
+            mode="replacement",
+            reply=output.reply,
+            replacement=replacement,
+        )
     if not recommendations and not cuts:
         return CommanderCoachResponse(mode="chat", reply=output.reply)
     doctor_cuts = [
@@ -320,8 +356,14 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         swaps=swaps,
         tool_call_count=deps.tool_calls,
     )
-    mode = "replacement" if output.mode == "replacement" else "doctor"
-    return CommanderCoachResponse(mode=mode, reply=output.reply, doctor=doctor)
+    return CommanderCoachResponse(mode="doctor", reply=output.reply, doctor=doctor)
+
+
+def _deck_card_name(target: str | None, existing: set[str]) -> str | None:
+    if target is None:
+        return None
+    normalized = target.strip().casefold()
+    return next((name for name in existing if name.casefold() == normalized), None)
 
 
 def _game_plan(deck: DeckDetailResponse) -> str:

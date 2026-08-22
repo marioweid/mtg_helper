@@ -65,9 +65,7 @@ export function CardDetailPanel({
   function toggleCategory(cat: string) {
     if (!onSetCategories) return;
     const has = card.categories.includes(cat);
-    const next = has
-      ? card.categories.filter((c) => c !== cat)
-      : [...card.categories, cat];
+    const next = has ? card.categories.filter((c) => c !== cat) : [...card.categories, cat];
     void onSetCategories(card.scryfall_id, next);
   }
 
@@ -84,9 +82,7 @@ export function CardDetailPanel({
         <div className="flex flex-wrap gap-1">
           <PlannedCutBadge quantity={card.planned_cut_quantity} />
         </div>
-        {card.type_line ? (
-          <p className="text-xs text-gray-500">{card.type_line}</p>
-        ) : null}
+        {card.type_line ? <p className="text-xs text-gray-500">{card.type_line}</p> : null}
         {card.oracle_text ? (
           <p className="whitespace-pre-line text-xs leading-relaxed text-gray-300">
             <OracleText text={card.oracle_text} />
@@ -109,8 +105,7 @@ export function CardDetailPanel({
               {CATEGORY_OPTIONS.map((opt) => {
                 const active = card.categories.includes(opt);
                 const hasExplicit = card.categories.length > 0;
-                const auto =
-                  !active && !hasExplicit && card.qualifying_stages.includes(opt);
+                const auto = !active && !hasExplicit && card.qualifying_stages.includes(opt);
                 const cls = active
                   ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
                   : auto
@@ -121,11 +116,7 @@ export function CardDetailPanel({
                     key={opt}
                     onClick={() => toggleCategory(opt)}
                     className={`rounded border px-2 py-0.5 text-xs transition-colors ${cls}`}
-                    title={
-                      auto
-                        ? "Auto-tagged from card text — click to make explicit"
-                        : undefined
-                    }
+                    title={auto ? "Auto-tagged from card text — click to make explicit" : undefined}
                   >
                     {STAGE_LABELS[opt] ?? opt}
                     {auto ? <span className="ml-1 text-[10px] text-gray-500">auto</span> : null}

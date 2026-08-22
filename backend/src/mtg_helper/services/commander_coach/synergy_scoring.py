@@ -215,9 +215,7 @@ def _camellia_specs() -> list[PackageSpec]:
         PackageSpec(
             "sacrifice", ("sacrifice creature", "sacrifice artifact"), ("sacrifice",), "engine"
         ),
-        PackageSpec(
-            "death_payoff", ("creature dies lose life",), ("dies", "loses life"), "payoff"
-        ),
+        PackageSpec("death_payoff", ("creature dies lose life",), ("dies", "loses life"), "payoff"),
         PackageSpec(
             "token_payoff", ("tokens creatures you control",), ("token", "tokens"), "payoff"
         ),

@@ -7,11 +7,7 @@ import { CardWorkspaceToolbar } from "@/components/card-workspace-toolbar";
 import { DeckCompactColumns } from "@/components/deck-compact-columns";
 import { DeckGrid } from "@/components/deck-grid";
 import { PlannedCutBadge } from "@/components/planned-cut-badge";
-import {
-  applyDeckFilter,
-  DeckFilterBar,
-  type DeckFilter,
-} from "@/components/deck-filter-bar";
+import { applyDeckFilter, DeckFilterBar, type DeckFilter } from "@/components/deck-filter-bar";
 import { STAGE_LABELS } from "@/lib/constants";
 import {
   getWorkspaceView,
@@ -60,8 +56,7 @@ function CardRow({
   inCombo: boolean;
 }) {
   const tags = bucketsFor(card).filter((t) => t !== "untagged");
-  const price =
-    card.price_eur_cents != null ? `€${(card.price_eur_cents / 100).toFixed(2)}` : "—";
+  const price = card.price_eur_cents != null ? `€${(card.price_eur_cents / 100).toFixed(2)}` : "—";
   return (
     <li className="group flex items-start gap-2 border-b border-white/5 px-2 py-1.5 text-xs hover:bg-white/5">
       <span className="mt-0.5 w-6 shrink-0 text-right tabular-nums text-gray-500">
@@ -139,7 +134,9 @@ export function DeckBrowserPanel({
     const storedGroup = getWorkspaceGroup(workspaceScope);
     const validStoredGroup =
       storedGroup === "type" || storedGroup === "tag" || storedGroup === "flat";
-    setGroup(validStoredGroup && !(storedView === "grid" && storedGroup === "flat") ? storedGroup : "type");
+    setGroup(
+      validStoredGroup && !(storedView === "grid" && storedGroup === "flat") ? storedGroup : "type",
+    );
     const storedSort = getWorkspaceSort(workspaceScope);
     const validStoredSort =
       storedSort === "default" ||
@@ -195,25 +192,25 @@ export function DeckBrowserPanel({
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
       {lastCut && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs"
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs"
+        >
+          <span className="truncate text-gray-300">
+            Planned cut for{" "}
+            <CardHover name={lastCut.name} imageUri={lastCut.image_uri} className="text-white">
+              {lastCut.name}
+            </CardHover>
+          </span>
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="shrink-0 rounded border border-emerald-500/40 px-2 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-500/10"
           >
-            <span className="truncate text-gray-300">
-              Planned cut for{" "}
-              <CardHover name={lastCut.name} imageUri={lastCut.image_uri} className="text-white">
-                {lastCut.name}
-              </CardHover>
-            </span>
-            <button
-              type="button"
-              onClick={handleUndo}
-              className="shrink-0 rounded border border-emerald-500/40 px-2 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Undo
-            </button>
-          </div>
+            Undo
+          </button>
+        </div>
       )}
 
       <CardWorkspaceToolbar

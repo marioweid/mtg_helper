@@ -13,11 +13,7 @@ interface TileProps {
 }
 
 export function VisualCardGrid({ children }: GridProps) {
-  return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-      {children}
-    </ul>
-  );
+  return <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{children}</ul>;
 }
 
 /** Artwork-first card tile used by deck and collection grids. */

@@ -558,6 +558,7 @@ _TRAIT_SYNONYMS: dict[str, str] = {
 
 def _classify_query_word(
     stripped: str,
+    *,
     seen_types: set[str],
     seen_subs: set[str],
     seen_kw: set[str],
@@ -626,12 +627,12 @@ def parse_query_types(query: str) -> TypeFilter | None:
         stripped = word.strip(".,!?;:'\"")
         _classify_query_word(
             stripped,
-            seen_types,
-            seen_subs,
-            seen_kw,
-            card_types,
-            subtypes,
-            keywords,
+            seen_types=seen_types,
+            seen_subs=seen_subs,
+            seen_kw=seen_kw,
+            card_types=card_types,
+            subtypes=subtypes,
+            keywords=keywords,
         )
         if stripped in _TOKEN_TYPE_NAMES and stripped not in seen_tokens:
             seen_tokens.add(stripped)
@@ -707,6 +708,7 @@ async def _search_tags(
     query_tags: list[str],
     commander_color_identity: list[str],
     exclude_ids: list[UUID],
+    *,
     exclude_lands: bool = False,
     limit: int = 50,
     owned_card_ids: frozenset[UUID] | None = None,
@@ -784,6 +786,7 @@ async def _search_fts(
     query_text: str,
     commander_color_identity: list[str],
     exclude_ids: list[UUID],
+    *,
     exclude_lands: bool = False,
     limit: int = 30,
     owned_card_ids: frozenset[UUID] | None = None,
@@ -986,7 +989,7 @@ def _representation_match_score(row: "asyncpg.Record", query: RepresentationQuer
         return 0.0
 
     tag_matches = set(row["tags"]) & set(query.tags)
-    mtgjson_matches = set(row["mtgjson_tags"]) & set(query.mtgjson_tags)
+    mtgjson_matches = set(row.get("mtgjson_tags") or []) & set(query.mtgjson_tags)
     type_matches = set(row["card_types"]) & set(query.card_types)
     subtype_matches = set(row["subtypes"]) & set(query.subtypes)
     keyword_matches = {k.lower() for k in row["keywords"]} & {k.lower() for k in query.keywords}
@@ -1056,8 +1059,146 @@ _MULTI_TAG_SYNERGY_THRESHOLD = 3
 _MULTI_TAG_SYNERGY_DAMPEN = 0.7
 
 
+@dataclass(frozen=True)
+class _ScoreContext:
+    tag_overlaps: dict[UUID, int]
+    fts_set: set[UUID]
+    commander_colors: set[str]
+    deck_cmc_counts: dict[int, int] | None
+    feedback_weights: dict[UUID, float] | None
+    user_profile: "profile_service.UserProfile | None"
+    type_filter: TypeFilter | None
+    stage: str | None
+    weights: RankingWeights
+    hub_inclusion: dict[UUID, float]
+    moxfield_inclusion: dict[UUID, float]
+    representation_query: RepresentationQuery | None
+    max_overlap: int
+    max_rank: int
+    synergy_base_weight: float
+
+
+@dataclass(frozen=True)
+class _ScoreComponents:
+    synergy: float
+    popularity: float
+    curve: float
+    personal: float
+    color: float
+    profile: float
+    inclusion: float
+    moxfield_inclusion: float
+    representation: float
+
+
+def _build_score_context(
+    all_ids: list[UUID],
+    *,
+    tag_overlaps: dict[UUID, int],
+    fts_set: set[UUID],
+    cards_by_id: dict[UUID, "asyncpg.Record"],
+    commander_color_identity: list[str],
+    deck_cmc_counts: dict[int, int] | None,
+    feedback_weights: dict[UUID, float] | None,
+    user_profile: "profile_service.UserProfile | None",
+    type_filter: TypeFilter | None,
+    stage: str | None,
+    ranking_weights: RankingWeights | None,
+    hub_inclusion: dict[UUID, float] | None,
+    moxfield_inclusion: dict[UUID, float] | None,
+    prefer_keywords: bool,
+    representation_query: RepresentationQuery | None,
+) -> _ScoreContext:
+    weights = ranking_weights if ranking_weights is not None else RankingWeights()
+    synergy_base_weight = weights.synergy + weights.semantic
+    if prefer_keywords:
+        synergy_base_weight += 0.05
+    ranks = [
+        cards_by_id[uid]["edhrec_rank"]
+        for uid in all_ids
+        if uid in cards_by_id and cards_by_id[uid]["edhrec_rank"] is not None
+    ]
+    return _ScoreContext(
+        tag_overlaps=tag_overlaps,
+        fts_set=fts_set,
+        commander_colors=set(commander_color_identity),
+        deck_cmc_counts=deck_cmc_counts,
+        feedback_weights=feedback_weights,
+        user_profile=user_profile,
+        type_filter=type_filter,
+        stage=stage,
+        weights=weights,
+        hub_inclusion=hub_inclusion or {},
+        moxfield_inclusion=moxfield_inclusion or {},
+        representation_query=representation_query,
+        max_overlap=max(tag_overlaps.values(), default=1) or 1,
+        max_rank=max(ranks, default=1) or 1,
+        synergy_base_weight=synergy_base_weight,
+    )
+
+
+def _score_components(uid: UUID, row: "asyncpg.Record", context: _ScoreContext) -> _ScoreComponents:
+    raw_overlap = context.tag_overlaps.get(uid, 0)
+    fts_bonus = 0.15 if uid in context.fts_set else 0.0
+    synergy = min(1.0, (raw_overlap / context.max_overlap) + fts_bonus)
+    if (
+        raw_overlap >= _MULTI_TAG_SYNERGY_THRESHOLD
+        and context.stage not in _MULTI_TAG_SYNERGY_EXEMPT
+    ):
+        synergy *= _MULTI_TAG_SYNERGY_DAMPEN
+    rank = row["edhrec_rank"]
+    popularity = 0.0
+    if rank is not None:
+        popularity = max(0.0, 1.0 - math.log1p(rank) / math.log1p(context.max_rank))
+    profile = 0.5
+    if context.user_profile is not None:
+        profile = profile_service.score_card(context.user_profile, uid, list(row["tags"]))
+    representation = 0.0
+    if context.representation_query is not None:
+        representation = _representation_match_score(row, context.representation_query)
+    return _ScoreComponents(
+        synergy=synergy,
+        popularity=popularity,
+        curve=_curve_fit_score(row["cmc"], context.deck_cmc_counts),
+        personal=_personal_rating(uid, context.feedback_weights),
+        color=_color_affinity_score(list(row["color_identity"]), context.commander_colors),
+        profile=profile,
+        inclusion=context.hub_inclusion.get(uid, 0.0),
+        moxfield_inclusion=context.moxfield_inclusion.get(uid, 0.0),
+        representation=representation,
+    )
+
+
+def _combine_score(
+    row: "asyncpg.Record", components: _ScoreComponents, context: _ScoreContext
+) -> float:
+    representation_weight = _W_REPRESENTATION if context.representation_query is not None else 0.0
+    type_weight = 0.0
+    type_score = 0.0
+    if context.type_filter is not None:
+        type_score = _type_match_score(row, context.type_filter)
+        if context.type_filter.strict and type_score == 0.0:
+            return 0.0
+        type_weight = 0.15
+    synergy_weight = max(0.0, context.synergy_base_weight - type_weight - representation_weight)
+    weights = context.weights
+    return (
+        synergy_weight * components.synergy
+        + type_weight * type_score
+        + representation_weight * components.representation
+        + _W_COLOR * components.color
+        + weights.popularity * components.popularity
+        + _W_CURVE * components.curve
+        + weights.personal * components.personal
+        + _W_PROFILE * components.profile
+        + weights.deck_inclusion * components.inclusion
+        + weights.moxfield_inclusion * components.moxfield_inclusion
+    )
+
+
 def _compute_weighted_scores(
     all_ids: list[UUID],
+    *,
     tag_overlaps: dict[UUID, int],
     fts_set: set[UUID],
     cards_by_id: dict[UUID, "asyncpg.Record"],
@@ -1107,88 +1248,29 @@ def _compute_weighted_scores(
     Returns:
         Dict mapping card UUID to final weighted score.
     """
-    w = ranking_weights if ranking_weights is not None else RankingWeights()
-    synergy_base_weight = w.synergy + w.semantic
-    if prefer_keywords:
-        synergy_base_weight += 0.05
-
-    max_overlap = max(tag_overlaps.values(), default=1) or 1
-    edhrec_ranks = [
-        cards_by_id[uid]["edhrec_rank"]
-        for uid in all_ids
-        if uid in cards_by_id and cards_by_id[uid]["edhrec_rank"] is not None
-    ]
-    max_rank = max(edhrec_ranks, default=1) or 1
-    cmdr_colors = set(commander_color_identity)
-
+    context = _build_score_context(
+        all_ids,
+        tag_overlaps=tag_overlaps,
+        fts_set=fts_set,
+        cards_by_id=cards_by_id,
+        commander_color_identity=commander_color_identity,
+        deck_cmc_counts=deck_cmc_counts,
+        feedback_weights=feedback_weights,
+        user_profile=user_profile,
+        type_filter=type_filter,
+        stage=stage,
+        ranking_weights=ranking_weights,
+        hub_inclusion=hub_inclusion,
+        moxfield_inclusion=moxfield_inclusion,
+        prefer_keywords=prefer_keywords,
+        representation_query=representation_query,
+    )
     scores: dict[UUID, float] = {}
     for uid in all_ids:
         row = cards_by_id.get(uid)
         if row is None:
             continue
-
-        raw_overlap = tag_overlaps.get(uid, 0)
-        fts_bonus = 0.15 if uid in fts_set else 0.0
-        synergy = min(1.0, (raw_overlap / max_overlap) + fts_bonus)
-        if raw_overlap >= _MULTI_TAG_SYNERGY_THRESHOLD and stage not in _MULTI_TAG_SYNERGY_EXEMPT:
-            synergy *= _MULTI_TAG_SYNERGY_DAMPEN
-
-        rank = row["edhrec_rank"]
-        popularity = (
-            max(0.0, 1.0 - math.log1p(rank) / math.log1p(max_rank)) if rank is not None else 0.0
-        )
-
-        curve = _curve_fit_score(row["cmc"], deck_cmc_counts)
-        personal = _personal_rating(uid, feedback_weights)
-        color = _color_affinity_score(list(row["color_identity"]), cmdr_colors)
-
-        if user_profile is not None:
-            profile_score = profile_service.score_card(user_profile, uid, list(row["tags"]))
-        else:
-            profile_score = 0.5
-
-        inclusion = hub_inclusion.get(uid, 0.0) if hub_inclusion else 0.0
-        mox_inclusion = moxfield_inclusion.get(uid, 0.0) if moxfield_inclusion else 0.0
-        representation = (
-            _representation_match_score(row, representation_query)
-            if representation_query is not None
-            else 0.0
-        )
-        rep_weight = _W_REPRESENTATION if representation_query is not None else 0.0
-
-        if type_filter is not None:
-            type_score = _type_match_score(row, type_filter)
-            if type_filter.strict and type_score == 0.0:
-                scores[uid] = 0.0
-                continue
-            # With type filter: reallocate 0.15 from synergy to type_score.
-            tf_synergy = max(0.0, synergy_base_weight - 0.15 - rep_weight)
-            scores[uid] = (
-                tf_synergy * synergy
-                + 0.15 * type_score
-                + rep_weight * representation
-                + _W_COLOR * color
-                + w.popularity * popularity
-                + _W_CURVE * curve
-                + w.personal * personal
-                + _W_PROFILE * profile_score
-                + w.deck_inclusion * inclusion
-                + w.moxfield_inclusion * mox_inclusion
-            )
-        else:
-            synergy_weight = max(0.0, synergy_base_weight - rep_weight)
-            scores[uid] = (
-                synergy_weight * synergy
-                + rep_weight * representation
-                + _W_COLOR * color
-                + w.popularity * popularity
-                + _W_CURVE * curve
-                + w.personal * personal
-                + _W_PROFILE * profile_score
-                + w.deck_inclusion * inclusion
-                + w.moxfield_inclusion * mox_inclusion
-            )
-
+        scores[uid] = _combine_score(row, _score_components(uid, row, context), context)
     return scores
 
 
@@ -1263,9 +1345,7 @@ async def _fetch_inclusion_signals(
     hub_inclusion: dict[UUID, float] = {}
     moxfield_inclusion: dict[UUID, float] = {}
     try:
-        hub_inclusion = await theme_service.score_themes(
-            pool, query_tags, commander_color_identity
-        )
+        hub_inclusion = await theme_service.score_themes(pool, query_tags, commander_color_identity)
     except Exception:
         _log.exception("Moxfield hub inclusion lookup failed; continuing without boost")
     if commander_id is not None:
@@ -1366,7 +1446,7 @@ def _filter_theme_rows(
     if required_hub_tag is None and not excluded_hub_tags:
         return rows
 
-    filtered: list["asyncpg.Record"] = []
+    filtered: list[asyncpg.Record] = []
     for row in rows:
         uid = row["id"]
         if (
@@ -1427,6 +1507,7 @@ def _apply_trusted_quota(
     moxfield_inclusion: dict[UUID, float],
     cards_by_id: dict[UUID, "asyncpg.Record"],
     limit: int,
+    *,
     stage: str | None = None,
     quota: float = 1.0,
 ) -> list[UUID]:
@@ -1493,14 +1574,276 @@ def _apply_trusted_quota(
     return (pinned + reserved + fill)[:limit]
 
 
+async def _fetch_excluded_theme_ids(
+    pool: asyncpg.Pool,
+    excluded_hub_tags: frozenset[str] | None,
+    commander_color_identity: list[str],
+) -> frozenset[UUID] | None:
+    if not excluded_hub_tags:
+        return None
+    try:
+        return frozenset(
+            set(
+                await theme_service.score_themes(
+                    pool, list(excluded_hub_tags), commander_color_identity
+                )
+            )
+        )
+    except Exception:
+        _log.exception("Moxfield hub exclusion lookup failed; continuing with tag-only Etc")
+        return None
+
+
+@dataclass(frozen=True)
+class _RetrievalRequest:
+    query_text: str
+    query_tags: list[str]
+    commander_color_identity: list[str]
+    deck_card_ids: list[UUID]
+    limit: int
+    offset: int
+    stage: str | None
+    deck_cmc_counts: dict[int, int] | None
+    feedback_weights: dict[UUID, float] | None
+    user_profile: "profile_service.UserProfile | None"
+    type_filter: TypeFilter | None
+    ranking_weights: RankingWeights | None
+    collection_filter: CollectionFilter | None
+    price_filter: PriceFilter | None
+    commander_id: UUID | None
+    bracket: int | None
+    prefer_keywords: bool
+    required_hub_tag: str | None
+    excluded_hub_tags: frozenset[str] | None
+
+
+@dataclass
+class _CandidateSearch:
+    all_ids: list[UUID]
+    tag_overlaps: dict[UUID, int]
+    fts_set: set[UUID]
+    signal_map: dict[UUID, list[str]]
+    hub_inclusion: dict[UUID, float]
+    moxfield_inclusion: dict[UUID, float]
+    excluded_theme_ids: frozenset[UUID] | None
+
+
+@dataclass(frozen=True)
+class _RankingResult:
+    top_ids: list[UUID]
+    scores: dict[UUID, float]
+    signal_map: dict[UUID, list[str]]
+    hub_inclusion: dict[UUID, float]
+    moxfield_inclusion: dict[UUID, float]
+
+
+def _owned_ids(request: _RetrievalRequest) -> frozenset[UUID] | None:
+    if request.collection_filter is None:
+        return None
+    return request.collection_filter.owned_card_ids
+
+
+async def _collect_candidate_search(
+    pool: asyncpg.Pool, request: _RetrievalRequest
+) -> _CandidateSearch:
+    exclude_lands = request.stage is not None and request.stage != "lands"
+    page_end = request.offset + request.limit
+    headroom = page_end + len(request.deck_card_ids)
+    pool_size = min(_MAX_INNER_POOL, max(headroom, 50))
+    fts_pool_size = min(_MAX_INNER_POOL, max(headroom, 30))
+    owned_ids = _owned_ids(request)
+    tag_results, fts_ids = await asyncio.gather(
+        _search_tags(
+            pool,
+            request.query_tags,
+            request.commander_color_identity,
+            request.deck_card_ids,
+            exclude_lands=exclude_lands,
+            limit=pool_size,
+            owned_card_ids=owned_ids,
+            price_filter=request.price_filter,
+        ),
+        _search_fts(
+            pool,
+            request.query_text,
+            request.commander_color_identity,
+            request.deck_card_ids,
+            exclude_lands=exclude_lands,
+            limit=fts_pool_size,
+            owned_card_ids=owned_ids,
+            price_filter=request.price_filter,
+        ),
+    )
+    tag_overlaps, fts_set, signal_map = _build_signal_map(tag_results, fts_ids)
+    hub_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
+        pool,
+        request.commander_id,
+        request.commander_color_identity,
+        request.bracket,
+        request.query_tags,
+    )
+    excluded_theme_ids = await _fetch_excluded_theme_ids(
+        pool, request.excluded_hub_tags, request.commander_color_identity
+    )
+    deck_exclude = set(request.deck_card_ids)
+    extra_ids = [
+        uid
+        for uid in {*hub_inclusion, *moxfield_inclusion}
+        if uid not in tag_overlaps
+        and uid not in fts_set
+        and uid not in deck_exclude
+        and (owned_ids is None or uid in owned_ids)
+    ]
+    return _CandidateSearch(
+        all_ids=list({*tag_overlaps, *fts_set, *extra_ids}),
+        tag_overlaps=tag_overlaps,
+        fts_set=fts_set,
+        signal_map=signal_map,
+        hub_inclusion=hub_inclusion,
+        moxfield_inclusion=moxfield_inclusion,
+        excluded_theme_ids=excluded_theme_ids,
+    )
+
+
+async def _load_candidate_rows(
+    pool: asyncpg.Pool,
+    request: _RetrievalRequest,
+    search: _CandidateSearch,
+    excluded_names: set[str],
+) -> list["asyncpg.Record"]:
+    exclude_lands = request.stage is not None and request.stage != "lands"
+    rows = await _fetch_candidates(
+        pool,
+        search.all_ids,
+        exclude_lands=exclude_lands,
+        price_filter=request.price_filter,
+    )
+    if excluded_names:
+        rows = [row for row in rows if _normalize_card_name(row["name"]) not in excluded_names]
+    rows = _filter_theme_rows(
+        rows,
+        required_hub_tag=request.required_hub_tag,
+        excluded_hub_tags=request.excluded_hub_tags,
+        allowed_theme_ids=frozenset(search.hub_inclusion),
+        excluded_theme_ids=search.excluded_theme_ids,
+    )
+    return _filter_rows_by_stage(rows, request.stage)
+
+
+def _rank_candidates(
+    request: _RetrievalRequest,
+    search: _CandidateSearch,
+    rows: list["asyncpg.Record"],
+) -> _RankingResult:
+    cards_by_id = {row["id"]: row for row in rows}
+    hub_inclusion = _filter_inclusion_by_stage(search.hub_inclusion, cards_by_id, request.stage)
+    moxfield_inclusion = _filter_inclusion_by_stage(
+        search.moxfield_inclusion, cards_by_id, request.stage
+    )
+    representation_query = _build_representation_query(request.query_tags, request.type_filter)
+    scores = _compute_weighted_scores(
+        search.all_ids,
+        tag_overlaps=search.tag_overlaps,
+        fts_set=search.fts_set,
+        cards_by_id=cards_by_id,
+        commander_color_identity=request.commander_color_identity,
+        deck_cmc_counts=request.deck_cmc_counts,
+        feedback_weights=request.feedback_weights,
+        user_profile=request.user_profile,
+        type_filter=request.type_filter,
+        stage=request.stage,
+        ranking_weights=request.ranking_weights,
+        hub_inclusion=hub_inclusion,
+        moxfield_inclusion=moxfield_inclusion,
+        prefer_keywords=request.prefer_keywords,
+        representation_query=representation_query,
+    )
+    _annotate_type_signals(search.signal_map, cards_by_id, request.type_filter)
+    _annotate_representation_signals(search.signal_map, cards_by_id, representation_query)
+    _annotate_hub_signals(search.signal_map, hub_inclusion, cards_by_id)
+    _annotate_moxfield_signals(search.signal_map, moxfield_inclusion, cards_by_id)
+    quota = request.ranking_weights.trusted_quota if request.ranking_weights else 1.0
+    page_end = request.offset + request.limit
+    ranked = _apply_trusted_quota(
+        scores,
+        hub_inclusion,
+        moxfield_inclusion,
+        cards_by_id,
+        page_end,
+        stage=request.stage,
+        quota=quota,
+    )
+    return _RankingResult(
+        top_ids=ranked[request.offset : page_end],
+        scores=scores,
+        signal_map=search.signal_map,
+        hub_inclusion=hub_inclusion,
+        moxfield_inclusion=moxfield_inclusion,
+    )
+
+
+def _build_retrieved_cards(
+    rows: list["asyncpg.Record"], ranking: _RankingResult
+) -> list[RetrievedCard]:
+    cards_by_id = {row["id"]: row for row in rows}
+    result: list[RetrievedCard] = []
+    seen_names: set[str] = set()
+    for uid in ranking.top_ids:
+        row = cards_by_id.get(uid)
+        if row is None or row["name"] in seen_names:
+            continue
+        seen_names.add(row["name"])
+        result.append(
+            RetrievedCard(
+                id=row["id"],
+                scryfall_id=row["scryfall_id"],
+                oracle_id=row["oracle_id"],
+                name=row["name"],
+                mana_cost=row["mana_cost"],
+                cmc=row["cmc"],
+                type_line=row["type_line"],
+                oracle_text=row["oracle_text"],
+                color_identity=list(row["color_identity"]),
+                image_uri=row["image_uri"],
+                tags=list(row["tags"]),
+                token_types=list(row["token_types"]),
+                edhrec_rank=row["edhrec_rank"],
+                power=row["power"],
+                toughness=row["toughness"],
+                rarity=row["rarity"],
+                price_eur_cents=row["price_eur_cents"],
+                game_changer=bool(row["game_changer"]),
+                score=ranking.scores[uid],
+                signals=ranking.signal_map.get(uid, []),
+                hub_weight=ranking.hub_inclusion.get(uid, 0.0),
+                moxfield_weight=ranking.moxfield_inclusion.get(uid, 0.0),
+            )
+        )
+    return result
+
+
+async def _retrieve_candidates(
+    pool: asyncpg.Pool, request: _RetrievalRequest
+) -> list[RetrievedCard]:
+    if _owned_ids(request) == frozenset():
+        return []
+    excluded_names = await _excluded_nonbasic_names(pool, request.deck_card_ids)
+    search = await _collect_candidate_search(pool, request)
+    if not search.all_ids:
+        return []
+    rows = await _load_candidate_rows(pool, request, search, excluded_names)
+    ranking = _rank_candidates(request, search, rows)
+    return _build_retrieved_cards(rows, ranking)
+
+
 async def retrieve_candidates(
     pool: asyncpg.Pool,
     query_text: str,
     query_tags: list[str],
     commander_color_identity: list[str],
     deck_card_ids: list[UUID],
-    limit: int = 40,
     *,
+    limit: int = 40,
     offset: int = 0,
     stage: str | None = None,
     deck_cmc_counts: dict[int, int] | None = None,
@@ -1549,172 +1892,28 @@ async def retrieve_candidates(
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
     """
-    exclude_lands = stage is not None and stage != "lands"
-    owned_ids = collection_filter.owned_card_ids if collection_filter else None
-    if owned_ids == frozenset():
-        return []
-    excluded_names = await _excluded_nonbasic_names(pool, deck_card_ids)
-
-    # Build a deep enough ranked list to satisfy ``offset + limit`` (Load More
-    # paginates through positions, not via a growing exclude list). The pool
-    # is also padded for cards already in the deck since those get filtered.
-    page_end = offset + limit
-    headroom = page_end + len(deck_card_ids)
-    pool_size = min(_MAX_INNER_POOL, max(headroom, 50))
-    fts_pool_size = min(_MAX_INNER_POOL, max(headroom, 30))
-
-    tag_results, fts_ids = await asyncio.gather(
-        _search_tags(
-            pool,
-            query_tags,
-            commander_color_identity,
-            deck_card_ids,
-            exclude_lands=exclude_lands,
-            limit=pool_size,
-            owned_card_ids=owned_ids,
-            price_filter=price_filter,
-        ),
-        _search_fts(
-            pool,
-            query_text,
-            commander_color_identity,
-            deck_card_ids,
-            exclude_lands=exclude_lands,
-            limit=fts_pool_size,
-            owned_card_ids=owned_ids,
-            price_filter=price_filter,
-        ),
-    )
-
-    tag_overlaps, fts_set, signal_map = _build_signal_map(tag_results, fts_ids)
-
-    hub_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
-        pool, commander_id, commander_color_identity, bracket, query_tags
-    )
-    excluded_theme_ids: frozenset[UUID] | None = None
-    if excluded_hub_tags:
-        try:
-            hub_theme_exclusions = set(
-                await theme_service.score_themes(
-                    pool, list(excluded_hub_tags), commander_color_identity
-                )
-            )
-            excluded_theme_ids = frozenset(hub_theme_exclusions)
-        except Exception:
-            _log.exception("Moxfield hub exclusion lookup failed; continuing with tag-only Etc")
-
-    # Include Moxfield hub and top-commander-pick matches as candidates so a high-synergy
-    # card not surfaced by tag/FTS still has a path into the result set.
-    # Must respect ``deck_card_ids`` — the search channels filter against it,
-    # but this fallback path bypasses them and would otherwise resurface cards
-    # already in the deck.
-    deck_exclude = set(deck_card_ids)
-    extra_ids = [
-        uid
-        for uid in {*hub_inclusion, *moxfield_inclusion}
-        if uid not in tag_overlaps
-        and uid not in fts_set
-        and uid not in deck_exclude
-        and (owned_ids is None or uid in owned_ids)
-    ]
-    all_ids = list({*tag_overlaps, *fts_set, *extra_ids})
-    if not all_ids:
-        return []
-
-    rows = await _fetch_candidates(
-        pool, all_ids, exclude_lands=exclude_lands, price_filter=price_filter
-    )
-    if excluded_names:
-        rows = [r for r in rows if _normalize_card_name(r["name"]) not in excluded_names]
-    rows = _filter_theme_rows(
-        rows,
+    request = _RetrievalRequest(
+        query_text=query_text,
+        query_tags=query_tags,
+        commander_color_identity=commander_color_identity,
+        deck_card_ids=deck_card_ids,
+        limit=limit,
+        offset=offset,
+        stage=stage,
+        deck_cmc_counts=deck_cmc_counts,
+        feedback_weights=feedback_weights,
+        user_profile=user_profile,
+        type_filter=type_filter,
+        ranking_weights=ranking_weights,
+        collection_filter=collection_filter,
+        price_filter=price_filter,
+        commander_id=commander_id,
+        bracket=bracket,
+        prefer_keywords=prefer_keywords,
         required_hub_tag=required_hub_tag,
         excluded_hub_tags=excluded_hub_tags,
-        allowed_theme_ids=frozenset(hub_inclusion),
-        excluded_theme_ids=excluded_theme_ids,
     )
-    rows = _filter_rows_by_stage(rows, stage)
-    cards_by_id = {r["id"]: r for r in rows}
-
-    # Trusted-card boost only fires when the card actually fits the stage —
-    # otherwise Sol Ring keeps showing up under "interaction" etc.
-    hub_inclusion = _filter_inclusion_by_stage(hub_inclusion, cards_by_id, stage)
-    moxfield_inclusion = _filter_inclusion_by_stage(moxfield_inclusion, cards_by_id, stage)
-    representation_query = _build_representation_query(query_tags, type_filter)
-
-    scores = _compute_weighted_scores(
-        all_ids,
-        tag_overlaps,
-        fts_set,
-        cards_by_id,
-        commander_color_identity,
-        deck_cmc_counts,
-        feedback_weights,
-        user_profile,
-        type_filter,
-        stage=stage,
-        ranking_weights=ranking_weights,
-        hub_inclusion=hub_inclusion,
-        moxfield_inclusion=moxfield_inclusion,
-        prefer_keywords=prefer_keywords,
-        representation_query=representation_query,
-    )
-
-    _annotate_type_signals(signal_map, cards_by_id, type_filter)
-    _annotate_representation_signals(signal_map, cards_by_id, representation_query)
-    _annotate_hub_signals(signal_map, hub_inclusion, cards_by_id)
-    _annotate_moxfield_signals(signal_map, moxfield_inclusion, cards_by_id)
-    trusted_quota = ranking_weights.trusted_quota if ranking_weights is not None else 1.0
-    full_ranked = _apply_trusted_quota(
-        scores,
-        hub_inclusion,
-        moxfield_inclusion,
-        cards_by_id,
-        page_end,
-        stage=stage,
-        quota=trusted_quota,
-    )
-    top_ids = full_ranked[offset:page_end]
-    if not top_ids:
-        return []
-
-    result: list[RetrievedCard] = []
-    seen_names: set[str] = set()
-    for uid in top_ids:
-        row = cards_by_id.get(uid)
-        if row is None:
-            continue
-        name = row["name"]
-        if name in seen_names:
-            continue
-        seen_names.add(name)
-        result.append(
-            RetrievedCard(
-                id=row["id"],
-                scryfall_id=row["scryfall_id"],
-                oracle_id=row["oracle_id"],
-                name=row["name"],
-                mana_cost=row["mana_cost"],
-                cmc=row["cmc"],
-                type_line=row["type_line"],
-                oracle_text=row["oracle_text"],
-                color_identity=list(row["color_identity"]),
-                image_uri=row["image_uri"],
-                tags=list(row["tags"]),
-                token_types=list(row["token_types"]),
-                edhrec_rank=row["edhrec_rank"],
-                power=row["power"],
-                toughness=row["toughness"],
-                rarity=row["rarity"],
-                price_eur_cents=row["price_eur_cents"],
-                game_changer=bool(row["game_changer"]),
-                score=scores[uid],
-                signals=signal_map.get(uid, []),
-                hub_weight=hub_inclusion.get(uid, 0.0),
-                moxfield_weight=moxfield_inclusion.get(uid, 0.0),
-            )
-        )
-    return result
+    return await _retrieve_candidates(pool, request)
 
 
 async def _fetch_candidates(

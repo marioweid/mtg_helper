@@ -93,7 +93,9 @@ export function PreferenceForm({ onCreated }: Props) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={
-            type === "avoid_archetype" ? "e.g. stax, land destruction" : "e.g. prefer synergy over power"
+            type === "avoid_archetype"
+              ? "e.g. stax, land destruction"
+              : "e.g. prefer synergy over power"
           }
           className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />

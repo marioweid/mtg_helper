@@ -55,10 +55,7 @@ export function BuilderFiltersDropdown(props: Props) {
   const ownedActive = props.selectedCollectionIds.length > 0;
   const priceActive = props.minPriceCents != null || props.maxPriceCents != null;
   const activeCount =
-    (ownedActive ? 1 : 0) +
-    (priceActive ? 1 : 0) +
-    props.cardTypes.length +
-    props.subtypes.length;
+    (ownedActive ? 1 : 0) + (priceActive ? 1 : 0) + props.cardTypes.length + props.subtypes.length;
   const hasDraft = Boolean(props.minPriceDraft.trim() || props.maxPriceDraft.trim());
 
   useEffect(() => {
@@ -191,9 +188,7 @@ function OwnedFilterSection(props: Props) {
             onClick={props.onToggleOwnedOnly}
             className={
               "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full " +
-              `transition-colors disabled:opacity-40 ${
-                active ? "bg-indigo-600" : "bg-white/10"
-              }`
+              `transition-colors disabled:opacity-40 ${active ? "bg-indigo-600" : "bg-white/10"}`
             }
           >
             <span
@@ -277,9 +272,7 @@ function PriceFilterSection(props: Props) {
           <span className="rounded-full bg-indigo-600/30 px-2 py-0.5 text-xs text-indigo-200">
             €{props.minPriceCents != null ? (props.minPriceCents / 100).toFixed(2) : "0.00"}
             {" – "}
-            {props.maxPriceCents != null
-              ? `€${(props.maxPriceCents / 100).toFixed(2)}`
-              : "∞"}
+            {props.maxPriceCents != null ? `€${(props.maxPriceCents / 100).toFixed(2)}` : "∞"}
           </span>
         )}
       </div>

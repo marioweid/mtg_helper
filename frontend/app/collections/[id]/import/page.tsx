@@ -87,7 +87,6 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
       <div className="mx-auto max-w-2xl">
         <PageHeader title="Import complete" />
 
-
         <div className="rounded-xl border border-green-500/30 bg-green-900/10 p-6 mb-4">
           <p className="text-green-400 font-medium text-lg mb-2">
             {result.imported} added · {result.updated} updated
@@ -194,59 +193,59 @@ export default function ImportCollectionPage({ params }: { params: Promise<{ id:
 
         {source === "csv" && (
           <>
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-3 font-semibold text-white">CSV Format</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {(Object.keys(FORMAT_COPY) as CollectionImportFormat[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={format === option}
-                onClick={() => {
-                  setFormat(option);
-                  setError(null);
-                }}
-                className={`rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
-                  format === option
-                    ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
-                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
-                }`}
-              >
-                <span className="font-medium">{FORMAT_COPY[option].label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
+            <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+              <h2 className="mb-3 font-semibold text-white">CSV Format</h2>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(FORMAT_COPY) as CollectionImportFormat[]).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={format === option}
+                    onClick={() => {
+                      setFormat(option);
+                      setError(null);
+                    }}
+                    className={`rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+                      format === option
+                        ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
+                        : "border-white/10 bg-white/5 text-gray-400 hover:border-white/20"
+                    }`}
+                  >
+                    <span className="font-medium">{FORMAT_COPY[option].label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
 
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-1 font-semibold text-white">{FORMAT_COPY[format].label} CSV</h2>
-          <p className="mb-4 text-xs text-gray-500">{FORMAT_COPY[format].description}</p>
+            <section className="rounded-xl border border-white/10 bg-white/5 p-6">
+              <h2 className="mb-1 font-semibold text-white">{FORMAT_COPY[format].label} CSV</h2>
+              <p className="mb-4 text-xs text-gray-500">{FORMAT_COPY[format].description}</p>
 
-          <div className="mb-3">
-            <label
-              htmlFor="csv-file"
-              className="inline-block cursor-pointer rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
-            >
-              Upload file…
-            </label>
-            <input
-              id="csv-file"
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(e) => void handleFile(e)}
-              className="hidden"
-            />
-          </div>
+              <div className="mb-3">
+                <label
+                  htmlFor="csv-file"
+                  className="inline-block cursor-pointer rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+                >
+                  Upload file…
+                </label>
+                <input
+                  id="csv-file"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => void handleFile(e)}
+                  className="hidden"
+                />
+              </div>
 
-          <textarea
-            value={csv}
-            onChange={(e) => setCsv(e.target.value)}
-            placeholder={FORMAT_COPY[format].placeholder}
-            rows={18}
-            spellCheck={false}
-            className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y font-mono"
-          />
-        </section>
+              <textarea
+                value={csv}
+                onChange={(e) => setCsv(e.target.value)}
+                placeholder={FORMAT_COPY[format].placeholder}
+                rows={18}
+                spellCheck={false}
+                className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y font-mono"
+              />
+            </section>
           </>
         )}
 

@@ -1,6 +1,6 @@
 """Tests for the onboarding quickstart pipeline."""
 
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable
 from typing import Any
 from unittest.mock import patch
 from uuid import UUID
@@ -52,7 +52,7 @@ def _make_mock_build_stage(
     per_stage: dict[str, list[CardSuggestion]] | None = None,
     *,
     record: list[dict[str, Any]] | None = None,
-) -> Iterator[BuildResponse]:
+) -> Callable[..., Awaitable[BuildResponse]]:
     """Stub for ai_service.build_stage that captures call args + returns canned data."""
 
     async def _mock(
@@ -60,6 +60,7 @@ def _make_mock_build_stage(
         deck_id: UUID,
         account_id: UUID,
         email: str,
+        *,
         stage: str | None = None,
         target: int | None = None,
         exclude: list[str] | None = None,
@@ -81,7 +82,7 @@ def _make_mock_build_stage(
         suggestions = (per_stage or {}).get(stage or "", [])
         return _build_response(stage or "theme", suggestions)
 
-    return _mock  # type: ignore[return-value]
+    return _mock
 
 
 @pytest.fixture

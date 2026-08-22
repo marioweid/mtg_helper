@@ -19,10 +19,7 @@ export default function CollectionsPage() {
       const items = await apiClient.listCollections();
       setCollections(items);
     } catch (err) {
-      toast.push(
-        err instanceof ApiError ? err.message : "Failed to load collections.",
-        "error",
-      );
+      toast.push(err instanceof ApiError ? err.message : "Failed to load collections.", "error");
       setCollections([]);
     }
   }, [toast]);
@@ -97,12 +94,8 @@ function CollectionTile({
         </div>
 
         <div className="relative mt-auto">
-          <p className="text-4xl font-bold tabular-nums text-white">
-            {collection.card_count}
-          </p>
-          <p className="text-xs text-gray-400">
-            card{collection.card_count !== 1 ? "s" : ""}
-          </p>
+          <p className="text-4xl font-bold tabular-nums text-white">{collection.card_count}</p>
+          <p className="text-xs text-gray-400">card{collection.card_count !== 1 ? "s" : ""}</p>
           <p className="mt-3 text-[11px] text-gray-500">
             Created {new Date(collection.created_at).toLocaleDateString()}
           </p>

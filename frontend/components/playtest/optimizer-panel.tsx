@@ -296,9 +296,7 @@ export function OptimizerPanel({ deckId, deckCards, onApplied }: Props) {
     setError(null);
     try {
       await applyOneSwap(swap);
-      const remaining = proposal.swaps.filter(
-        (s) => s.out_scryfall_id !== swap.out_scryfall_id,
-      );
+      const remaining = proposal.swaps.filter((s) => s.out_scryfall_id !== swap.out_scryfall_id);
       setProposal(remaining.length === 0 ? null : { ...proposal, swaps: remaining });
       onApplied?.();
     } catch (err) {
@@ -441,8 +439,8 @@ function ProgressBar({ progress }: { progress: Progress }) {
         />
       </div>
       <p className="text-[11px] text-gray-500">
-        Running many simulations — this can take a while on deeper settings. You can keep
-        using the rest of the app.
+        Running many simulations — this can take a while on deeper settings. You can keep using the
+        rest of the app.
       </p>
     </div>
   );
@@ -515,9 +513,7 @@ function ProposalView({
               total Δ price{" "}
               <span
                 className={
-                  proposal.total_price_delta_cents < 0
-                    ? "text-emerald-300"
-                    : "text-red-300"
+                  proposal.total_price_delta_cents < 0 ? "text-emerald-300" : "text-red-300"
                 }
               >
                 {proposal.total_price_delta_cents < 0 ? "-" : "+"}€

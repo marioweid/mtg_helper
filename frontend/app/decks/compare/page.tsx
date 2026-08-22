@@ -123,7 +123,13 @@ function SidePicker({
   );
 }
 
-function DiffRow({ entry, side }: { entry: DiffEntry; side: "added" | "removed" | "qty" | "common" }) {
+function DiffRow({
+  entry,
+  side,
+}: {
+  entry: DiffEntry;
+  side: "added" | "removed" | "qty" | "common";
+}) {
   const accent =
     side === "added"
       ? "border-l-emerald-500/60"
@@ -137,11 +143,7 @@ function DiffRow({ entry, side }: { entry: DiffEntry; side: "added" | "removed" 
       className={`flex items-center gap-3 border-l-2 ${accent} rounded-r-lg bg-white/5 px-3 py-2`}
     >
       {entry.card.image_uri ? (
-        <img
-          src={entry.card.image_uri}
-          alt=""
-          className="h-12 w-9 shrink-0 rounded object-cover"
-        />
+        <img src={entry.card.image_uri} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
       ) : (
         <div className="h-12 w-9 shrink-0 rounded bg-zinc-800" />
       )}
@@ -219,10 +221,7 @@ export default function ComparePage() {
   // Resolve initial URL params (a snapshot needs its parent deck id).
   useEffect(() => {
     if (initialResolved) return;
-    const resolveSide = async (
-      id: string | null,
-      kind: ComparisonKind,
-    ): Promise<SideState> => {
+    const resolveSide = async (id: string | null, kind: ComparisonKind): Promise<SideState> => {
       if (!id) return { deckId: null, snapshotId: null };
       if (kind === "deck") return { deckId: id, snapshotId: null };
       try {
@@ -249,11 +248,11 @@ export default function ComparePage() {
       return;
     }
     const leftSide = left.snapshotId
-      ? ({ kind: "snapshot" as const, id: left.snapshotId })
-      : ({ kind: "deck" as const, id: left.deckId });
+      ? { kind: "snapshot" as const, id: left.snapshotId }
+      : { kind: "deck" as const, id: left.deckId };
     const rightSide = right.snapshotId
-      ? ({ kind: "snapshot" as const, id: right.snapshotId })
-      : ({ kind: "deck" as const, id: right.deckId });
+      ? { kind: "snapshot" as const, id: right.snapshotId }
+      : { kind: "deck" as const, id: right.deckId };
     setLoading(true);
     try {
       const r = await apiClient.compareDecks(leftSide, rightSide);

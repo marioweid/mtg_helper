@@ -637,13 +637,7 @@ export interface PlaytestMulliganReasonStats {
 }
 
 export interface AnalysisFinding {
-  category:
-    | "mana_base"
-    | "consistency"
-    | "curve"
-    | "commander"
-    | "color_fix"
-    | "card_quality";
+  category: "mana_base" | "consistency" | "curve" | "commander" | "color_fix" | "card_quality";
   severity: "info" | "warn" | "critical";
   title: string;
   detail: string;

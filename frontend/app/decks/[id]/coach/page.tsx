@@ -338,7 +338,11 @@ function AssistantMessage({
     return <ReplacementMessage result={result} busy={busy} onAdd={onAdd} />;
   }
   if (!doctor) {
-    return <div className="max-w-3xl rounded-xl border border-white/10 bg-white/5 p-4">{result.reply}</div>;
+    return (
+      <div className="max-w-3xl rounded-xl border border-white/10 bg-white/5 p-4">
+        {result.reply}
+      </div>
+    );
   }
   return (
     <div className="max-w-5xl space-y-6 rounded-xl border border-white/10 bg-white/5 p-5">
@@ -355,7 +359,10 @@ function AssistantMessage({
           <h2 className="mb-3 text-lg font-semibold text-white">Findings</h2>
           <div className="grid gap-3 xl:grid-cols-2">
             {doctor.findings.map((finding, i) => (
-              <div key={`${finding.title}-${i}`} className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div
+                key={`${finding.title}-${i}`}
+                className="rounded-xl border border-white/10 bg-black/20 p-4"
+              >
                 <div className="text-xs uppercase text-gray-500">
                   {finding.category} · {finding.severity}
                 </div>
@@ -409,7 +416,10 @@ function AssistantMessage({
           <h2 className="mb-3 text-lg font-semibold text-white">Standalone cuts</h2>
           <div className="grid gap-2 xl:grid-cols-2">
             {doctor.cuts.map((cut) => (
-              <div key={cut.card_name} className="rounded-xl border border-red-500/20 bg-red-950/10 p-3">
+              <div
+                key={cut.card_name}
+                className="rounded-xl border border-red-500/20 bg-red-950/10 p-3"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <CardHover name={cut.card_name} className="font-semibold text-red-100">
                     {cut.card_name}
@@ -544,7 +554,10 @@ export default function CoachPage() {
       setMemoryOpen(false);
       toast.push("Assistant memory saved", "success");
     } catch (err) {
-      toast.push(err instanceof ApiError ? err.message : "Failed to save Assistant memory", "error");
+      toast.push(
+        err instanceof ApiError ? err.message : "Failed to save Assistant memory",
+        "error",
+      );
     } finally {
       setMemorySaving(false);
     }
@@ -652,7 +665,10 @@ export default function CoachPage() {
       <div className="shrink-0 px-2 py-2 sm:px-3 lg:px-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-bold text-white">MTG Assistant</h1>
-          <Link href={`/decks/${deck.id}`} className="truncate text-sm text-gray-400 hover:text-white">
+          <Link
+            href={`/decks/${deck.id}`}
+            className="truncate text-sm text-gray-400 hover:text-white"
+          >
             {deck.name}
           </Link>
           <button
@@ -704,10 +720,7 @@ export default function CoachPage() {
               </div>
             )}
 
-            {messages.length === 0 && !loading && (
-              <AssistantStarterPrompts onSelect={setPrompt} />
-            )}
-
+            {messages.length === 0 && !loading && <AssistantStarterPrompts onSelect={setPrompt} />}
           </div>
 
           <div className="border-t border-white/10 p-3">

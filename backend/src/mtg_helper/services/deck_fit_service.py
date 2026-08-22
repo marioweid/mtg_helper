@@ -115,7 +115,7 @@ def _base_score(
     return 30.0 + normalized * 50.0
 
 
-def _band(score: int) -> str:
+def _band(score: int) -> Literal["strong", "solid", "weak"]:
     if score >= 75:
         return "strong"
     if score >= 45:

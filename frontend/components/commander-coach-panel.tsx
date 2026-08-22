@@ -142,9 +142,7 @@ export function CommanderCoachPanel({ deckId }: Props) {
                         <div>
                           Cut: <span className="text-red-300">{s.remove.join(", ")}</span>
                         </div>
-                        <div>
-                          Add: {s.add.map((card) => card.name).join(", ")}
-                        </div>
+                        <div>Add: {s.add.map((card) => card.name).join(", ")}</div>
                         <div className="mt-1 text-gray-400">{s.reason}</div>
                       </li>
                     ))}
@@ -152,9 +150,7 @@ export function CommanderCoachPanel({ deckId }: Props) {
                 </section>
               )}
 
-              <div className="text-[11px] text-gray-500">
-                Tool calls: {doctor.tool_call_count}
-              </div>
+              <div className="text-[11px] text-gray-500">Tool calls: {doctor.tool_call_count}</div>
             </>
           )}
         </div>

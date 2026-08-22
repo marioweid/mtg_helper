@@ -12,7 +12,8 @@ const JOBS: { id: Job; label: string; path: string; description: string }[] = [
     id: "refresh-all",
     label: "Refresh all",
     path: "/api/v1/admin/refresh-all",
-    description: "Apply schema, sync Scryfall, MTGJSON, Moxfield and Archidekt themes, then re-tag cards.",
+    description:
+      "Apply schema, sync Scryfall, MTGJSON, Moxfield and Archidekt themes, then re-tag cards.",
   },
   {
     id: "sync",
@@ -310,9 +311,7 @@ export function AdminPanel() {
               </pre>
             ) : null}
 
-            {errorMsg ? (
-              <p className="mt-3 text-sm text-red-400">Error: {errorMsg}</p>
-            ) : null}
+            {errorMsg ? <p className="mt-3 text-sm text-red-400">Error: {errorMsg}</p> : null}
           </div>
         );
       })}

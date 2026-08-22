@@ -47,10 +47,8 @@ const TIPS = {
     "% of trials classified as 'flooded': hit a turn ≥4 with 2+ more lands than the turn number AND mana utilization < 50%.",
   screw_rate:
     "% of trials classified as 'mana screwed': hit a turn ≥3 where lands in play fell at least 2 behind the curve.",
-  opening_flood_mull:
-    "% of opening 7-card hands (before mulligan decision) that held 6+ lands.",
-  opening_screw_mull:
-    "% of opening 7-card hands (before mulligan decision) that held 0–1 lands.",
+  opening_flood_mull: "% of opening 7-card hands (before mulligan decision) that held 6+ lands.",
+  opening_screw_mull: "% of opening 7-card hands (before mulligan decision) that held 0–1 lands.",
   first_missed:
     "Average turn the deck first failed to drop a land. Sentinel: turns + 1 means it never missed within the sim window.",
   color_screw_pct:
@@ -149,9 +147,7 @@ export function PlaytestStatsPanel({ deckId, defaultTurns = 4 }: Props) {
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold text-white">Batch simulation</h2>
-        <p className="text-xs text-gray-500">
-          Aggregate stats across many goldfish runs
-        </p>
+        <p className="text-xs text-gray-500">Aggregate stats across many goldfish runs</p>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
@@ -244,12 +240,7 @@ function pct(value: number): string {
  * like kept-at-7 and commander cast rate. Thresholds mirror the ones the
  * AI analysis agent uses in ``simulation_analysis_service.py``.
  */
-function score(
-  value: number,
-  good: number,
-  critical: number,
-  higherIsBetter: boolean,
-): number {
+function score(value: number, good: number, critical: number, higherIsBetter: boolean): number {
   if (higherIsBetter) {
     if (value >= good) return 1;
     if (value <= critical) return 0;
@@ -330,11 +321,7 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
           tip={TIPS.opening_screw_mull}
           value={pct(oh.pct_screwed_mull)}
         />
-        <Stat
-          label="Kept ≤ 5"
-          tip={TIPS.kept_le5}
-          value={pct(oh.pct_kept_5 + oh.pct_kept_le4)}
-        />
+        <Stat label="Kept ≤ 5" tip={TIPS.kept_le5} value={pct(oh.pct_kept_5 + oh.pct_kept_le4)} />
       </div>
 
       <ColorShortagePanel stats={cs} />
@@ -415,9 +402,7 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
       </p>
 
       <details className="text-gray-500">
-        <summary className="cursor-pointer hover:text-gray-300">
-          Mulligan distribution
-        </summary>
+        <summary className="cursor-pointer hover:text-gray-300">Mulligan distribution</summary>
         <ul className="mt-1 flex flex-col gap-0.5">
           {stats.mulligan_distribution.map((count, i) => (
             <li key={i}>
@@ -450,24 +435,12 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
             {stats.per_turn.map((row) => (
               <tr key={row.turn}>
                 <td className="py-0.5 text-gray-200">{row.turn}</td>
-                <td className="py-0.5 tabular-nums text-gray-200">
-                  {row.lands_p25.toFixed(1)}
-                </td>
-                <td className="py-0.5 tabular-nums text-gray-200">
-                  {row.lands_p50.toFixed(1)}
-                </td>
-                <td className="py-0.5 tabular-nums text-gray-200">
-                  {row.lands_p75.toFixed(1)}
-                </td>
-                <td className="py-0.5 tabular-nums text-gray-200">
-                  {row.mana_p25.toFixed(1)}
-                </td>
-                <td className="py-0.5 tabular-nums text-gray-200">
-                  {row.mana_p50.toFixed(1)}
-                </td>
-                <td className="py-0.5 tabular-nums text-gray-200">
-                  {row.mana_p75.toFixed(1)}
-                </td>
+                <td className="py-0.5 tabular-nums text-gray-200">{row.lands_p25.toFixed(1)}</td>
+                <td className="py-0.5 tabular-nums text-gray-200">{row.lands_p50.toFixed(1)}</td>
+                <td className="py-0.5 tabular-nums text-gray-200">{row.lands_p75.toFixed(1)}</td>
+                <td className="py-0.5 tabular-nums text-gray-200">{row.mana_p25.toFixed(1)}</td>
+                <td className="py-0.5 tabular-nums text-gray-200">{row.mana_p50.toFixed(1)}</td>
+                <td className="py-0.5 tabular-nums text-gray-200">{row.mana_p75.toFixed(1)}</td>
               </tr>
             ))}
           </tbody>
@@ -478,9 +451,10 @@ function StatsTable({ stats }: { stats: PlaytestStats }) {
 }
 
 function ColorShortagePanel({ stats }: { stats: PlaytestStats["color_screw"] }) {
-  const entries = COLOR_ORDER.filter((c) => (stats.shortages_by_color[c] ?? 0) > 0).map(
-    (c) => ({ color: c, rate: stats.shortages_by_color[c] ?? 0 }),
-  );
+  const entries = COLOR_ORDER.filter((c) => (stats.shortages_by_color[c] ?? 0) > 0).map((c) => ({
+    color: c,
+    rate: stats.shortages_by_color[c] ?? 0,
+  }));
   if (entries.length === 0) return null;
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
@@ -521,10 +495,7 @@ function CommanderRow({ stats }: { stats: PlaytestCommanderStats }) {
       </div>
       <p className="mt-0.5 text-[10px] text-gray-400">
         avg first cast:{" "}
-        <span
-          title={TIPS.commander_avg_cast}
-          className="cursor-help tabular-nums text-gray-200"
-        >
+        <span title={TIPS.commander_avg_cast} className="cursor-help tabular-nums text-gray-200">
           T{stats.avg_cast_turn.toFixed(2)}
         </span>
       </p>
@@ -591,9 +562,7 @@ function AnalysisPanel({ analysis }: { analysis: SimulationAnalysisResponse }) {
           {analysis.tool_call_count} tool call{analysis.tool_call_count === 1 ? "" : "s"}
         </p>
       </div>
-      {analysis.summary && (
-        <p className="leading-snug text-gray-100">{analysis.summary}</p>
-      )}
+      {analysis.summary && <p className="leading-snug text-gray-100">{analysis.summary}</p>}
       {analysis.findings.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">

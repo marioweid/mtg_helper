@@ -28,9 +28,7 @@ export function primaryType(card: DeckCardItem): PrimaryType | "Other" {
   return OTHER;
 }
 
-export function groupByPrimaryType(
-  cards: DeckCardItem[],
-): Record<string, DeckCardItem[]> {
+export function groupByPrimaryType(cards: DeckCardItem[]): Record<string, DeckCardItem[]> {
   const groups: Record<string, DeckCardItem[]> = {};
   for (const card of cards) {
     const t = primaryType(card);
@@ -39,12 +37,8 @@ export function groupByPrimaryType(
   return groups;
 }
 
-export function sortedPrimaryTypes(
-  groups: Record<string, DeckCardItem[]>,
-): string[] {
+export function sortedPrimaryTypes(groups: Record<string, DeckCardItem[]>): string[] {
   const ordered = PRIMARY_TYPES.filter((t) => groups[t]?.length);
-  const extras = Object.keys(groups).filter(
-    (t) => !PRIMARY_TYPES.includes(t as PrimaryType),
-  );
+  const extras = Object.keys(groups).filter((t) => !PRIMARY_TYPES.includes(t as PrimaryType));
   return [...ordered, ...extras];
 }

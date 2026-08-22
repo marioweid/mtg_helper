@@ -26,16 +26,10 @@ interface Props {
 
 export function PreferenceList({ preferences, onDeleted }: Props) {
   const toast = useToast();
-  const displayPreferences = preferences.filter(
-    (p) => p.preference_type !== "feedback_boosting",
-  );
+  const displayPreferences = preferences.filter((p) => p.preference_type !== "feedback_boosting");
 
   if (displayPreferences.length === 0) {
-    return (
-      <p className="text-sm text-gray-500 py-4 text-center">
-        No preferences set yet.
-      </p>
-    );
+    return <p className="text-sm text-gray-500 py-4 text-center">No preferences set yet.</p>;
   }
 
   async function handleDelete(id: string) {

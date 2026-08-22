@@ -51,9 +51,7 @@ function DeckCard({ deck }: { deck: DeckSummary }) {
         />
 
         <div className="relative mt-auto flex flex-col gap-1.5 p-4">
-          <h2 className="pr-8 font-semibold leading-tight text-white drop-shadow">
-            {deck.name}
-          </h2>
+          <h2 className="pr-8 font-semibold leading-tight text-white drop-shadow">{deck.name}</h2>
           <p className="text-xs text-gray-200/90 drop-shadow">{deck.commander_name}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-200">
             <span className="rounded bg-black/55 px-1.5 py-0.5 backdrop-blur">
@@ -103,7 +101,9 @@ export default async function DecksPage() {
       {decks.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-white/20 py-20 text-center">
           <p className="text-gray-400">No decks yet.</p>
-          <p className="text-xs text-gray-500">Pick a commander and we&apos;ll build a sample deck in under a minute.</p>
+          <p className="text-xs text-gray-500">
+            Pick a commander and we&apos;ll build a sample deck in under a minute.
+          </p>
           <div className="mt-2 flex flex-col items-center gap-2 sm:flex-row">
             <Link
               href="/onboarding"

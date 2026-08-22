@@ -1,7 +1,11 @@
 # Generic Hub-First Card Search Design
 
 **Date:** 2026-07-12
-**Status:** Implemented; Gemini 3.5 is the production default
+**Status:** Historical implementation record; model-default sections superseded on 2026-08-21
+
+> This document is retained to describe the card-search design and its implementation history.
+> All Gemini defaults and model-migration instructions below are historical, not operational.
+> Current production AI configuration is defined by the OpenAI Responses migration design.
 
 The typed `search_cards` contract, hub-first filtering, unchanged-filter global fallback,
 provenance, assistant grounding, and deterministic tests were implemented on 2026-07-16. The

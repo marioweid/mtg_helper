@@ -297,10 +297,12 @@ async def import_parsed_entries(
     )
 
     updated_deck = await deck_service._fetch_deck(pool, deck.id)
+    if updated_deck is None:
+        raise deck_service.DeckNotFoundError(f"Imported deck {deck.id} disappeared after creation")
     suggested_tags = await _aggregate_keyword_tags(pool, resolved_cards)
 
     return DeckImportResponse(
-        deck=updated_deck,  # type: ignore[arg-type]
+        deck=updated_deck,
         imported_count=sum(quantity for _, quantity, _ in resolved_cards),
         unresolved=unresolved,
         color_violations=color_violations,

@@ -103,9 +103,7 @@ export function CardSearch({
         className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
       />
       {loading && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-          ...
-        </div>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">...</div>
       )}
       {open && results.length > 0 && (
         <ul className="absolute z-50 mt-1 w-full rounded-lg border border-white/10 bg-gray-900 shadow-xl overflow-hidden">

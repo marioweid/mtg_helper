@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from typing import Literal
 
 from mtg_helper.models.ai import (
     CoachRoleBudgetReport,
@@ -11,13 +12,17 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 
+LaneRole = Literal["engine", "payoff", "support", "interaction", "mana", "risk"]
+LaneStrength = Literal["core", "present", "thin"]
+LaneSource = Literal["commander", "tags", "cards", "memory", "role_budget", "synergy"]
+
 
 @dataclass(frozen=True)
 class LaneSpec:
     """Detection terms and role metadata for one MTG strategy lane."""
 
     name: str
-    role: str
+    role: LaneRole
     terms: tuple[str, ...]
     protect: bool = False
 
@@ -80,7 +85,7 @@ def analyze_signals(
         strength = _strength(spec.name, source, examples, synergy)
         lanes[spec.name] = CoachSignalLane(
             name=spec.name,
-            role=spec.role,  # type: ignore[arg-type]
+            role=spec.role,
             strength=strength,
             source=source,
             terms=list(spec.terms),
@@ -125,7 +130,7 @@ def _source_for_lane(
     tag_lanes: set[str],
     memory_blob: str,
     examples: list[str],
-) -> str | None:
+) -> LaneSource | None:
     if _has_any(commander_blob, spec.terms):
         return "commander"
     if spec.name in tag_lanes:
@@ -139,10 +144,10 @@ def _source_for_lane(
 
 def _strength(
     lane_name: str,
-    source: str,
+    source: LaneSource,
     examples: list[str],
     synergy: CoachSynergyReport | None,
-) -> str:
+) -> LaneStrength:
     if source in {"commander", "memory"}:
         return "core"
     if synergy and lane_name in synergy.weak_packages:
@@ -161,27 +166,35 @@ def _merge_report_lanes(
 ) -> None:
     if roles:
         for role in roles.priority_roles:
-            _upsert_lane(lanes, f"role_gap_{role}", "support", "thin", "role_budget", [role])
+            _upsert_lane(
+                lanes,
+                f"role_gap_{role}",
+                "support",
+                "thin",
+                "role_budget",
+                terms=[role],
+            )
     if synergy:
         for package in synergy.weak_packages:
-            _upsert_lane(lanes, package, "support", "thin", "synergy", [package])
+            _upsert_lane(lanes, package, "support", "thin", "synergy", terms=[package])
 
 
 def _upsert_lane(
     lanes: dict[str, CoachSignalLane],
     name: str,
-    role: str,
-    strength: str,
-    source: str,
+    role: LaneRole,
+    strength: LaneStrength,
+    source: LaneSource,
+    *,
     terms: list[str],
 ) -> None:
     if name in lanes:
         return
     lanes[name] = CoachSignalLane(
         name=name,
-        role=role,  # type: ignore[arg-type]
-        strength=strength,  # type: ignore[arg-type]
-        source=source,  # type: ignore[arg-type]
+        role=role,
+        strength=strength,
+        source=source,
         terms=terms,
     )
 

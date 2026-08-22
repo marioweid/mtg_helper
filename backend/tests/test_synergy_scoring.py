@@ -71,8 +71,7 @@ def test_score_penalizes_generic_ramp_when_not_needed() -> None:
         name="Rampant Growth",
         type_line="Sorcery",
         oracle_text=(
-            "Search your library for a basic land card, "
-            "put it onto the battlefield tapped."
+            "Search your library for a basic land card, put it onto the battlefield tapped."
         ),
     )
     roles = CoachRoleBudgetReport(

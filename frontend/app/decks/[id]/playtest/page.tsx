@@ -120,16 +120,12 @@ export default function SimulatePage({ params }: PageProps) {
     <div className="flex flex-col gap-4 pb-28">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <Link
-            href={`/decks/${deckId}`}
-            className="text-xs text-indigo-400 hover:underline"
-          >
+          <Link href={`/decks/${deckId}`} className="text-xs text-indigo-400 hover:underline">
             ← {deck?.name || "Deck"}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-white">Simulate</h1>
           <p className="mt-1 text-xs text-gray-500">
-            Batch goldfish simulation across many trials. For interactive playtesting,
-            use Moxfield.
+            Batch goldfish simulation across many trials. For interactive playtesting, use Moxfield.
           </p>
         </div>
       </header>
@@ -153,11 +149,7 @@ export default function SimulatePage({ params }: PageProps) {
       <PlaytestStatsPanel deckId={deckId} />
 
       {deck && optimizerEnabled && (
-        <OptimizerPanel
-          deckId={deckId}
-          deckCards={deck.cards}
-          onApplied={() => void loadDeck()}
-        />
+        <OptimizerPanel deckId={deckId} deckCards={deck.cards} onApplied={() => void loadDeck()} />
       )}
 
       <CardDetailModal

@@ -6,13 +6,13 @@ import asyncpg
 import pytest_asyncio
 from httpx import AsyncClient
 
-from mtg_helper.main import app
 from tests.conftest import (
     DOUBLING_SEASON_SCRYFALL_ID,
     HAZEL_SCRYFALL_ID,
     SOL_RING_SCRYFALL_ID,
     create_test_account,
 )
+
 
 async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
     async with pool.acquire() as conn:

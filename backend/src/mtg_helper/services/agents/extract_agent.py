@@ -4,25 +4,22 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import asyncpg
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, UsageLimits
 
 from mtg_helper.models.ai import KeywordExtractResponse
 from mtg_helper.services import card_service
 from mtg_helper.services.agents._history import to_model_messages
-from mtg_helper.services.agents._model import (
-    fast_google_model_settings,
-    make_fast_google_model,
-)
+from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
 from mtg_helper.services.agents._prompts import (
     BRACKET_DESCRIPTIONS,
     FORCE_FINALIZE_HINT,
     MAX_HISTORY_TURNS,
     SANDBOX_RULES,
 )
+from mtg_helper.services.agents._usage import log_run_usage
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
 from mtg_helper.services.theme_service import load_theme_prompt_catalog, load_theme_tags
 
-_TEMPERATURE = 0.3
 _MAX_OUTPUT_TOKENS = 2048
 
 KEYWORD_EXAMPLES: tuple[str, ...] = (
@@ -128,13 +125,12 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
 
 def _build_agent() -> Agent[ExtractDeps, KeywordExtractResponse]:
     agent = Agent[ExtractDeps, KeywordExtractResponse](
-        model=make_fast_google_model(),
+        model=make_openai_model(),
         deps_type=ExtractDeps,
         output_type=KeywordExtractResponse,
-        model_settings=fast_google_model_settings(
+        model_settings=openai_model_settings(
             max_tokens=_MAX_OUTPUT_TOKENS,
-            temperature=_TEMPERATURE,
-            thinking="minimal",
+            reasoning="minimal",
         ),
         retries=1,
     )
@@ -150,7 +146,7 @@ _AGENT: Agent[ExtractDeps, KeywordExtractResponse] | None = None
 
 
 def get_agent() -> Agent[ExtractDeps, KeywordExtractResponse]:
-    """Lazy singleton — Gemini provider needs ``settings.gemini_api_key``."""
+    """Return the lazily constructed OpenAI Responses agent."""
     global _AGENT
     if _AGENT is None:
         _AGENT = _build_agent()
@@ -163,6 +159,7 @@ async def extract_turn(
     partner_scryfall_id: UUID | None,
     bracket: int,
     history: list[dict[str, str]],
+    *,
     message: str,
 ) -> KeywordExtractResponse:
     """Run one turn of the keyword-extracting deck agent.
@@ -211,7 +208,14 @@ async def extract_turn(
         user_message,
         deps=deps,
         message_history=to_model_messages(trimmed),
+        usage_limits=UsageLimits(
+            request_limit=2,
+            tool_calls_limit=0,
+            input_tokens_limit=24_000,
+            output_tokens_limit=3_000,
+        ),
     )
+    log_run_usage("extract", "turn", result.usage())
     output = result.output
     allowed = await load_theme_tags(pool)
     output.archetype_tags = [tag for tag in output.archetype_tags if tag in allowed]

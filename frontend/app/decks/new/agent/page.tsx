@@ -162,7 +162,9 @@ export default function AgentDeckPage() {
 
           <section className="rounded-xl border border-white/10 bg-white/5 p-6">
             <h2 className="mb-1 font-semibold text-white">Partner Commander</h2>
-            <p className="mb-4 text-xs text-gray-500">Optional — only for commanders with Partner</p>
+            <p className="mb-4 text-xs text-gray-500">
+              Optional — only for commanders with Partner
+            </p>
             <CardSearch
               placeholder="Search for partner commander..."
               typeFilter="Legendary Creature"
@@ -227,10 +229,7 @@ export default function AgentDeckPage() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-4">
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === "user" ? "bg-indigo-600 text-white" : "bg-white/10 text-gray-200"

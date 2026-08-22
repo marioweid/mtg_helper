@@ -534,9 +534,7 @@ def _diff_entries(diff: DeckDiff) -> list[DiffEntry]:
     return [*diff.added, *diff.removed, *diff.quantity_changed, *diff.common]
 
 
-async def _attach_ownership(
-    pool: asyncpg.Pool, diff: DeckDiff, account_id: UUID | None
-) -> None:
+async def _attach_ownership(pool: asyncpg.Pool, diff: DeckDiff, account_id: UUID | None) -> None:
     entries = _diff_entries(diff)
     scryfall_ids = [entry.card.scryfall_id for entry in entries]
     ownership = await collection_service.build_ownership_map(pool, account_id, scryfall_ids)

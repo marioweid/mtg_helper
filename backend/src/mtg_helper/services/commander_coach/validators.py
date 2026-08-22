@@ -16,6 +16,13 @@ class ValidationIssue:
     reason: str
 
 
+@dataclass(frozen=True)
+class _SwapAdditionSignals:
+    tags: set[str]
+    words: set[str]
+    flexible: bool
+
+
 _ENGINE_WORDS: frozenset[str] = frozenset(
     {
         "counter",
@@ -182,10 +189,45 @@ def _validate_cut(
     return None
 
 
+def _validate_theme_removal(
+    swap: DoctorSwap,
+    removed: DeckCardItem,
+    theme: set[str],
+    commander_words: set[str],
+    addition: _SwapAdditionSignals,
+) -> ValidationIssue | None:
+    removed_tags = _card_tags(removed)
+    theme_overlap = removed_tags & theme
+    if not theme_overlap:
+        return None
+    preserves_theme = bool(addition.tags & theme_overlap) or bool(addition.tags & theme)
+    preserves_role = bool(addition.tags & removed_tags)
+    removed_engine_words = _card_engine_words(removed)
+    commander_overlap = removed_engine_words & commander_words
+    preserves_engine_text = bool(removed_engine_words & addition.words)
+    preserves_commander_text = not commander_overlap or bool(commander_overlap & addition.words)
+    flexible_utility = addition.flexible and bool(addition.words & theme)
+    if not preserves_commander_text:
+        return ValidationIssue(
+            "swap",
+            tuple(swap.remove),
+            f"removes {removed.name}, which directly overlaps the commander's engine "
+            f"({', '.join(sorted(commander_overlap))}), but additions do not preserve it",
+        )
+    if not (preserves_theme or preserves_role or preserves_engine_text or flexible_utility):
+        return ValidationIssue(
+            "swap",
+            tuple(swap.remove),
+            f"removes {removed.name}, a theme/engine card "
+            f"({', '.join(sorted(theme_overlap or removed_engine_words))}), "
+            "but the additions do not preserve that theme, role, or engine text",
+        )
+    return None
+
+
 def _validate_swap(
     swap: DoctorSwap,
     deck_cards: dict[str, DeckCardItem],
-    deck_names: set[str],
     theme: set[str],
     commander_words: set[str],
     protected_names: set[str],
@@ -193,7 +235,7 @@ def _validate_swap(
     missing = [name for name in swap.remove if name not in deck_cards]
     if missing:
         return ValidationIssue("swap", tuple(swap.remove), f"remove card not in deck: {missing[0]}")
-    duplicate_adds = [card.name for card in swap.add if card.name in deck_names]
+    duplicate_adds = [card.name for card in swap.add if card.name in deck_cards]
     if duplicate_adds:
         return ValidationIssue(
             "swap", tuple(swap.remove), f"add card already in deck: {duplicate_adds[0]}"
@@ -208,7 +250,11 @@ def _validate_swap(
         )
 
     add_tags = _add_tags(swap)
-    added_words = _add_words(swap) | add_tags
+    addition = _SwapAdditionSignals(
+        tags=add_tags,
+        words=_add_words(swap) | add_tags,
+        flexible=_is_flexible_addition(swap),
+    )
     for name in swap.remove:
         removed = deck_cards[name]
         if name in protected_names:
@@ -217,32 +263,8 @@ def _validate_swap(
                 tuple(swap.remove),
                 f"removes {name}, which is protected by persistent Coach memory",
             )
-        removed_tags = _card_tags(removed)
-        theme_overlap = removed_tags & theme
-        if not theme_overlap:
-            continue
-        preserves_theme = bool(add_tags & theme_overlap) or bool(add_tags & theme)
-        preserves_role = bool(add_tags & removed_tags)
-        removed_engine_words = _card_engine_words(removed)
-        commander_overlap = removed_engine_words & commander_words
-        preserves_engine_text = bool(removed_engine_words & added_words)
-        preserves_commander_text = not commander_overlap or bool(commander_overlap & added_words)
-        flexible_utility = _is_flexible_addition(swap) and bool(added_words & theme)
-        if not preserves_commander_text:
-            return ValidationIssue(
-                "swap",
-                tuple(swap.remove),
-                f"removes {name}, which directly overlaps the commander's engine "
-                f"({', '.join(sorted(commander_overlap))}), but additions do not preserve it",
-            )
-        if not (preserves_theme or preserves_role or preserves_engine_text or flexible_utility):
-            return ValidationIssue(
-                "swap",
-                tuple(swap.remove),
-                f"removes {name}, a theme/engine card "
-                f"({', '.join(sorted(theme_overlap or removed_engine_words))}), "
-                "but the additions do not preserve that theme, role, or engine text",
-            )
+        if issue := _validate_theme_removal(swap, removed, theme, commander_words, addition):
+            return issue
     return None
 
 
@@ -253,7 +275,6 @@ def validate_doctor_output(
 ) -> list[ValidationIssue]:
     """Return theme/legality issues found in a doctor response."""
     deck_cards = _deck_cards_by_name(deck)
-    deck_names = set(deck_cards)
     theme = _theme_tags(deck, coach_memory_notes)
     commander_words = _commander_words(deck) | _memory_terms(coach_memory_notes)
     protected_names = _memory_protected_names(deck, coach_memory_notes)
@@ -265,7 +286,6 @@ def validate_doctor_output(
         if issue := _validate_swap(
             swap,
             deck_cards,
-            deck_names,
             theme,
             commander_words,
             protected_names,

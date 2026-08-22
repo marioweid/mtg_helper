@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from collections.abc import Mapping
 from uuid import UUID
 
 import asyncpg
@@ -83,7 +84,9 @@ def _parse_stage_targets(raw: object) -> dict[str, int]:
         return {}
     if isinstance(raw, str):
         return json.loads(raw)
-    return dict(raw)
+    if isinstance(raw, Mapping):
+        return dict(raw)
+    raise TypeError(f"Stage targets must be a JSON object, got {type(raw).__name__}")
 
 
 def _row_to_deck(row: asyncpg.Record) -> DeckResponse:
@@ -168,6 +171,7 @@ async def _planned_state(
     cards: list[DeckCardItem],
     partner_id: UUID | None,
     email: str | None,
+    *,
     account_id: UUID | None,
 ) -> tuple[list[PlannedDeckChange], int, int]:
     physical = sum(card.quantity for card in cards) + 1 + (1 if partner_id else 0)
@@ -414,7 +418,7 @@ async def get_deck(
         cards,
         deck_row["partner_id"],
         email,
-        account_id,
+        account_id=account_id,
     )
 
     deck = DeckDetailResponse(
@@ -836,17 +840,32 @@ async def update_deck_card_quantity(
         )
     if result != "UPDATE 1":
         return False
-    previous = int(old_quantity or 0)
+    await _reconcile_quantity_plan(
+        pool,
+        deck_id,
+        card_row["id"],
+        quantity,
+        int(old_quantity or 0),
+    )
+    return True
+
+
+async def _reconcile_quantity_plan(
+    pool: asyncpg.Pool,
+    deck_id: UUID,
+    card_id: UUID,
+    quantity: int,
+    previous: int,
+) -> None:
     if quantity > previous:
         await planned_change_service.consume_immediate_plan(
-            pool, deck_id, card_row["id"], "addition", quantity - previous
+            pool, deck_id, card_id, "addition", quantity - previous
         )
     elif quantity < previous:
         await planned_change_service.consume_immediate_plan(
-            pool, deck_id, card_row["id"], "cut", previous - quantity
+            pool, deck_id, card_id, "cut", previous - quantity
         )
-    await planned_change_service.clamp_cut_plan(pool, deck_id, card_row["id"], quantity)
-    return True
+    await planned_change_service.clamp_cut_plan(pool, deck_id, card_id, quantity)
 
 
 async def remove_card_from_deck(
@@ -883,7 +902,5 @@ async def remove_card_from_deck(
         )
     if result != "DELETE 1":
         return False
-    await planned_change_service.consume_immediate_plan(
-        pool, deck_id, card_row["id"], "cut"
-    )
+    await planned_change_service.consume_immediate_plan(pool, deck_id, card_row["id"], "cut")
     return True

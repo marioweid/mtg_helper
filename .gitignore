@@ -231,7 +231,10 @@ infra/terraform/*.tfstate.*
 infra/terraform/terraform.tfvars
 infra/terraform/tfplan
 **/.env.prod
-docs/superpowers
+docs/superpowers/*
+!docs/superpowers/specs/
+docs/superpowers/specs/*
+!docs/superpowers/specs/2026-08-21-openai-responses-migration-design.md
 .superpowers/
 
 # Local Codex app/thread configuration

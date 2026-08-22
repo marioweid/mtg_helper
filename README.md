@@ -50,7 +50,7 @@ The application combines a local Scryfall-backed card database, deck management 
 - **Backend:** Python 3.13, FastAPI, Pydantic, asyncpg
 - **Database:** PostgreSQL 16
 - **Vector search:** Qdrant
-- **AI:** Google Gemini / Pydantic AI integration
+- **AI:** OpenAI Responses API / Pydantic AI integration
 - **Local development:** Docker Compose
 - **Deployment:** Portainer-friendly Docker Compose stack behind a reverse proxy / Cloudflare access layer
 
@@ -59,11 +59,11 @@ The application combines a local Scryfall-backed card database, deck management 
 The easiest way to run the full stack is Docker Compose.
 
 ```bash
-# copy and fill backend environment values
+# Copy the backend environment file used by local Compose (it remains outside images).
 cp backend/.env.example backend/.env
-$EDITOR backend/.env
+$EDITOR backend/.env  # set OPENAI_API_KEY
 
-# start Postgres, Qdrant, backend, and frontend
+# start Postgres, backend, and frontend
 docker compose up -d --build
 
 # follow logs
@@ -77,7 +77,6 @@ Default local services:
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | PostgreSQL | localhost:5432 |
-| Qdrant | http://localhost:6333 |
 
 Stop the stack with:
 

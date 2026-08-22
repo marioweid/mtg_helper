@@ -5,7 +5,6 @@ from uuid import UUID
 
 from httpx import AsyncClient
 
-from mtg_helper.main import app
 from mtg_helper.services.ai_service import (
     _ALLOWED_CARD_TYPES,
     _ALLOWED_SUBTYPES,
@@ -13,6 +12,7 @@ from mtg_helper.services.ai_service import (
     _canonicalize,
     _compute_highlight_reasons,
     _merge_type_filters,
+    _resolve_stage_query,
     _resolve_structured_type_filter,
 )
 from mtg_helper.services.deck_service import STAGES
@@ -34,6 +34,7 @@ def _make_candidate(
     return RetrievedCard(
         id=uid or UUID("aaaaaaaa-0000-0000-0000-000000000000"),
         scryfall_id=uid or UUID("aaaaaaaa-0000-0000-0000-000000000000"),
+        oracle_id=uid or UUID("aaaaaaaa-0000-0000-0000-000000000000"),
         name="Test Card",
         mana_cost="{1}",
         cmc=Decimal("1"),
@@ -109,6 +110,60 @@ def test_merge_type_filters_unions_categories_and_propagates_flags() -> None:
 
 
 # ── build_stage ───────────────────────────────────────────────────────────────
+
+
+def test_stage_query_uses_stage_defaults_without_archetype_tags() -> None:
+    query = _resolve_stage_query("ramp", "tokens matter", [], None)
+
+    assert query == (
+        "mana ramp acceleration mana rocks mana dorks tokens matter",
+        ["ramp", "fast_mana"],
+        False,
+        None,
+        None,
+    )
+
+
+def test_stage_query_merges_archetype_and_stage_tags_without_duplicates() -> None:
+    query = _resolve_stage_query("ramp", None, ["tokens", "ramp"], None)
+
+    assert query == (
+        "mana ramp acceleration mana rocks mana dorks",
+        ["tokens", "ramp", "fast_mana"],
+        True,
+        None,
+        None,
+    )
+
+
+def test_theme_query_requires_and_normalizes_selected_archetype() -> None:
+    query = _resolve_stage_query("theme", "artifact tokens", ["artifact_tokens"], "Artifact-Tokens")
+
+    assert query == (
+        "artifact tokens synergy theme artifact tokens",
+        ["artifact_tokens"],
+        True,
+        "artifact_tokens",
+        None,
+    )
+
+
+def test_theme_query_rejects_tag_outside_deck_archetypes() -> None:
+    query = _resolve_stage_query("theme", "artifact tokens", ["artifact_tokens"], "spellslinger")
+
+    assert query is None
+
+
+def test_theme_etc_query_excludes_explicit_archetypes() -> None:
+    query = _resolve_stage_query("theme", "artifact tokens", ["tokens", "artifacts"], "__etc")
+
+    assert query == (
+        "artifact tokens synergy theme commander staples support",
+        ["tokens"],
+        True,
+        None,
+        frozenset({"tokens", "artifacts"}),
+    )
 
 
 async def test_build_stage_returns_200_with_valid_structure(client: AsyncClient) -> None:

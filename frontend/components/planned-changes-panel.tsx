@@ -7,11 +7,7 @@ import { CardHover } from "@/components/card-hover";
 import { OwnedBadge } from "@/components/owned-badge";
 import { PlannedBuyListDialog } from "@/components/planned-buy-list-dialog";
 import { apiClient, ApiError } from "@/lib/api";
-import type {
-  CollectionMembership,
-  CollectionResponse,
-  PlannedDeckChange,
-} from "@/lib/types";
+import type { CollectionMembership, CollectionResponse, PlannedDeckChange } from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -132,9 +128,7 @@ export function PlannedChangesPanel({
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border border-indigo-500/20 bg-indigo-950/20 px-3 py-2">
-              <span className="text-xs text-indigo-200">
-                {selectedPlans.length} selected
-              </span>
+              <span className="text-xs text-indigo-200">{selectedPlans.length} selected</span>
               <button
                 type="button"
                 disabled={selectedPlans.length === 0}
@@ -262,15 +256,15 @@ function PlanGroup({
           >
             {plans.every((plan) => selectedIds.has(plan.id)) ? "Clear" : "Select all"}
           </button>
-        {onCreateBuyList && (
-          <button
-            type="button"
-            onClick={onCreateBuyList}
-            className="rounded border border-emerald-500/30 px-2 py-1 text-[11px] font-medium text-emerald-200 hover:border-emerald-400/60 hover:text-white"
-          >
-            Create buy list
-          </button>
-        )}
+          {onCreateBuyList && (
+            <button
+              type="button"
+              onClick={onCreateBuyList}
+              className="rounded border border-emerald-500/30 px-2 py-1 text-[11px] font-medium text-emerald-200 hover:border-emerald-400/60 hover:text-white"
+            >
+              Create buy list
+            </button>
+          )}
         </div>
       </div>
       <ul className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10">
@@ -326,7 +320,9 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onTog
           </CardHover>
         </p>
         {plan.direction === "addition" ? (
-          <div className="mt-1 flex flex-wrap gap-1"><OwnedBadge owned={plan.owned_in} /></div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <OwnedBadge owned={plan.owned_in} />
+          </div>
         ) : (
           <p className="text-[10px] text-gray-500">Still in the physical deck</p>
         )}
@@ -393,9 +389,7 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onTog
           disabled={busy}
           title="Cancel planned change"
           aria-label={`Cancel planned change for ${plan.name}`}
-          onClick={() =>
-            void onRun(plan.id, () => apiClient.cancelPlannedChange(deckId, plan.id))
-          }
+          onClick={() => void onRun(plan.id, () => apiClient.cancelPlannedChange(deckId, plan.id))}
           className="rounded px-2 py-1 text-xs text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-40"
         >
           ×

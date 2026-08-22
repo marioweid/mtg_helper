@@ -16,7 +16,8 @@ from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
 
 from mtg_helper.models.ai import CardSearchHit, CardSearchInput, DeckDoctorResponse
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
-from mtg_helper.services.agents._model import google_model_settings, make_google_model
+from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
+from mtg_helper.services.agents._usage import log_run_usage
 from mtg_helper.services.card_search_tool import search_cards
 from mtg_helper.services.retrieval_service import card_qualifying_stages
 
@@ -25,7 +26,6 @@ _log = logging.getLogger(__name__)
 _MAX_TOOL_CALLS = 14
 _REQUEST_LIMIT = _MAX_TOOL_CALLS + 3
 _WALL_CLOCK_SECONDS = 75.0
-_TEMPERATURE = 0.45
 _MAX_OUTPUT_TOKENS = 8192
 
 _SYSTEM_PROMPT = """You are a peak Commander deck doctor for Magic: The Gathering.
@@ -97,14 +97,13 @@ class DoctorDeps:
 
 def _build_agent() -> Agent[DoctorDeps, DeckDoctorResponse]:
     agent = Agent[DoctorDeps, DeckDoctorResponse](
-        model=make_google_model(),
+        model=make_openai_model(),
         deps_type=DoctorDeps,
         output_type=DeckDoctorResponse,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings=google_model_settings(
+        model_settings=openai_model_settings(
             max_tokens=_MAX_OUTPUT_TOKENS,
-            temperature=_TEMPERATURE,
-            thinking="medium",
+            reasoning="low",
         ),
         retries=1,
     )
@@ -218,9 +217,7 @@ def _engine_words(text: str | None) -> list[str]:
     if not text:
         return []
     words = {
-        word
-        for word in text.lower().replace("/", " ").replace(",", " ").split()
-        if len(word) >= 3
+        word for word in text.lower().replace("/", " ").replace(",", " ").split() if len(word) >= 3
     }
     return sorted(words)[:60]
 
@@ -341,7 +338,12 @@ async def doctor_deck(
             _get_agent().run(
                 instruction + payload,
                 deps=deps,
-                usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT),
+                usage_limits=UsageLimits(
+                    request_limit=_REQUEST_LIMIT,
+                    tool_calls_limit=_MAX_TOOL_CALLS,
+                    input_tokens_limit=128_000,
+                    output_tokens_limit=16_000,
+                ),
             ),
             timeout=_WALL_CLOCK_SECONDS,
         )
@@ -351,6 +353,7 @@ async def doctor_deck(
     except TimeoutError:
         _log.warning("Deck doctor timed out")
         return _fallback_response("Deck doctor timed out before finishing.")
+    log_run_usage("deck_doctor", "diagnose", result.usage())
     output = result.output
     output.tool_call_count = deps.tool_call_count[0]
     return output

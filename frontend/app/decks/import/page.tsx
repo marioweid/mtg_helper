@@ -111,7 +111,8 @@ export default function ImportDeckPage() {
             {result.unresolved.length > 0 && (
               <div>
                 <p className="text-yellow-400 text-sm font-medium mb-1">
-                  {result.unresolved.length} card{result.unresolved.length !== 1 ? "s" : ""} not found in database
+                  {result.unresolved.length} card{result.unresolved.length !== 1 ? "s" : ""} not
+                  found in database
                 </p>
                 <ul className="text-xs text-gray-400 list-disc list-inside space-y-0.5">
                   {result.unresolved.map((n) => (
@@ -119,15 +120,17 @@ export default function ImportDeckPage() {
                   ))}
                 </ul>
                 <p className="text-xs text-gray-500 mt-1">
-                  These cards may not be in your local DB yet. Try syncing cards from the admin panel.
+                  These cards may not be in your local DB yet. Try syncing cards from the admin
+                  panel.
                 </p>
               </div>
             )}
             {result.color_violations.length > 0 && (
               <div>
                 <p className="text-red-400 text-sm font-medium mb-1">
-                  {result.color_violations.length} card{result.color_violations.length !== 1 ? "s" : ""} skipped
-                  (color identity violation)
+                  {result.color_violations.length} card
+                  {result.color_violations.length !== 1 ? "s" : ""} skipped (color identity
+                  violation)
                 </p>
                 <ul className="text-xs text-gray-400 list-disc list-inside space-y-0.5">
                   {result.color_violations.map((n) => (
@@ -178,9 +181,7 @@ export default function ImportDeckPage() {
               setError(null);
             }}
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              mode === m
-                ? "bg-indigo-600 text-white"
-                : "text-gray-400 hover:text-gray-200"
+              mode === m ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-gray-200"
             }`}
           >
             {m === "url" ? "From URL" : "Paste Text"}
@@ -193,8 +194,8 @@ export default function ImportDeckPage() {
           <section className="rounded-xl border border-white/10 bg-white/5 p-6">
             <h2 className="mb-1 font-semibold text-white">Deck URL</h2>
             <p className="mb-4 text-xs text-gray-500">
-              Paste a public Moxfield or Archidekt deck URL. The deck name and
-              description will be taken from the source unless you override below.
+              Paste a public Moxfield or Archidekt deck URL. The deck name and description will be
+              taken from the source unless you override below.
             </p>
             <input
               type="url"
@@ -208,8 +209,8 @@ export default function ImportDeckPage() {
           <section className="rounded-xl border border-white/10 bg-white/5 p-6">
             <h2 className="mb-1 font-semibold text-white">Deck List</h2>
             <p className="mb-4 text-xs text-gray-500">
-              Paste your deck list from Moxfield, MTGO, TappedOut, or any similar format.
-              Mark your commander with <code className="text-indigo-400">*CMDR*</code> at the end of the line.
+              Paste your deck list from Moxfield, MTGO, TappedOut, or any similar format. Mark your
+              commander with <code className="text-indigo-400">*CMDR*</code> at the end of the line.
             </p>
             <textarea
               value={deckList}
@@ -227,7 +228,10 @@ export default function ImportDeckPage() {
           <div className="flex flex-col gap-4">
             <div>
               <label className="mb-1.5 block text-sm text-gray-400" htmlFor="name">
-                Name {mode === "url" && <span className="text-gray-600">(optional — falls back to source name)</span>}
+                Name{" "}
+                {mode === "url" && (
+                  <span className="text-gray-600">(optional — falls back to source name)</span>
+                )}
               </label>
               <input
                 id="name"

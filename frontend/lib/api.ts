@@ -274,10 +274,10 @@ export const apiClient = {
     }),
 
   completePlannedChange: (deckId: string, planId: string, quantity = 1) =>
-    request<PlannedDeckChange | null>(
-      `/decks/${deckId}/planned-changes/${planId}/complete`,
-      { method: "POST", body: JSON.stringify({ quantity }) },
-    ),
+    request<PlannedDeckChange | null>(`/decks/${deckId}/planned-changes/${planId}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ quantity }),
+    }),
 
   applyDeckRevision: (deckId: string, body: DeckRevisionCreate) =>
     request<DeckRevision>(`/decks/${deckId}/revisions`, {
@@ -285,11 +285,9 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  listDeckRevisions: (deckId: string) =>
-    request<DeckRevision[]>(`/decks/${deckId}/revisions`),
+  listDeckRevisions: (deckId: string) => request<DeckRevision[]>(`/decks/${deckId}/revisions`),
 
-  getDeckRevision: (revisionId: string) =>
-    request<DeckRevision>(`/revisions/${revisionId}`),
+  getDeckRevision: (revisionId: string) => request<DeckRevision>(`/revisions/${revisionId}`),
 
   updateDeckRevision: (revisionId: string, body: DeckRevisionUpdate) =>
     request<DeckRevision>(`/revisions/${revisionId}`, {
@@ -309,7 +307,8 @@ export const apiClient = {
     fetch(`${CLIENT_BASE}/decks/${deckId}`, {
       method: "DELETE",
     }).then((res) => {
-      if (!res.ok && res.status !== 204) throw new ApiError("DELETE_FAILED", "Failed to delete deck");
+      if (!res.ok && res.status !== 204)
+        throw new ApiError("DELETE_FAILED", "Failed to delete deck");
     }),
 
   updateCardCategories: (deckId: string, scryfallId: string, categories: string[]) =>
@@ -336,7 +335,8 @@ export const apiClient = {
     fetch(`${CLIENT_BASE}/decks/${deckId}/cards/${scryfallId}`, {
       method: "DELETE",
     }).then((res) => {
-      if (!res.ok && res.status !== 204) throw new ApiError("DELETE_FAILED", "Failed to remove card");
+      if (!res.ok && res.status !== 204)
+        throw new ApiError("DELETE_FAILED", "Failed to remove card");
     }),
 
   removeCard: (deckId: string, scryfallId: string) =>
@@ -350,8 +350,7 @@ export const apiClient = {
     }),
 
   // Snapshots + Comparison
-  listSnapshots: (deckId: string) =>
-    request<SnapshotSummary[]>(`/decks/${deckId}/snapshots`),
+  listSnapshots: (deckId: string) => request<SnapshotSummary[]>(`/decks/${deckId}/snapshots`),
 
   createSnapshot: (deckId: string, label?: string | null) =>
     request<SnapshotResponse>(`/decks/${deckId}/snapshots`, {
@@ -359,8 +358,7 @@ export const apiClient = {
       body: JSON.stringify({ label: label ?? null }),
     }),
 
-  getSnapshot: (snapshotId: string) =>
-    request<SnapshotDetailResponse>(`/snapshots/${snapshotId}`),
+  getSnapshot: (snapshotId: string) => request<SnapshotDetailResponse>(`/snapshots/${snapshotId}`),
 
   deleteSnapshot: (snapshotId: string) =>
     fetch(`${CLIENT_BASE}/snapshots/${snapshotId}`, {
@@ -370,7 +368,10 @@ export const apiClient = {
         throw new ApiError("DELETE_FAILED", "Failed to delete snapshot");
     }),
 
-  compareDecks: (left: { kind: ComparisonKind; id: string }, right: { kind: ComparisonKind; id: string }) => {
+  compareDecks: (
+    left: { kind: ComparisonKind; id: string },
+    right: { kind: ComparisonKind; id: string },
+  ) => {
     const qs = new URLSearchParams({
       left: left.id,
       left_kind: left.kind,
@@ -431,8 +432,7 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  getCoachMemory: (deckId: string) =>
-    request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`),
+  getCoachMemory: (deckId: string) => request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`),
 
   updateCoachMemory: (deckId: string, body: CoachMemoryUpdate) =>
     request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`, {
@@ -505,8 +505,7 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  listFeedback: (deckId: string) =>
-    request<FeedbackResponse[]>(`/decks/${deckId}/feedback`),
+  listFeedback: (deckId: string) => request<FeedbackResponse[]>(`/decks/${deckId}/feedback`),
 
   deleteFeedback: (deckId: string, feedbackId: string) =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/feedback/${feedbackId}`, {
@@ -574,10 +573,8 @@ export const apiClient = {
     if (params?.limit !== undefined) qs.set("limit", String(params.limit));
     if (params?.offset !== undefined) qs.set("offset", String(params.offset));
     if (params?.type) qs.set("type", params.type);
-    if (params?.min_price_cents != null)
-      qs.set("min_price_cents", String(params.min_price_cents));
-    if (params?.max_price_cents != null)
-      qs.set("max_price_cents", String(params.max_price_cents));
+    if (params?.min_price_cents != null) qs.set("min_price_cents", String(params.min_price_cents));
+    if (params?.max_price_cents != null) qs.set("max_price_cents", String(params.max_price_cents));
     if (params?.search) qs.set("search", params.search);
     if (params?.sort) qs.set("sort", params.sort);
     if (params?.direction) qs.set("direction", params.direction);

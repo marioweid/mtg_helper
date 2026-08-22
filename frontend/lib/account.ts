@@ -16,4 +16,3 @@ export async function getCurrentAccount(): Promise<AccountResponse> {
   });
   return inflight;
 }
-

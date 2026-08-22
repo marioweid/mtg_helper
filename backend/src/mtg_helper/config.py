@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str
-    gemini_api_key: str = ""
+    openai_api_key: Annotated[SecretStr, Field(min_length=1)]
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
     mtgjson_all_printings_url: str = "https://mtgjson.com/api/v5/AllPrintings.json.zip"
     mtgjson_keywords_url: str = "https://mtgjson.com/api/v5/Keywords.json"
@@ -27,10 +27,6 @@ class Settings(BaseSettings):
     archidekt_base_url: str = "https://archidekt.com/api"
     archidekt_tag_delay_seconds: float = 1.0
     archidekt_tag_stale_after_hours: float = 168.0
-
-    # LLM
-    chat_model: str = "gemini-3.5-flash"
-    fast_model: str = "gemini-3.1-flash-lite"
 
     # Pagination defaults
     default_limit: int = 20

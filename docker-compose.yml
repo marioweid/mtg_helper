@@ -12,9 +12,6 @@
 services:
   postgres:
     image: postgres:16
-    env_file:
-      - path: ./.env
-        required: false
     environment:
       POSTGRES_DB: mtg_helper
       POSTGRES_USER: mtg
@@ -35,8 +32,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - path: ./.env
-        required: false
+      - ./backend/.env
     environment:
       # Override the localhost DATABASE_URL from backend/.env — inside the
       # container, the database lives at the ``postgres`` service hostname.
@@ -54,9 +50,6 @@ services:
     build:
       context: ./frontend
       target: dev
-    env_file:
-      - path: ./.env
-        required: false
     ports:
       - "3000:3000"
     environment:

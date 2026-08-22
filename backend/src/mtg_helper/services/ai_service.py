@@ -1,4 +1,4 @@
-"""AI deck building service using the Gemini API."""
+"""Deterministic deck-building retrieval service."""
 
 import asyncio
 import logging
@@ -491,11 +491,118 @@ def _normalize_hub_tag(tag: str | None) -> str | None:
     return tag.strip().lower().replace("-", "_")
 
 
+def _resolve_stage_query(
+    stage: str,
+    description: str | None,
+    archetype_tags: list[str],
+    theme_tag: str | None,
+) -> tuple[str, list[str], bool, str | None, frozenset[str] | None] | None:
+    query_text, base_tags = stage_retrieval_query(stage, description)
+    required_hub_tag: str | None = None
+    excluded_hub_tags: frozenset[str] | None = None
+    if stage == "theme" and archetype_tags:
+        normalized_theme_tag = _normalize_hub_tag(theme_tag) if theme_tag else None
+        if theme_tag == _THEME_ETC_TAG:
+            query_tags = base_tags
+            excluded_hub_tags = frozenset(archetype_tags)
+            query_text = f"{query_text} commander staples support"
+        else:
+            if normalized_theme_tag not in archetype_tags:
+                return None
+            query_tags = [normalized_theme_tag]
+            required_hub_tag = normalized_theme_tag
+            query_text = f"{query_text} {normalized_theme_tag.replace('_', ' ')}"
+        prefer_keywords = True
+    elif archetype_tags:
+        seen: set[str] = set()
+        query_tags = [
+            tag for tag in (*archetype_tags, *base_tags) if not (tag in seen or seen.add(tag))
+        ]
+        prefer_keywords = True
+    else:
+        query_tags = base_tags
+        prefer_keywords = False
+    return query_text, query_tags, prefer_keywords, required_hub_tag, excluded_hub_tags
+
+
+async def _stage_excluded_ids(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    account_id: UUID,
+    exclude: list[str] | None,
+) -> list[UUID]:
+    deck_card_ids = [card.card_id for card in deck.cards]
+    exclude_ids = await _resolve_exclude_ids(pool, exclude)
+    commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
+    avoid_ids = await preference_service.get_avoid_card_ids(pool, account_id)
+    return list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
+
+
+async def _build_stage_suggestions(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    account_id: UUID,
+    email: str,
+    *,
+    stage_query: tuple[str, list[str], bool, str | None, frozenset[str] | None],
+    resolved_stage: str,
+    commander_color_identity: list[str],
+    all_excluded: list[UUID],
+    target: int | None,
+    offset: int,
+    collection_ids: list[UUID] | None,
+    max_price_cents: int | None,
+    min_price_cents: int | None,
+    card_types: list[str] | None,
+    subtypes: list[str] | None,
+) -> list[CardSuggestion]:
+    query_text, query_tags, prefer_keywords, required_hub_tag, excluded_hub_tags = stage_query
+    feedback_weights, user_profile = await asyncio.gather(
+        _compute_feedback_weights(pool, deck.id, account_id),
+        _load_user_profile(pool, deck.id, account_id, email),
+    )
+    candidates = await retrieve_candidates(
+        pool,
+        query_text,
+        query_tags,
+        commander_color_identity,
+        all_excluded,
+        limit=target if target is not None else 20,
+        offset=offset,
+        stage=resolved_stage,
+        deck_cmc_counts=_compute_deck_cmc_counts(deck),
+        feedback_weights=feedback_weights,
+        user_profile=user_profile,
+        ranking_weights=await _load_ranking_weights(pool, account_id),
+        collection_filter=await _resolve_collection_filter(pool, deck, collection_ids),
+        price_filter=_resolve_price_filter(max_price_cents, min_price_cents),
+        commander_id=deck.commander_id,
+        bracket=deck.bracket,
+        type_filter=_resolve_structured_type_filter(card_types, subtypes),
+        prefer_keywords=prefer_keywords,
+        required_hub_tag=required_hub_tag,
+        excluded_hub_tags=excluded_hub_tags,
+    )
+    _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
+    if resolved_stage == "lands":
+        candidates = [
+            candidate for candidate in candidates if "Land" in (candidate.type_line or "")
+        ]
+    ownership_map = await collection_service.build_ownership_map(
+        pool, account_id, [candidate.scryfall_id for candidate in candidates]
+    )
+    return [
+        card_from_retrieved(candidate, resolved_stage, query_tags, ownership_map)
+        for candidate in candidates
+    ]
+
+
 async def build_stage(
     pool: asyncpg.Pool,
     deck_id: UUID,
     account_id: UUID,
     email: str,
+    *,
     stage: str | None = None,
     target: int | None = None,
     offset: int = 0,
@@ -547,97 +654,40 @@ async def build_stage(
     if commander is None:
         raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
 
-    deck_card_ids = [c.card_id for c in deck.cards]
-    exclude_ids = await _resolve_exclude_ids(pool, exclude)
-    commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
-    avoid_ids = await preference_service.get_avoid_card_ids(pool, account_id)
-    all_excluded = list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
+    all_excluded = await _stage_excluded_ids(pool, deck, account_id, exclude)
 
-    query_text, base_tags = stage_retrieval_query(resolved_stage, deck.description)
     deck_archetype_tags = list(deck.archetype_tags or [])
-    required_hub_tag: str | None = None
-    excluded_hub_tags: frozenset[str] | None = None
-    if resolved_stage == "theme" and deck_archetype_tags:
-        normalized_theme_tag = _normalize_hub_tag(theme_tag) if theme_tag else None
-        if theme_tag == _THEME_ETC_TAG:
-            query_tags = base_tags
-            excluded_hub_tags = frozenset(deck_archetype_tags)
-            query_text = f"{query_text} commander staples support"
-        else:
-            if normalized_theme_tag not in deck_archetype_tags:
-                return BuildResponse(
-                    stage=resolved_stage,
-                    stage_number=stage_number(resolved_stage),
-                    total_stages=_TOTAL_STAGES,
-                    suggestions=[],
-                    unresolved=[],
-                )
-            active_theme_tag = normalized_theme_tag
-            query_tags = [active_theme_tag]
-            required_hub_tag = active_theme_tag
-            query_text = f"{query_text} {active_theme_tag.replace('_', ' ')}"
-        prefer_keywords = True
-    elif deck_archetype_tags:
-        # Union the explicit chips with the stage's default tags so e.g. the
-        # ramp stage still pulls ramp cards while the deck's archetype tilts
-        # which ramp pieces win the tiebreaker.
-        seen: set[str] = set()
-        query_tags = [
-            t for t in (*deck_archetype_tags, *base_tags) if not (t in seen or seen.add(t))
-        ]
-        prefer_keywords = True
-    else:
-        query_tags = base_tags
-        prefer_keywords = False
-
-    feedback_weights, user_profile = await asyncio.gather(
-        _compute_feedback_weights(pool, deck.id, account_id),
-        _load_user_profile(pool, deck.id, account_id, email),
+    stage_query = _resolve_stage_query(
+        resolved_stage, deck.description, deck_archetype_tags, theme_tag
     )
-    ranking_weights = await _load_ranking_weights(pool, account_id)
-    deck_cmc_counts = _compute_deck_cmc_counts(deck)
-    collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
-    price_filter = _resolve_price_filter(max_price_cents, min_price_cents)
-    type_filter = _resolve_structured_type_filter(card_types, subtypes)
-
-    limit = target if target is not None else 20
-    candidates = await retrieve_candidates(
+    if stage_query is None:
+        return BuildResponse(
+            stage=resolved_stage,
+            stage_number=stage_number(resolved_stage),
+            total_stages=_TOTAL_STAGES,
+            suggestions=[],
+            unresolved=[],
+        )
+    suggestions = await _build_stage_suggestions(
         pool,
-        query_text,
-        query_tags,
-        commander.color_identity,
-        all_excluded,
-        limit=limit,
+        deck,
+        account_id,
+        email,
+        stage_query=stage_query,
+        resolved_stage=resolved_stage,
+        commander_color_identity=commander.color_identity,
+        all_excluded=all_excluded,
+        target=target,
         offset=offset,
-        stage=resolved_stage,
-        deck_cmc_counts=deck_cmc_counts,
-        feedback_weights=feedback_weights,
-        user_profile=user_profile,
-        ranking_weights=ranking_weights,
-        collection_filter=collection_filter,
-        price_filter=price_filter,
-        commander_id=deck.commander_id,
-        bracket=deck.bracket,
-        type_filter=type_filter,
-        prefer_keywords=prefer_keywords,
-        required_hub_tag=required_hub_tag,
-        excluded_hub_tags=excluded_hub_tags,
+        collection_ids=collection_ids,
+        max_price_cents=max_price_cents,
+        min_price_cents=min_price_cents,
+        card_types=card_types,
+        subtypes=subtypes,
     )
-    _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
-
-    if resolved_stage == "lands":
-        candidates = [c for c in candidates if "Land" in (c.type_line or "")]
-    ownership_map = await collection_service.build_ownership_map(
-        pool, account_id, [c.scryfall_id for c in candidates]
-    )
-    suggestions = [
-        card_from_retrieved(c, resolved_stage, query_tags, ownership_map) for c in candidates
-    ]
 
     if advance_deck_stage:
-        await deck_service.update_deck(
-            pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage)
-        )
+        await deck_service.update_deck(pool, deck_id, deck_service.DeckUpdate(stage=resolved_stage))
 
     return BuildResponse(
         stage=resolved_stage,
@@ -654,6 +704,7 @@ async def suggest_cards(
     account_id: UUID,
     email: str,
     prompt: str,
+    *,
     count: int,
     collection_ids: list[UUID] | None = None,
     max_price_cents: int | None = None,
@@ -690,9 +741,7 @@ async def suggest_cards(
     parsed_tags = parse_query_tags(prompt)
     deck_archetype_tags = list(deck.archetype_tags or [])
     seen: set[str] = set()
-    query_tags = [
-        t for t in (*deck_archetype_tags, *parsed_tags) if not (t in seen or seen.add(t))
-    ]
+    query_tags = [t for t in (*deck_archetype_tags, *parsed_tags) if not (t in seen or seen.add(t))]
     prefer_keywords = bool(deck_archetype_tags)
     parsed_filter = parse_query_types(prompt)
     structured_filter = _resolve_structured_type_filter(card_types, subtypes)

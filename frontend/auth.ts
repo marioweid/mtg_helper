@@ -79,10 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (account.expires_at) token.expiresAt = account.expires_at;
         return token;
       }
-      if (
-        token.expiresAt &&
-        Date.now() / 1000 > token.expiresAt - REFRESH_LEEWAY_SECONDS
-      ) {
+      if (token.expiresAt && Date.now() / 1000 > token.expiresAt - REFRESH_LEEWAY_SECONDS) {
         return refreshIdToken(token);
       }
       return token;

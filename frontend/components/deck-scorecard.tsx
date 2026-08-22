@@ -66,8 +66,7 @@ export function DeckScorecard({ cards, stageTargets }: Props) {
   });
 
   const okCount = rows.filter((r) => r.status === "ok").length;
-  const overallGlyph =
-    okCount === rows.length ? "🟢" : okCount >= rows.length - 1 ? "🟡" : "🔴";
+  const overallGlyph = okCount === rows.length ? "🟢" : okCount >= rows.length - 1 ? "🟡" : "🔴";
 
   return (
     <div>

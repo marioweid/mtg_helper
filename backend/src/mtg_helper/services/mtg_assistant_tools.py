@@ -149,7 +149,7 @@ async def find_theme_cards(
             roles=roles,
             limit=limit,
         )
-    card_ids = sorted(scores, key=scores.get, reverse=True)[:80]
+    card_ids = sorted(scores, key=lambda card_id: scores[card_id], reverse=True)[:80]
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             _THEME_CARD_SQL,

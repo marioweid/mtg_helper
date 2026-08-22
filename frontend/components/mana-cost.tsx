@@ -73,9 +73,7 @@ export function OracleText({ text }: { text: string | null | undefined }) {
   let key = 0;
   while ((match = regex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      segments.push(
-        <Fragment key={`t-${key}`}>{text.slice(lastIndex, match.index)}</Fragment>,
-      );
+      segments.push(<Fragment key={`t-${key}`}>{text.slice(lastIndex, match.index)}</Fragment>);
       key += 1;
     }
     segments.push(<ManaSymbol key={`s-${key}`} symbol={match[0].slice(1, -1)} />);

@@ -43,12 +43,7 @@ import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { TopPicksPanel } from "@/components/top-picks-panel";
 import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
-import {
-  deckTotal,
-  totalCardCount,
-  type DeckCardItem,
-  type DeckDetailResponse,
-} from "@/lib/types";
+import { deckTotal, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 
 type GroupMode = "tag" | "type";
 type DeckTab = "cards" | "top-picks" | "combos" | "history";
@@ -168,14 +163,19 @@ export default function DeckDetailPage() {
   }, [deckId]);
 
   useEffect(() => {
-    apiClient.listPreferences().then((prefs) => {
-      const names = new Set(
-        prefs
-          .filter((p) => p.preference_type === "pet_card" && p.card_name)
-          .map((p) => p.card_name as string),
-      );
-      setPetCardNames(names);
-    }).catch(() => {/* non-critical */});
+    apiClient
+      .listPreferences()
+      .then((prefs) => {
+        const names = new Set(
+          prefs
+            .filter((p) => p.preference_type === "pet_card" && p.card_name)
+            .map((p) => p.card_name as string),
+        );
+        setPetCardNames(names);
+      })
+      .catch(() => {
+        /* non-critical */
+      });
   }, []);
 
   async function handleSaveDescription() {
@@ -194,7 +194,8 @@ export default function DeckDetailPage() {
 
   async function handleDeleteDeck() {
     if (!deck) return;
-    if (!confirm(`Delete "${deck.name}"? All cards and feedback will be permanently removed.`)) return;
+    if (!confirm(`Delete "${deck.name}"? All cards and feedback will be permanently removed.`))
+      return;
     setDeleting(true);
     try {
       await apiClient.deleteDeck(deck.id);
@@ -269,7 +270,7 @@ export default function DeckDetailPage() {
   const visibleCards = applyDeckFilter(deck.cards, filter);
   const colors = colorIdentityFromCards(deck.cards);
   const selectedCard = selectedCardId
-    ? deck.cards.find((c) => c.deck_card_id === selectedCardId) ?? null
+    ? (deck.cards.find((c) => c.deck_card_id === selectedCardId) ?? null)
     : null;
   const comboCardIds = new Set<string>();
   if (combos) {
@@ -280,7 +281,7 @@ export default function DeckDetailPage() {
     }
   }
   const stage = STAGE_LABELS[deck.stage] ?? deck.stage;
-  const bracket = deck.bracket != null ? BRACKET_LABELS[deck.bracket] ?? null : null;
+  const bracket = deck.bracket != null ? (BRACKET_LABELS[deck.bracket] ?? null) : null;
 
   const buildLabel = deck.stage === "complete" ? "View Build" : "Continue Building";
 
@@ -399,10 +400,7 @@ export default function DeckDetailPage() {
                   </div>
                 </CardWorkspaceToolbar>
               )}
-              <CommanderSection
-                commander={deck.commander_card}
-                partner={deck.partner_card}
-              />
+              <CommanderSection commander={deck.commander_card} partner={deck.partner_card} />
               {isGrid ? (
                 <DeckGrid
                   cards={visibleCards}
@@ -430,7 +428,10 @@ export default function DeckDetailPage() {
               {deck.cards.length === 0 && (
                 <div className="rounded-xl border border-dashed border-white/20 py-12 text-center text-gray-500">
                   No cards yet.{" "}
-                  <Link href={`/decks/${deck.id}/build`} className="text-indigo-400 hover:underline">
+                  <Link
+                    href={`/decks/${deck.id}/build`}
+                    className="text-indigo-400 hover:underline"
+                  >
                     Start building
                   </Link>
                 </div>
@@ -440,9 +441,7 @@ export default function DeckDetailPage() {
 
           {tab === "combos" && <ComboTab deckId={deck.id} />}
 
-          {tab === "top-picks" && (
-            <TopPicksPanel deckId={deck.id} onPlanChanged={load} />
-          )}
+          {tab === "top-picks" && <TopPicksPanel deckId={deck.id} onPlanChanged={load} />}
 
           {tab === "history" && <DeckHistoryPanel deckId={deck.id} />}
         </div>

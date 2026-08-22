@@ -3,6 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from mtg_helper.services.mana_base_service import (
     candidate_lands,
     parse_pips,
 )
+from mtg_helper.services.retrieval_service import PriceFilter
 
 
 def _make_card(
@@ -341,12 +343,11 @@ class TestCandidateLands:
         )
 
         deck = _make_deck([], ["G", "W"])
-        result = await candidate_lands(
-            MagicMock(), MagicMock(), MagicMock(), deck, max_price_cents=500, limit=40
-        )
+        result = await candidate_lands(pool=MagicMock(), deck=deck, max_price_cents=500, limit=40)
         assert [c.name for c in result] == ["Temple Garden"]
         assert captured["limit"] == 40
-        assert captured["price_filter"].max_cents == 500
+        price_filter = cast(PriceFilter, captured["price_filter"])
+        assert price_filter.max_cents == 500
         assert captured["stage"] == "lands"
 
     @pytest.mark.asyncio
@@ -364,5 +365,5 @@ class TestCandidateLands:
             AsyncMock(return_value={}),
         )
         deck = _make_deck([], ["G"])
-        await candidate_lands(MagicMock(), MagicMock(), MagicMock(), deck, max_price_cents=None)
+        await candidate_lands(pool=MagicMock(), deck=deck, max_price_cents=None)
         assert captured["price_filter"] is None

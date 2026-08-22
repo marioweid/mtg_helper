@@ -1,11 +1,4 @@
-export const STAGES = [
-  "theme",
-  "ramp",
-  "draw",
-  "interaction",
-  "lands",
-  "complete",
-] as const;
+export const STAGES = ["theme", "ramp", "draw", "interaction", "lands", "complete"] as const;
 
 export type Stage = (typeof STAGES)[number];
 

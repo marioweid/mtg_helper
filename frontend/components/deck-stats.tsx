@@ -43,14 +43,12 @@ export function DeckStats({ cards }: { cards: DeckCardItem[] }) {
   const colors = colorCounts(cards);
   const maxColorCount = Math.max(...Object.values(colors), 1);
   const totalCount = cards.reduce((sum, c) => sum + qty(c), 0);
-  const nonLandCount = cards.filter((c) => !c.type_line?.includes("Land")).reduce((sum, c) => sum + qty(c), 0);
-  const totalPriceCents = cards.reduce(
-    (sum, c) => sum + (c.price_eur_cents ?? 0) * qty(c),
-    0,
-  );
+  const nonLandCount = cards
+    .filter((c) => !c.type_line?.includes("Land"))
+    .reduce((sum, c) => sum + qty(c), 0);
+  const totalPriceCents = cards.reduce((sum, c) => sum + (c.price_eur_cents ?? 0) * qty(c), 0);
   const pricedCount = cards.filter((c) => c.price_eur_cents != null).length;
-  const totalPrice =
-    pricedCount === 0 ? "—" : `€${(totalPriceCents / 100).toFixed(2)}`;
+  const totalPrice = pricedCount === 0 ? "—" : `€${(totalPriceCents / 100).toFixed(2)}`;
 
   const categories = [
     ...CATEGORY_ORDER.filter((c) => (categoryCounts[c] ?? 0) > 0 || CATEGORY_TARGETS[c] != null),

@@ -55,9 +55,7 @@ function buildGroups(cards: DeckCardItem[], groupBy: GroupBy): Group[] {
     .map(([key, items]) => ({
       key,
       label: STAGE_LABELS[key] ?? key,
-      items: [...items].sort(
-        (a, b) => (a.cmc ?? 0) - (b.cmc ?? 0) || a.name.localeCompare(b.name),
-      ),
+      items: [...items].sort((a, b) => (a.cmc ?? 0) - (b.cmc ?? 0) || a.name.localeCompare(b.name)),
     }))
     .sort((a, b) => b.items.length - a.items.length);
 }
@@ -88,10 +86,7 @@ function CompactRow({
       }`}
     >
       {showStepper ? (
-        <span
-          className="flex shrink-0 items-center gap-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <span className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => void onSetQuantity?.(card.scryfall_id, card.quantity - 1)}
@@ -123,11 +118,17 @@ function CompactRow({
             {card.name}
           </CardHover>
         </div>
-        {isPet && <span className="shrink-0 text-red-400" title="Pet card">♥</span>}
+        {isPet && (
+          <span className="shrink-0 text-red-400" title="Pet card">
+            ♥
+          </span>
+        )}
         <DeckFitIndicator card={card} />
         <PlannedCutBadge quantity={card.planned_cut_quantity} />
         {inCombo && (
-          <span className="shrink-0 text-yellow-300" title="In a combo">⚡</span>
+          <span className="shrink-0 text-yellow-300" title="In a combo">
+            ⚡
+          </span>
         )}
       </div>
       {card.mana_cost && (
@@ -179,9 +180,7 @@ export function DeckCompactColumns({
   onToggleGroup,
 }: Props) {
   if (cards.length === 0) {
-    return (
-      <p className="px-2 py-6 text-center text-xs text-gray-500">No cards.</p>
-    );
+    return <p className="px-2 py-6 text-center text-xs text-gray-500">No cards.</p>;
   }
   const groups = buildGroups(cards, groupBy);
 

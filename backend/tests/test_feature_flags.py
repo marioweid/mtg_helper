@@ -172,11 +172,12 @@ async def test_optimize_starts_when_enabled(
     assert "job_id" in resp.json()["data"]
 
 
+@pytest.mark.no_db
 async def test_single_flight_rejects_overlapping_run() -> None:
     """A second job started while one holds the semaphore is errored, not run."""
     async with _OPTIMIZE_SEMAPHORE:
         job = optimizer_jobs.OptimizerJob(job_id=uuid4(), account_id=uuid4(), deck_id=uuid4())
-        await _run_optimize_job(job, None, None, None, None, OptimizeRequest(), uuid4())
+        await _run_optimize_job(job, None, None, OptimizeRequest(), uuid4())
 
     assert job.status == "error"
     assert job.error is not None

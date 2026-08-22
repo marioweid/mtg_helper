@@ -72,11 +72,7 @@ describe("card workspaces", () => {
 
   it("renders deck cards as artwork-first tiles with direct cut actions", () => {
     const html = renderToStaticMarkup(
-      <DeckGrid
-        cards={[deckCard]}
-        onCardClick={() => undefined}
-        onRemove={() => undefined}
-      />,
+      <DeckGrid cards={[deckCard]} onCardClick={() => undefined} onRemove={() => undefined} />,
     );
 
     expect(html).toContain("Artifact");

@@ -40,19 +40,13 @@ export function BracketValidationPanel({ validation }: Props) {
           <li key={`${v.rule}-${idx}`}>
             <div className="text-xs uppercase tracking-wide text-gray-400">
               {RULE_LABELS[v.rule]} ·{" "}
-              <span
-                className={
-                  v.severity === "block" ? "text-red-300" : "text-amber-300"
-                }
-              >
+              <span className={v.severity === "block" ? "text-red-300" : "text-amber-300"}>
                 {v.severity}
               </span>
             </div>
             <div>{v.message}</div>
             {v.cards.length > 0 && (
-              <div className="mt-0.5 text-xs text-gray-400">
-                {v.cards.join(", ")}
-              </div>
+              <div className="mt-0.5 text-xs text-gray-400">{v.cards.join(", ")}</div>
             )}
           </li>
         ))}

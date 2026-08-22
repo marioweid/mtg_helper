@@ -202,7 +202,9 @@ export function ManaFixPanel({ deckId, onAddCard }: Props) {
                     : "rounded bg-amber-900/30 px-1.5 py-0.5 text-amber-300"
                 }
               >
-                {report.land_delta > 0 ? `+${report.land_delta} lands` : `${report.land_delta} lands`}
+                {report.land_delta > 0
+                  ? `+${report.land_delta} lands`
+                  : `${report.land_delta} lands`}
               </span>
             )}
             <span className="text-gray-600">·</span>

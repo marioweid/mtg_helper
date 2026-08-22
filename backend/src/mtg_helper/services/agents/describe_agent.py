@@ -9,23 +9,20 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import asyncpg
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, UsageLimits
 
 from mtg_helper.models.ai import DescribeResponse
 from mtg_helper.services import card_service
 from mtg_helper.services.agents._history import to_model_messages
-from mtg_helper.services.agents._model import (
-    fast_google_model_settings,
-    make_fast_google_model,
-)
+from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
 from mtg_helper.services.agents._prompts import (
     BRACKET_DESCRIPTIONS,
     FORCE_FINALIZE_HINT,
     MAX_HISTORY_TURNS,
     SANDBOX_RULES,
 )
+from mtg_helper.services.agents._usage import log_run_usage
 
-_TEMPERATURE = 0.3
 _MAX_OUTPUT_TOKENS = 2048
 
 # Known strategy tags the retrieval system recognizes — injected into the
@@ -112,13 +109,12 @@ def _build_system_prompt(deps: DescribeDeps) -> str:
 
 def _build_agent() -> Agent[DescribeDeps, DescribeResponse]:
     agent = Agent[DescribeDeps, DescribeResponse](
-        model=make_fast_google_model(),
+        model=make_openai_model(),
         deps_type=DescribeDeps,
         output_type=DescribeResponse,
-        model_settings=fast_google_model_settings(
+        model_settings=openai_model_settings(
             max_tokens=_MAX_OUTPUT_TOKENS,
-            temperature=_TEMPERATURE,
-            thinking="minimal",
+            reasoning="minimal",
         ),
         retries=1,
     )
@@ -134,7 +130,7 @@ _AGENT: Agent[DescribeDeps, DescribeResponse] | None = None
 
 
 def get_agent() -> Agent[DescribeDeps, DescribeResponse]:
-    """Lazy singleton — Gemini provider needs ``settings.gemini_api_key``."""
+    """Return the lazily constructed OpenAI Responses agent."""
     global _AGENT
     if _AGENT is None:
         _AGENT = _build_agent()
@@ -147,6 +143,7 @@ async def describe_turn(
     partner_scryfall_id: UUID | None,
     bracket: int,
     history: list[dict[str, str]],
+    *,
     message: str,
 ) -> DescribeResponse:
     """Run one turn of the deck-description agent.
@@ -194,5 +191,12 @@ async def describe_turn(
         user_message,
         deps=deps,
         message_history=to_model_messages(trimmed),
+        usage_limits=UsageLimits(
+            request_limit=2,
+            tool_calls_limit=0,
+            input_tokens_limit=16_000,
+            output_tokens_limit=3_000,
+        ),
     )
+    log_run_usage("describe", "turn", result.usage())
     return result.output

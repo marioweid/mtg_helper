@@ -27,6 +27,8 @@ from mtg_helper.models.playtest import (
 from mtg_helper.models.swaps import SwapCandidate, SwapResponse
 from mtg_helper.services import deck_optimizer_service
 
+pytestmark = pytest.mark.no_db
+
 
 def _stats(
     *,
@@ -292,8 +294,6 @@ async def _run(monkeypatch: pytest.MonkeyPatch, deck, **kwargs):
     """Invoke ``run_search`` with the standard mocked dependencies."""
     return await deck_optimizer_service.run_search(
         MagicMock(),
-        MagicMock(),
-        MagicMock(),
         deck,
         kwargs.pop("sim_request", PlaytestSimulateRequest()),
         max_price_cents=kwargs.pop("max_price_cents", None),
@@ -345,6 +345,7 @@ class TestNonlandSearch:
         assert swap.out_card_name == "Weak Card"
         assert swap.in_card_name == "Better Card"
         assert swap.price_delta_cents == 400 - 1500
+        assert find_swaps.await_args is not None
         assert find_swaps.await_args.kwargs["max_price_cents"] == 500
 
     @pytest.mark.asyncio
@@ -391,7 +392,7 @@ class TestNonlandSearch:
         _patch_lands(monkeypatch, [])
 
         async def fake_find_swaps(*args, **kwargs):
-            source = next(c for c in cards if c.card_id == args[4])
+            source = next(c for c in cards if c.card_id == args[2])
             return _swap_response(
                 source.card_id, [_candidate(f"Replacement for {source.name}", price_eur_cents=500)]
             )
@@ -517,6 +518,7 @@ class TestLandSearch:
         proposal = await _run(monkeypatch, deck, max_price_cents=500)
         assert len(proposal.swaps) == 1
         assert proposal.swaps[0].in_card_name == "Command Tower"
+        assert cl.await_args is not None
         assert cl.await_args.kwargs["max_price_cents"] == 500
 
     @pytest.mark.asyncio

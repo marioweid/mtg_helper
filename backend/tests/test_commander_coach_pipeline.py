@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -9,9 +10,20 @@ from uuid import uuid4
 import asyncpg
 import pytest
 from pydantic_ai.models.test import TestModel
+from starlette.requests import Request
 
-from mtg_helper.models.ai import CardSearchHit, ColorStatus, CommanderCoachRequest, ManaBaseReport
+from mtg_helper.models.accounts import AccountResponse
+from mtg_helper.models.ai import (
+    CardSearchHit,
+    ColorStatus,
+    CommanderCoachRequest,
+    CommanderCoachResponse,
+    ManaBaseReport,
+    ReplacementOption,
+    TargetedReplacementResponse,
+)
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
+from mtg_helper.routers import ai
 from mtg_helper.services import mtg_assistant
 from mtg_helper.services.commander_coach import orchestrator, signal_lanes
 from mtg_helper.services.mtg_assistant import (
@@ -22,8 +34,13 @@ from mtg_helper.services.mtg_assistant import (
     _to_response,
 )
 from mtg_helper.services.mtg_assistant_tools import AssistantManaBaseAnalysis, ManaBaseSwap
+from mtg_helper.services.mtg_card_search import (
+    CardEvidenceSource,
+    CardSearchCandidate,
+    CardSearchResult,
+)
 
-pytestmark = pytest.mark.asyncio
+pytestmark = pytest.mark.no_db
 
 
 def _card(name: str, *, tags: list[str] | None = None) -> DeckCardItem:
@@ -92,12 +109,16 @@ async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
         },
     )
     with mtg_assistant.get_agent().override(model=model):
-        result = await orchestrator.run_coach(None, _deck(), CommanderCoachRequest())
+        result = await orchestrator.run_coach(
+            cast(asyncpg.Pool, None), _deck(), CommanderCoachRequest()
+        )
 
     assert result.mode == "doctor"
     assert result.doctor is not None
+    assert result.replacement is None
     assert result.doctor.cuts[0].card_name == "Medium Value Card"
     assert result.doctor.tool_call_count == 1
+    assert model.last_model_request_parameters is not None
     tool_names = {tool.name for tool in model.last_model_request_parameters.function_tools}
     assert "search_cards" in tool_names
     assert "find_theme_cards" not in tool_names
@@ -146,7 +167,7 @@ async def test_landbase_request_uses_grounded_mana_analysis_tool() -> None:
         mtg_assistant.get_agent().override(model=model),
     ):
         result = await orchestrator.run_coach(
-            None,
+            cast(asyncpg.Pool, None),
             _deck(),
             CommanderCoachRequest(message="Can we improve my landbase?"),
         )
@@ -154,6 +175,54 @@ async def test_landbase_request_uses_grounded_mana_analysis_tool() -> None:
     assert result.doctor is not None
     assert result.doctor.tool_call_count == 1
     assert result.doctor.adds[0].card.name == "Llanowar Wastes"
+
+
+async def test_run_coach_returns_grounded_replacement() -> None:
+    candidate_id = uuid4()
+    search_result = CardSearchResult(
+        evidence_source=CardEvidenceSource.GLOBAL_SEARCH,
+        candidates=[
+            CardSearchCandidate(
+                card=CardSearchHit(scryfall_id=candidate_id, name="Squirrel Sovereign"),
+                evidence_source=CardEvidenceSource.GLOBAL_SEARCH,
+                role_matches=["anthem"],
+            )
+        ],
+    )
+    model = TestModel(
+        call_tools=["search_cards"],
+        custom_output_args={
+            "mode": "replacement",
+            "reply": "Replace the generic creature with a squirrel anthem.",
+            "target_card_name": "Medium Value Card",
+            "recommendations": [
+                {
+                    "scryfall_id": candidate_id,
+                    "reason": "It supports the deck's squirrel plan.",
+                    "role_match": "theme_upgrade",
+                    "tradeoff": "It is narrower outside the tribal plan.",
+                }
+            ],
+        },
+    )
+    with (
+        patch.object(mtg_assistant, "search_cards_service", AsyncMock(return_value=search_result)),
+        mtg_assistant.get_agent().override(model=model),
+    ):
+        result = await orchestrator.run_coach(
+            cast(asyncpg.Pool, None),
+            _deck(),
+            CommanderCoachRequest(message="Replace Medium Value Card."),
+        )
+
+    assert result.mode == "replacement"
+    assert result.doctor is None
+    assert result.replacement is not None
+    assert result.replacement.target_card_name == "Medium Value Card"
+    assert result.replacement.best_pick is not None
+    assert result.replacement.best_pick.name == "Squirrel Sovereign"
+    assert result.replacement.options[0].role_match == "theme_upgrade"
+    assert result.replacement.tool_call_count == 1
 
 
 async def test_signal_lanes_detect_core_commander_packages() -> None:
@@ -182,3 +251,178 @@ def test_assistant_drops_ungrounded_cards_and_unknown_cuts() -> None:
 
     assert result.mode == "chat"
     assert result.doctor is None
+    assert result.replacement is None
+
+
+def test_assistant_chat_never_returns_action_payloads() -> None:
+    candidate_id = uuid4()
+    deps = AssistantDeps(pool=cast(asyncpg.Pool, None), deck=_deck())
+    deps.retrieved[candidate_id] = CardSearchCandidate(
+        card=CardSearchHit(scryfall_id=candidate_id, name="Grounded Card"),
+        evidence_source=CardEvidenceSource.GLOBAL_SEARCH,
+    )
+    output = AssistantAnswer(
+        mode="chat",
+        reply="Here is a conversational answer.",
+        target_card_name="Medium Value Card",
+        recommendations=[
+            AssistantRecommendation(scryfall_id=candidate_id, reason="Grounded but not requested.")
+        ],
+        cuts=[AssistantCut(card_name="Medium Value Card", reason="Not requested.")],
+    )
+
+    result = _to_response(output, deps)
+
+    assert result.mode == "chat"
+    assert result.doctor is None
+    assert result.replacement is None
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        AssistantAnswer(
+            mode="replacement",
+            reply="That target is not in this deck.",
+            target_card_name="Unknown Card",
+        ),
+        AssistantAnswer(
+            mode="replacement",
+            reply="The suggested card was not returned by a tool.",
+            target_card_name="Medium Value Card",
+            recommendations=[
+                AssistantRecommendation(
+                    scryfall_id=uuid4(),
+                    reason="Ungrounded recommendation.",
+                    role_match="same_role",
+                )
+            ],
+        ),
+    ],
+    ids=["invalid-target", "ungrounded-recommendation"],
+)
+def test_assistant_replacement_rejects_non_actionable_output(output: AssistantAnswer) -> None:
+    result = _to_response(
+        output,
+        AssistantDeps(pool=cast(asyncpg.Pool, None), deck=_deck()),
+    )
+
+    assert result.mode == "chat"
+    assert result.doctor is None
+    assert result.replacement is None
+
+
+def test_assistant_replacement_matches_target_case_insensitively() -> None:
+    deps = AssistantDeps(pool=cast(asyncpg.Pool, None), deck=_deck())
+    output = AssistantAnswer(
+        mode="replacement",
+        reply="Keeping the card is reasonable.",
+        target_card_name="  medium value card  ",
+        keep_reason="It remains useful at this mana value.",
+    )
+
+    result = _to_response(output, deps)
+
+    assert result.mode == "replacement"
+    assert result.doctor is None
+    assert result.replacement is not None
+    assert result.replacement.target_card_name == "Medium Value Card"
+    assert result.replacement.keep_reason == "It remains useful at this mana value."
+
+
+def test_assistant_replacement_allows_grounded_keep_only_advice() -> None:
+    output = AssistantAnswer(
+        mode="replacement",
+        reply="No available option is a clear upgrade.",
+        target_card_name="Medium Value Card",
+        keep_reason="Keep it until a candidate preserves both its role and curve slot.",
+    )
+
+    result = _to_response(
+        output,
+        AssistantDeps(pool=cast(asyncpg.Pool, None), deck=_deck()),
+    )
+
+    assert result.mode == "replacement"
+    assert result.doctor is None
+    assert result.replacement is not None
+    assert result.replacement.best_pick is None
+    assert result.replacement.options == []
+    assert result.replacement.keep_reason == (
+        "Keep it until a candidate preserves both its role and curve slot."
+    )
+
+
+async def test_coach_endpoint_serializes_targeted_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deck = _deck()
+    replacement = TargetedReplacementResponse(
+        target_card_name="Medium Value Card",
+        summary="Use the grounded anthem.",
+        best_pick=CardSearchHit(name="Squirrel Sovereign"),
+        options=[
+            ReplacementOption(
+                card=CardSearchHit(name="Squirrel Sovereign"),
+                reason="Supports squirrels.",
+                role_match="theme_upgrade",
+                tradeoff="Narrower outside this deck.",
+            )
+        ],
+        tool_call_count=1,
+    )
+    response = CommanderCoachResponse(
+        mode="replacement",
+        reply=replacement.summary,
+        replacement=replacement,
+    )
+
+    async def return_deck(*_args: object, **_kwargs: object) -> DeckDetailResponse:
+        return deck
+
+    async def return_body(*_args: object, **_kwargs: object) -> CommanderCoachRequest:
+        return CommanderCoachRequest(message="Replace Medium Value Card")
+
+    async def no_memory(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    async def return_response(*_args: object, **_kwargs: object) -> CommanderCoachResponse:
+        return response
+
+    monkeypatch.setattr(ai, "_require_deck", return_deck)
+    monkeypatch.setattr(ai, "_request_with_memory", return_body)
+    monkeypatch.setattr(ai, "_handle_assistant_memory", no_memory)
+    monkeypatch.setattr(ai.commander_coach, "run_coach", return_response)
+    request = Request({"type": "http", "app": SimpleNamespace(state=SimpleNamespace(db_pool=None))})
+    account = AccountResponse(
+        id=uuid4(),
+        display_name="Coach Tester",
+        email="coach@example.com",
+        created_at=datetime.now(UTC),
+    )
+
+    result = await ai.coach_deck(
+        deck.id,
+        CommanderCoachRequest(message="Replace Medium Value Card"),
+        request,
+        account,
+    )
+
+    payload = result.model_dump(mode="json")["data"]
+    assert payload["mode"] == "replacement"
+    assert payload["doctor"] is None
+    assert payload["replacement"] == {
+        "target_card_name": "Medium Value Card",
+        "summary": "Use the grounded anthem.",
+        "keep_reason": None,
+        "best_pick": CardSearchHit(name="Squirrel Sovereign").model_dump(mode="json"),
+        "options": [
+            {
+                "card": CardSearchHit(name="Squirrel Sovereign").model_dump(mode="json"),
+                "reason": "Supports squirrels.",
+                "role_match": "theme_upgrade",
+                "tradeoff": "Narrower outside this deck.",
+            }
+        ],
+        "tool_call_count": 1,
+    }

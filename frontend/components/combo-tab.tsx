@@ -85,9 +85,7 @@ function ComboSection({ title, subtitle, accent, empty, combos }: SectionProps) 
     <section>
       <header className="mb-3 flex items-baseline gap-3">
         <h2 className="text-lg font-semibold text-white">{title}</h2>
-        <span
-          className={`rounded border px-2 py-0.5 text-xs ${ACCENT_CLASSES[accent]}`}
-        >
+        <span className={`rounded border px-2 py-0.5 text-xs ${ACCENT_CLASSES[accent]}`}>
           {combos.length} · {subtitle}
         </span>
       </header>
@@ -148,7 +146,11 @@ function ComboRow({ combo }: { combo: Combo }) {
   );
 }
 
-function PieceCard({ piece }: { piece: { card: { name: string; image_uri: string | null }; in_deck: boolean } }) {
+function PieceCard({
+  piece,
+}: {
+  piece: { card: { name: string; image_uri: string | null }; in_deck: boolean };
+}) {
   const { card, in_deck } = piece;
   return (
     <CardHover
@@ -171,9 +173,7 @@ function PieceCard({ piece }: { piece: { card: { name: string; image_uri: string
       )}
       <span
         className={`rounded px-1.5 py-0.5 text-[10px] ${
-          in_deck
-            ? "bg-emerald-900/40 text-emerald-300"
-            : "bg-amber-900/40 text-amber-300"
+          in_deck ? "bg-emerald-900/40 text-emerald-300" : "bg-amber-900/40 text-amber-300"
         }`}
       >
         {in_deck ? "in deck" : "needs"}

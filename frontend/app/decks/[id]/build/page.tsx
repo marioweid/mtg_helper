@@ -215,14 +215,10 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         ...existing.unresolved,
         ...action.unresolved.filter((u) => !existing.unresolved.includes(u)),
       ];
-      const allIds = new Set([
-        ...existingIds,
-        ...newSuggestions.map(cardIdentity),
-      ]);
+      const allIds = new Set([...existingIds, ...newSuggestions.map(cardIdentity)]);
       const newBuffer = uniqueSuggestions(action.buffer, allIds);
       const exhausted = newSuggestions.length === 0 && newBuffer.length === 0;
-      const newOffset =
-        existing.suggestions.length + newSuggestions.length + newBuffer.length;
+      const newOffset = existing.suggestions.length + newSuggestions.length + newBuffer.length;
       return {
         ...state,
         stages: {
@@ -270,9 +266,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     }
     case "REJECT_AND_REPLACE": {
       const stage = state.stages[action.stage]!;
-      const filtered = stage.suggestions.filter(
-        (s) => cardIdentity(s) !== action.scryfallId,
-      );
+      const filtered = stage.suggestions.filter((s) => cardIdentity(s) !== action.scryfallId);
       const [replacement, ...remainingBuffer] = stage.buffer;
       const newStatuses: Record<string, SuggestionStatus> = { ...stage.statuses };
       delete newStatuses[action.scryfallId];
@@ -371,8 +365,8 @@ export default function BuildPage() {
   const [deckBracket, setDeckBracket] = useState<number | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [deckColorIdentity, setDeckColorIdentity] = useState("");
-  const [basicLandQuantities, setBasicLandQuantities] = useState<Record<string, number>>(
-    () => Object.fromEntries(BASIC_LAND_NAMES.map((n) => [n, 1])),
+  const [basicLandQuantities, setBasicLandQuantities] = useState<Record<string, number>>(() =>
+    Object.fromEntries(BASIC_LAND_NAMES.map((n) => [n, 1])),
   );
   const [basicLandAdding, setBasicLandAdding] = useState<Record<string, boolean>>({});
   const [collections, setCollections] = useState<CollectionResponse[]>([]);
@@ -412,9 +406,7 @@ export default function BuildPage() {
     () =>
       new Set([
         ...deckCards.map(cardIdentity),
-        ...plannedChanges
-          .filter((plan) => plan.direction === "addition")
-          .map(cardIdentity),
+        ...plannedChanges.filter((plan) => plan.direction === "addition").map(cardIdentity),
       ]),
     [deckCards, plannedChanges],
   );
@@ -591,15 +583,18 @@ export default function BuildPage() {
     ],
   );
 
-  const preloadThemeTabs = useCallback((force = false) => {
-    const tabs = themeTabs.length > 0 ? themeTabs : [THEME_ETC_TAG];
-    for (const tag of tabs) {
-      const key = themeStageKey(tag);
-      const bucket = state.stages[key];
-      if (!force && (bucket?.loaded || bucket?.loading)) continue;
-      void loadStage("theme", tag);
-    }
-  }, [loadStage, state.stages, themeTabs]);
+  const preloadThemeTabs = useCallback(
+    (force = false) => {
+      const tabs = themeTabs.length > 0 ? themeTabs : [THEME_ETC_TAG];
+      for (const tag of tabs) {
+        const key = themeStageKey(tag);
+        const bucket = state.stages[key];
+        if (!force && (bucket?.loaded || bucket?.loading)) continue;
+        void loadStage("theme", tag);
+      }
+    },
+    [loadStage, state.stages, themeTabs],
+  );
 
   function switchStage(stage: string) {
     dispatch({ type: "SET_ACTIVE_STAGE", stage });
@@ -930,7 +925,10 @@ export default function BuildPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Build Deck</h1>
-        <Link href={`/decks/${deckId}`} className="text-sm text-gray-400 hover:text-white transition-colors">
+        <Link
+          href={`/decks/${deckId}`}
+          className="text-sm text-gray-400 hover:text-white transition-colors"
+        >
           View deck
         </Link>
       </div>
@@ -1101,52 +1099,66 @@ export default function BuildPage() {
           {/* Basic Lands (lands tab only) */}
           {state.activeStage === "lands" && (
             <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Basic Lands</p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+                Basic Lands
+              </p>
               <div className="flex flex-wrap gap-2">
                 {basicLandsForIdentity(deckColorIdentity).map((name) => {
-                  const current =
-                    deckCards.find((c) => c.name === name)?.quantity ?? 0;
+                  const current = deckCards.find((c) => c.name === name)?.quantity ?? 0;
                   return (
-                  <div key={name} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                    <span className="text-xs font-medium text-gray-300 w-14">{name}</span>
-                    <span
-                      className={`text-xs w-8 text-right tabular-nums ${current > 0 ? "text-green-400" : "text-gray-600"}`}
-                      title="Currently in deck"
+                    <div
+                      key={name}
+                      className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5"
                     >
-                      ×{current}
-                    </span>
-                    <button
-                      onClick={() => setBasicLandQuantities((prev) => ({ ...prev, [name]: Math.max(1, (prev[name] ?? 1) - 1) }))}
-                      className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-gray-300 hover:bg-white/20 text-xs"
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={basicLandQuantities[name] ?? 1}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 1 && v <= 99)
-                          setBasicLandQuantities((prev) => ({ ...prev, [name]: v }));
-                      }}
-                      className="w-8 rounded bg-white/10 px-1 py-0.5 text-center text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                    <button
-                      onClick={() => setBasicLandQuantities((prev) => ({ ...prev, [name]: Math.min(99, (prev[name] ?? 1) + 1) }))}
-                      className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-gray-300 hover:bg-white/20 text-xs"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => void handleBasicLandAdd(name)}
-                      disabled={basicLandAdding[name]}
-                      className="ml-1 rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                    >
-                      {basicLandAdding[name] ? "…" : "Add"}
-                    </button>
-                  </div>
+                      <span className="text-xs font-medium text-gray-300 w-14">{name}</span>
+                      <span
+                        className={`text-xs w-8 text-right tabular-nums ${current > 0 ? "text-green-400" : "text-gray-600"}`}
+                        title="Currently in deck"
+                      >
+                        ×{current}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setBasicLandQuantities((prev) => ({
+                            ...prev,
+                            [name]: Math.max(1, (prev[name] ?? 1) - 1),
+                          }))
+                        }
+                        className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-gray-300 hover:bg-white/20 text-xs"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={basicLandQuantities[name] ?? 1}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!isNaN(v) && v >= 1 && v <= 99)
+                            setBasicLandQuantities((prev) => ({ ...prev, [name]: v }));
+                        }}
+                        className="w-8 rounded bg-white/10 px-1 py-0.5 text-center text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <button
+                        onClick={() =>
+                          setBasicLandQuantities((prev) => ({
+                            ...prev,
+                            [name]: Math.min(99, (prev[name] ?? 1) + 1),
+                          }))
+                        }
+                        className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-gray-300 hover:bg-white/20 text-xs"
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => void handleBasicLandAdd(name)}
+                        disabled={basicLandAdding[name]}
+                        className="ml-1 rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                      >
+                        {basicLandAdding[name] ? "…" : "Add"}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1253,7 +1265,9 @@ export default function BuildPage() {
       )}
 
       <CardDetailModal
-        card={selectedCardId ? deckCards.find((c) => c.deck_card_id === selectedCardId) ?? null : null}
+        card={
+          selectedCardId ? (deckCards.find((c) => c.deck_card_id === selectedCardId) ?? null) : null
+        }
         onClose={() => setSelectedCardId(null)}
         deckId={deckId}
         onRemove={async (id) => {

@@ -1,12 +1,14 @@
 """Tests for hybrid retrieval pure functions: scoring, signal map, and query parsing."""
 
 from decimal import Decimal
+from typing import cast
 from uuid import UUID
 
 import asyncpg
 import pytest
 
 from mtg_helper.services.retrieval_service import (
+    CollectionFilter,
     RepresentationQuery,
     TypeFilter,
     _annotate_representation_signals,
@@ -14,6 +16,7 @@ from mtg_helper.services.retrieval_service import (
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
+    _fetch_excluded_theme_ids,
     _filter_inclusion_by_stage,
     _filter_rows_by_stage,
     _filter_theme_rows,
@@ -23,6 +26,7 @@ from mtg_helper.services.retrieval_service import (
     _type_match_score,
     parse_query_tags,
     parse_query_types,
+    retrieve_candidates,
     stage_retrieval_query,
 )
 
@@ -31,6 +35,10 @@ _A = UUID("aaaaaaaa-0000-0000-0000-000000000000")
 _B = UUID("bbbbbbbb-0000-0000-0000-000000000000")
 _C = UUID("cccccccc-0000-0000-0000-000000000000")
 _D = UUID("dddddddd-0000-0000-0000-000000000000")
+
+
+def _record(values: object) -> asyncpg.Record:
+    return cast(asyncpg.Record, values)
 
 
 # ── _build_signal_map ─────────────────────────────────────────────────────────
@@ -131,6 +139,7 @@ def test_personal_rating_avoid_card_weight_low() -> None:
 
 def _make_row(
     uid: UUID,
+    *,
     edhrec_rank: int | None = 100,
     cmc: float = 2.0,
     color_identity: list[str] | None = None,
@@ -138,26 +147,28 @@ def _make_row(
     card_types: list[str] | None = None,
     traits: list[str] | None = None,
     type_line: str = "Creature",
-) -> dict:
-    return {
-        "id": uid,
-        "edhrec_rank": edhrec_rank,
-        "cmc": Decimal(str(cmc)),
-        "color_identity": color_identity or ["G", "B"],
-        "type_line": type_line,
-        "tags": [],
-        "hub_tags": hub_tags or [],
-        "card_types": card_types or [],
-        "subtypes": [],
-        "keywords": [],
-        "traits": traits or [],
-        "token_types": [],
-    }
+) -> asyncpg.Record:
+    return _record(
+        {
+            "id": uid,
+            "edhrec_rank": edhrec_rank,
+            "cmc": Decimal(str(cmc)),
+            "color_identity": color_identity or ["G", "B"],
+            "type_line": type_line,
+            "tags": [],
+            "hub_tags": hub_tags or [],
+            "card_types": card_types or [],
+            "subtypes": [],
+            "keywords": [],
+            "traits": traits or [],
+            "token_types": [],
+        }
+    )
 
 
 def test_stage_filter_uses_functional_tags_not_theme_tags() -> None:
-    role_card = {**_make_row(_A, hub_tags=["artifacts"]), "tags": ["ramp"]}
-    theme_only = {**_make_row(_B, hub_tags=["ramp"]), "tags": []}
+    role_card = _record({**_make_row(_A, hub_tags=["artifacts"]), "tags": ["ramp"]})
+    theme_only = _record({**_make_row(_B, hub_tags=["ramp"]), "tags": []})
 
     filtered = _filter_inclusion_by_stage(  # type: ignore[arg-type]
         {_A: 0.4, _B: 0.9}, {_A: role_card, _B: theme_only}, "ramp"
@@ -167,8 +178,8 @@ def test_stage_filter_uses_functional_tags_not_theme_tags() -> None:
 
 
 def test_stage_gate_removes_fts_and_theme_cards_without_role() -> None:
-    role_card = {**_make_row(_A, hub_tags=["artifacts"]), "tags": ["draw"]}
-    theme_only = {**_make_row(_B, hub_tags=["draw"]), "tags": []}
+    role_card = _record({**_make_row(_A, hub_tags=["artifacts"]), "tags": ["draw"]})
+    theme_only = _record({**_make_row(_B, hub_tags=["draw"]), "tags": []})
 
     filtered = _filter_rows_by_stage(  # type: ignore[arg-type]
         [role_card, theme_only], "draw"
@@ -178,7 +189,7 @@ def test_stage_gate_removes_fts_and_theme_cards_without_role() -> None:
 
 
 def test_stage_gate_does_not_filter_theme_results() -> None:
-    theme_card = {**_make_row(_A, hub_tags=["artifacts"]), "tags": []}
+    theme_card = _record({**_make_row(_A, hub_tags=["artifacts"]), "tags": []})
 
     filtered = _filter_rows_by_stage([theme_card], "theme")  # type: ignore[arg-type]
 
@@ -186,7 +197,7 @@ def test_stage_gate_does_not_filter_theme_results() -> None:
 
 
 def test_draw_stage_rejects_card_selection_without_draw() -> None:
-    selection_only = {**_make_row(_A), "tags": ["card_selection"]}
+    selection_only = _record({**_make_row(_A), "tags": ["card_selection"]})
 
     filtered = _filter_rows_by_stage([selection_only], "draw")  # type: ignore[arg-type]
 
@@ -286,16 +297,38 @@ def test_theme_rows_etc_excludes_selected_theme_page_ids() -> None:
     assert [row["id"] for row in filtered] == [_B]
 
 
+@pytest.mark.asyncio
+@pytest.mark.no_db
+async def test_excluded_theme_lookup_failure_falls_back_to_local_tags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fail_lookup(*_args: object) -> dict[UUID, float]:
+        raise RuntimeError("theme source unavailable")
+
+    monkeypatch.setattr(
+        "mtg_helper.services.retrieval_service.theme_service.score_themes",
+        fail_lookup,
+    )
+
+    result = await _fetch_excluded_theme_ids(
+        cast(asyncpg.Pool, object()), frozenset({"artifacts"}), ["G"]
+    )
+
+    assert result is None
+
+
 def test_representation_match_score_full_match() -> None:
-    row = {
-        **_make_row(_A),
-        "tags": ["ramp", "token"],
-        "card_types": ["Artifact"],
-        "subtypes": ["Equipment"],
-        "keywords": ["Flying"],
-        "traits": ["activated"],
-        "token_types": ["treasure"],
-    }
+    row = _record(
+        {
+            **_make_row(_A),
+            "tags": ["ramp", "token"],
+            "card_types": ["Artifact"],
+            "subtypes": ["Equipment"],
+            "keywords": ["Flying"],
+            "traits": ["activated"],
+            "token_types": ["treasure"],
+        }
+    )
     query = RepresentationQuery(
         tags=["ramp"],
         card_types=["Artifact"],
@@ -308,20 +341,35 @@ def test_representation_match_score_full_match() -> None:
 
 
 def test_representation_match_score_partial_match() -> None:
-    row = {
-        **_make_row(_A),
-        "tags": ["ramp"],
-        "card_types": ["Artifact"],
-    }
+    row = _record(
+        {
+            **_make_row(_A),
+            "tags": ["ramp"],
+            "card_types": ["Artifact"],
+        }
+    )
     query = RepresentationQuery(tags=["ramp"], card_types=["Creature"])
 
     assert _representation_match_score(row, query) == 0.5  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize("include_null_key", [False, True])
+@pytest.mark.no_db
+def test_representation_match_score_treats_missing_optional_tags_as_empty(
+    include_null_key: bool,
+) -> None:
+    row = dict(_make_row(_A))
+    if include_null_key:
+        row["mtgjson_tags"] = None
+    query = RepresentationQuery(mtgjson_tags=["ramp"])
+
+    assert _representation_match_score(cast(asyncpg.Record, row), query) == 0.0
+
+
 def test_representation_signal_annotation() -> None:
     rows = {
-        _A: {**_make_row(_A), "tags": ["draw"]},
-        _B: {**_make_row(_B), "tags": ["ramp"]},
+        _A: _record({**_make_row(_A), "tags": ["draw"]}),
+        _B: _record({**_make_row(_B), "tags": ["ramp"]}),
     }
     signal_map: dict[UUID, list[str]] = {}
 
@@ -336,7 +384,7 @@ def test_representation_signal_annotation() -> None:
 
 
 def test_weighted_score_higher_composite_wins() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
+    rows = {_A: _make_row(_A, edhrec_rank=10), _B: _make_row(_B, edhrec_rank=100)}
     scores = _compute_weighted_scores(
         [_A, _B],
         tag_overlaps={},
@@ -381,8 +429,8 @@ def test_weighted_score_feedback_boosts_card() -> None:
 
 def test_weighted_score_representation_boosts_matching_card() -> None:
     rows = {
-        _A: {**_make_row(_A), "tags": ["ramp"]},
-        _B: {**_make_row(_B), "tags": ["draw"]},
+        _A: _record({**_make_row(_A), "tags": ["ramp"]}),
+        _B: _record({**_make_row(_B), "tags": ["draw"]}),
     }
     scores = _compute_weighted_scores(
         [_A, _B],
@@ -467,6 +515,50 @@ def test_weighted_score_hub_inclusion_none_is_noop() -> None:
     assert base == explicit_none
 
 
+@pytest.mark.no_db
+def test_weighted_scoring_does_not_mutate_caller_inputs() -> None:
+    rows = {_A: _make_row(_A, edhrec_rank=10), _B: _make_row(_B, edhrec_rank=100)}
+    all_ids = [_A, _B]
+    tag_overlaps = {_A: 2, _B: 1}
+    fts_ids = {_B}
+    hub_inclusion = {_A: 0.8}
+    moxfield_inclusion = {_B: 0.4}
+
+    _compute_weighted_scores(
+        all_ids,
+        tag_overlaps=tag_overlaps,
+        fts_set=fts_ids,
+        cards_by_id=rows,
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
+        feedback_weights=None,
+        hub_inclusion=hub_inclusion,
+        moxfield_inclusion=moxfield_inclusion,
+    )
+
+    assert all_ids == [_A, _B]
+    assert tag_overlaps == {_A: 2, _B: 1}
+    assert fts_ids == {_B}
+    assert hub_inclusion == {_A: 0.8}
+    assert moxfield_inclusion == {_B: 0.4}
+
+
+@pytest.mark.asyncio
+@pytest.mark.no_db
+async def test_retrieve_candidates_empty_collection_uses_public_call_shape_without_io() -> None:
+    result = await retrieve_candidates(
+        cast(asyncpg.Pool, object()),
+        "ramp",
+        ["ramp"],
+        ["G"],
+        [],
+        limit=5,
+        collection_filter=CollectionFilter(owned_card_ids=frozenset()),
+    )
+
+    assert result == []
+
+
 # ── _apply_trusted_quota ──────────────────────────────────────────────────────
 
 
@@ -474,12 +566,16 @@ def _ids(prefix: str, count: int) -> list[UUID]:
     return [UUID(f"{prefix}{i:04x}-0000-0000-0000-000000000000") for i in range(count)]
 
 
+def _id_rows(ids: list[UUID]) -> dict[UUID, asyncpg.Record]:
+    return {uid: _record({"id": uid}) for uid in ids}
+
+
 def test_trusted_quota_reserves_low_scoring_hub_cards() -> None:
     semantic = _ids("aaaa", 30)
     trusted = _ids("bbbb", 8)
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
     scores.update({uid: 0.30 + i * 0.001 for i, uid in enumerate(trusted)})
-    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    cards_by_id = _id_rows([*semantic, *trusted])
     hub = {uid: 0.9 for uid in trusted}
 
     top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=20)
@@ -496,7 +592,7 @@ def test_trusted_quota_fills_with_trusted_first_then_composite() -> None:
     # rule the slice would prefer semantic.
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
     scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
-    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    cards_by_id = _id_rows([*semantic, *trusted])
     moxfield = {uid: 0.8 for uid in trusted}
 
     top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
@@ -510,7 +606,7 @@ def test_trusted_quota_overflow_trusted_truncated_at_limit() -> None:
     """When trusted exceeds limit, return is exactly limit items, all trusted."""
     trusted = _ids("bbbb", 50)
     scores = {uid: 0.5 for uid in trusted}
-    cards_by_id = {uid: {"id": uid} for uid in trusted}
+    cards_by_id = _id_rows(trusted)
     moxfield = {uid: 0.9 for uid in trusted}
 
     top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
@@ -525,7 +621,7 @@ def test_trusted_quota_composite_fills_remainder() -> None:
     semantic = _ids("aaaa", 10)
     scores = {uid: 0.5 for uid in trusted}
     scores.update({uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)})
-    cards_by_id = {uid: {"id": uid} for uid in [*trusted, *semantic]}
+    cards_by_id = _id_rows([*trusted, *semantic])
     hub = {uid: 0.7 for uid in trusted}
 
     top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=8)
@@ -542,7 +638,7 @@ def test_trusted_quota_skips_zero_score_cards() -> None:
     trusted = _ids("bbbb", 3)
     scores = {uid: 0.5 for uid in semantic}
     scores.update({uid: 0.0 for uid in trusted})  # zeroed by strict type filter
-    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    cards_by_id = _id_rows([*semantic, *trusted])
     hub = {uid: 0.9 for uid in trusted}
 
     # limit=5 forces composite truncation: zeroed trusted cards rank last and
@@ -555,7 +651,7 @@ def test_trusted_quota_skips_zero_score_cards() -> None:
 def test_trusted_quota_no_signals_falls_through() -> None:
     semantic = _ids("aaaa", 5)
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
-    cards_by_id = {uid: {"id": uid} for uid in semantic}
+    cards_by_id = _id_rows(semantic)
 
     top = _apply_trusted_quota(scores, {}, {}, cards_by_id, limit=3)
 
@@ -565,7 +661,7 @@ def test_trusted_quota_no_signals_falls_through() -> None:
 def test_trusted_quota_picks_highest_inclusion_first() -> None:
     trusted = _ids("bbbb", 4)
     scores = {uid: 0.1 for uid in trusted}
-    cards_by_id = {uid: {"id": uid} for uid in trusted}
+    cards_by_id = _id_rows(trusted)
     hub = {trusted[0]: 0.2, trusted[1]: 0.9, trusted[2]: 0.5, trusted[3]: 0.7}
 
     top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=4)
@@ -577,7 +673,7 @@ def test_trusted_quota_picks_highest_inclusion_first() -> None:
 def test_trusted_quota_limit_zero_returns_empty() -> None:
     trusted = _ids("bbbb", 3)
     scores = {uid: 0.5 for uid in trusted}
-    cards_by_id = {uid: {"id": uid} for uid in trusted}
+    cards_by_id = _id_rows(trusted)
     hub = {uid: 0.9 for uid in trusted}
 
     assert _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=0) == []
@@ -591,7 +687,7 @@ def test_trusted_quota_half_split_reserves_half_for_composite() -> None:
     # cap the trusted reservation would still eat the whole page (15 > 10).
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
     scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
-    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    cards_by_id = _id_rows([*semantic, *trusted])
     moxfield = {uid: 0.8 for uid in trusted}
 
     top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10, quota=0.5)
@@ -611,7 +707,7 @@ def test_trusted_quota_zero_drops_all_trusted_reservations() -> None:
     trusted = _ids("bbbb", 5)
     scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
     scores.update({uid: 0.5 for uid in trusted})
-    cards_by_id = {uid: {"id": uid} for uid in [*semantic, *trusted]}
+    cards_by_id = _id_rows([*semantic, *trusted])
     moxfield = {uid: 0.9 for uid in trusted}
 
     top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=6, quota=0.0)
@@ -627,7 +723,7 @@ def test_trusted_quota_skips_cards_missing_from_db() -> None:
     # In real flow `_compute_weighted_scores` skips uids missing from cards_by_id,
     # so neither scores nor cards_by_id have entries for the filtered-out trusted.
     scores = {uid: 0.5 for uid in semantic}
-    cards_by_id = {uid: {"id": uid} for uid in semantic}
+    cards_by_id = _id_rows(semantic)
     hub = {uid: 0.9 for uid in trusted}
 
     top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=10)
@@ -817,19 +913,21 @@ def _make_type_row(
     keywords: list[str] | None = None,
     traits: list[str] | None = None,
     token_types: list[str] | None = None,
-) -> dict:
-    return {
-        "id": _A,
-        "edhrec_rank": 100,
-        "cmc": Decimal("2"),
-        "color_identity": ["G", "B"],
-        "card_types": card_types,
-        "subtypes": subtypes,
-        "keywords": keywords or [],
-        "traits": traits or [],
-        "token_types": token_types or [],
-        "tags": [],
-    }
+) -> asyncpg.Record:
+    return _record(
+        {
+            "id": _A,
+            "edhrec_rank": 100,
+            "cmc": Decimal("2"),
+            "color_identity": ["G", "B"],
+            "card_types": card_types,
+            "subtypes": subtypes,
+            "keywords": keywords or [],
+            "traits": traits or [],
+            "token_types": token_types or [],
+            "tags": [],
+        }
+    )
 
 
 def test_type_match_score_full_match() -> None:
@@ -900,8 +998,8 @@ def test_type_match_score_match_all_off_keeps_or_semantics() -> None:
 
 def test_weighted_score_type_filter_boosts_matching_card() -> None:
     rows = {
-        _A: {**_make_type_row(["Artifact"], []), "id": _A},
-        _B: {**_make_type_row(["Creature"], ["Human"]), "id": _B},
+        _A: _record({**_make_type_row(["Artifact"], []), "id": _A}),
+        _B: _record({**_make_type_row(["Creature"], ["Human"]), "id": _B}),
     }
     tf = TypeFilter(card_types=["Artifact"], subtypes=[])
     scores = _compute_weighted_scores(
@@ -918,7 +1016,7 @@ def test_weighted_score_type_filter_boosts_matching_card() -> None:
 
 
 def test_weighted_score_no_type_filter_unchanged_weights() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
+    rows = {_A: _make_row(_A, edhrec_rank=10), _B: _make_row(_B, edhrec_rank=100)}
     scores_no_filter = _compute_weighted_scores(
         [_A, _B],
         tag_overlaps={},
@@ -1031,8 +1129,8 @@ def test_parse_query_types_double_strike_phrase() -> None:
 
 def test_strict_mode_zeroes_out_zero_match_cards() -> None:
     rows = {
-        _A: {**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A},
-        _B: {**_make_type_row(["Enchantment"], []), "id": _B},  # zero match
+        _A: _record({**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A}),
+        _B: _record({**_make_type_row(["Enchantment"], []), "id": _B}),  # zero match
     }
     tf = TypeFilter(card_types=["Creature"], subtypes=[], keywords=["Flying"], strict=True)
     scores = _compute_weighted_scores(
@@ -1052,7 +1150,7 @@ def test_strict_mode_zeroes_out_zero_match_cards() -> None:
 def test_strict_mode_partial_match_not_zeroed() -> None:
     # Flying creature but no deathtouch — partial match, not zeroed
     rows = {
-        _A: {**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A},
+        _A: _record({**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A}),
     }
     tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"], strict=True)
     scores = _compute_weighted_scores(
@@ -1070,7 +1168,7 @@ def test_strict_mode_partial_match_not_zeroed() -> None:
 
 def test_non_strict_mode_zero_match_not_zeroed() -> None:
     rows = {
-        _A: {**_make_type_row(["Enchantment"], []), "id": _A},
+        _A: _record({**_make_type_row(["Enchantment"], []), "id": _A}),
     }
     tf = TypeFilter(card_types=["Creature"], subtypes=[], strict=False)
     scores = _compute_weighted_scores(

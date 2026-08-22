@@ -9,7 +9,12 @@ import { ManaCurve } from "@/components/mana-curve";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
 import { CATEGORY_ORDER, STAGE_DEFAULTS, STAGE_LABELS } from "@/lib/constants";
-import { totalCardCount, type CardResponse, type DeckCardItem, type DeckManaCurve } from "@/lib/types";
+import {
+  totalCardCount,
+  type CardResponse,
+  type DeckCardItem,
+  type DeckManaCurve,
+} from "@/lib/types";
 
 interface Props {
   cards: DeckCardItem[];
@@ -32,7 +37,10 @@ interface Props {
   manaCurve?: DeckManaCurve | null;
 }
 
-function StageTargetChips({ counts, targets }: {
+function StageTargetChips({
+  counts,
+  targets,
+}: {
   counts: Record<string, number>;
   targets: Record<string, number>;
 }) {
@@ -101,9 +109,11 @@ function useDeckDrawer() {
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = [...panelRef.current.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
-      )];
+      const focusable = [
+        ...panelRef.current.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
+        ),
+      ];
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -128,20 +138,23 @@ export function ExpandableDeckBar(props: Props) {
   const target = props.target ?? 100;
   const count = totalCardCount(props.cards) + (props.commander ? 1 : 0);
 
-  const handleAddCard = useCallback(async (card: CardResponse) => {
-    if (!props.deckId) return;
-    try {
-      await apiClient.addCard(props.deckId, {
-        card_scryfall_id: card.scryfall_id,
-        quantity: 1,
-        added_by: "user",
-      });
-      toast.push(`Planned ${card.name}`, "success");
-      props.onCardAdded?.();
-    } catch (err) {
-      toast.push(err instanceof ApiError ? err.message : "Failed to plan card", "error");
-    }
-  }, [props.deckId, props.onCardAdded, toast]);
+  const handleAddCard = useCallback(
+    async (card: CardResponse) => {
+      if (!props.deckId) return;
+      try {
+        await apiClient.addCard(props.deckId, {
+          card_scryfall_id: card.scryfall_id,
+          quantity: 1,
+          added_by: "user",
+        });
+        toast.push(`Planned ${card.name}`, "success");
+        props.onCardAdded?.();
+      } catch (err) {
+        toast.push(err instanceof ApiError ? err.message : "Failed to plan card", "error");
+      }
+    },
+    [props.deckId, props.onCardAdded, toast],
+  );
 
   return (
     <>
@@ -162,18 +175,29 @@ export function ExpandableDeckBar(props: Props) {
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-semibold text-white">Your deck</span>
-              <span className="text-xs tabular-nums text-gray-400">{count}/{target} cards</span>
+              <span className="text-xs tabular-nums text-gray-400">
+                {count}/{target} cards
+              </span>
             </div>
             <div className="mt-1 hidden overflow-hidden md:block">
-              <DeckTypeBreakdown cards={props.cards} target={target} commander={props.commander ?? null} />
+              <DeckTypeBreakdown
+                cards={props.cards}
+                target={target}
+                commander={props.commander ?? null}
+              />
             </div>
           </div>
           <GameChangerBadge
             cards={props.cards}
             bracket={props.bracket ?? null}
-            commander={props.commander?.name
-              ? { name: props.commander.name, game_changer: props.commander.game_changer ?? false }
-              : null}
+            commander={
+              props.commander?.name
+                ? {
+                    name: props.commander.name,
+                    game_changer: props.commander.game_changer ?? false,
+                  }
+                : null
+            }
           />
           <button
             ref={triggerRef}
@@ -215,8 +239,15 @@ function DeckDrawer({ panelRef, onClose, onAddCard, ...props }: DrawerProps) {
       >
         <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
           <div>
-            <h2 id="deck-drawer-title" className="text-wrap-balance text-base font-semibold text-white">Deck Workspace</h2>
-            <p className="text-xs text-gray-400">Browse, inspect, and adjust without leaving the builder.</p>
+            <h2
+              id="deck-drawer-title"
+              className="text-wrap-balance text-base font-semibold text-white"
+            >
+              Deck Workspace
+            </h2>
+            <p className="text-xs text-gray-400">
+              Browse, inspect, and adjust without leaving the builder.
+            </p>
           </div>
           <button
             type="button"
