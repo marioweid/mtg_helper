@@ -723,8 +723,20 @@ export interface TargetedReplacementResponse {
   tool_call_count: number;
 }
 
+export interface CoachHistoryCardReference {
+  scryfall_id: string;
+  name: string;
+}
+
+export interface CoachHistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+  recommendations?: CoachHistoryCardReference[];
+}
+
 export interface CommanderCoachRequest {
   message: string;
+  history?: CoachHistoryTurn[];
   mode?: CommanderCoachMode;
   coach_memory_notes?: string | null;
 }
@@ -744,6 +756,7 @@ export interface CoachMemoryUpdate {
 export interface CommanderCoachResponse {
   mode: CommanderCoachResolvedMode;
   reply: string;
+  recommendations: ReplacementOption[];
   doctor: DeckDoctorResponse | null;
   replacement: TargetedReplacementResponse | null;
   coach_memory: CoachMemoryResponse | null;

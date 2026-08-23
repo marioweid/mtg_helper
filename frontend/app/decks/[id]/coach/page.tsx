@@ -10,12 +10,15 @@ import {
   INITIAL_ASSISTANT_PROMPT,
 } from "@/components/assistant-starter-prompts";
 import { CoachDeckWorkspace } from "@/components/coach-deck-workspace";
+import { CoachRecommendations } from "@/components/coach-recommendations";
 import { ManaCost } from "@/components/mana-cost";
 import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { DeckDetailSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
 import { STAGE_DEFAULTS } from "@/lib/constants";
+import { buildCoachHistory } from "@/lib/coach-conversation";
+import { coachProgressMessage } from "@/lib/coach-progress";
 import type {
   AnalysisCardHit,
   CommanderCoachProgressEvent,
@@ -28,47 +31,6 @@ import type {
 type CoachMessage =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; result: CommanderCoachResponse };
-
-function ProgressTimeline({ events }: { events: CommanderCoachProgressEvent[] }) {
-  const latestIndex = events.length - 1;
-  return (
-    <div className="space-y-2">
-      {events.length === 0 && (
-        <div className="flex items-center gap-2 text-xs text-gray-300">
-          <span className="h-2 w-2 animate-ping rounded-full bg-indigo-300" />
-          Starting…
-        </div>
-      )}
-      {events.map((item, index) => {
-        const active = index === latestIndex;
-        return (
-          <div key={`${item.event}-${index}`} className="flex items-start gap-3 text-xs">
-            <span className="relative mt-1 flex h-3 w-3 shrink-0 items-center justify-center">
-              {active ? (
-                <span className="absolute h-3 w-3 animate-ping rounded-full bg-indigo-300/70" />
-              ) : null}
-              <span
-                className={
-                  active
-                    ? "h-2 w-2 rounded-full bg-indigo-300"
-                    : "h-2 w-2 rounded-full bg-emerald-400"
-                }
-              />
-            </span>
-            <div>
-              <div className={active ? "font-medium text-indigo-100" : "text-gray-300"}>
-                {item.message}
-              </div>
-              <div className="text-[10px] uppercase tracking-wide text-gray-600">
-                {item.event.replace(/_/g, " ")}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function CardHitLine({ card }: { card: AnalysisCardHit }) {
   return (
@@ -314,8 +276,6 @@ function ReplacementMessage({
           </div>
         </section>
       )}
-
-      <div className="text-xs text-gray-500">Tool calls: {replacement.tool_call_count}</div>
     </div>
   );
 }
@@ -340,7 +300,8 @@ function AssistantMessage({
   if (!doctor) {
     return (
       <div className="max-w-3xl rounded-xl border border-white/10 bg-white/5 p-4">
-        {result.reply}
+        <p>{result.reply}</p>
+        <CoachRecommendations recommendations={result.recommendations} busy={busy} onAdd={onAdd} />
       </div>
     );
   }
@@ -351,7 +312,6 @@ function AssistantMessage({
         <p className="text-gray-200">{doctor.summary}</p>
         <div className="mt-4 mb-1 text-xs uppercase tracking-wide text-gray-500">Game plan</div>
         <p className="text-gray-300">{doctor.game_plan}</p>
-        <div className="mt-3 text-xs text-gray-500">Tool calls: {doctor.tool_call_count}</div>
       </section>
 
       {doctor.findings.length > 0 && (
@@ -452,7 +412,7 @@ export default function CoachPage() {
   const [prompt, setPrompt] = useState(INITIAL_ASSISTANT_PROMPT);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<CommanderCoachProgressEvent[]>([]);
+  const [progress, setProgress] = useState("Looking over the deck…");
   const [busy, setBusy] = useState<string | null>(null);
   const [memoryNotes, setMemoryNotes] = useState("");
   const [memorySavedAt, setMemorySavedAt] = useState<string | null>(null);
@@ -485,34 +445,39 @@ export default function CoachPage() {
     };
   }, []);
 
-  function transcriptWith(next: string): string {
-    const previous = messages
-      .slice(-6)
-      .map((message) => {
-        if (message.role === "user") return `User: ${message.content}`;
-        return `Assistant: ${message.result.reply}`;
-      })
-      .join("\n");
-    return previous ? `${previous}\nUser: ${next}` : next;
-  }
-
   async function runCoach() {
     const content = prompt.trim();
     if (!content) return;
     const userMessage: CoachMessage = { role: "user", content };
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
-    setProgress([]);
+    setProgress("Looking over the deck…");
     setError(null);
     try {
       const started = await apiClient.startCoachDeck(deckId, {
         mode: "auto",
-        message: transcriptWith(content),
+        message: content,
+        history: buildCoachHistory(
+          messages.map((message) => ({
+            role: message.role,
+            content: message.role === "user" ? message.content : message.result.reply,
+            recommendations:
+              message.role === "assistant"
+                ? message.result.recommendations
+                    .filter((item) => item.card.scryfall_id)
+                    .map((item) => ({
+                      scryfall_id: item.card.scryfall_id as string,
+                      name: item.card.name,
+                    }))
+                : undefined,
+          })),
+        ),
       });
       const events = new EventSource(`/api/v1/decks/${deckId}/coach/${started.job_id}/stream`);
       events.addEventListener("progress", (event) => {
         const data = JSON.parse((event as MessageEvent).data) as CommanderCoachProgressEvent;
-        setProgress((prev) => [...prev, data]);
+        const message = coachProgressMessage(data);
+        if (message) setProgress(message);
       });
       events.addEventListener("done", (event) => {
         const response = JSON.parse((event as MessageEvent).data) as CommanderCoachResponse;
@@ -716,7 +681,10 @@ export default function CoachPage() {
             {loading && (
               <div className="max-w-2xl rounded-2xl border border-indigo-400/20 bg-indigo-950/20 p-4 text-sm">
                 <div className="mb-2 font-medium text-indigo-100">Assistant is working…</div>
-                <ProgressTimeline events={progress} />
+                <div className="flex items-center gap-2 text-xs text-gray-300">
+                  <span className="h-2 w-2 animate-ping rounded-full bg-indigo-300" />
+                  {progress}
+                </div>
               </div>
             )}
 

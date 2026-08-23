@@ -8,6 +8,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from mtg_helper.config import settings
 
 ReasoningLevel = Literal["minimal", "low"]
+TextVerbosity = Literal["low", "medium"]
 OPENAI_MODEL = "gpt-5.6-luna"
 
 
@@ -21,11 +22,12 @@ def openai_model_settings(
     *,
     max_tokens: int,
     reasoning: ReasoningLevel,
+    verbosity: TextVerbosity = "low",
 ) -> OpenAIResponsesModelSettings:
     """Build private, low-verbosity settings for one OpenAI Responses run."""
     return OpenAIResponsesModelSettings(
         max_tokens=max_tokens,
         openai_reasoning_effort=reasoning,
         openai_store=False,
-        openai_text_verbosity="low",
+        openai_text_verbosity=verbosity,
     )

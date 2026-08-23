@@ -1,10 +1,10 @@
 """Pydantic models for AI deck building endpoints."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mtg_helper.models.cards import CardResponse
 
@@ -445,10 +445,32 @@ CoachResolvedMode = Literal[
 ]
 
 
+class CoachHistoryCardReference(BaseModel):
+    """One database-grounded card mentioned by a prior assistant turn."""
+
+    scryfall_id: UUID
+    name: str = Field(min_length=1, max_length=200)
+
+
+class CoachHistoryTurn(BaseModel):
+    """One completed visible turn supplied as recent conversation context."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+    recommendations: list[CoachHistoryCardReference] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def _references_belong_to_assistant(self) -> Self:
+        if self.role == "user" and self.recommendations:
+            raise ValueError("recommendations are only valid on assistant history turns")
+        return self
+
+
 class CommanderCoachRequest(BaseModel):
     """Request body for the Commander Coach orchestrator."""
 
-    message: str = Field(default="Doctor this deck", max_length=4000)
+    message: str = Field(default="Doctor this deck", min_length=1, max_length=4000)
+    history: list[CoachHistoryTurn] = Field(default_factory=list, max_length=12)
     mode: CoachMode = "auto"
     coach_memory_notes: str | None = Field(default=None, max_length=8000)
 
@@ -474,6 +496,7 @@ class CommanderCoachResponse(BaseModel):
 
     mode: CoachResolvedMode
     reply: str
+    recommendations: list[ReplacementOption] = Field(default_factory=list, max_length=8)
     doctor: DeckDoctorResponse | None = None
     replacement: TargetedReplacementResponse | None = None
     coach_memory: CoachMemoryResponse | None = None
