@@ -38,6 +38,7 @@ from mtg_helper.services.mtg_assistant_tools import (
     AssistantManaBaseAnalysis,
     BracketReport,
     DeckAnalysis,
+    GameChangerCheck,
     LegalityReport,
 )
 from mtg_helper.services.mtg_assistant_tools import (
@@ -48,6 +49,9 @@ from mtg_helper.services.mtg_assistant_tools import (
 )
 from mtg_helper.services.mtg_assistant_tools import (
     check_bracket as check_bracket_service,
+)
+from mtg_helper.services.mtg_assistant_tools import (
+    check_game_changers as check_game_changers_service,
 )
 from mtg_helper.services.mtg_assistant_tools import (
     check_legality as check_legality_service,
@@ -111,6 +115,8 @@ VERIFICATION
 - Recommended additions MUST come from find_cards in this run. Prior recommendation references help
   resolve follow-ups but must be searched again before returning actionable cards. Return the exact
   scryfall_id.
+- Never state whether a card is or isn't a Game Changer from memory - verify with
+  check_game_changers (arbitrary cards) or check_bracket (the current deck).
 - The deck briefing includes bounded Oracle text for every current card. Use inspect_deck_cards only
   when exact wording beyond that briefing matters.
 - For a repeatable or infinite loop, account for starting resources, every cost and trigger,
@@ -155,6 +161,8 @@ TOOLS AND OUTPUT
   from the deck. Set each option's role match and explain any tradeoff. Use keep_reason only when
   keeping the target is a defensible recommendation.
 - Call check_legality for legality questions and check_bracket for bracket questions.
+- Call check_game_changers when a question turns on whether specific cards are on the official
+  Game Changers list (e.g. "which of these are Game Changers?"); pass the exact card names.
 - Treat brackets as table guidance, not format legality.
 - Prefer a few strong, deck-specific recommendations over generic lists.
 - Output mode: use mode=doctor for whole-deck diagnosis, cuts, or conversion requests and fill
@@ -237,6 +245,7 @@ def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
             analyze_deck,
             check_legality,
             check_bracket,
+            check_game_changers,
         ],
     )
 
@@ -306,6 +315,19 @@ async def check_bracket(
     if not ctx.deps.allow_tool():
         return None
     return check_bracket_service(ctx.deps.deck, target_bracket)
+
+
+async def check_game_changers(
+    ctx: RunContext[AssistantDeps], names: list[str]
+) -> GameChangerCheck | None:
+    """Check which named cards are on the official Game Changers list.
+
+    Use for questions about arbitrary cards (e.g. "is Doubling Season a Game
+    Changer?"); for the current deck, prefer check_bracket.
+    """
+    if not ctx.deps.allow_tool():
+        return None
+    return await check_game_changers_service(ctx.deps.pool, names)
 
 
 _AGENT: Agent[AssistantDeps, AssistantAnswer] | None = None
