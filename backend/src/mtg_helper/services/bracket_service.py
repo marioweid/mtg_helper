@@ -12,6 +12,8 @@ Bracket policy used here (Brackets 1–5):
     5 (cEDH):       anything allowed
 """
 
+from dataclasses import dataclass, field
+
 from mtg_helper.models.brackets import BracketValidationResponse, BracketViolation
 from mtg_helper.models.combos import ComboListResponse
 from mtg_helper.models.decks import DeckDetailResponse
@@ -61,6 +63,21 @@ FAST_MANA: frozenset[str] = frozenset(
         "Desperate Ritual",
     }
 )
+
+
+@dataclass(frozen=True)
+class BracketEvaluation:
+    """Per-rule evidence plus the final validation result for one deck."""
+
+    declared_bracket: int
+    game_changers: list[str] = field(default_factory=list)
+    game_changer_limit: int | None = None
+    game_changer_overage: int = 0
+    mass_land_destruction: list[str] = field(default_factory=list)
+    fast_mana: list[str] = field(default_factory=list)
+    infinite_combo_pairs: list[list[str]] = field(default_factory=list)
+    violations: list[BracketViolation] = field(default_factory=list)
+    acceptable: bool = True
 
 
 def _normalize_names(deck: DeckDetailResponse) -> dict[str, str]:
@@ -178,6 +195,57 @@ def _check_infinite_combos(pairs: list[list[str]], declared: int) -> BracketViol
     return None
 
 
+def evaluate_bracket(
+    deck: DeckDetailResponse,
+    combos: ComboListResponse | None,
+    *,
+    target_bracket: int | None = None,
+) -> BracketEvaluation:
+    """Evaluate a deck against a bracket and return per-rule evidence.
+
+    Args:
+        deck: Full deck detail including commander.
+        combos: Optional combo list from Commander Spellbook; when omitted,
+            combo-based rules are skipped.
+        target_bracket: When given, evaluates the deck as if it declared this
+            bracket (used for conversion questions such as "would this pass
+            at bracket 3?").
+
+    Returns:
+        BracketEvaluation with the evaluated bracket, per-rule card lists,
+        Game Changer limits and overage, and the validation result.
+    """
+    declared = target_bracket or deck.bracket or 3
+    names_in_deck = _normalize_names(deck)
+    game_changers = _game_changer_hits(deck)
+    mld = _match(names_in_deck, MASS_LAND_DESTRUCTION)
+    fast_mana = _match(names_in_deck, FAST_MANA)
+    combo_pairs = _two_card_active_combos(combos)
+    game_changer_limit = 0 if declared <= 2 else (3 if declared == 3 else None)
+    game_changer_overage = (
+        max(0, len(game_changers) - game_changer_limit) if game_changer_limit is not None else 0
+    )
+
+    candidates = [
+        _check_game_changers(game_changers, declared),
+        _check_mld(mld, declared),
+        _check_fast_mana(fast_mana, declared),
+        _check_infinite_combos(combo_pairs, declared),
+    ]
+    violations = [v for v in candidates if v is not None]
+    return BracketEvaluation(
+        declared_bracket=declared,
+        game_changers=game_changers,
+        game_changer_limit=game_changer_limit,
+        game_changer_overage=game_changer_overage,
+        mass_land_destruction=mld,
+        fast_mana=fast_mana,
+        infinite_combo_pairs=combo_pairs,
+        violations=violations,
+        acceptable=not any(v.severity == "block" for v in violations),
+    )
+
+
 def validate_bracket(
     deck: DeckDetailResponse,
     combos: ComboListResponse | None,
@@ -193,19 +261,9 @@ def validate_bracket(
         BracketValidationResponse with the declared bracket, a ``legal``
         flag (no blocking violations), and a list of violations.
     """
-    declared = deck.bracket or 3
-    names_in_deck = _normalize_names(deck)
-
-    candidates = [
-        _check_game_changers(_game_changer_hits(deck), declared),
-        _check_mld(_match(names_in_deck, MASS_LAND_DESTRUCTION), declared),
-        _check_fast_mana(_match(names_in_deck, FAST_MANA), declared),
-        _check_infinite_combos(_two_card_active_combos(combos), declared),
-    ]
-    violations = [v for v in candidates if v is not None]
-    legal = not any(v.severity == "block" for v in violations)
+    evaluation = evaluate_bracket(deck, combos)
     return BracketValidationResponse(
-        declared_bracket=declared,
-        legal=legal,
-        violations=violations,
+        declared_bracket=evaluation.declared_bracket,
+        legal=evaluation.acceptable,
+        violations=evaluation.violations,
     )

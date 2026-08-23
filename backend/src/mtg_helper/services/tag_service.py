@@ -90,7 +90,12 @@ _PAT_CARD_SELECTION = _re(
     r"|look at the top \d+ cards? of your library"
 )
 _PAT_SACRIFICE = _re(r"sacrifice (?:a |an |another |this |one |two )")
-_PAT_DEATH_TRIGGER = _re(r"whenever (?:a |another )?(?:creature |[\w]+ )?dies|when [\w ,']+ dies")
+_PAT_DEATH_TRIGGER = _re(
+    r"whenever (?:a |an |another )?(?:creature |token |[\w ,'&]+ )?dies"
+    r"|whenever [\w ,'&]+ dies"
+    r"|whenever [\w ,'&]+ is put into a graveyard from the battlefield"
+    r"|when [\w ,']+ dies"
+)
 _PAT_BLINK = _re(r"exile [\w ,']+then return [\w ,']+ to the battlefield|flicker")
 _PAT_STAX = _re(
     r"(?:opponents?|players?) can't (?:cast|activate|play|attack|block)"
@@ -591,7 +596,7 @@ def _tag_graveyard_sacrifice(text: str, kw_set: set[str], tags: list[str]) -> No
     has_death = bool(_PAT_DEATH_TRIGGER.search(text))
     if has_sacrifice:
         tags.append("sacrifice")
-    if has_sacrifice and has_death:
+    if has_sacrifice or has_death:
         tags.append("aristocrats")
 
 

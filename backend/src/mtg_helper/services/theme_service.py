@@ -10,87 +10,147 @@ _SEED_GROUPS = (
     (
         "plus_one_plus_one",
         "+1/+1 Counters",
-        "Cards that create, move, multiply, or reward +1/+1 counters on permanents.",
-        ("counters", "+1/+1 counters", "counter synergies"),
+        "Cards that create, move, multiply, or reward +1/+1 counters on permanents; "
+        "proliferate, counter doublers, and counter payoffs.",
+        (
+            "counters",
+            "+1/+1 counters",
+            "counter synergies",
+            "proliferate",
+            "counter doublers",
+            "toughness counters",
+        ),
         ("plus_one_plus_one", "plus_1_plus_1", "plus_1_plus_1_counters", "plus_counters"),
     ),
     (
         "artifacts",
         "Artifacts",
-        "Artifact engines, payoffs, and artifact-matters cards.",
-        ("artifact matters",),
+        "Artifact engines, payoffs, and artifact-matters cards; affinity, artifact tokens, "
+        "treasures, and artifact recursion.",
+        ("artifact matters", "artifacts matter", "artifact synergies"),
         ("artifacts",),
     ),
     (
         "aristocrats",
         "Aristocrats",
-        "Sacrifice creatures or tokens for death triggers and resource advantages.",
-        ("sacrifice", "death triggers"),
+        "Sacrifice creatures or tokens for death triggers and resource advantages; "
+        "sac outlets, drain payoffs, and death-trigger engines.",
+        (
+            "sacrifice",
+            "death triggers",
+            "sac outlets",
+            "sacrifice value",
+            "blood artist",
+            "zulaport",
+            "drain effects",
+            "token sacrifice",
+            "aristocrat",
+        ),
         ("aristocrats",),
     ),
     (
         "blink",
         "Blink",
-        "Exile and return permanents to reuse enter-the-battlefield abilities.",
-        ("flicker", "etb"),
-        ("blink",),
+        "Exile and return permanents to reuse enter-the-battlefield abilities; "
+        "flicker, etb value, and ephemerate-style loops.",
+        ("flicker", "etb", "enter the battlefield", "blink value", "etb triggers"),
+        ("blink", "blink_flicker"),
     ),
     (
         "enchantments",
         "Enchantments",
-        "Enchantment engines, constellation effects, and enchantment payoffs.",
-        ("enchantress", "constellation"),
+        "Enchantment engines, constellation effects, and enchantment payoffs; "
+        "enchantress draw and aura/curse strategies.",
+        ("enchantress", "constellation", "auras", "enchantment synergies"),
         ("enchantments",),
     ),
     (
         "equipment",
         "Equipment",
-        "Equipment, attachment support, and equipped-creature payoffs.",
-        ("equipment matters", "armed"),
+        "Equipment, attachment support, and equipped-creature payoffs; "
+        "equip costs, living weapon, and equipment voltron.",
+        ("equipment matters", "armed", "equip", "equipment voltron"),
         ("equipment",),
     ),
     (
         "lifegain",
         "Lifegain",
-        "Life-gain enablers and cards that reward gaining or having life.",
-        ("life gain", "life matters"),
-        ("lifegain",),
+        "Life-gain enablers and cards that reward gaining or having life; "
+        "soul sisters, lifegain payoffs, and aetherflux-style finishers.",
+        ("life gain", "life matters", "soul sisters", "gain life"),
+        ("lifegain", "life_gain"),
     ),
     (
         "reanimator",
         "Reanimator",
-        "Put valuable permanents into graveyards and return them to the battlefield.",
-        ("reanimation", "graveyard recursion"),
+        "Put valuable permanents into graveyards and return them to the battlefield; "
+        "reanimate spells, recursion, and graveyard value.",
+        ("reanimation", "graveyard recursion", "reanimate", "reanimator deck", "graveyard value"),
         ("reanimator",),
     ),
     (
         "spellslinger",
         "Spellslinger",
-        "Cast many instants and sorceries and profit from spell-casting triggers.",
-        ("instants and sorceries", "spell casting"),
+        "Cast many instants and sorceries and profit from spell-casting triggers; "
+        "storm, magecraft, cantrips, and copy effects.",
+        ("instants and sorceries", "spell casting", "storm", "magecraft", "cantrips"),
         ("spellslinger",),
     ),
     (
         "tokens",
         "Tokens",
-        "Create creature or artifact tokens and amplify their board presence or value.",
-        ("go wide", "token matters"),
+        "Create creature or artifact tokens and amplify their board presence or value; "
+        "go-wide swarms, token doublers, and token payoffs.",
+        ("go wide", "token matters", "creature tokens", "token swarm", "token doublers"),
         ("tokens",),
     ),
     (
         "voltron",
         "Voltron",
-        "Concentrate auras, equipment, counters, and protection on one attacker.",
-        ("commander damage", "single attacker"),
+        "Concentrate auras, equipment, counters, and protection on one attacker; "
+        "commander damage and single-attacker strategies.",
+        ("commander damage", "single attacker", "one big creature", "suit up"),
         ("voltron",),
     ),
     (
         "x_spells",
         "X Spells",
         "Variable-cost spells whose mana cost or effect contains X, plus mana and "
-        "payoffs that scale them.",
-        ("x-spells", "variable mana", "big x spells", "x cost"),
+        "payoffs that scale them; hydras and big X finishers.",
+        ("x-spells", "variable mana", "big x spells", "x cost", "hydra"),
         ("x_spells", "x_spells_matter", "x-spells"),
+    ),
+    (
+        "graveyard",
+        "Graveyard",
+        "Self-mill, dredge, delve, and graveyard-filling engines that enable "
+        "recursion, flashback, or reanimation payoffs.",
+        ("self mill", "graveyard fill", "dredge", "delve", "self-mill"),
+        ("graveyard", "graveyard_matters", "self_mill"),
+    ),
+    (
+        "stax",
+        "Stax",
+        "Resource denial and stax pieces that slow opponents: taxes, restrictions, "
+        "and hate bears that control the game.",
+        ("stax pieces", "hate bears", "taxes", "resource denial", "prison"),
+        ("stax",),
+    ),
+    (
+        "treasure",
+        "Treasure",
+        "Create or reference Treasure tokens for mana bursts; treasure storm, "
+        "artifact tokens, and treasure payoffs.",
+        ("treasure tokens", "treasure storm", "gold tokens"),
+        ("treasure", "treasure_matters"),
+    ),
+    (
+        "storm",
+        "Storm",
+        "Cast many spells in one turn and win with storm copies; ritual-heavy "
+        "spellslinger lines and copy payoffs.",
+        ("storm count", "storm copies", "grapeshot", "rituals"),
+        ("storm",),
     ),
 )
 

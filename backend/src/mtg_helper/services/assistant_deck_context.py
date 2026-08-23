@@ -22,6 +22,7 @@ class InspectedDeckCard(BaseModel):
     quantity: int
     categories: list[str]
     tags: list[str]
+    game_changer: bool = False
     deck_fit_score: int | None
     deck_fit_band: Literal["strong", "solid", "weak"] | None
     deck_fit_reasons: list[str]
@@ -96,6 +97,7 @@ def _manifest_row(card: DeckCardItem) -> dict[str, object]:
         "oracle_text": (card.oracle_text or "")[:_MAX_MANIFEST_ORACLE_TEXT] or None,
         "categories": card.categories[:8],
         "tags": card.tags[:8],
+        "game_changer": card.game_changer,
         "deck_fit_score": card.deck_fit_score,
         "deck_fit_band": card.deck_fit_band,
         "deck_fit_reasons": card.deck_fit_reasons[:3],
@@ -113,6 +115,7 @@ def _inspection_row(card: DeckCardItem) -> InspectedDeckCard:
         quantity=card.quantity,
         categories=card.categories[:8],
         tags=card.tags[:8],
+        game_changer=card.game_changer,
         deck_fit_score=card.deck_fit_score,
         deck_fit_band=card.deck_fit_band,
         deck_fit_reasons=card.deck_fit_reasons[:3],

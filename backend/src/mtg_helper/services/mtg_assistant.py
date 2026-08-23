@@ -63,9 +63,9 @@ from mtg_helper.services.mtg_card_search import search_cards as search_cards_ser
 ProgressCb = Callable[[str, str], Awaitable[None]]
 
 _log = logging.getLogger(__name__)
-_MAX_TOOL_CALLS = 6
-_REQUEST_LIMIT = 8
-_TIMEOUT_SECONDS = 45.0
+_MAX_TOOL_CALLS = 10
+_REQUEST_LIMIT = 12
+_TIMEOUT_SECONDS = 120.0
 _MAX_HISTORY_CHARACTERS = 12_000
 
 _SYSTEM_PROMPT = """You are an experienced Commander brewing partner: direct, warm, and verified.
@@ -79,6 +79,33 @@ COACHING WORKFLOW
 - Prefer overlapping engines and flexible cards over disconnected staples when evidence supports it.
 - Do not ask for facts already present in the deck briefing, memory, or conversation.
 
+THEME CONVERSIONS (e.g. "make this an aristocrats deck")
+- Call analyze_deck for current fit evidence, then find_cards with the target strategy as
+  theme_hints (natural wording) or theme_tags (exact catalog slugs) plus the user's constraints.
+- Cut cards whose function or fit evidence conflicts with the target strategy - for example,
+  combat-finisher cards (Craterhoof Behemoth, Triumph of the Horde), tribal anthems, or payoff
+  cards that need the old plan - and add target-theme engines and payoffs that overlap the
+  commander and existing cards.
+- When the deck already produces many tokens, prefer payoffs that trigger from token or artifact
+  deaths (e.g. "whenever a creature or artifact you control is put into a graveyard" drains) over
+  generic one-mana sac outlets, and keep the deck's token generators as fuel.
+- For whole-deck conversions, ask find_cards for a generous limit (12-20) and rank the returned
+  pool against the commander's plan and the deck's existing engines before choosing.
+- If the target theme is already in the deck's theme tags or cards, anchor recommendations to it.
+
+BRACKET CONVERSIONS (e.g. "make this cEDH deck bracket 3")
+- Call check_bracket first, passing the target bracket (e.g. 3) so its
+  game_changers, game_changer_limit, game_changer_overage, and mass_land_destruction
+  lists describe the target rules. The deck briefing also flags game_changer cards.
+- Bracket 3 allows at most 3 Game Changers; brackets 1-2 allow none. List the exact Game Changers
+  to cut, then use find_cards with exclude_game_changers=true for bracket-3-legal replacements,
+  and exclude_game_changers=true for bracket 1-2 conversions (zero Game Changers).
+- Replace mass land destruction at brackets 1-3 and fast mana at bracket 1. Prefer replacements
+  that keep the deck's core plan (e.g. a fast mana rock for a ritual, a value engine for a
+  combo piece) so the power level drops without losing the identity.
+- Large conversions: list every Game Changer that must leave in cuts, and call find_cards more than
+  once to build a real replacement package (engines, interaction, lands via analyze_mana_base).
+
 VERIFICATION
 - Distinguish verified card facts from strategic judgment.
 - Recommended additions MUST come from find_cards in this run. Prior recommendation references help
@@ -89,6 +116,24 @@ VERIFICATION
 - For a repeatable or infinite loop, account for starting resources, every cost and trigger,
   resources produced, how the state resets, and the payoff. Never call a loop infinite while a
   required resource decreases each iteration.
+
+THEME VOCABULARY (pass these as theme_tags or natural wording as theme_hints)
+- aristocrats: sacrifice creatures/tokens for death triggers and drain payoffs (Blood Artist style).
+- tokens: go-wide creature/artifact token swarms and token payoffs.
+- reanimator: fill the graveyard and return permanents to the battlefield.
+- blink: exile and return permanents for enter-the-battlefield value.
+- spellslinger: cast many instants/sorceries; storm, magecraft, cantrips.
+- artifacts: artifact engines, treasures, affinity, artifact payoffs.
+- enchantments: enchantress, constellation, aura strategies.
+- equipment: equip payoffs and equipment voltron.
+- lifegain: gain life and reward life totals; soul sisters and lifegain finishers.
+- +1/+1 counters (plus_one_plus_one): counter synergy, proliferate, counter payoffs.
+- voltron: pile auras/equipment/counters onto one attacker; commander damage.
+- x_spells: X-cost spells, hydras, scalable mana payoffs.
+- graveyard: self-mill, dredge, delve, graveyard-filling engines.
+- stax: taxes, restrictions, hate bears, resource denial.
+- treasure: Treasure token generation and payoffs.
+- storm: storm count payoffs and ritual-heavy lines.
 
 TOOLS AND OUTPUT
 - Use inspect_deck_cards to recheck exact text when a rules-sensitive interaction depends on it.
@@ -112,6 +157,10 @@ TOOLS AND OUTPUT
 - Call check_legality for legality questions and check_bracket for bracket questions.
 - Treat brackets as table guidance, not format legality.
 - Prefer a few strong, deck-specific recommendations over generic lists.
+- Output mode: use mode=doctor for whole-deck diagnosis, cuts, or conversion requests and fill
+  cuts plus recommendations (set replaces on each recommendation when the swap is clear). Use
+  mode=replacement only for one named card. Otherwise keep mode=chat, which may still include
+  recommendations.
 - Ask one focused question only when the missing answer materially changes legality, budget, or two
   genuinely different strategies. Never ask because an internal search or theme lookup was empty.
 - Never mention tools, searches, pipelines, IDs, scores, theme availability, fallback, or
@@ -146,8 +195,8 @@ class AssistantAnswer(BaseModel):
 
     mode: Literal["chat", "doctor", "replacement"] = "chat"
     reply: str
-    recommendations: list[AssistantRecommendation] = Field(default_factory=list, max_length=8)
-    cuts: list[AssistantCut] = Field(default_factory=list, max_length=8)
+    recommendations: list[AssistantRecommendation] = Field(default_factory=list, max_length=12)
+    cuts: list[AssistantCut] = Field(default_factory=list, max_length=24)
     target_card_name: str | None = Field(default=None, max_length=200)
     keep_reason: str | None = Field(default=None, max_length=500)
 
@@ -246,11 +295,17 @@ async def check_legality(ctx: RunContext[AssistantDeps]) -> LegalityReport | Non
     return await check_legality_service(ctx.deps.pool, ctx.deps.deck)
 
 
-async def check_bracket(ctx: RunContext[AssistantDeps]) -> BracketReport | None:
-    """Evaluate the deck against the project's versioned bracket rules."""
+async def check_bracket(
+    ctx: RunContext[AssistantDeps], target_bracket: int | None = None
+) -> BracketReport | None:
+    """Evaluate the deck against the project's versioned bracket rules.
+
+    Pass ``target_bracket`` to evaluate a conversion (e.g. 3 for "would this
+    pass at bracket 3?"); otherwise the deck's declared bracket is used.
+    """
     if not ctx.deps.allow_tool():
         return None
-    return check_bracket_service(ctx.deps.deck)
+    return check_bracket_service(ctx.deps.deck, target_bracket)
 
 
 _AGENT: Agent[AssistantDeps, AssistantAnswer] | None = None
@@ -285,7 +340,7 @@ async def run_assistant(
                 usage_limits=UsageLimits(
                     request_limit=_REQUEST_LIMIT,
                     tool_calls_limit=_MAX_TOOL_CALLS,
-                    input_tokens_limit=64_000,
+                    input_tokens_limit=128_000,
                     output_tokens_limit=8_000,
                 ),
             ),

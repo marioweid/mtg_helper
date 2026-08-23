@@ -239,3 +239,6 @@ docs/superpowers/specs/*
 
 # Local Codex app/thread configuration
 .codex/config.toml
+
+# Local dev data (portable postgres, caches, logs)
+.local/
