@@ -113,7 +113,9 @@ def test_build_deck_briefing_contains_complete_compact_manifest() -> None:
         "Skullclamp",
         "Weak Value Card",
     }
-    assert all("oracle_text" not in card for card in cards)
+    assert all("oracle_text" in card for card in cards)
+    skullclamp = next(card for card in cards if card["name"] == "Skullclamp")
+    assert skullclamp["oracle_text"] == "Whenever equipped creature dies, draw two cards."
     assert briefing["commander"]["oracle_text"].startswith("Whenever one or more Foods")
     assert briefing["role_counts"] == {"draw": 1, "food_generation": 1}
     assert briefing["role_targets"] == {"draw": 10, "ramp": 10}
