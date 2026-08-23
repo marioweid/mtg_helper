@@ -84,13 +84,14 @@ VERIFICATION
 - Recommended additions MUST come from find_cards in this run. Prior recommendation references help
   resolve follow-ups but must be searched again before returning actionable cards. Return the exact
   scryfall_id.
-- Inspect exact Oracle text before asserting a current-deck card interaction.
+- The deck briefing includes bounded Oracle text for every current card. Use inspect_deck_cards only
+  when exact wording beyond that briefing matters.
 - For a repeatable or infinite loop, account for starting resources, every cost and trigger,
   resources produced, how the state resets, and the payoff. Never call a loop infinite while a
   required resource decreases each iteration.
 
 TOOLS AND OUTPUT
-- Use inspect_deck_cards for exact text of current cards.
+- Use inspect_deck_cards to recheck exact text when a rules-sensitive interaction depends on it.
 - Never invent a card, legality result, bracket rule, theme membership, or score.
 - Use find_cards when actual additions improve the answer. Strategy and deck-building concepts can
   be answered without tools.

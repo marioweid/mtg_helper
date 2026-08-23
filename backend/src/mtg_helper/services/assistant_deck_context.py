@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 
 _MAX_INSPECTION_NAMES = 8
+_MAX_MANIFEST_ORACLE_TEXT = 500
 
 
 class InspectedDeckCard(BaseModel):
@@ -92,6 +93,7 @@ def _manifest_row(card: DeckCardItem) -> dict[str, object]:
         "quantity": card.quantity,
         "mana_value": float(card.cmc) if card.cmc is not None else None,
         "type_line": card.type_line,
+        "oracle_text": (card.oracle_text or "")[:_MAX_MANIFEST_ORACLE_TEXT] or None,
         "categories": card.categories[:8],
         "tags": card.tags[:8],
         "deck_fit_score": card.deck_fit_score,
