@@ -1,10 +1,10 @@
 """Pydantic models for AI deck building endpoints."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mtg_helper.models.cards import CardResponse
 
@@ -445,11 +445,25 @@ CoachResolvedMode = Literal[
 ]
 
 
+class CoachHistoryCardReference(BaseModel):
+    """One database-grounded card mentioned by a prior assistant turn."""
+
+    scryfall_id: UUID
+    name: str = Field(min_length=1, max_length=200)
+
+
 class CoachHistoryTurn(BaseModel):
     """One completed visible turn supplied as recent conversation context."""
 
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=4000)
+    recommendations: list[CoachHistoryCardReference] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def _references_belong_to_assistant(self) -> Self:
+        if self.role == "user" and self.recommendations:
+            raise ValueError("recommendations are only valid on assistant history turns")
+        return self
 
 
 class CommanderCoachRequest(BaseModel):

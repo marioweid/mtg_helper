@@ -6,13 +6,20 @@ const MAX_HISTORY_CHARACTERS = 12_000;
 export interface VisibleCoachTurn {
   role: "user" | "assistant";
   content: string;
+  recommendations?: CoachHistoryTurn["recommendations"];
 }
 
 export function buildCoachHistory(turns: VisibleCoachTurn[]): CoachHistoryTurn[] {
   let history = turns
     .filter((turn) => turn.content.trim().length > 0)
     .slice(-MAX_HISTORY_TURNS)
-    .map((turn) => ({ role: turn.role, content: turn.content }));
+    .map((turn) => ({
+      role: turn.role,
+      content: turn.content,
+      ...(turn.role === "assistant" && turn.recommendations?.length
+        ? { recommendations: turn.recommendations }
+        : {}),
+    }));
 
   while (history.length > 0 && characterCount(history) > MAX_HISTORY_CHARACTERS) {
     history = history.slice(1);

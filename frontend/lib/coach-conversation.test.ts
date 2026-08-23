@@ -56,4 +56,18 @@ describe("buildCoachHistory", () => {
     expect(history[0]?.content).toContain("middle");
     expect(history.at(-1)?.content).toBe("newest-user");
   });
+
+  it("preserves grounded references only on assistant turns", () => {
+    const recommendations = [{ scryfall_id: "card-1", name: "Mirkwood Bats" }];
+
+    const history = buildCoachHistory([
+      { role: "user", content: "Give me token draw.", recommendations },
+      { role: "assistant", content: "Try Mirkwood Bats.", recommendations },
+    ]);
+
+    expect(history).toEqual([
+      { role: "user", content: "Give me token draw." },
+      { role: "assistant", content: "Try Mirkwood Bats.", recommendations },
+    ]);
+  });
 });

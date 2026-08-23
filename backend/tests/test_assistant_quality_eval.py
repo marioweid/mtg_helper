@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.eval_assistant_quality import load_cases, score_text
+from scripts.eval_assistant_quality import load_cases, score_run, score_text
 
 pytestmark = pytest.mark.no_db
 
@@ -32,7 +32,7 @@ def test_quality_corpus_covers_required_behaviors() -> None:
         "memory-budget-limit",
         "no-infinite-combos",
         "camellia-altar-invalid-two-card-loop",
-        "ambiguous-theme",
+        "broad-value-theme",
         "ungrounded-recommendation",
     }
 
@@ -49,3 +49,13 @@ def test_score_text_detects_forbidden_claims_case_insensitively() -> None:
         "Camellia + Ashnod's Altar is infinite",
         "replacement Food",
     ]
+
+
+def test_score_run_checks_observable_tool_calls() -> None:
+    case = next(case for case in load_cases(_CASES) if case.id == "broad-value-theme")
+
+    result = score_run(case, "Food sacrifice draw fits Camellia.", ["search_themes"])
+
+    assert result.passed is False
+    assert result.missing_tools == ["find_cards"]
+    assert result.unexpected_tools == ["search_themes"]

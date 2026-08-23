@@ -39,7 +39,6 @@ from mtg_helper.services.mtg_assistant_tools import (
     BracketReport,
     DeckAnalysis,
     LegalityReport,
-    ThemeMatch,
 )
 from mtg_helper.services.mtg_assistant_tools import (
     analyze_deck as analyze_deck_service,
@@ -52,9 +51,6 @@ from mtg_helper.services.mtg_assistant_tools import (
 )
 from mtg_helper.services.mtg_assistant_tools import (
     check_legality as check_legality_service,
-)
-from mtg_helper.services.mtg_assistant_tools import (
-    search_themes as search_themes_service,
 )
 from mtg_helper.services.mtg_card_search import (
     AssistantCardSearchInput,
@@ -72,11 +68,12 @@ _REQUEST_LIMIT = 8
 _TIMEOUT_SECONDS = 45.0
 _MAX_HISTORY_CHARACTERS = 12_000
 
-_SYSTEM_PROMPT = """You are a confident but verified Commander deck-building partner.
+_SYSTEM_PROMPT = """You are an experienced Commander brewing partner: direct, warm, and verified.
 
 COACHING WORKFLOW
 - Understand the commander's game plan and the user's stated direction.
-- Inspect what the deck already contains, then answer the current question directly.
+- Answer the current question directly. Have an informed opinion and make reasonable, reversible
+  assumptions when the user's direction is clear.
 - Give a small ranked package, explain interactions with the commander and existing cards, state
   tradeoffs, and identify what to add or change first.
 - Prefer overlapping engines and flexible cards over disconnected staples when evidence supports it.
@@ -84,7 +81,9 @@ COACHING WORKFLOW
 
 VERIFICATION
 - Distinguish verified card facts from strategic judgment.
-- Recommended additions MUST come from search_cards in this run. Return the exact scryfall_id.
+- Recommended additions MUST come from find_cards in this run. Prior recommendation references help
+  resolve follow-ups but must be searched again before returning actionable cards. Return the exact
+  scryfall_id.
 - Inspect exact Oracle text before asserting a current-deck card interaction.
 - For a repeatable or infinite loop, account for starting resources, every cost and trigger,
   resources produced, how the state resets, and the payoff. Never call a loop infinite while a
@@ -93,16 +92,17 @@ VERIFICATION
 TOOLS AND OUTPUT
 - Use inspect_deck_cards for exact text of current cards.
 - Never invent a card, legality result, bracket rule, theme membership, or score.
-- For a thematic request, call search_themes before search_cards and pass only returned theme tags.
-- Express explicit requirements with search_cards fields; never filter a broad result in prose.
+- Use find_cards when actual additions improve the answer. Strategy and deck-building concepts can
+  be answered without tools.
+- Express explicit requirements with find_cards fields; never filter a broad result in prose.
 - mana_cost_symbols matches symbols in the printed mana cost, not symbols or X in oracle text.
 - Distinguish mana cost from mana value, card type from subtype, and theme from constraints.
-- Do not invent numeric meanings for words such as cheap; ask or omit the numeric filter.
-- If search_cards reports global_fallback, tell the user the selected theme had no matching cards.
+- For qualitative budget words such as cheap, omit the numeric filter and state a brief assumption;
+  ask for a hard cap only when it materially changes the decision.
 - Call analyze_deck for deck diagnosis, cuts, or swaps.
 - For landbase, land base, mana base, color fixing, or land-swap requests, call
   analyze_mana_base first. Its swaps are sufficient unless the user asks for constrained or
-  additional alternatives; only then make a follow-up search_cards call.
+  additional alternatives; only then make a follow-up find_cards call.
 - For cuts and swaps, prefer the lowest deck-fit scores returned by analyze_deck and explain the
   provided evidence. Do not propose protected cards as ordinary cuts or alter numeric scores.
 - For one-card replacement requests, use replacement mode and return the exact target card name
@@ -111,7 +111,12 @@ TOOLS AND OUTPUT
 - Call check_legality for legality questions and check_bracket for bracket questions.
 - Treat brackets as table guidance, not format legality.
 - Prefer a few strong, deck-specific recommendations over generic lists.
-- If search_themes is ambiguous or empty, ask one focused clarification question.
+- Ask one focused question only when the missing answer materially changes legality, budget, or two
+  genuinely different strategies. Never ask because an internal search or theme lookup was empty.
+- Never mention tools, searches, pipelines, IDs, scores, theme availability, fallback, or
+  validation.
+- Sound like a knowledgeable MTG friend, not an audit report. Avoid canned openings and generic
+  closing offers.
 - Rules-document lookup is not available yet; be transparent when an official rules citation is
   required.
 - Do not mention internal agents or pipelines.
@@ -176,8 +181,7 @@ def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
         ),
         retries=1,
         tools=[
-            search_themes,
-            search_cards,
+            find_cards,
             inspect_deck_cards,
             analyze_mana_base,
             analyze_deck,
@@ -187,18 +191,11 @@ def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
     )
 
 
-async def search_themes(ctx: RunContext[AssistantDeps], query: str) -> list[ThemeMatch]:
-    """Find relevant theme ids and descriptions for a strategy phrase."""
-    if not ctx.deps.allow_tool():
-        return []
-    return await search_themes_service(ctx.deps.pool, query)
-
-
-async def search_cards(
+async def find_cards(
     ctx: RunContext[AssistantDeps],
     filters: AssistantCardSearchInput,
 ) -> CardSearchResult:
-    """Apply typed filters to a theme-first or global legal card search."""
+    """Find legal additions using optional theme evidence and automatic global fallback."""
     if not ctx.deps.allow_tool():
         return CardSearchResult(evidence_source="none", message="Tool-call budget exhausted.")
     result = await search_cards_service(ctx.deps.pool, ctx.deps.deck, filters)
@@ -321,6 +318,12 @@ def _prompt_payload(deck: DeckDetailResponse, request: CommanderCoachRequest) ->
         "current_request": request.message,
         "deck": build_deck_briefing(deck),
         "preferences": (request.coach_memory_notes or "")[-8000:],
+        "prior_recommendations": [
+            reference.model_dump(mode="json")
+            for turn in request.history
+            if turn.role == "assistant"
+            for reference in turn.recommendations
+        ][-8:],
     }
 
 
@@ -341,6 +344,9 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         for item in output.recommendations
         if item.scryfall_id in deps.retrieved
     ]
+    reply = output.reply
+    if output.recommendations and not recommendations:
+        reply = "I couldn't verify those card suggestions, so I left them out."
     options = [
         ReplacementOption(
             card=candidate.card,
@@ -353,17 +359,17 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
     if output.mode == "chat":
         return CommanderCoachResponse(
             mode="chat",
-            reply=output.reply,
+            reply=reply,
             recommendations=options,
         )
     if output.mode == "replacement":
         target = _deck_card_name(output.target_card_name, existing)
         keep_reason = output.keep_reason.strip() if output.keep_reason else None
         if target is None or (not recommendations and not keep_reason):
-            return CommanderCoachResponse(mode="chat", reply=output.reply)
+            return CommanderCoachResponse(mode="chat", reply=reply)
         replacement = TargetedReplacementResponse(
             target_card_name=target,
-            summary=output.reply,
+            summary=reply,
             keep_reason=keep_reason,
             best_pick=options[0].card if options else None,
             options=options,
@@ -371,12 +377,12 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         )
         return CommanderCoachResponse(
             mode="replacement",
-            reply=output.reply,
+            reply=reply,
             recommendations=options,
             replacement=replacement,
         )
     if not recommendations and not cuts:
-        return CommanderCoachResponse(mode="chat", reply=output.reply)
+        return CommanderCoachResponse(mode="chat", reply=reply)
     doctor_cuts = [
         DoctorCut(card_name=cut.card_name, reason=cut.reason, confidence="medium") for cut in cuts
     ]
@@ -394,7 +400,7 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         if any(name in existing for name in item.replaces)
     ]
     doctor = DeckDoctorResponse(
-        summary=output.reply,
+        summary=reply,
         game_plan=_game_plan(deps.deck),
         cuts=doctor_cuts,
         adds=doctor_adds,
@@ -403,7 +409,7 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
     )
     return CommanderCoachResponse(
         mode="doctor",
-        reply=output.reply,
+        reply=reply,
         recommendations=options,
         doctor=doctor,
     )

@@ -223,7 +223,7 @@ async def test_empty_hub_result_retries_identical_filters_globally(
     )
 
     assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
-    assert result.message is not None
+    assert result.message is None
     assert [candidate.card.name for candidate in result.candidates] == ["Doubling Season"]
     assert result.candidates[0].evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
 
@@ -235,6 +235,24 @@ async def test_unknown_theme_returns_structured_empty_result(db_pool: asyncpg.Po
         AssistantCardSearchInput(theme_tags=["not_a_real_theme"]),
     )
 
-    assert result.evidence_source is CardEvidenceSource.NONE
-    assert result.candidates == []
-    assert result.message is not None
+    assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
+    assert result.candidates
+    assert result.message is None
+
+
+async def test_natural_theme_hint_resolves_catalog_before_search(db_pool: asyncpg.Pool) -> None:
+    cards = await _insert_search_cards(db_pool)
+    await _insert_x_theme(db_pool, cards)
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(
+            theme_hints=["variable mana spells"],
+            mana_cost_symbols=["{X}"],
+        ),
+    )
+
+    assert result.evidence_source is CardEvidenceSource.HUB_STATS
+    assert result.resolved_theme_tags == ["moxfield:x_spells"]
+    assert [candidate.card.name for candidate in result.candidates] == ["Hydra Search Test"]

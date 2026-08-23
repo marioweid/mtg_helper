@@ -723,9 +723,15 @@ export interface TargetedReplacementResponse {
   tool_call_count: number;
 }
 
+export interface CoachHistoryCardReference {
+  scryfall_id: string;
+  name: string;
+}
+
 export interface CoachHistoryTurn {
   role: "user" | "assistant";
   content: string;
+  recommendations?: CoachHistoryCardReference[];
 }
 
 export interface CommanderCoachRequest {

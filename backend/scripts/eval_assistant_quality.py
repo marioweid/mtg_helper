@@ -35,6 +35,8 @@ class AssistantEvalResult(BaseModel):
     passed: bool
     missing_required: list[str]
     forbidden_matches: list[str]
+    missing_tools: list[str] = Field(default_factory=list)
+    unexpected_tools: list[str] = Field(default_factory=list)
 
 
 _CASE_ADAPTER = TypeAdapter(list[AssistantEvalCase])
@@ -59,6 +61,22 @@ def score_text(case: AssistantEvalCase, text: str) -> AssistantEvalResult:
         passed=not missing and not forbidden,
         missing_required=missing,
         forbidden_matches=forbidden,
+    )
+
+
+def score_run(case: AssistantEvalCase, text: str, tool_calls: list[str]) -> AssistantEvalResult:
+    """Score final text and observable tool calls for one captured assistant run."""
+    result = score_text(case, text)
+    expected = set(case.expected_tools)
+    actual = set(tool_calls)
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    return result.model_copy(
+        update={
+            "passed": result.passed and not missing and not unexpected,
+            "missing_tools": missing,
+            "unexpected_tools": unexpected,
+        }
     )
 
 

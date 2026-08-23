@@ -17,6 +17,7 @@ from starlette.requests import Request
 from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     CardSearchHit,
+    CoachHistoryCardReference,
     ColorStatus,
     CommanderCoachRequest,
     CommanderCoachResponse,
@@ -98,15 +99,23 @@ def _deck() -> DeckDetailResponse:
 
 
 def test_coach_request_accepts_role_aware_history() -> None:
+    card_id = uuid4()
     request = CommanderCoachRequest(
         message="What should I add for draw?",
         history=[
             {"role": "user", "content": "Keep this Food-first."},
-            {"role": "assistant", "content": "I will prioritize Food engines."},
+            {
+                "role": "assistant",
+                "content": "I will prioritize Food engines.",
+                "recommendations": [{"scryfall_id": card_id, "name": "Mirkwood Bats"}],
+            },
         ],
     )
 
     assert [turn.role for turn in request.history] == ["user", "assistant"]
+    assert request.history[1].recommendations == [
+        CoachHistoryCardReference(scryfall_id=card_id, name="Mirkwood Bats")
+    ]
     assert request.message == "What should I add for draw?"
 
 
@@ -196,6 +205,27 @@ def test_prompt_payload_contains_complete_deck_and_preferences() -> None:
     assert medium_card["deck_fit_score"] == 25
 
 
+def test_prompt_payload_includes_grounded_prior_recommendations() -> None:
+    card_id = uuid4()
+    request = CommanderCoachRequest(
+        message="Which of those is best?",
+        history=[
+            {"role": "user", "content": "Give me token draw."},
+            {
+                "role": "assistant",
+                "content": "Try Mirkwood Bats.",
+                "recommendations": [{"scryfall_id": card_id, "name": "Mirkwood Bats"}],
+            },
+        ],
+    )
+
+    payload = _prompt_payload(_deck(), request)
+
+    assert payload["prior_recommendations"] == [
+        {"scryfall_id": str(card_id), "name": "Mirkwood Bats"}
+    ]
+
+
 async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
     model = TestModel(
         call_tools=["analyze_deck"],
@@ -223,7 +253,8 @@ async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
     assert result.doctor.tool_call_count == 1
     assert model.last_model_request_parameters is not None
     tool_names = {tool.name for tool in model.last_model_request_parameters.function_tools}
-    assert "search_cards" in tool_names
+    assert "find_cards" in tool_names
+    assert "search_themes" not in tool_names
     assert "find_theme_cards" not in tool_names
 
 
@@ -314,7 +345,7 @@ async def test_run_coach_returns_grounded_replacement() -> None:
         ],
     )
     model = TestModel(
-        call_tools=["search_cards"],
+        call_tools=["find_cards"],
         custom_output_args={
             "mode": "replacement",
             "reply": "Replace the generic creature with a squirrel anthem.",
@@ -349,6 +380,21 @@ async def test_run_coach_returns_grounded_replacement() -> None:
     assert result.replacement.tool_call_count == 1
 
 
+async def test_find_cards_passes_natural_theme_hints_to_discovery() -> None:
+    search = AsyncMock(return_value=CardSearchResult(evidence_source="global_fallback"))
+    deps = AssistantDeps(pool=cast(asyncpg.Pool, None), deck=_deck())
+    filters = mtg_assistant.AssistantCardSearchInput(
+        theme_hints=["Food sacrifice card draw"],
+        oracle_text_any=["draw a card"],
+    )
+
+    with patch.object(mtg_assistant, "search_cards_service", search):
+        result = await mtg_assistant.find_cards(SimpleNamespace(deps=deps), filters)
+
+    search.assert_awaited_once_with(deps.pool, deps.deck, filters)
+    assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
+
+
 async def test_signal_lanes_detect_core_commander_packages() -> None:
     report = signal_lanes.analyze_signals(_deck())
 
@@ -374,6 +420,7 @@ def test_assistant_drops_ungrounded_cards_and_unknown_cuts() -> None:
     result = _to_response(output, deps)
 
     assert result.mode == "chat"
+    assert result.reply == "I couldn't verify those card suggestions, so I left them out."
     assert result.doctor is None
     assert result.replacement is None
 

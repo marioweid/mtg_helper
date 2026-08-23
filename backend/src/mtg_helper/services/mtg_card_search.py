@@ -43,10 +43,15 @@ class CardEvidenceSource(StrEnum):
 class AssistantCardSearchInput(BaseModel):
     """Bounded structural filters accepted by the assistant's search tool."""
 
+    theme_hints: list[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="Natural strategy phrases; unresolved hints use legal global search.",
+    )
     theme_tags: list[str] = Field(
         default_factory=list,
         max_length=5,
-        description="Theme or qualified source IDs returned by search_themes.",
+        description="Known administrator theme slugs or qualified source IDs.",
     )
     mana_cost_symbols: list[str] = Field(
         default_factory=list,
@@ -112,6 +117,12 @@ class AssistantCardSearchInput(BaseModel):
         if invalid:
             raise ValueError(f"invalid theme tag: {invalid[0]}")
         return tags
+
+    @field_validator("theme_hints")
+    @classmethod
+    def _normalize_theme_hints(cls, value: list[str]) -> list[str]:
+        hints = [" ".join(item.strip().split()) for item in value]
+        return [item for item in hints if item]
 
     @field_validator("mana_cost_symbols")
     @classmethod
@@ -185,44 +196,43 @@ async def search_cards(
     deck: DeckDetailResponse,
     filters: AssistantCardSearchInput,
 ) -> CardSearchResult:
-    """Search a selected theme pool first, then retry unchanged filters globally."""
-    resolved_tags: list[str] = []
+    """Search legal cards globally and use resolved theme statistics as ranking evidence."""
+    resolved_tags = await _resolve_discovery_themes(pool, filters)
     evidence: dict[UUID, _ThemeEvidence] = {}
-    if filters.theme_tags:
-        resolved_tags = await _resolve_theme_tags(pool, filters.theme_tags)
-        if not resolved_tags:
-            return CardSearchResult(
-                evidence_source=CardEvidenceSource.NONE,
-                message="No enabled theme matched the supplied theme_tags; clarify the theme.",
-            )
+    requested_theme = bool(filters.theme_tags or filters.theme_hints)
+    if resolved_tags:
         evidence = await _load_theme_evidence(pool, resolved_tags)
-        if evidence:
-            candidates = await _query_candidates(
-                pool, deck, filters, CardEvidenceSource.HUB_STATS, evidence
-            )
-            if candidates:
-                return CardSearchResult(
-                    evidence_source=CardEvidenceSource.HUB_STATS,
-                    resolved_theme_tags=resolved_tags,
-                    candidates=candidates,
-                )
-    source = (
-        CardEvidenceSource.GLOBAL_FALLBACK
-        if filters.theme_tags
-        else CardEvidenceSource.GLOBAL_SEARCH
-    )
-    candidates = await _query_candidates(pool, deck, filters, source, {})
-    message = None
-    if source is CardEvidenceSource.GLOBAL_FALLBACK:
-        message = (
-            "The selected theme pool had no matches; unchanged filters used the legal database."
-        )
+    if evidence:
+        source = CardEvidenceSource.HUB_STATS
+    elif requested_theme:
+        source = CardEvidenceSource.GLOBAL_FALLBACK
+    else:
+        source = CardEvidenceSource.GLOBAL_SEARCH
+    candidates = await _query_candidates(pool, deck, filters, source, evidence)
     return CardSearchResult(
         evidence_source=source,
         resolved_theme_tags=resolved_tags,
         candidates=candidates,
-        message=message,
+        message=None,
     )
+
+
+async def _resolve_discovery_themes(
+    pool: asyncpg.Pool, filters: AssistantCardSearchInput
+) -> list[str]:
+    resolved = await _resolve_theme_tags(pool, filters.theme_tags) if filters.theme_tags else []
+    if not filters.theme_hints:
+        return resolved
+    from mtg_helper.services.mtg_assistant_tools import search_themes
+
+    queries = list(filters.theme_hints)
+    queries.extend(
+        word for hint in filters.theme_hints for word in _normalize(hint).split() if len(word) >= 4
+    )
+    for query in dict.fromkeys(queries):
+        matches = await search_themes(pool, query)
+        resolved.extend(match.tag for match in matches[:2])
+    return list(dict.fromkeys(resolved))
 
 
 async def _resolve_theme_tags(pool: asyncpg.Pool, tags: list[str]) -> list[str]:
@@ -253,7 +263,7 @@ async def _query_candidates(
     evidence: dict[UUID, _ThemeEvidence],
 ) -> list[CardSearchCandidate]:
     hub_ids = sorted(evidence, key=lambda card_id: evidence[card_id].score, reverse=True)
-    where, args = _build_filters(deck, filters, hub_ids)
+    where, args = _build_filters(deck, filters)
     order_by = _build_order(filters.ranking, deck, hub_ids, args)
     sql = _CARD_SELECT + " WHERE " + " AND ".join(where) + order_by
     async with pool.acquire() as conn:
@@ -265,7 +275,6 @@ async def _query_candidates(
 def _build_filters(
     deck: DeckDetailResponse,
     filters: AssistantCardSearchInput,
-    hub_ids: list[UUID],
 ) -> tuple[list[str], list[object]]:
     where = [
         "is_canonical",
@@ -276,8 +285,6 @@ def _build_filters(
         "type_line NOT LIKE '%Conspiracy%'",
     ]
     args: list[object] = [list(deck.commander_color_identity)]
-    if hub_ids:
-        _add_filter(where, args, "id = ANY($N::uuid[])", hub_ids)
     if filters.exclude_deck_cards:
         _add_filter(where, args, "NOT (id = ANY($N::uuid[]))", _deck_card_ids(deck))
     _add_optional_filters(where, args, filters)
@@ -448,7 +455,7 @@ def _roles(blob: str) -> list[str]:
 
 def _matched_filter_names(filters: AssistantCardSearchInput) -> list[str]:
     payload = filters.model_dump()
-    ignored = {"theme_tags", "exclude_deck_cards", "ranking", "limit"}
+    ignored = {"theme_tags", "theme_hints", "exclude_deck_cards", "ranking", "limit"}
     return [
         name for name, value in payload.items() if name not in ignored and value not in (None, [])
     ]
