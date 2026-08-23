@@ -395,6 +395,15 @@ async def test_find_cards_passes_natural_theme_hints_to_discovery() -> None:
     assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
 
 
+def test_find_cards_input_treats_natural_theme_tags_as_hints() -> None:
+    filters = mtg_assistant.AssistantCardSearchInput(
+        theme_tags=["Food sacrifice", "aristocrats"],
+    )
+
+    assert filters.theme_tags == ["aristocrats"]
+    assert filters.theme_hints == ["Food sacrifice"]
+
+
 async def test_signal_lanes_detect_core_commander_packages() -> None:
     report = signal_lanes.analyze_signals(_deck())
 

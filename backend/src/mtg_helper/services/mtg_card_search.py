@@ -109,6 +109,24 @@ class AssistantCardSearchInput(BaseModel):
     )
     limit: int = Field(default=8, ge=1, le=_MAX_RESULTS, description="Maximum returned cards.")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _move_natural_theme_tags_to_hints(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        tags = value.get("theme_tags")
+        if not isinstance(tags, list):
+            return value
+        normalized = [str(tag).strip().lower() for tag in tags]
+        known_tags = [tag for tag in normalized if _TAG_RE.fullmatch(tag)]
+        natural_hints = [tag for tag in tags if not _TAG_RE.fullmatch(str(tag).strip().lower())]
+        if not natural_hints:
+            return value
+        updated = dict(value)
+        updated["theme_tags"] = known_tags
+        updated["theme_hints"] = [*value.get("theme_hints", []), *natural_hints]
+        return updated
+
     @field_validator("theme_tags")
     @classmethod
     def _validate_theme_tags(cls, value: list[str]) -> list[str]:
