@@ -9,6 +9,8 @@ from uuid import uuid4
 
 import asyncpg
 import pytest
+from pydantic import ValidationError
+from pydantic_ai.messages import ModelRequest, ModelResponse
 from pydantic_ai.models.test import TestModel
 from starlette.requests import Request
 
@@ -31,6 +33,8 @@ from mtg_helper.services.mtg_assistant import (
     AssistantCut,
     AssistantDeps,
     AssistantRecommendation,
+    _bounded_history,
+    _prompt_payload,
     _to_response,
 )
 from mtg_helper.services.mtg_assistant_tools import AssistantManaBaseAnalysis, ManaBaseSwap
@@ -93,6 +97,105 @@ def _deck() -> DeckDetailResponse:
     )
 
 
+def test_coach_request_accepts_role_aware_history() -> None:
+    request = CommanderCoachRequest(
+        message="What should I add for draw?",
+        history=[
+            {"role": "user", "content": "Keep this Food-first."},
+            {"role": "assistant", "content": "I will prioritize Food engines."},
+        ],
+    )
+
+    assert [turn.role for turn in request.history] == ["user", "assistant"]
+    assert request.message == "What should I add for draw?"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"message": ""},
+        {"message": "Question", "history": [{"role": "user", "content": ""}]},
+        {"message": "Question", "history": [{"role": "system", "content": "No"}]},
+        {
+            "message": "Question",
+            "history": [{"role": "user", "content": str(index)} for index in range(13)],
+        },
+    ],
+    ids=["empty-message", "empty-history", "unknown-role", "too-many-turns"],
+)
+def test_coach_request_rejects_invalid_history(payload: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        CommanderCoachRequest.model_validate(payload)
+
+
+def test_coach_response_defaults_to_no_recommendations() -> None:
+    response = CommanderCoachResponse(mode="chat", reply="Answer")
+
+    assert response.recommendations == []
+
+
+def test_bounded_history_keeps_newest_complete_pairs() -> None:
+    request = CommanderCoachRequest(
+        message="Latest",
+        history=[
+            {"role": "user", "content": f"user-{index}-" + "x" * 1990}
+            if index % 2 == 0
+            else {"role": "assistant", "content": f"assistant-{index}-" + "x" * 1990}
+            for index in range(12)
+        ],
+    )
+
+    history = _bounded_history(request)
+
+    assert len(history) % 2 == 0
+    assert isinstance(history[0], ModelRequest)
+    assert isinstance(history[1], ModelResponse)
+    assert "user-6" in str(history[0])
+    assert "assistant-11" in str(history[-1])
+
+
+def test_bounded_history_handles_irregular_roles_without_dropping_newest_user() -> None:
+    request = CommanderCoachRequest(
+        message="Latest",
+        history=[
+            {"role": "user", "content": "old-" + "x" * 3996},
+            {"role": "user", "content": "middle-" + "x" * 3993},
+            {"role": "assistant", "content": "answer-" + "x" * 3993},
+            {"role": "user", "content": "newest-user"},
+        ],
+    )
+
+    history = _bounded_history(request)
+
+    assert len(history) == 3
+    assert "middle" in str(history[0])
+    assert "newest-user" in str(history[-1])
+
+
+def test_prompt_payload_contains_complete_deck_and_preferences() -> None:
+    deck = _deck()
+    deck.cards[0].deck_fit_score = 25
+    deck.stage_targets = {"draw": 10}
+    request = CommanderCoachRequest(
+        message="What should I add for draw?",
+        coach_memory_notes="Keep this Food-first.",
+    )
+
+    payload = _prompt_payload(deck, request)
+
+    assert payload["current_request"] == request.message
+    assert payload["preferences"] == "Keep this Food-first."
+    assert payload["deck"]["role_targets"] == {"draw": 10}
+    assert {card["name"] for card in payload["deck"]["cards"]} == {
+        "Medium Value Card",
+        "Food Engine",
+    }
+    medium_card = next(
+        card for card in payload["deck"]["cards"] if card["name"] == "Medium Value Card"
+    )
+    assert medium_card["deck_fit_score"] == 25
+
+
 async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
     model = TestModel(
         call_tools=["analyze_deck"],
@@ -122,6 +225,27 @@ async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
     tool_names = {tool.name for tool in model.last_model_request_parameters.function_tools}
     assert "search_cards" in tool_names
     assert "find_theme_cards" not in tool_names
+
+
+async def test_assistant_can_inspect_exact_current_deck_cards() -> None:
+    model = TestModel(
+        call_tools=["inspect_deck_cards"],
+        custom_output_args={
+            "mode": "chat",
+            "reply": "Food Engine creates Food.",
+        },
+    )
+    with mtg_assistant.get_agent().override(model=model):
+        result = await orchestrator.run_coach(
+            cast(asyncpg.Pool, None),
+            _deck(),
+            CommanderCoachRequest(message="What does Food Engine do?"),
+        )
+
+    assert result.reply == "Food Engine creates Food."
+    assert model.last_model_request_parameters is not None
+    tool_names = {tool.name for tool in model.last_model_request_parameters.function_tools}
+    assert "inspect_deck_cards" in tool_names
 
 
 async def test_landbase_request_uses_grounded_mana_analysis_tool() -> None:
@@ -254,7 +378,7 @@ def test_assistant_drops_ungrounded_cards_and_unknown_cuts() -> None:
     assert result.replacement is None
 
 
-def test_assistant_chat_never_returns_action_payloads() -> None:
+def test_assistant_chat_returns_only_grounded_recommendations() -> None:
     candidate_id = uuid4()
     deps = AssistantDeps(pool=cast(asyncpg.Pool, None), deck=_deck())
     deps.retrieved[candidate_id] = CardSearchCandidate(
@@ -266,7 +390,8 @@ def test_assistant_chat_never_returns_action_payloads() -> None:
         reply="Here is a conversational answer.",
         target_card_name="Medium Value Card",
         recommendations=[
-            AssistantRecommendation(scryfall_id=candidate_id, reason="Grounded but not requested.")
+            AssistantRecommendation(scryfall_id=candidate_id, reason="Grounded recommendation."),
+            AssistantRecommendation(scryfall_id=uuid4(), reason="Unknown recommendation."),
         ],
         cuts=[AssistantCut(card_name="Medium Value Card", reason="Not requested.")],
     )
@@ -274,6 +399,7 @@ def test_assistant_chat_never_returns_action_payloads() -> None:
     result = _to_response(output, deps)
 
     assert result.mode == "chat"
+    assert [option.card.name for option in result.recommendations] == ["Grounded Card"]
     assert result.doctor is None
     assert result.replacement is None
 

@@ -76,11 +76,7 @@ async def test_coach_can_add_memory_after_memory_conversation(
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/coach",
         json={
-            "message": (
-                "User: what is in your memory?\n"
-                "Coach: none\n"
-                "User: add the yuna cares about all counters please"
-            ),
+            "message": "Remember that Yuna cares about all counters",
             "mode": "auto",
         },
     )
@@ -89,48 +85,7 @@ async def test_coach_can_add_memory_after_memory_conversation(
     data = resp.json()["data"]
     assert data["mode"] == "memory"
     assert data["memory_updated"] is True
-    assert data["coach_memory"]["notes"] == "yuna cares about all counters"
-
-
-async def test_coach_self_detects_preference_memory(
-    client: AsyncClient,
-) -> None:
-    await create_test_account(client, "Self Memory")
-    deck_id = await create_test_deck(client, name="Self Aware Memory")
-
-    resp = await client.post(
-        f"/api/v1/decks/{deck_id}/coach",
-        json={"message": "I hate counterspells", "mode": "auto"},
-    )
-
-    assert resp.status_code == 200
-    data = resp.json()["data"]
-    assert data["mode"] == "memory"
-    assert data["memory_updated"] is True
-    assert data["coach_memory"]["notes"] == "I hate counterspells"
-
-
-async def test_coach_self_detects_commander_interpretation_memory(
-    client: AsyncClient,
-) -> None:
-    await create_test_account(client, "Interpretation Memory")
-    deck_id = await create_test_deck(client, name="Yuna Interpretation")
-
-    resp = await client.post(
-        f"/api/v1/decks/{deck_id}/coach",
-        json={
-            "message": "please for Yuna I also want other counters than +1/+1 counters",
-            "mode": "auto",
-        },
-    )
-
-    assert resp.status_code == 200
-    data = resp.json()["data"]
-    assert data["mode"] == "memory"
-    assert data["memory_updated"] is True
-    assert data["coach_memory"]["notes"] == (
-        "for Yuna I also want other counters than +1/+1 counters"
-    )
+    assert data["coach_memory"]["notes"] == "Yuna cares about all counters"
 
 
 async def test_coach_can_remove_matching_memory_line(

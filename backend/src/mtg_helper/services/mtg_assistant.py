@@ -11,6 +11,7 @@ from uuid import UUID
 import asyncpg
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
+from pydantic_ai.messages import ModelMessage
 
 from mtg_helper.models.ai import (
     CommanderCoachRequest,
@@ -23,8 +24,16 @@ from mtg_helper.models.ai import (
     TargetedReplacementResponse,
 )
 from mtg_helper.models.decks import DeckDetailResponse
+from mtg_helper.services.agents._history import to_model_messages
 from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
 from mtg_helper.services.agents._usage import log_run_usage
+from mtg_helper.services.assistant_deck_context import (
+    DeckCardInspection,
+    build_deck_briefing,
+)
+from mtg_helper.services.assistant_deck_context import (
+    inspect_deck_cards as inspect_deck_cards_service,
+)
 from mtg_helper.services.mtg_assistant_tools import (
     AssistantManaBaseAnalysis,
     BracketReport,
@@ -61,14 +70,29 @@ _log = logging.getLogger(__name__)
 _MAX_TOOL_CALLS = 6
 _REQUEST_LIMIT = 8
 _TIMEOUT_SECONDS = 45.0
+_MAX_HISTORY_CHARACTERS = 12_000
 
-_SYSTEM_PROMPT = """You are MTG Assistant, a concise conversational Magic: The Gathering helper.
-You have one job: answer the user's current request using deterministic tools whenever facts about
-their deck or cards are required.
+_SYSTEM_PROMPT = """You are a confident but verified Commander deck-building partner.
 
-Rules:
+COACHING WORKFLOW
+- Understand the commander's game plan and the user's stated direction.
+- Inspect what the deck already contains, then answer the current question directly.
+- Give a small ranked package, explain interactions with the commander and existing cards, state
+  tradeoffs, and identify what to add or change first.
+- Prefer overlapping engines and flexible cards over disconnected staples when evidence supports it.
+- Do not ask for facts already present in the deck briefing, memory, or conversation.
+
+VERIFICATION
+- Distinguish verified card facts from strategic judgment.
+- Recommended additions MUST come from search_cards in this run. Return the exact scryfall_id.
+- Inspect exact Oracle text before asserting a current-deck card interaction.
+- For a repeatable or infinite loop, account for starting resources, every cost and trigger,
+  resources produced, how the state resets, and the payoff. Never call a loop infinite while a
+  required resource decreases each iteration.
+
+TOOLS AND OUTPUT
+- Use inspect_deck_cards for exact text of current cards.
 - Never invent a card, legality result, bracket rule, theme membership, or score.
-- Any recommended card MUST come from search_cards in this run. Return its exact scryfall_id.
 - For a thematic request, call search_themes before search_cards and pass only returned theme tags.
 - Express explicit requirements with search_cards fields; never filter a broad result in prose.
 - mana_cost_symbols matches symbols in the printed mana cost, not symbols or X in oracle text.
@@ -145,11 +169,16 @@ def _build_agent() -> Agent[AssistantDeps, AssistantAnswer]:
         deps_type=AssistantDeps,
         output_type=AssistantAnswer,
         system_prompt=_SYSTEM_PROMPT,
-        model_settings=openai_model_settings(max_tokens=2048, reasoning="low"),
+        model_settings=openai_model_settings(
+            max_tokens=4096,
+            reasoning="low",
+            verbosity="medium",
+        ),
         retries=1,
         tools=[
             search_themes,
             search_cards,
+            inspect_deck_cards,
             analyze_mana_base,
             analyze_deck,
             check_legality,
@@ -177,6 +206,15 @@ async def search_cards(
         if candidate.card.scryfall_id is not None:
             ctx.deps.retrieved[candidate.card.scryfall_id] = candidate
     return result
+
+
+async def inspect_deck_cards(
+    ctx: RunContext[AssistantDeps], names: list[str]
+) -> DeckCardInspection | None:
+    """Return exact text and fit evidence for up to eight current-deck cards."""
+    if not ctx.deps.allow_tool():
+        return None
+    return inspect_deck_cards_service(ctx.deps.deck, names)
 
 
 async def analyze_deck(ctx: RunContext[AssistantDeps]) -> DeckAnalysis | None:
@@ -239,11 +277,13 @@ async def run_assistant(
         await progress("assistant_thinking", "MTG Assistant is selecting deterministic tools")
     deps = AssistantDeps(pool=pool, deck=deck)
     payload = _prompt_payload(deck, request)
+    history = _bounded_history(request)
     try:
         result = await asyncio.wait_for(
             get_agent().run(
                 json.dumps(payload, default=str),
                 deps=deps,
+                message_history=history,
                 usage_limits=UsageLimits(
                     request_limit=_REQUEST_LIMIT,
                     tool_calls_limit=_MAX_TOOL_CALLS,
@@ -277,25 +317,23 @@ async def run_assistant(
 
 
 def _prompt_payload(deck: DeckDetailResponse, request: CommanderCoachRequest) -> dict[str, object]:
-    commander = deck.commander_card
     return {
-        "latest_request": request.message[-4000:],
-        "deck": {
-            "name": deck.name,
-            "commander": commander.name if commander else None,
-            "commander_text": commander.oracle_text if commander else None,
-            "colors": deck.commander_color_identity,
-            "bracket": deck.bracket,
-            "themes": deck.archetype_tags,
-            "card_count": sum(card.quantity for card in deck.cards),
-        },
-        "preferences": (request.coach_memory_notes or "")[-2000:],
+        "current_request": request.message,
+        "deck": build_deck_briefing(deck),
+        "preferences": (request.coach_memory_notes or "")[-8000:],
     }
 
 
+def _bounded_history(request: CommanderCoachRequest) -> list[ModelMessage]:
+    turns = [turn.model_dump() for turn in request.history]
+    while turns and sum(len(turn["content"]) for turn in turns) > _MAX_HISTORY_CHARACTERS:
+        turns.pop(0)
+    while turns and turns[0]["role"] != "user":
+        turns.pop(0)
+    return to_model_messages(turns)
+
+
 def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoachResponse:
-    if output.mode == "chat":
-        return CommanderCoachResponse(mode="chat", reply=output.reply)
     existing = {card.name for card in deps.deck.cards}
     cuts = [cut for cut in output.cuts if cut.card_name in existing]
     recommendations = [
@@ -303,20 +341,26 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         for item in output.recommendations
         if item.scryfall_id in deps.retrieved
     ]
+    options = [
+        ReplacementOption(
+            card=candidate.card,
+            reason=item.reason,
+            role_match=item.role_match,
+            tradeoff=item.tradeoff,
+        )
+        for item, candidate in recommendations
+    ]
+    if output.mode == "chat":
+        return CommanderCoachResponse(
+            mode="chat",
+            reply=output.reply,
+            recommendations=options,
+        )
     if output.mode == "replacement":
         target = _deck_card_name(output.target_card_name, existing)
         keep_reason = output.keep_reason.strip() if output.keep_reason else None
         if target is None or (not recommendations and not keep_reason):
             return CommanderCoachResponse(mode="chat", reply=output.reply)
-        options = [
-            ReplacementOption(
-                card=candidate.card,
-                reason=item.reason,
-                role_match=item.role_match,
-                tradeoff=item.tradeoff,
-            )
-            for item, candidate in recommendations
-        ]
         replacement = TargetedReplacementResponse(
             target_card_name=target,
             summary=output.reply,
@@ -328,6 +372,7 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         return CommanderCoachResponse(
             mode="replacement",
             reply=output.reply,
+            recommendations=options,
             replacement=replacement,
         )
     if not recommendations and not cuts:
@@ -356,7 +401,12 @@ def _to_response(output: AssistantAnswer, deps: AssistantDeps) -> CommanderCoach
         swaps=swaps,
         tool_call_count=deps.tool_calls,
     )
-    return CommanderCoachResponse(mode="doctor", reply=output.reply, doctor=doctor)
+    return CommanderCoachResponse(
+        mode="doctor",
+        reply=output.reply,
+        recommendations=options,
+        doctor=doctor,
+    )
 
 
 def _deck_card_name(target: str | None, existing: set[str]) -> str | None:

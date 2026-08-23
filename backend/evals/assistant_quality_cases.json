@@ -1,0 +1,118 @@
+[
+  {
+    "id": "camellia-food-win-conditions",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "What win conditions should I use if I want Camellia to stay Food-focused?",
+    "memory": "Keep the deck Food-first rather than generic Squirrel tribal.",
+    "expected_tools": ["search_themes", "search_cards"],
+    "required_phrases": ["Food"],
+    "forbidden_phrases": ["generic Squirrel tribal"],
+    "rubric": ["deck_awareness", "grounding", "correctness", "actionability"]
+  },
+  {
+    "id": "camellia-food-draw-follow-up",
+    "deck_fixture": "camellia_food",
+    "history": [
+      {"role": "user", "content": "Keep this deck Food-first."},
+      {"role": "assistant", "content": "I will prioritize Food engines over generic tribal cards."}
+    ],
+    "message": "What should I add for card draw?",
+    "memory": "",
+    "expected_tools": ["search_cards"],
+    "required_phrases": ["Food"],
+    "forbidden_phrases": ["I need to know your commander"],
+    "rubric": ["continuity", "deck_awareness", "prioritization", "actionability"]
+  },
+  {
+    "id": "avoid-existing-card",
+    "deck_fixture": "camellia_food_with_skullclamp",
+    "history": [],
+    "message": "Recommend three draw additions.",
+    "memory": "",
+    "expected_tools": ["search_cards"],
+    "required_phrases": ["draw"],
+    "forbidden_phrases": ["Add Skullclamp"],
+    "rubric": ["deck_awareness", "grounding", "actionability"]
+  },
+  {
+    "id": "targeted-replacement",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "What should replace Weak Value Card?",
+    "memory": "",
+    "expected_tools": ["inspect_deck_cards", "search_cards"],
+    "required_phrases": ["Weak Value Card"],
+    "forbidden_phrases": ["not in your deck"],
+    "rubric": ["deck_awareness", "grounding", "tradeoffs", "actionability"]
+  },
+  {
+    "id": "mana-base-diagnosis",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "Is my mana base balanced for Camellia?",
+    "memory": "",
+    "expected_tools": ["analyze_mana_base"],
+    "required_phrases": ["source"],
+    "forbidden_phrases": ["without seeing your lands"],
+    "rubric": ["deck_awareness", "grounding", "correctness"]
+  },
+  {
+    "id": "memory-budget-limit",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "Recommend Food payoffs.",
+    "memory": "Keep individual additions under EUR 5.",
+    "expected_tools": ["search_cards"],
+    "required_phrases": ["budget"],
+    "forbidden_phrases": ["Craterhoof Behemoth"],
+    "rubric": ["preference_use", "grounding", "actionability"]
+  },
+  {
+    "id": "no-infinite-combos",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "How should this deck close games?",
+    "memory": "Do not recommend infinite combos.",
+    "expected_tools": ["search_cards"],
+    "required_phrases": ["combat"],
+    "forbidden_phrases": ["infinite loop"],
+    "rubric": ["preference_use", "deck_awareness", "actionability"]
+  },
+  {
+    "id": "camellia-altar-invalid-two-card-loop",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "Does Camellia plus Ashnod's Altar go infinite by itself?",
+    "memory": "",
+    "expected_tools": ["inspect_deck_cards", "search_cards"],
+    "required_phrases": ["Peregrin Took"],
+    "forbidden_phrases": [
+      "Camellia + Ashnod's Altar is infinite",
+      "replacement Food"
+    ],
+    "rubric": ["card_text_correctness", "confidence_calibration", "correctness"]
+  },
+  {
+    "id": "ambiguous-theme",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "Find cards for my value theme.",
+    "memory": "",
+    "expected_tools": ["search_themes"],
+    "required_phrases": ["which"],
+    "forbidden_phrases": ["Here are eight cards"],
+    "rubric": ["clarification", "confidence_calibration"]
+  },
+  {
+    "id": "ungrounded-recommendation",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "Recommend one unusual Food payoff.",
+    "memory": "",
+    "expected_tools": ["search_cards"],
+    "required_phrases": ["Food"],
+    "forbidden_phrases": ["Imaginary Food Engine"],
+    "rubric": ["grounding", "correctness"]
+  }
+]

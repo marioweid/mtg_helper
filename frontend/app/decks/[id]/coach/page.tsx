@@ -10,12 +10,14 @@ import {
   INITIAL_ASSISTANT_PROMPT,
 } from "@/components/assistant-starter-prompts";
 import { CoachDeckWorkspace } from "@/components/coach-deck-workspace";
+import { CoachRecommendations } from "@/components/coach-recommendations";
 import { ManaCost } from "@/components/mana-cost";
 import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { DeckDetailSkeleton } from "@/components/skeleton";
 import { useToast } from "@/components/toast";
 import { apiClient, ApiError } from "@/lib/api";
 import { STAGE_DEFAULTS } from "@/lib/constants";
+import { buildCoachHistory } from "@/lib/coach-conversation";
 import type {
   AnalysisCardHit,
   CommanderCoachProgressEvent,
@@ -340,7 +342,8 @@ function AssistantMessage({
   if (!doctor) {
     return (
       <div className="max-w-3xl rounded-xl border border-white/10 bg-white/5 p-4">
-        {result.reply}
+        <p>{result.reply}</p>
+        <CoachRecommendations recommendations={result.recommendations} busy={busy} onAdd={onAdd} />
       </div>
     );
   }
@@ -485,17 +488,6 @@ export default function CoachPage() {
     };
   }, []);
 
-  function transcriptWith(next: string): string {
-    const previous = messages
-      .slice(-6)
-      .map((message) => {
-        if (message.role === "user") return `User: ${message.content}`;
-        return `Assistant: ${message.result.reply}`;
-      })
-      .join("\n");
-    return previous ? `${previous}\nUser: ${next}` : next;
-  }
-
   async function runCoach() {
     const content = prompt.trim();
     if (!content) return;
@@ -507,7 +499,13 @@ export default function CoachPage() {
     try {
       const started = await apiClient.startCoachDeck(deckId, {
         mode: "auto",
-        message: transcriptWith(content),
+        message: content,
+        history: buildCoachHistory(
+          messages.map((message) => ({
+            role: message.role,
+            content: message.role === "user" ? message.content : message.result.reply,
+          })),
+        ),
       });
       const events = new EventSource(`/api/v1/decks/${deckId}/coach/${started.job_id}/stream`);
       events.addEventListener("progress", (event) => {

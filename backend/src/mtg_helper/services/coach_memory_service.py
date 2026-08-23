@@ -118,13 +118,6 @@ def remove_memory_by_query(notes: str, query: str) -> tuple[str, list[str]]:
     return _remove_matching_lines(notes, query)
 
 
-def _latest_user_text(message: str) -> str:
-    marker = "\nUser:"
-    if marker in message:
-        return message.rsplit(marker, maxsplit=1)[-1].strip()
-    return message.strip()
-
-
 def _is_show_intent(text: str) -> bool:
     lower = text.lower()
     return "memory" in lower and any(
@@ -148,51 +141,13 @@ def _clean_note(note: str) -> str | None:
     return cleaned or None
 
 
-def _looks_like_memory_note(text: str) -> bool:
-    lower = text.lower().strip()
-    if lower.endswith("?"):
-        return False
-    direct_prefixes = (
-        "avoid ",
-        "don't suggest ",
-        "dont suggest ",
-        "do not suggest ",
-        "i dislike ",
-        "i don't like ",
-        "i dont like ",
-        "i hate ",
-        "i like ",
-        "i prefer ",
-        "i want ",
-        "keep ",
-        "never suggest ",
-        "please don't suggest ",
-        "please dont suggest ",
-        "please avoid ",
-        "preserve ",
-        "protect ",
-    )
-    if lower.startswith(direct_prefixes):
-        return True
-    if lower.startswith(("for ", "please for ")):
-        return any(
-            marker in lower
-            for marker in (" i want ", " cares about ", " counts ", " means ", " avoid ")
-        )
-    return " cares about " in lower or " should count as " in lower
-
-
-def _extract_add_note(text: str, full_message: str) -> str | None:
+def _extract_add_note(text: str) -> str | None:
     lower = text.lower()
     phrases = ("remember that", "remember", "add to memory", "save to memory", "note that")
     for phrase in phrases:
-        if phrase in lower:
-            start = lower.index(phrase) + len(phrase)
+        if lower.startswith(phrase):
+            start = len(phrase)
             return _clean_note(text[start:])
-    if lower.startswith(("add ", "save ")) and "memory" in full_message.lower():
-        return _clean_note(text.split(maxsplit=1)[1])
-    if _looks_like_memory_note(text):
-        return _clean_note(text)
     return None
 
 
@@ -216,12 +171,11 @@ def _remove_matching_lines(notes: str, text: str) -> tuple[str, list[str]]:
     return "\n".join(kept).strip(), removed
 
 
-def _is_remove_intent(text: str, full_message: str) -> bool:
+def _is_remove_intent(text: str) -> bool:
     lower = text.lower()
-    conversation_mentions_memory = "memory" in full_message.lower()
-    if "forget" in lower or "delete" in lower or "memory" in lower:
-        return True
-    return "remove" in lower and (conversation_mentions_memory or "thing" in lower)
+    return lower.startswith("forget") or (
+        "memory" in lower and any(word in lower for word in ("delete", "remove"))
+    )
 
 
 async def handle_memory_message(
@@ -231,7 +185,7 @@ async def handle_memory_message(
     request: CommanderCoachRequest,
 ) -> CommanderCoachResponse | None:
     """Handle conversational memory read/add/remove commands, if present."""
-    text = _latest_user_text(request.message)
+    text = request.message.strip()
     memory = await get_memory(pool, deck_id, account_id)
 
     if _is_show_intent(text):
@@ -241,7 +195,7 @@ async def handle_memory_message(
             reply = "I don't have any memory notes for this deck yet."
         return CommanderCoachResponse(mode="memory", reply=reply, coach_memory=memory)
 
-    note = _extract_add_note(text, request.message)
+    note = _extract_add_note(text)
     if note is not None:
         current = memory.notes.strip()
         updated_notes = note if not current else f"{current}\n{note}"
@@ -255,7 +209,7 @@ async def handle_memory_message(
             memory_updated=True,
         )
 
-    if _is_remove_intent(text, request.message):
+    if _is_remove_intent(text):
         updated_notes, removed = _remove_matching_lines(memory.notes, text)
         if not removed:
             return CommanderCoachResponse(

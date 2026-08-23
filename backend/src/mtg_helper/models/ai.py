@@ -445,10 +445,18 @@ CoachResolvedMode = Literal[
 ]
 
 
+class CoachHistoryTurn(BaseModel):
+    """One completed visible turn supplied as recent conversation context."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class CommanderCoachRequest(BaseModel):
     """Request body for the Commander Coach orchestrator."""
 
-    message: str = Field(default="Doctor this deck", max_length=4000)
+    message: str = Field(default="Doctor this deck", min_length=1, max_length=4000)
+    history: list[CoachHistoryTurn] = Field(default_factory=list, max_length=12)
     mode: CoachMode = "auto"
     coach_memory_notes: str | None = Field(default=None, max_length=8000)
 
@@ -474,6 +482,7 @@ class CommanderCoachResponse(BaseModel):
 
     mode: CoachResolvedMode
     reply: str
+    recommendations: list[ReplacementOption] = Field(default_factory=list, max_length=8)
     doctor: DeckDoctorResponse | None = None
     replacement: TargetedReplacementResponse | None = None
     coach_memory: CoachMemoryResponse | None = None

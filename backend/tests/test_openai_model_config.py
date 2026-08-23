@@ -40,6 +40,17 @@ def test_openai_settings_are_private_and_low_verbosity() -> None:
     }
 
 
+def test_openai_settings_allow_workflow_specific_verbosity() -> None:
+    model_settings = openai_model_settings(
+        max_tokens=4096,
+        reasoning="low",
+        verbosity="medium",
+    )
+
+    assert model_settings["max_tokens"] == 4096
+    assert model_settings["openai_text_verbosity"] == "medium"
+
+
 def test_factory_uses_fixed_openai_responses_model() -> None:
     model = make_openai_model()
 
@@ -49,19 +60,20 @@ def test_factory_uses_fixed_openai_responses_model() -> None:
 
 
 @pytest.mark.parametrize(
-    ("builder", "reasoning"),
+    ("builder", "reasoning", "verbosity"),
     [
-        (build_describe, "minimal"),
-        (build_extract, "minimal"),
-        (build_commander_suggestor, "low"),
-        (build_mtg_assistant, "low"),
-        (build_deck_doctor, "low"),
-        (build_simulation_analysis, "low"),
+        (build_describe, "minimal", "low"),
+        (build_extract, "minimal", "low"),
+        (build_commander_suggestor, "low", "low"),
+        (build_mtg_assistant, "low", "medium"),
+        (build_deck_doctor, "low", "low"),
+        (build_simulation_analysis, "low", "low"),
     ],
 )
 def test_agents_use_openai_responses_with_expected_reasoning(
     builder: Callable[[], Agent],
     reasoning: str,
+    verbosity: str,
 ) -> None:
     agent = builder()
 
@@ -70,5 +82,14 @@ def test_agents_use_openai_responses_with_expected_reasoning(
     assert isinstance(agent.model_settings, dict)
     model_settings = cast(OpenAIResponsesModelSettings, agent.model_settings)
     assert model_settings["openai_store"] is False
-    assert model_settings["openai_text_verbosity"] == "low"
+    assert model_settings["openai_text_verbosity"] == verbosity
     assert model_settings["openai_reasoning_effort"] == reasoning
+
+
+def test_mtg_assistant_uses_quality_output_settings() -> None:
+    agent = build_mtg_assistant()
+
+    assert isinstance(agent.model_settings, dict)
+    model_settings = cast(OpenAIResponsesModelSettings, agent.model_settings)
+    assert model_settings["max_tokens"] == 4096
+    assert model_settings["openai_text_verbosity"] == "medium"
