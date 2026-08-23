@@ -114,5 +114,32 @@
     "required_phrases": ["Food"],
     "forbidden_phrases": ["Imaginary Food Engine"],
     "rubric": ["grounding", "correctness"]
+  },
+  {
+    "id": "aristocrats-conversion-cuts-and-adds",
+    "deck_fixture": "moxfield_token_shell",
+    "history": [],
+    "message": "What do I need to cut and what to add in this deck to make it an aristocrats deck?",
+    "memory": "",
+    "expected_tools": ["analyze_deck", "find_cards"],
+    "required_phrases": ["aristocrats", "cut"],
+    "forbidden_phrases": [
+      "add Craterhoof Behemoth",
+      "keep Craterhoof Behemoth",
+      "add Triumph of the Horde",
+      "add Banner of Kinship"
+    ],
+    "rubric": ["deck_awareness", "grounding", "prioritization", "actionability"]
+  },
+  {
+    "id": "bluefarm-bracket-3-conversion",
+    "deck_fixture": "moxfield_bluefarm_cedh",
+    "history": [],
+    "message": "How can I make this cEDH deck bracket 3 bluefarm?",
+    "memory": "",
+    "expected_tools": ["check_bracket", "find_cards"],
+    "required_phrases": ["game changers", "3"],
+    "forbidden_phrases": ["keep more than 3", "keep more than three"],
+    "rubric": ["deck_awareness", "grounding", "correctness", "actionability"]
   }
 ]

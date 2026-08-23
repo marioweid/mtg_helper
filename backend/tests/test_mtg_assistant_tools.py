@@ -168,3 +168,69 @@ def test_bracket_check_is_deterministic_for_game_changers(bracket: int) -> None:
     assert not report.acceptable
     assert report.ruleset == "project-commander-brackets-v1"
     assert any("Game Changers" in warning for warning in report.warnings)
+
+
+def test_bracket_report_lists_game_changers_and_limit() -> None:
+    cards = [
+        _card("Mana Crypt", game_changer=True),
+        _card("Rhystic Study", game_changer=True),
+        _card("Jeweled Lotus", game_changer=True),
+        _card("Dockside Extortionist", game_changer=True),
+    ]
+
+    report = check_bracket(_deck(cards, bracket=3))
+
+    assert report.game_changers == [
+        "Dockside Extortionist",
+        "Jeweled Lotus",
+        "Mana Crypt",
+        "Rhystic Study",
+    ]
+    assert report.game_changer_limit == 3
+    assert report.game_changer_overage == 1
+    assert not report.acceptable
+
+
+def test_bracket_report_allow_three_game_changers_at_bracket_three() -> None:
+    cards = [
+        _card("Mana Crypt", game_changer=True),
+        _card("Rhystic Study", game_changer=True),
+        _card("Dockside Extortionist", game_changer=True),
+    ]
+
+    report = check_bracket(_deck(cards, bracket=3))
+
+    assert report.acceptable
+    assert report.game_changer_overage == 0
+    assert report.game_changers == ["Dockside Extortionist", "Mana Crypt", "Rhystic Study"]
+
+
+def test_bracket_report_unlimited_at_bracket_four() -> None:
+    cards = [
+        _card("Mana Crypt", game_changer=True),
+        _card("Rhystic Study", game_changer=True),
+        _card("Jeweled Lotus", game_changer=True),
+        _card("Dockside Extortionist", game_changer=True),
+    ]
+
+    report = check_bracket(_deck(cards, bracket=4))
+
+    assert report.acceptable
+    assert report.game_changer_limit is None
+    assert report.game_changer_overage == 0
+
+
+def test_bracket_report_target_bracket_overrides_declared() -> None:
+    cards = [
+        _card("Mana Crypt", game_changer=True),
+        _card("Rhystic Study", game_changer=True),
+        _card("Jeweled Lotus", game_changer=True),
+        _card("Dockside Extortionist", game_changer=True),
+    ]
+
+    report = check_bracket(_deck(cards, bracket=5), target_bracket=3)
+
+    assert report.declared_bracket == 3
+    assert report.game_changer_limit == 3
+    assert report.game_changer_overage == 1
+    assert not report.acceptable

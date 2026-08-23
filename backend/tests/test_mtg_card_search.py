@@ -166,6 +166,123 @@ async def test_search_enforces_exact_mana_symbol_and_combined_filters(
     assert all("mana_cost_symbols" in candidate.matched_filters for candidate in result.candidates)
 
 
+async def _insert_game_changer(pool: asyncpg.Pool) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO cards (
+                scryfall_id, name, mana_cost, cmc, type_line, oracle_text,
+                color_identity, colors, card_types, subtypes, tags, legalities,
+                prices, edhrec_rank, is_canonical, game_changer
+            )
+            VALUES (
+                $1, 'Jeweled Lotus Search Test', '{0}', 0, 'Artifact',
+                '{T}, Sacrifice Jeweled Lotus Search Test: Add three mana of any one color.',
+                ARRAY[]::text[], ARRAY[]::text[], ARRAY['Artifact'], ARRAY[]::text[],
+                ARRAY['ramp'], '{"commander":"legal"}', '{"eur":"60.00"}', 10, true, true
+            )
+            """,
+            uuid4(),
+        )
+
+
+async def test_search_excludes_game_changers_when_requested(db_pool: asyncpg.Pool) -> None:
+    await _insert_search_cards(db_pool)
+    await _insert_game_changer(db_pool)
+    deck = await _deck(db_pool)
+
+    without_filter = await search_cards(
+        db_pool,
+        deck,
+        AssistantCardSearchInput(oracle_text_all=["add"]),
+    )
+    assert "Jeweled Lotus Search Test" in {c.card.name for c in without_filter.candidates}
+
+    result = await search_cards(
+        db_pool,
+        deck,
+        AssistantCardSearchInput(exclude_game_changers=True, oracle_text_all=["add"]),
+    )
+
+    assert "Jeweled Lotus Search Test" not in {c.card.name for c in result.candidates}
+    assert result.candidates
+
+
+async def _insert_aristocrats_group(pool: asyncpg.Pool, cards: dict[str, UUID]) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO moxfield_hubs (id, slug, tag, name, description)
+            VALUES (9002, 'aristocrats', 'aristocrats', 'Aristocrats',
+                    'Sacrifice creatures and tokens for death triggers and drain payoffs.')
+            """
+        )
+        await conn.execute(
+            """
+            INSERT INTO theme_groups (slug, label, description, aliases)
+            VALUES ('aristocrats', 'Aristocrats', 'Sacrifice for death triggers.',
+                    ARRAY['sacrifice'])
+            """
+        )
+        await conn.execute(
+            """
+            INSERT INTO theme_group_members (group_id, source, moxfield_hub_id)
+            SELECT g.id, 'moxfield', 9002 FROM theme_groups g WHERE g.slug = 'aristocrats'
+            """
+        )
+        await conn.execute(
+            """
+            INSERT INTO moxfield_hub_card_stats (
+                hub_id, card_id, hub_deck_count, baseline_deck_count,
+                hub_deck_pct, baseline_deck_pct, synergy_score,
+                hub_sample_size, baseline_sample_size
+            ) VALUES (9002, $1, 20, 100, 0.5, 0.1, 0.9, 40, 1000)
+            """,
+            cards["Hydra Search Test"],
+        )
+
+
+async def test_theme_hint_expands_group_to_member_hub_stats(db_pool: asyncpg.Pool) -> None:
+    cards = await _insert_search_cards(db_pool)
+    await _insert_aristocrats_group(db_pool, cards)
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(theme_hints=["aristocrats"], mana_cost_symbols=["{X}"]),
+    )
+
+    assert result.evidence_source is CardEvidenceSource.HUB_STATS
+    assert result.resolved_theme_tags == ["moxfield:aristocrats"]
+    assert result.candidates[0].card.name == "Hydra Search Test"
+    assert result.candidates[0].matched_theme_tags == ["moxfield:aristocrats"]
+
+
+async def test_theme_hint_without_stats_uses_local_tag_fallback(db_pool: asyncpg.Pool) -> None:
+    cards = await _insert_search_cards(db_pool)
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO moxfield_hubs (id, slug, tag, name)
+            VALUES (9003, 'aristocrats', 'aristocrats', 'Aristocrats')
+            """
+        )
+        await conn.execute(
+            "UPDATE cards SET tags = tags || ARRAY['aristocrats'] WHERE id = $1",
+            cards["Hydra Search Test"],
+        )
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(theme_hints=["aristocrats"]),
+    )
+
+    assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
+    assert result.candidates
+    assert all(candidate.card.name == "Hydra Search Test" for candidate in result.candidates)
+
+
 async def _insert_x_theme(pool: asyncpg.Pool, cards: dict[str, UUID]) -> None:
     async with pool.acquire() as conn:
         await conn.execute(

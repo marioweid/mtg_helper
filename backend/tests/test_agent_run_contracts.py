@@ -256,7 +256,7 @@ _CASES = [
         "get_agent",
         _invoke_assistant,
         mtg_assistant.AssistantAnswer(reply="done"),
-        _limits(8, 6, 64_000, 8_000),
+        _limits(12, 10, 128_000, 8_000),
         "mtg_assistant",
         "answer",
         "fallback",

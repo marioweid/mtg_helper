@@ -5,6 +5,8 @@ export const ASSISTANT_STARTER_PROMPTS = [
   "Suggest upgrades for my main theme.",
   "What should I replace this card with?",
   "Check my mana, draw, and interaction balance.",
+  "Convert this deck into an aristocrats deck — what should I cut and add?",
+  "Make this deck bracket 3 legal — which Game Changers should go?",
 ] as const;
 
 export function AssistantStarterPrompts({ onSelect }: { onSelect: (prompt: string) => void }) {

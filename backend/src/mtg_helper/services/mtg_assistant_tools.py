@@ -90,12 +90,18 @@ class LegalityReport(BaseModel):
 
 
 class BracketReport(BaseModel):
-    """Current deterministic bracket evaluation."""
+    """Current deterministic bracket evaluation with per-rule evidence."""
 
     declared_bracket: int
     acceptable: bool
     ruleset: str = "project-commander-brackets-v1"
     warnings: list[str] = Field(default_factory=list)
+    game_changers: list[str] = Field(default_factory=list)
+    game_changer_limit: int | None = None
+    game_changer_overage: int = 0
+    mass_land_destruction: list[str] = Field(default_factory=list)
+    fast_mana: list[str] = Field(default_factory=list)
+    infinite_combo_pairs: list[list[str]] = Field(default_factory=list)
 
 
 async def search_themes(
@@ -312,13 +318,25 @@ async def check_legality(
     return LegalityReport(legal=not issues, issues=issues)
 
 
-def check_bracket(deck: DeckDetailResponse) -> BracketReport:
-    """Expose current project bracket checks as evidence, never model judgment."""
-    report = bracket_service.validate_bracket(deck, combos=None)
+def check_bracket(deck: DeckDetailResponse, target_bracket: int | None = None) -> BracketReport:
+    """Expose current project bracket checks as evidence, never model judgment.
+
+    Args:
+        deck: The deck to evaluate.
+        target_bracket: Optional target bracket to evaluate against (used for
+            conversion questions). Defaults to the deck's declared bracket.
+    """
+    evaluation = bracket_service.evaluate_bracket(deck, combos=None, target_bracket=target_bracket)
     return BracketReport(
-        declared_bracket=report.declared_bracket,
-        acceptable=report.legal,
-        warnings=[violation.message for violation in report.violations],
+        declared_bracket=evaluation.declared_bracket,
+        acceptable=evaluation.acceptable,
+        warnings=[violation.message for violation in evaluation.violations],
+        game_changers=evaluation.game_changers,
+        game_changer_limit=evaluation.game_changer_limit,
+        game_changer_overage=evaluation.game_changer_overage,
+        mass_land_destruction=evaluation.mass_land_destruction,
+        fast_mana=evaluation.fast_mana,
+        infinite_combo_pairs=evaluation.infinite_combo_pairs,
     )
 
 

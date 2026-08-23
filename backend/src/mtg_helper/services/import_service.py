@@ -278,6 +278,8 @@ async def import_parsed_entries(
     )
 
     commander_identity = set(commander_card.color_identity)
+    if partner_card:
+        commander_identity |= set(partner_card.color_identity)
     resolved_cards, unresolved, color_violations = await _resolve_non_commanders(
         pool, non_commanders, commander_identity
     )

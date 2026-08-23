@@ -67,6 +67,11 @@ CREATE INDEX IF NOT EXISTS idx_cards_cmc ON cards (cmc);
 -- Tag-based filtering (hybrid retrieval)
 CREATE INDEX IF NOT EXISTS idx_cards_tags ON cards USING GIN (tags);
 
+-- Combined tag expression used by the assistant's theme fallback/supplement
+-- and by required_tags / excluded_tags filters.
+CREATE INDEX IF NOT EXISTS idx_cards_all_tags_gin
+    ON cards USING GIN ((tags || hub_tags || mtgjson_tags));
+
 -- Mechanical trait filtering (etb, activated, evasion)
 CREATE INDEX IF NOT EXISTS idx_cards_traits ON cards USING GIN (traits);
 

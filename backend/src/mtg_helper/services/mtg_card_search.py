@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from mtg_helper.models.ai import CardSearchHit
 from mtg_helper.models.decks import DeckDetailResponse
 
-_MAX_RESULTS = 12
+_MAX_RESULTS = 20
 _SEARCH_POOL_SIZE = 250
 _MANA_SYMBOL_RE = re.compile(
     r"^\{(?:[0-9]+|[WUBRGCSXYZ]|[WUBRG]/[WUBRGP]|2/[WUBRG])\}$",
@@ -94,6 +94,10 @@ class AssistantCardSearchInput(BaseModel):
         max_length=12,
         description="Local hub or MTGJSON tags that the card must not have.",
     )
+    exclude_game_changers: bool = Field(
+        default=False,
+        description="Exclude Game Changer cards so additions stay bracket-3 legal.",
+    )
     min_price_eur_cents: int | None = Field(
         default=None, ge=0, le=1_000_000, description="Minimum known EUR price in cents."
     )
@@ -107,7 +111,7 @@ class AssistantCardSearchInput(BaseModel):
         default=CardSearchRanking.THEME_SYNERGY,
         description="Deterministic primary ordering for matching cards.",
     )
-    limit: int = Field(default=8, ge=1, le=_MAX_RESULTS, description="Maximum returned cards.")
+    limit: int = Field(default=12, ge=1, le=_MAX_RESULTS, description="Maximum returned cards.")
 
     @model_validator(mode="before")
     @classmethod
@@ -226,13 +230,26 @@ async def search_cards(
         source = CardEvidenceSource.GLOBAL_FALLBACK
     else:
         source = CardEvidenceSource.GLOBAL_SEARCH
-    candidates = await _query_candidates(pool, deck, filters, source, evidence)
+    fallback_tags = _fallback_tags(resolved_tags) if requested_theme else []
+    candidates, actual_source = await _query_candidates(
+        pool,
+        deck,
+        filters,
+        source,
+        evidence,
+        fallback_tags=fallback_tags,
+    )
     return CardSearchResult(
-        evidence_source=source,
+        evidence_source=actual_source,
         resolved_theme_tags=resolved_tags,
         candidates=candidates,
         message=None,
     )
+
+
+def _fallback_tags(resolved_tags: list[str]) -> list[str]:
+    """Strip source qualifiers for local-tag fallback when hub stats are absent."""
+    return sorted({tag.split(":", maxsplit=1)[-1] for tag in resolved_tags})
 
 
 async def _resolve_discovery_themes(
@@ -247,9 +264,12 @@ async def _resolve_discovery_themes(
     queries.extend(
         word for hint in filters.theme_hints for word in _normalize(hint).split() if len(word) >= 4
     )
+    hint_tags: list[str] = []
     for query in dict.fromkeys(queries):
         matches = await search_themes(pool, query)
-        resolved.extend(match.tag for match in matches[:2])
+        hint_tags.extend(match.tag for match in matches[:2])
+    if hint_tags:
+        resolved.extend(await _resolve_theme_tags(pool, list(dict.fromkeys(hint_tags))))
     return list(dict.fromkeys(resolved))
 
 
@@ -279,20 +299,60 @@ async def _query_candidates(
     filters: AssistantCardSearchInput,
     source: CardEvidenceSource,
     evidence: dict[UUID, _ThemeEvidence],
-) -> list[CardSearchCandidate]:
+    *,
+    fallback_tags: list[str] | None = None,
+) -> tuple[list[CardSearchCandidate], CardEvidenceSource]:
     hub_ids = sorted(evidence, key=lambda card_id: evidence[card_id].score, reverse=True)
-    where, args = _build_filters(deck, filters)
+    rows = await _fetch_candidates(pool, deck, filters, hub_ids, [])
+    candidates = [_candidate(row, deck, filters, source, evidence) for row in rows]
+    if not candidates and hub_ids:
+        # Automatic global fallback: identical filters without theme evidence.
+        rows = await _fetch_candidates(pool, deck, filters, [], [])
+        candidates = [
+            _candidate(row, deck, filters, CardEvidenceSource.GLOBAL_FALLBACK, {}) for row in rows
+        ]
+        return candidates[: filters.limit], CardEvidenceSource.GLOBAL_FALLBACK
+    if fallback_tags and not hub_ids:
+        # Local-tag fallback: no hub evidence, restrict to locally tagged theme cards.
+        rows = await _fetch_candidates(pool, deck, filters, [], fallback_tags)
+        candidates = [
+            _candidate(row, deck, filters, CardEvidenceSource.GLOBAL_FALLBACK, {}) for row in rows
+        ]
+        return candidates[: filters.limit], CardEvidenceSource.GLOBAL_FALLBACK
+    if fallback_tags:
+        # Theme-text supplement: locally tagged theme cards that the hub sample
+        # missed (e.g. budget or casual payoffs), ranked after evidence cards.
+        supplement = await _fetch_candidates(pool, deck, filters, [], fallback_tags)
+        seen_ids = {row["id"] for row in rows}
+        candidates.extend(
+            _candidate(row, deck, filters, source, {})
+            for row in supplement
+            if row["id"] not in seen_ids
+        )
+    return candidates[: filters.limit], source
+
+
+async def _fetch_candidates(
+    pool: asyncpg.Pool,
+    deck: DeckDetailResponse,
+    filters: AssistantCardSearchInput,
+    hub_ids: list[UUID],
+    fallback_tags: list[str],
+) -> list[asyncpg.Record]:
+    where, args = _build_filters(deck, filters, fallback_tags=fallback_tags)
+    if hub_ids:
+        _add_filter(where, args, "id = ANY($N::uuid[])", hub_ids)
     order_by = _build_order(filters.ranking, deck, hub_ids, args)
     sql = _CARD_SELECT + " WHERE " + " AND ".join(where) + order_by
     async with pool.acquire() as conn:
-        rows = await conn.fetch(sql, *args)
-    candidates = [_candidate(row, deck, filters, source, evidence) for row in rows]
-    return candidates[: filters.limit]
+        return await conn.fetch(sql, *args)
 
 
 def _build_filters(
     deck: DeckDetailResponse,
     filters: AssistantCardSearchInput,
+    *,
+    fallback_tags: list[str] | None = None,
 ) -> tuple[list[str], list[object]]:
     where = [
         "is_canonical",
@@ -305,6 +365,8 @@ def _build_filters(
     args: list[object] = [list(deck.commander_color_identity)]
     if filters.exclude_deck_cards:
         _add_filter(where, args, "NOT (id = ANY($N::uuid[]))", _deck_card_ids(deck))
+    if fallback_tags:
+        _add_filter(where, args, "(tags || hub_tags || mtgjson_tags) && $N::text[]", fallback_tags)
     _add_optional_filters(where, args, filters)
     return where, args
 
@@ -312,6 +374,8 @@ def _build_filters(
 def _add_optional_filters(
     where: list[str], args: list[object], filters: AssistantCardSearchInput
 ) -> None:
+    if filters.exclude_game_changers:
+        where.append("NOT game_changer")
     values: tuple[tuple[bool, str, object], ...] = (
         (
             bool(filters.mana_cost_symbols),
@@ -473,7 +537,14 @@ def _roles(blob: str) -> list[str]:
 
 def _matched_filter_names(filters: AssistantCardSearchInput) -> list[str]:
     payload = filters.model_dump()
-    ignored = {"theme_tags", "theme_hints", "exclude_deck_cards", "ranking", "limit"}
+    ignored = {
+        "theme_tags",
+        "theme_hints",
+        "exclude_deck_cards",
+        "exclude_game_changers",
+        "ranking",
+        "limit",
+    }
     return [
         name for name, value in payload.items() if name not in ignored and value not in (None, [])
     ]
