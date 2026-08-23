@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import asyncpg
 import pytest
 
 from mtg_helper.models.ai import CardSuggestion, ColorStatus, ManaBaseReport, ManaFixResponse
@@ -13,6 +14,7 @@ from mtg_helper.services.mtg_assistant_tools import (
     _structural_issues,
     _theme_match_score,
     check_bracket,
+    check_game_changers,
 )
 
 
@@ -234,3 +236,61 @@ def test_bracket_report_target_bracket_overrides_declared() -> None:
     assert report.game_changer_limit == 3
     assert report.game_changer_overage == 1
     assert not report.acceptable
+
+
+async def _flag_game_changer(pool: asyncpg.Pool, name: str) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE cards SET game_changer = true WHERE name = $1", name)
+
+
+async def test_check_game_changers_returns_deterministic_flags(db_pool: asyncpg.Pool) -> None:
+    await _flag_game_changer(db_pool, "Rhystic Study")
+
+    result = await check_game_changers(db_pool, ["Doubling Season", "Rhystic Study"])
+
+    assert result.ruleset == "project-commander-brackets-v1"
+    assert {item.name: item.is_game_changer for item in result.results} == {
+        "Doubling Season": False,
+        "Rhystic Study": True,
+    }
+    assert result.unknown_names == []
+
+
+async def test_check_game_changers_reports_unknown_names(db_pool: asyncpg.Pool) -> None:
+    result = await check_game_changers(db_pool, ["Doubling Season", "Not a Real Card"])
+
+    assert {item.name: item.is_game_changer for item in result.results} == {
+        "Doubling Season": False
+    }
+    assert result.unknown_names == ["Not a Real Card"]
+
+
+async def test_check_game_changers_matches_mdfc_front_face(db_pool: asyncpg.Pool) -> None:
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, oracle_text,
+                type_line, cmc, mana_cost, rarity, set_code, legalities,
+                power, toughness, colors, keywords, prices, is_canonical, game_changer)
+            VALUES ($1, $2, $3, ARRAY['B'], 'Tergrid text.', 'Legendary Creature', 4,
+                    '{2}{B}{B}', 'rare', 'khm', '{}', '4', '5', ARRAY['B'], ARRAY[]::text[],
+                    '{}', true, true)
+            """,
+            "8d7b8d2c-36f5-40e7-91de-9c8c1b44da67",
+            "8d7b8d2c-aaaa-40e7-91de-9c8c1b44da67",
+            "Tergrid, God of Fright // Tergrid's Lantern",
+        )
+
+    result = await check_game_changers(db_pool, ["Tergrid, God of Fright"])
+
+    assert len(result.results) == 1
+    assert result.results[0].name == "Tergrid, God of Fright // Tergrid's Lantern"
+    assert result.results[0].is_game_changer is True
+    assert result.unknown_names == []
+
+
+async def test_check_game_changers_rejects_too_many_names(db_pool: asyncpg.Pool) -> None:
+    names = [f"Card {i}" for i in range(11)]
+
+    with pytest.raises(ValueError, match="at most 10 names"):
+        await check_game_changers(db_pool, names)

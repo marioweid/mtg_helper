@@ -141,5 +141,16 @@
     "required_phrases": ["game changers", "3"],
     "forbidden_phrases": ["keep more than 3", "keep more than three"],
     "rubric": ["deck_awareness", "grounding", "correctness", "actionability"]
+  },
+  {
+    "id": "game-changer-status-verified",
+    "deck_fixture": "camellia_food",
+    "history": [],
+    "message": "Are Doubling Season and Parallel Lives Game Changers?",
+    "memory": "",
+    "expected_tools": ["check_game_changers"],
+    "required_phrases": ["no"],
+    "forbidden_phrases": ["yes", "they are game changers", "are game changers"],
+    "rubric": ["grounding", "correctness", "confidence_calibration"]
   }
 ]

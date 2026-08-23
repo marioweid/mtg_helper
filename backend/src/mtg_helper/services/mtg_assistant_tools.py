@@ -18,6 +18,7 @@ from mtg_helper.services.theme_service import score_themes
 
 _MAX_THEME_MATCHES = 5
 _MAX_CANDIDATES = 12
+_MAX_GAME_CHANGER_NAMES = 10
 _BASIC_LAND_TYPES = {"Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"}
 
 
@@ -102,6 +103,21 @@ class BracketReport(BaseModel):
     mass_land_destruction: list[str] = Field(default_factory=list)
     fast_mana: list[str] = Field(default_factory=list)
     infinite_combo_pairs: list[list[str]] = Field(default_factory=list)
+
+
+class GameChangerStatus(BaseModel):
+    """One named card's deterministic Game Changer status."""
+
+    name: str
+    is_game_changer: bool
+
+
+class GameChangerCheck(BaseModel):
+    """Deterministic Game Changer lookup for arbitrary card names."""
+
+    results: list[GameChangerStatus] = Field(default_factory=list)
+    unknown_names: list[str] = Field(default_factory=list)
+    ruleset: str = "project-commander-brackets-v1"
 
 
 async def search_themes(
@@ -338,6 +354,55 @@ def check_bracket(deck: DeckDetailResponse, target_bracket: int | None = None) -
         fast_mana=evaluation.fast_mana,
         infinite_combo_pairs=evaluation.infinite_combo_pairs,
     )
+
+
+async def check_game_changers(pool: asyncpg.Pool, names: list[str]) -> GameChangerCheck:
+    """Return deterministic Game Changer status for up to ten named cards.
+
+    Matches canonical card names case-insensitively, including the front face
+    of modal double-faced cards (e.g. ``Tergrid`` finds
+    ``Tergrid, God of Fright // Tergrid's Lantern``). Names with no match are
+    reported in ``unknown_names`` rather than guessed.
+
+    Args:
+        pool: Database pool for the card lookup.
+        names: Card names to check; at most ``_MAX_GAME_CHANGER_NAMES``.
+    """
+    if len(names) > _MAX_GAME_CHANGER_NAMES:
+        raise ValueError(f"check_game_changers accepts at most {_MAX_GAME_CHANGER_NAMES} names")
+    requested = [name.strip() for name in names if name and name.strip()]
+    if not requested:
+        return GameChangerCheck()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT name, game_changer
+            FROM cards
+            WHERE is_canonical
+              AND (
+                  lower(name) = ANY($1::text[])
+                  OR lower(split_part(name, ' // ', 1)) = ANY($1::text[])
+              )
+            """,
+            [name.casefold() for name in requested],
+        )
+    by_name: dict[str, asyncpg.Record] = {
+        row["name"].casefold().split(" // ", maxsplit=1)[0]: row for row in rows
+    }
+    results: list[GameChangerStatus] = []
+    unknown: list[str] = []
+    for name in requested:
+        row = by_name.get(name.casefold())
+        if row is None:
+            unknown.append(name)
+        else:
+            results.append(
+                GameChangerStatus(
+                    name=row["name"],
+                    is_game_changer=bool(row["game_changer"]),
+                )
+            )
+    return GameChangerCheck(results=results, unknown_names=unknown)
 
 
 def _theme_match_score(query: str, row: Mapping[str, object]) -> float:

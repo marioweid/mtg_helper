@@ -11,11 +11,11 @@ pytestmark = pytest.mark.no_db
 _CASES = Path(__file__).parents[1] / "evals" / "assistant_quality_cases.json"
 
 
-def test_quality_corpus_contains_twelve_unique_complete_cases() -> None:
+def test_quality_corpus_contains_thirteen_unique_complete_cases() -> None:
     cases = load_cases(_CASES)
 
-    assert len(cases) == 12
-    assert len({case.id for case in cases}) == 12
+    assert len(cases) == 13
+    assert len({case.id for case in cases}) == 13
     assert all(case.rubric for case in cases)
     assert all(case.required_phrases or case.forbidden_phrases for case in cases)
 
@@ -36,6 +36,7 @@ def test_quality_corpus_covers_required_behaviors() -> None:
         "ungrounded-recommendation",
         "aristocrats-conversion-cuts-and-adds",
         "bluefarm-bracket-3-conversion",
+        "game-changer-status-verified",
     }
 
 
