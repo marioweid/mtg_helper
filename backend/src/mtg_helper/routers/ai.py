@@ -286,6 +286,7 @@ async def coach_deck(
         request.app.state.db_pool,
         deck,
         body,
+        account_id=account.id,
     )
     return DataResponse(data=result)
 
@@ -307,6 +308,7 @@ async def _run_coach_job(
             deck,
             body,
             progress=progress,
+            account_id=job.account_id,
         )
         await coach_jobs.finish_ok(job, result)
     except Exception as exc:  # noqa: BLE001 - surface job failures to stream clients

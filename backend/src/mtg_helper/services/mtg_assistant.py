@@ -97,6 +97,13 @@ THEME CONVERSIONS (e.g. "make this an aristocrats deck")
   pool against the commander's plan and the deck's existing engines before choosing.
 - If the target theme is already in the deck's theme tags or cards, anchor recommendations to it.
 
+COLLECTION-ONLY REQUESTS (e.g. "add cards I own", "which of my cards can I add")
+- Call find_cards with collection_only=true so results are restricted to cards the user owns.
+  Each returned card includes owned_quantity - use it to say how many copies the user has and
+  whether a recommended card is a single copy or a spare.
+- If the search returns no candidates, the user likely does not own matching cards; say so and
+  offer to search without the collection restriction instead of inventing owned cards.
+
 BRACKET CONVERSIONS (e.g. "make this cEDH deck bracket 3")
 - Call check_bracket first, passing the target bracket (e.g. 3) so its
   game_changers, game_changer_limit, game_changer_overage, and mass_land_destruction
@@ -215,6 +222,7 @@ class AssistantDeps:
 
     pool: asyncpg.Pool
     deck: DeckDetailResponse
+    account_id: UUID | None = None
     retrieved: dict[UUID, CardSearchCandidate] = field(default_factory=dict)
     tool_calls: int = 0
 
@@ -254,14 +262,57 @@ async def find_cards(
     ctx: RunContext[AssistantDeps],
     filters: AssistantCardSearchInput,
 ) -> CardSearchResult:
-    """Find legal additions using optional theme evidence and automatic global fallback."""
+    """Find legal additions using optional theme evidence and automatic global fallback.
+
+    When ``filters.collection_only`` is set, results are restricted to cards the
+    account owns across its collections, and each candidate carries the owned
+    quantity so the assistant can say how many copies the user has.
+    """
     if not ctx.deps.allow_tool():
         return CardSearchResult(evidence_source="none", message="Tool-call budget exhausted.")
-    result = await search_cards_service(ctx.deps.pool, ctx.deps.deck, filters)
+    owned_card_ids = await _owned_card_ids(ctx.deps) if filters.collection_only else None
+    result = await search_cards_service(
+        ctx.deps.pool,
+        ctx.deps.deck,
+        filters,
+        owned_card_ids=owned_card_ids,
+    )
+    await _attach_owned_quantities(ctx.deps, result)
     for candidate in result.candidates:
         if candidate.card.scryfall_id is not None:
             ctx.deps.retrieved[candidate.card.scryfall_id] = candidate
     return result
+
+
+async def _owned_card_ids(deps: AssistantDeps) -> frozenset[UUID]:
+    """Return canonical card ids the account owns, or an empty set when unknown."""
+    if deps.account_id is None:
+        return frozenset()
+    from mtg_helper.services import collection_service
+
+    collections = await collection_service.list_collections(deps.pool, deps.account_id)
+    return await collection_service.get_owned_card_ids_for_collections(
+        deps.pool, [collection.id for collection in collections]
+    )
+
+
+async def _attach_owned_quantities(deps: AssistantDeps, result: CardSearchResult) -> None:
+    """Enrich collection-restricted candidates with the number of copies owned."""
+    if deps.account_id is None or not result.candidates:
+        return
+    scryfall_ids = [
+        candidate.card.scryfall_id
+        for candidate in result.candidates
+        if candidate.card.scryfall_id is not None
+    ]
+    if not scryfall_ids:
+        return
+    from mtg_helper.services import collection_service
+
+    quantities = await collection_service.owned_quantities(deps.pool, deps.account_id, scryfall_ids)
+    for candidate in result.candidates:
+        if candidate.card.scryfall_id is not None:
+            candidate.owned_quantity = quantities.get(candidate.card.scryfall_id, 0)
 
 
 async def inspect_deck_cards(
@@ -346,11 +397,21 @@ async def run_assistant(
     deck: DeckDetailResponse,
     request: CommanderCoachRequest,
     progress: ProgressCb | None = None,
+    *,
+    account_id: UUID | None = None,
 ) -> CommanderCoachResponse:
-    """Run one bounded assistant turn and return the legacy-compatible envelope."""
+    """Run one bounded assistant turn and return the legacy-compatible envelope.
+
+    Args:
+        pool: Database pool.
+        deck: The deck the assistant is coaching.
+        request: The user request with history and memory.
+        progress: Optional progress callback.
+        account_id: The owning account; enables collection-aware card search.
+    """
     if progress is not None:
         await progress("assistant_thinking", "MTG Assistant is selecting deterministic tools")
-    deps = AssistantDeps(pool=pool, deck=deck)
+    deps = AssistantDeps(pool=pool, deck=deck, account_id=account_id)
     payload = _prompt_payload(deck, request)
     history = _bounded_history(request)
     try:

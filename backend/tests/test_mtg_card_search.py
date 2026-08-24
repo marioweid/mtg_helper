@@ -373,3 +373,81 @@ async def test_natural_theme_hint_resolves_catalog_before_search(db_pool: asyncp
     assert result.evidence_source is CardEvidenceSource.HUB_STATS
     assert result.resolved_theme_tags == ["moxfield:x_spells"]
     assert [candidate.card.name for candidate in result.candidates] == ["Hydra Search Test"]
+
+
+async def test_search_collection_only_restricts_to_owned_cards(
+    db_pool: asyncpg.Pool,
+) -> None:
+    cards = await _insert_search_cards(db_pool)
+    owned = frozenset({cards["Hydra Search Test"]})
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(collection_only=True),
+        owned_card_ids=owned,
+    )
+
+    assert result.evidence_source is CardEvidenceSource.GLOBAL_SEARCH
+    assert [candidate.card.name for candidate in result.candidates] == ["Hydra Search Test"]
+
+
+async def test_search_collection_only_with_owned_unmatched_returns_empty(
+    db_pool: asyncpg.Pool,
+) -> None:
+    await _insert_search_cards(db_pool)
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(collection_only=True),
+        owned_card_ids=frozenset({uuid4()}),
+    )
+
+    assert result.candidates == []
+
+
+async def test_search_none_owned_ids_means_no_filter(
+    db_pool: asyncpg.Pool,
+) -> None:
+    """Service-level contract: ``owned_card_ids=None`` disables ownership filtering."""
+    await _insert_search_cards(db_pool)
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(collection_only=True),
+        owned_card_ids=None,
+    )
+
+    assert result.candidates
+    assert len(result.candidates) >= 2
+
+
+async def test_collection_only_tag_fallback_retries_without_tags(
+    db_pool: asyncpg.Pool,
+) -> None:
+    """Collection-only search with a theme tag must surface owned cards even
+    when none of them carry the tag (fallback retries without the tag filter)."""
+    cards = await _insert_search_cards(db_pool)
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO moxfield_hubs (id, slug, tag, name)
+            VALUES (9004, 'tokens', 'tokens', 'Tokens')
+            """
+        )
+    owned = frozenset({cards["Hydra Search Test"]})
+
+    result = await search_cards(
+        db_pool,
+        await _deck(db_pool),
+        AssistantCardSearchInput(
+            collection_only=True,
+            theme_tags=["tokens"],
+        ),
+        owned_card_ids=owned,
+    )
+
+    assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
+    assert [candidate.card.name for candidate in result.candidates] == ["Hydra Search Test"]
