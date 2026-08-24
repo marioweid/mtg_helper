@@ -28,6 +28,30 @@ type ThemeState = { groups: ThemeGroup[]; source_tags: SourceTag[] };
 type GroupSelection = number | null | undefined;
 type SelectableGroup = Pick<ThemeGroup, "id" | "deleted_at">;
 
+type ThemeSuggestion = {
+  id: number;
+  source: "moxfield" | "archidekt";
+  source_id: number;
+  confidence: number;
+  rationale: string | null;
+  status: string;
+  created_at: string | null;
+  reviewed_at: string | null;
+  target_slug: string | null;
+  target_label: string | null;
+  target_description: string | null;
+  target_aliases: string[] | null;
+  source_name: string | null;
+  source_tag: string | null;
+};
+
+type ThemeSuggestJob = {
+  status: "idle" | "running" | "ok" | "error";
+  phase: string;
+  error: string | null;
+  result: Record<string, unknown> | null;
+};
+
 export function resolveSelectedGroup(
   current: GroupSelection,
   groups: SelectableGroup[],
@@ -57,6 +81,14 @@ export function ThemeManager() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState("");
+  const [suggestions, setSuggestions] = useState<ThemeSuggestion[]>([]);
+  const [suggestJob, setSuggestJob] = useState<ThemeSuggestJob>({
+    status: "idle",
+    phase: "",
+    error: null,
+    result: null,
+  });
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const response = await fetch("/api/v1/admin/themes");
@@ -66,9 +98,43 @@ export function ThemeManager() {
     setSelectedGroupId((current) => resolveSelectedGroup(current, next.groups));
   }, []);
 
+  const refreshSuggestions = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/admin/theme-suggestions");
+      if (!response.ok) return;
+      const body = (await response.json()) as { suggestions: ThemeSuggestion[] };
+      setSuggestions(body.suggestions);
+    } catch {
+      // Transient — next refresh retries.
+    }
+  }, []);
+
+  const refreshSuggestJob = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/admin/status");
+      if (!response.ok) return;
+      const body = (await response.json()) as { theme_suggest: ThemeSuggestJob };
+      setSuggestJob(body.theme_suggest);
+    } catch {
+      // Transient — next poll retries.
+    }
+  }, []);
+
   useEffect(() => {
     void refresh().catch((reason: unknown) => setError(String(reason)));
-  }, [refresh]);
+    void refreshSuggestions();
+    void refreshSuggestJob();
+  }, [refresh, refreshSuggestions, refreshSuggestJob]);
+
+  useEffect(() => {
+    if (suggestJob.status !== "running") return;
+    const id = setInterval(() => {
+      void refreshSuggestJob().then(() => {
+        if (suggestJob.status !== "running") void refreshSuggestions();
+      });
+    }, 2000);
+    return () => clearInterval(id);
+  }, [suggestJob.status, refreshSuggestJob, refreshSuggestions]);
 
   const visibleTags = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -99,6 +165,27 @@ export function ThemeManager() {
       await mutate("/api/v1/admin/theme-groups", "POST", { label });
       setNewLabel("");
     });
+  }
+
+  async function runSuggestions() {
+    setSuggestError(null);
+    try {
+      await mutate("/api/v1/admin/suggest-theme-groups", "POST");
+      await refreshSuggestJob();
+    } catch (reason) {
+      setSuggestError(reason instanceof Error ? reason.message : String(reason));
+    }
+  }
+
+  async function decideSuggestion(id: number, action: "apply" | "reject") {
+    setSuggestError(null);
+    try {
+      await mutate(`/api/v1/admin/theme-suggestions/${id}/${action}`, "POST");
+      await refreshSuggestions();
+      await refresh();
+    } catch (reason) {
+      setSuggestError(reason instanceof Error ? reason.message : String(reason));
+    }
   }
 
   return (
@@ -135,6 +222,101 @@ export function ThemeManager() {
       </div>
 
       {error && <p className="mb-3 rounded bg-red-950/60 p-2 text-sm text-red-300">{error}</p>}
+
+      <div className="mb-6 rounded border border-white/10 bg-black/20 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-white">AI group suggestions</h3>
+            <p className="text-sm text-gray-400">
+              Draft group assignments for ungrouped hubs, then approve or reject each.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void runSuggestions()}
+            disabled={suggestJob.status === "running"}
+            className="rounded bg-purple-600 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {suggestJob.status === "running"
+              ? "Drafting…"
+              : suggestJob.status === "ok"
+                ? "Draft again"
+                : "Draft suggestions"}
+          </button>
+        </div>
+        {suggestJob.status === "running" && (
+          <p className="mt-2 text-sm text-blue-300">Phase: {suggestJob.phase}</p>
+        )}
+        {suggestJob.status === "error" && (
+          <p className="mt-2 text-sm text-red-300">Draft failed: {suggestJob.error}</p>
+        )}
+        {suggestJob.status === "ok" && suggestJob.result && (
+          <p className="mt-2 text-sm text-green-300">
+            Drafted {String(suggestJob.result["suggestions_stored"])} suggestions from{" "}
+            {String(suggestJob.result["sources_considered"])} sources.
+          </p>
+        )}
+        {suggestError && (
+          <p className="mt-2 text-sm text-red-300">Suggestion error: {suggestError}</p>
+        )}
+        <div className="mt-3 space-y-2">
+          {suggestions.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              {suggestJob.status === "ok" || suggestJob.status === "running"
+                ? "No pending suggestions."
+                : "Run a draft pass to see suggestions here."}
+            </p>
+          ) : (
+            suggestions.map((suggestion) => (
+              <div
+                key={suggestion.id}
+                className="flex flex-wrap items-start gap-3 rounded border border-white/10 p-3 text-sm"
+              >
+                <span
+                  className={`rounded px-2 py-1 text-xs ${suggestion.source === "moxfield" ? "bg-purple-950 text-purple-200" : "bg-orange-950 text-orange-200"}`}
+                >
+                  {suggestion.source}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-white">
+                    {suggestion.source_name}{" "}
+                    <span className="text-xs text-gray-500">({suggestion.source_tag})</span>
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    → {suggestion.target_label}
+                    {suggestion.target_slug ? ` (${suggestion.target_slug})` : ""}
+                  </p>
+                  {suggestion.target_description && (
+                    <p className="mt-1 text-xs text-gray-500">{suggestion.target_description}</p>
+                  )}
+                  {suggestion.rationale && (
+                    <p className="mt-1 text-xs italic text-gray-500">{suggestion.rationale}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-600">
+                    Confidence {Math.round(suggestion.confidence * 100)}%
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void decideSuggestion(suggestion.id, "apply")}
+                    className="rounded bg-green-700 px-3 py-1.5 text-xs text-white hover:bg-green-600"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void decideSuggestion(suggestion.id, "reject")}
+                    className="rounded bg-gray-800 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <div className="space-y-2">

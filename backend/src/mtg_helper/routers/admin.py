@@ -24,6 +24,7 @@ from mtg_helper.services import (
     mtgjson,
     scryfall,
     theme_service,
+    theme_suggestion_service,
 )
 from mtg_helper.services.admin_jobs import (
     JobRegistry,
@@ -190,6 +191,7 @@ async def status(request: Request) -> dict[str, Any]:
         "mtgjson": asdict(registry.mtgjson),
         "tag": asdict(registry.tag),
         "refresh_all": asdict(registry.refresh_all),
+        "theme_suggest": asdict(registry.theme_suggest),
     }
 
 
@@ -216,6 +218,7 @@ class ThemeGroupCreate(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     slug: str | None = Field(default=None, min_length=1, max_length=80)
     description: str | None = None
+    aliases: list[str] = Field(default_factory=list, max_length=12)
     sort_order: int = 0
 
 
@@ -341,6 +344,60 @@ async def update_theme_source(
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return {"source": source, "source_id": source_id, "enabled": body.enabled}
+
+
+@router.post("/admin/suggest-theme-groups", status_code=202)
+async def suggest_theme_groups(request: Request) -> dict[str, Any]:
+    """Kick off an LLM draft pass over ungrouped theme source tags."""
+    job = _registry(request).theme_suggest
+    _ensure_idle(job)
+    start(job)
+    asyncio.create_task(
+        _wrap(
+            job,
+            theme_suggestion_service.generate_suggestions(
+                request.app.state.db_pool,
+                progress=make_progress_cb(job),
+            ),
+        )
+    )
+    return _response(job)
+
+
+@router.get("/admin/theme-suggestions")
+async def list_theme_suggestions(
+    request: Request, status_filter: str = "pending"
+) -> dict[str, Any]:
+    """Return theme-group suggestions by status."""
+    if status_filter not in {"pending", "approved", "rejected"}:
+        raise HTTPException(400, "status_filter must be pending, approved, or rejected")
+    return {
+        "suggestions": await theme_suggestion_service.list_suggestions(
+            request.app.state.db_pool, status=status_filter
+        )
+    }
+
+
+@router.post("/admin/theme-suggestions/{suggestion_id}/apply")
+async def apply_theme_suggestion(suggestion_id: int, request: Request) -> dict[str, Any]:
+    """Approve one suggestion, creating the group when needed and attaching the tag."""
+    try:
+        return await theme_suggestion_service.apply_suggestion(
+            request.app.state.db_pool, suggestion_id
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/admin/theme-suggestions/{suggestion_id}/reject")
+async def reject_theme_suggestion(suggestion_id: int, request: Request) -> dict[str, Any]:
+    """Reject one suggestion without touching theme membership."""
+    try:
+        return await theme_suggestion_service.reject_suggestion(
+            request.app.state.db_pool, suggestion_id
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.post("/admin/sync-archidekt-tag", status_code=202)
