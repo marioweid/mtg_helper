@@ -412,11 +412,12 @@ async def create_group(pool: asyncpg.Pool, data: dict[str, Any]) -> dict[str, An
         raise ValueError("Theme group label and slug must contain letters or numbers")
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            """INSERT INTO theme_groups (slug, label, description, sort_order)
-               VALUES ($1, $2, $3, $4) RETURNING *""",
+            """INSERT INTO theme_groups (slug, label, description, aliases, sort_order)
+               VALUES ($1, $2, $3, $4, $5) RETURNING *""",
             slug,
             label,
             data.get("description"),
+            list(data.get("aliases") or []),
             data.get("sort_order", 0),
         )
     return dict(row)

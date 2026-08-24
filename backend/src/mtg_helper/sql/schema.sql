@@ -251,6 +251,36 @@ CREATE INDEX IF NOT EXISTS idx_theme_groups_visible
     ON theme_groups (enabled, deleted_at, sort_order, label);
 
 -- ============================================================
+-- ADMIN-CURATED THEME GROUP SUGGESTIONS (LLM drafts, human approves)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS theme_group_suggestions (
+    id                    BIGSERIAL PRIMARY KEY,
+    source                TEXT NOT NULL CHECK (source IN ('moxfield', 'archidekt')),
+    source_id             BIGINT NOT NULL,
+    group_id              BIGINT REFERENCES theme_groups(id) ON DELETE SET NULL,
+    new_group_slug        TEXT,
+    new_group_label       TEXT,
+    new_group_description TEXT,
+    new_group_aliases     TEXT[] NOT NULL DEFAULT '{}',
+    confidence            REAL NOT NULL DEFAULT 0,
+    rationale             TEXT,
+    status                TEXT NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_at           TIMESTAMPTZ,
+    CHECK (
+        (group_id IS NOT NULL AND new_group_slug IS NULL)
+        OR (group_id IS NULL AND new_group_slug IS NOT NULL)
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_group_suggestions_source_unique
+    ON theme_group_suggestions (source, source_id)
+    WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_theme_group_suggestions_status
+    ON theme_group_suggestions (status, created_at);
+
+-- ============================================================
 -- ACCOUNTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS accounts (

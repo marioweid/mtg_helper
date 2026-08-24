@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
-JobKey = Literal["sync", "mtgjson", "tag", "refresh-all"]
+JobKey = Literal["sync", "mtgjson", "tag", "refresh-all", "theme-suggest"]
 JobStatus = Literal["idle", "running", "ok", "error"]
 
 ProgressCb = Callable[[str, int, int], None]
@@ -44,6 +44,7 @@ class JobRegistry:
     mtgjson: JobState = field(default_factory=lambda: JobState(key="mtgjson"))
     tag: JobState = field(default_factory=lambda: JobState(key="tag"))
     refresh_all: JobState = field(default_factory=lambda: JobState(key="refresh-all"))
+    theme_suggest: JobState = field(default_factory=lambda: JobState(key="theme-suggest"))
 
 
 def reset(job: JobState) -> None:

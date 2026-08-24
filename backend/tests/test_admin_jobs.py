@@ -22,7 +22,7 @@ from mtg_helper.services.admin_jobs import (
 
 def test_registry_initial_state() -> None:
     reg = JobRegistry()
-    for job in (reg.sync, reg.mtgjson, reg.tag, reg.refresh_all):
+    for job in (reg.sync, reg.mtgjson, reg.tag, reg.refresh_all, reg.theme_suggest):
         assert job.status == "idle"
         assert job.current == 0
         assert job.total == 0
@@ -74,10 +74,10 @@ async def test_status_endpoint_returns_all_job_slots(client: AsyncClient) -> Non
     resp = await client.get("/api/v1/admin/status")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"sync", "mtgjson", "tag", "refresh_all"}
+    assert set(body.keys()) == {"sync", "mtgjson", "tag", "refresh_all", "theme_suggest"}
     for key, slot in body.items():
         assert slot["status"] == "idle"
-        assert slot["key"] in {"sync", "mtgjson", "tag", "refresh-all"}
+        assert slot["key"] in {"sync", "mtgjson", "tag", "refresh-all", "theme-suggest"}
         del key  # keys checked above; loop var quietens linters
 
 
@@ -185,40 +185,85 @@ async def test_sync_endpoint_records_error_on_failure(
 
 
 @pytest.mark.asyncio
+async def test_suggest_theme_groups_endpoint_runs_in_background(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = asyncio.Event()
+
+    async def _fake_generate(_pool: Any, *, progress: Any) -> dict[str, Any]:
+        progress("classifying", 1, 1)
+        await asyncio.sleep(0)
+        done.set()
+        return {"sources_considered": 3, "suggestions_stored": 2, "skipped": 1}
+
+    monkeypatch.setattr(
+        "mtg_helper.routers.admin.theme_suggestion_service.generate_suggestions", _fake_generate
+    )
+
+    resp = await client.post("/api/v1/admin/suggest-theme-groups")
+    assert resp.status_code == 202
+    assert resp.json()["job"] == "theme-suggest"
+
+    await asyncio.wait_for(done.wait(), timeout=2.0)
+    await asyncio.sleep(0)
+
+    status = (await client.get("/api/v1/admin/status")).json()["theme_suggest"]
+    assert status["status"] == "ok"
+    assert status["result"]["suggestions_stored"] == 2
+
+
+async def _fake_apply_schema(_pool: Any) -> None:
+    _phases_seen.append("schema")
+
+
+async def _fake_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
+    progress("upserting", 5, 5)
+    _phases_seen.append("scryfall")
+    return {"cards_processed": 5}
+
+
+async def _fake_mtgjson(_pool: Any, *, progress: Any) -> dict[str, Any]:
+    progress("mtgjson", 3, 3)
+    _phases_seen.append("mtgjson")
+    return {"mtgjson_cards_processed": 3, "mtgjson_keywords_processed": 2}
+
+
+async def _fake_hubs(_pool: Any, *, progress: Any) -> dict[str, Any]:
+    progress("hubs", 7, 7)
+    _phases_seen.append("hubs")
+    return {"moxfield_hubs_processed": 7, "moxfield_hub_cards_matched": 42}
+
+
+async def _fake_archidekt(_pool: Any, *, progress: Any) -> dict[str, Any]:
+    progress("archidekt", 2, 2)
+    _phases_seen.append("archidekt")
+    return {"archidekt_tags_processed": 2, "archidekt_tag_cards_matched": 10}
+
+
+async def _fake_tag(_pool: Any, *, progress: Any) -> dict[str, Any]:
+    progress("tagging", 5, 5)
+    _phases_seen.append("tag")
+    return {"cards_tagged": 5}
+
+
+_phases_seen: list[str] = []
+
+
+@pytest.mark.asyncio
 async def test_refresh_all_chains_sync_tag(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """refresh-all runs schema, source syncs, then tags in order."""
-    phases_seen: list[str] = []
-
-    async def _fake_apply_schema(_pool: Any) -> None:
-        phases_seen.append("schema")
-
-    async def _fake_sync(_pool: Any, *, progress: Any) -> dict[str, Any]:
-        progress("upserting", 5, 5)
-        phases_seen.append("scryfall")
-        return {"cards_processed": 5}
-
-    async def _fake_mtgjson(_pool: Any, *, progress: Any) -> dict[str, Any]:
-        progress("mtgjson", 3, 3)
-        phases_seen.append("mtgjson")
-        return {"mtgjson_cards_processed": 3, "mtgjson_keywords_processed": 2}
-
-    async def _fake_hubs(_pool: Any, *, progress: Any) -> dict[str, Any]:
-        progress("hubs", 7, 7)
-        phases_seen.append("hubs")
-        return {"moxfield_hubs_processed": 7, "moxfield_hub_cards_matched": 42}
-
-    async def _fake_tag(_pool: Any, *, progress: Any) -> dict[str, Any]:
-        progress("tagging", 5, 5)
-        phases_seen.append("tag")
-        return {"cards_tagged": 5}
+    _phases_seen.clear()
 
     monkeypatch.setattr("mtg_helper.routers.admin.apply_schema", _fake_apply_schema)
     monkeypatch.setattr("mtg_helper.routers.admin.scryfall.run_sync", _fake_sync)
     monkeypatch.setattr("mtg_helper.routers.admin.mtgjson.run_sync", _fake_mtgjson)
     monkeypatch.setattr(
         "mtg_helper.routers.admin.moxfield_hub_service.sync_hub_card_stats", _fake_hubs
+    )
+    monkeypatch.setattr(
+        "mtg_helper.routers.admin.archidekt_tag_service.sync_tag_card_stats", _fake_archidekt
     )
     monkeypatch.setattr("mtg_helper.routers.admin.run_batch_tag", _fake_tag)
 
@@ -232,12 +277,14 @@ async def test_refresh_all_chains_sync_tag(
             break
 
     assert status["status"] == "ok"
-    assert phases_seen == ["schema", "scryfall", "mtgjson", "hubs", "tag"]
+    assert _phases_seen == ["schema", "scryfall", "mtgjson", "hubs", "archidekt", "tag"]
     assert status["result"] == {
         "cards_processed": 5,
         "mtgjson_cards_processed": 3,
         "mtgjson_keywords_processed": 2,
         "moxfield_hubs_processed": 7,
         "moxfield_hub_cards_matched": 42,
+        "archidekt_tags_processed": 2,
+        "archidekt_tag_cards_matched": 10,
         "cards_tagged": 5,
     }

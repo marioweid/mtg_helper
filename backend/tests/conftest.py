@@ -197,7 +197,9 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
                 moxfield_hubs,
                 collection_cards, collections, account_ranking_weights,
                 deck_snapshot_cards, deck_snapshots, deck_coach_memory,
-                deck_feedback, preferences, deck_cards, decks, accounts CASCADE
+                deck_feedback, preferences, deck_cards, decks, accounts,
+                theme_group_suggestions, theme_group_members, theme_groups,
+                archidekt_tag_card_stats, archidekt_tags CASCADE
             """
         )
         await conn.execute(
