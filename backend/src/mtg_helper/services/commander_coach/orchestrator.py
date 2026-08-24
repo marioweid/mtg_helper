@@ -1,6 +1,7 @@
 """Compatibility entrypoint for the single MTG Assistant."""
 
 from collections.abc import Awaitable, Callable
+from uuid import UUID
 
 import asyncpg
 
@@ -17,7 +18,9 @@ async def run_coach(
     request: CommanderCoachRequest,
     progress: ProgressCb | None = None,
     memory_learn: Callable[[str], Awaitable[None]] | None = None,
+    *,
+    account_id: UUID | None = None,
 ) -> CommanderCoachResponse:
     """Run the MTG Assistant while preserving the existing API function name."""
     del memory_learn
-    return await run_assistant(pool, deck, request, progress)
+    return await run_assistant(pool, deck, request, progress, account_id=account_id)

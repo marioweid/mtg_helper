@@ -1,6 +1,7 @@
 """Compatibility namespace for MTG Assistant and deterministic deck analysis."""
 
 from collections.abc import Awaitable, Callable
+from uuid import UUID
 
 import asyncpg
 
@@ -17,11 +18,13 @@ async def run_coach(
     request: CommanderCoachRequest,
     progress: ProgressCb | None = None,
     memory_learn: MemoryLearnCb | None = None,
+    *,
+    account_id: UUID | None = None,
 ) -> CommanderCoachResponse:
     """Lazily call the compatibility orchestrator without creating import cycles."""
     from mtg_helper.services.commander_coach.orchestrator import run_coach as run
 
-    return await run(pool, deck, request, progress, memory_learn)
+    return await run(pool, deck, request, progress, memory_learn, account_id=account_id)
 
 
 __all__ = ["run_coach"]

@@ -391,7 +391,9 @@ async def test_find_cards_passes_natural_theme_hints_to_discovery() -> None:
     with patch.object(mtg_assistant, "search_cards_service", search):
         result = await mtg_assistant.find_cards(SimpleNamespace(deps=deps), filters)
 
-    search.assert_awaited_once_with(deps.pool, deps.deck, filters)
+    search.assert_awaited_once_with(
+        deps.pool, deps.deck, filters, owned_card_ids=None
+    )
     assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
 
 
