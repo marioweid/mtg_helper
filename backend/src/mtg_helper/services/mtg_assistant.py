@@ -5,12 +5,12 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 import asyncpg
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext, UsageLimitExceeded, UsageLimits
+from pydantic_ai import Agent, ModelRetry, RunContext, UsageLimitExceeded, UsageLimits
 from pydantic_ai.messages import ModelMessage
 
 from mtg_helper.models.ai import (
@@ -316,11 +316,22 @@ async def _attach_owned_quantities(deps: AssistantDeps, result: CardSearchResult
 
 
 async def inspect_deck_cards(
-    ctx: RunContext[AssistantDeps], names: list[str]
+    ctx: RunContext[AssistantDeps],
+    names: Annotated[list[str], Field(max_length=8)],
 ) -> DeckCardInspection | None:
-    """Return exact text and fit evidence for up to eight current-deck cards."""
+    """Return exact text and fit evidence for up to eight current-deck cards.
+
+    The argument schema caps ``names`` at eight so pydantic-ai rejects an
+    oversized tool call as a retryable validation error instead of letting the
+    deck-inspection guard raise ValueError inside the tool and abort the run.
+    """
     if not ctx.deps.allow_tool():
         return None
+    if len(names) > 8:
+        raise ModelRetry(
+            f"inspect_deck_cards accepts at most 8 card names per call "
+            f"(received {len(names)}); split the request into batches of up to 8."
+        )
     return inspect_deck_cards_service(ctx.deps.deck, names)
 
 
@@ -369,15 +380,23 @@ async def check_bracket(
 
 
 async def check_game_changers(
-    ctx: RunContext[AssistantDeps], names: list[str]
+    ctx: RunContext[AssistantDeps],
+    names: Annotated[list[str], Field(max_length=10)],
 ) -> GameChangerCheck | None:
     """Check which named cards are on the official Game Changers list.
 
     Use for questions about arbitrary cards (e.g. "is Doubling Season a Game
-    Changer?"); for the current deck, prefer check_bracket.
+    Changer?"); for the current deck, prefer check_bracket. The argument schema
+    caps ``names`` at ten so an oversized tool call becomes a retryable
+    validation error instead of a ValueError inside the tool aborting the run.
     """
     if not ctx.deps.allow_tool():
         return None
+    if len(names) > 10:
+        raise ModelRetry(
+            f"check_game_changers accepts at most 10 card names per call "
+            f"(received {len(names)}); split the request into batches of up to 10."
+        )
     return await check_game_changers_service(ctx.deps.pool, names)
 
 
