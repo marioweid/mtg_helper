@@ -1,5 +1,13 @@
 # Development Roadmap
 
+> Historical checklist — reviewed 2026-09-06. Unchecked boxes below do not reliably
+> identify remaining work. The current builder already accepts stage and target requests,
+> caches stage results, and supports basic-land quantities. Its current stage order is
+> Theme → Ramp → Draw → Interaction → Lands; it has no Utility stage. Card actions now
+> support planned changes. Reconcile each item with the current implementation before
+> treating it as a new requirement; do not restore the old sequence solely from this list.
+> GitHub currently contains no milestones or open issues for this repository.
+
 ## Completed Phases
 
 ### Phase 1 — Foundation (Done)
