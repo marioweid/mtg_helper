@@ -1,50 +1,100 @@
-"""Logfire observability setup.
+"""Export framework and AI traces to the configured self-hosted Assay instance."""
 
-Configuration is centralized here so Logfire is initialized exactly once per
-process before framework/client instrumentation is registered.
-"""
-
+import asyncio
 import logging
-from typing import Any
+from collections.abc import Sequence
 
+# Assay 0.4.0 exposes no public exporter/provider bridge. Keep this private import
+# isolated and pin the SDK; its JSON transport is required (protobuf is unsupported).
+from assay._exporter import AssaySpanExporter
 from fastapi import FastAPI
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExportResult
+from pydantic_ai import Agent, InstrumentationSettings
+
+from mtg_helper.config import Settings
 
 _log = logging.getLogger(__name__)
-_CONFIGURED = False
 
 
-def configure_logfire(app: FastAPI) -> None:
-    """Configure Logfire and instrument supported libraries.
+class _ReportingAssayExporter(AssaySpanExporter):
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        result = super().export(spans)
+        if result is SpanExportResult.FAILURE:
+            # The SDK returns failure silently. Never log payloads or credentials.
+            _log.warning(
+                "Assay trace export failed; check ASSAY_ENDPOINT connectivity, "
+                "ASSAY_API_KEY permissions, and ASSAY_APPLICATION slug"
+            )
+        return result
 
-    Logfire reads ``LOGFIRE_TOKEN`` from the environment. With
-    ``send_to_logfire='if-token-present'`` local development still gets
-    OpenTelemetry instrumentation without failing when no token is configured.
+
+def configure_assay(app: FastAPI, settings: Settings) -> TracerProvider | None:
+    """Instrument one backend app before its middleware stack is built.
+
+    All three Assay settings are required together; leaving all empty disables
+    tracing. Exports run in a background batch worker, never on the request path.
+    AI content is captured; HTTP bodies and headers are not explicitly captured.
     """
-    global _CONFIGURED
-    if _CONFIGURED:
-        return
+    existing = getattr(app.state, "assay_provider", None)
+    if existing is not None:
+        return existing
+    endpoint = settings.assay_endpoint.strip()
+    api_key = settings.assay_api_key.get_secret_value().strip()
+    application = settings.assay_application.strip()
+    configured = (endpoint, api_key, application)
+    if not any(configured):
+        return None
+    if not all(configured):
+        raise ValueError(
+            "Set ASSAY_ENDPOINT, ASSAY_API_KEY, and ASSAY_APPLICATION together, "
+            "or leave all three empty to disable tracing"
+        )
 
+    exporter = _ReportingAssayExporter(endpoint, api_key)
+    provider = TracerProvider(
+        resource=Resource.create(
+            {"service.name": "mtg-helper-backend", "assay.application.slug": application}
+        )
+    )
+    provider.add_span_processor(BatchSpanProcessor(exporter))
     try:
-        import logfire
-    except ModuleNotFoundError:
-        _log.warning("Logfire package is not installed; tracing disabled")
-        _CONFIGURED = True
-        return
+        FastAPIInstrumentor.instrument_app(
+            app, tracer_provider=provider, exclude_spans=["receive", "send"]
+        )
+        HTTPXClientInstrumentor().instrument(tracer_provider=provider)
+        Agent.instrument_all(
+            InstrumentationSettings(
+                tracer_provider=provider,
+                include_content=True,
+                include_binary_content=False,
+                # v3 uses the standard GenAI agent/tool attributes Assay reads.
+                version=3,
+                # Assay sums model usage; don't count it again on parent agent spans.
+                use_aggregated_usage_attribute_names=True,
+            )
+        )
+    except Exception:
+        FastAPIInstrumentor.uninstrument_app(app)
+        HTTPXClientInstrumentor().uninstrument()
+        Agent.instrument_all(False)
+        provider.shutdown()
+        raise
+    app.state.assay_provider = provider
+    _log.info("Assay tracing enabled for application %s", application)
+    return provider
 
-    try:
-        configure_kwargs: dict[str, Any] = {"send_to_logfire": "if-token-present"}
-        if hasattr(logfire, "MetricsOptions"):
-            configure_kwargs["metrics"] = logfire.MetricsOptions(collect_in_spans=True)
-        try:
-            logfire.configure(service_name="mtg-helper-backend", **configure_kwargs)
-        except TypeError:
-            configure_kwargs.pop("metrics", None)
-            logfire.configure(**configure_kwargs)
-        logfire.instrument_fastapi(app)
-        logfire.instrument_httpx()
-        # Do not instrument asyncpg/Postgres: per-query spans are too dense for
-        # normal Coach/API traces and drown out the higher-level operations.
-        logfire.instrument_pydantic_ai()
-        _CONFIGURED = True
-    except Exception:  # noqa: BLE001 - observability must not stop app startup
-        _log.exception("Logfire configuration failed; continuing without tracing")
+
+async def shutdown_assay(app: FastAPI) -> None:
+    """Drain queued traces and close the exporter off the event loop on shutdown."""
+    provider = getattr(app.state, "assay_provider", None)
+    if provider is None:
+        return
+    app.state.assay_provider = None
+    Agent.instrument_all(False)
+    HTTPXClientInstrumentor().uninstrument()
+    FastAPIInstrumentor.uninstrument_app(app)
+    await asyncio.to_thread(provider.shutdown)

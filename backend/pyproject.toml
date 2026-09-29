@@ -12,7 +12,10 @@ dependencies = [
     "curl_cffi==0.15.0",
     "google-auth==2.49.2",
     "pydantic-ai-slim[openai]==1.71.0",
-    "logfire[fastapi,httpx]==4.41.0",
+    "assay-sdk==0.4.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-instrumentation-fastapi==0.65b0",
+    "opentelemetry-instrumentation-httpx==0.65b0",
 ]
 
 [project.optional-dependencies]

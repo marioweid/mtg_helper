@@ -85,6 +85,49 @@ CLI equivalent for testing on the server:
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
+## Assay tracing
+
+The backend sends traces to your **existing** Assay instance; this stack does not deploy Assay.
+Create a project and application in Assay, then save the project's ingest key. Set these in
+Portainer's stack environment (production) or `backend/.env` (local Compose / `uv run`):
+
+```dotenv
+ASSAY_ENDPOINT=http://your-homeserver:8080
+ASSAY_API_KEY=asy_your_project_ingest_key
+ASSAY_APPLICATION=mtg-helper
+```
+
+- Use the application's **slug**, not its UUID, and a project ingest key, **not** the admin token.
+  The application must belong to that key's project. Local-mode Assay still requires the key.
+- The endpoint is Assay's HTTP(S) base URL (no UI path). It must be reachable **from the backend
+  container**. `localhost` points to that container, not your homeserver. Use the server's LAN
+  hostname/IP and published port, or its service name on an explicitly shared Docker network.
+  Prefer HTTPS outside a trusted LAN; both the ingest key and AI content travel to this endpoint.
+- Set all three values, or leave all three empty to disable tracing. Partial or malformed
+  configuration fails startup rather than silently disabling the integration.
+- Rebuild/redeploy the backend after this dependency change. Subsequent environment changes
+  require recreating/redeploying the container, not just restarting it.
+- Only the backend receives these variables. No frontend configuration is needed.
+
+Traces include FastAPI requests, outbound HTTPX calls, and Pydantic AI agent/model/tool spans,
+including **AI prompts, responses, and tool arguments/results**. Binary AI attachments are excluded.
+Treat traces as private application data and configure retention/access controls in Assay.
+HTTP bodies/headers are not explicitly captured; standard HTTP URL and error metadata can still
+contain sensitive data. Database query spans remain disabled to avoid bulk-sync noise.
+
+To verify, use an AI feature (for example the card coach), then open **Traces** in your Assay
+application. Export runs in background batches, so allow a few seconds. Graceful backend shutdown
+flushes pending spans. Collector outages/rejections do not fail API or AI requests; affected batches
+are dropped and log `Assay trace export failed`. Check network reachability, project key, and slug
+if traces are missing. `Assay tracing enabled` confirms configuration, not remote connectivity.
+
+This is tracing integration only: it does not provision Assay projects, group conversations into
+Assay Sessions, or configure evaluation/scoring datasets. The pinned `assay-sdk==0.4.0` supplies
+Assay's JSON exporter; its private exporter bridge is isolated in `observability.py` because the
+SDK has no public OpenTelemetry provider integration. OpenTelemetry versions match the SDK's pins.
+There is no Logfire configuration or fallback (Pydantic AI retains its own transitive `logfire-api`
+shim, which does not export to Logfire).
+
 ## Database
 
 Schema is `backend/src/mtg_helper/sql/schema.sql` — idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE`). Auto-applied on backend startup via `apply_schema()` and on first compose up via `docker-entrypoint-initdb.d`. There is no separate migration tool — edit `schema.sql`, restart the backend.

@@ -51,6 +51,7 @@ The application combines a local Scryfall-backed card database, deck management 
 - **Database:** PostgreSQL 16
 - **Vector search:** Qdrant
 - **AI:** OpenAI Responses API / Pydantic AI integration
+- **Tracing:** Optional self-hosted Assay (FastAPI, HTTPX, and AI content traces)
 - **Local development:** Docker Compose
 - **Deployment:** Portainer-friendly Docker Compose stack behind a reverse proxy / Cloudflare access layer
 
@@ -85,6 +86,10 @@ docker compose down
 ```
 
 See [`OPERATIONS.md`](OPERATIONS.md) for production deployment, data sync, Portainer setup, and operational commands.
+
+To connect an existing Assay instance, set `ASSAY_ENDPOINT`, `ASSAY_API_KEY` (project ingest key),
+and `ASSAY_APPLICATION` (application slug) on the backend. See
+[Assay tracing setup](OPERATIONS.md#assay-tracing) for Portainer, networking, and privacy details.
 
 ## Development checks
 
