@@ -1,5 +1,13 @@
 # Commander Coach Suggestion Quality Plan
 
+> Historical plan — reviewed 2026-09-06. The active Coach entrypoint now delegates to
+> the single MTG Assistant (`backend/src/mtg_helper/services/commander_coach/orchestrator.py`).
+> The Identity/Cut specialist work below is not an active implementation backlog.
+> Consult `docs/superpowers/specs/2026-08-23-autonomous-mtg-buddy-design.md` and
+> `docs/superpowers/specs/2026-08-23-conversational-mtg-assistant-quality-design.md`
+> for the current assistant designs. The benchmark targets below are historical targets,
+> not evidence that the current assistant meets them.
+
 ## Current Problem
 
 The Coach pipeline now avoids copying Moxfield decklists, but suggestion quality is still not good enough.
