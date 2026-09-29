@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     archidekt_tag_delay_seconds: float = 1.0
     archidekt_tag_stale_after_hours: float = 168.0
 
+    # Remote Assay tracing is disabled unless all three values are supplied.
+    assay_endpoint: str = ""
+    assay_api_key: SecretStr = SecretStr("")
+    assay_application: str = ""
+
     # Pagination defaults
     default_limit: int = 20
     max_limit: int = 100

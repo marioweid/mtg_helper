@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from mtg_helper.auth import get_current_account, require_admin_or_internal
 from mtg_helper.config import settings
 from mtg_helper.db import apply_schema, close_pool, create_pool
-from mtg_helper.observability import configure_logfire
+from mtg_helper.observability import configure_assay, shutdown_assay
 from mtg_helper.routers import (
     admin,
     ai,
@@ -42,6 +42,16 @@ _log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    """Close tracing on normal shutdown and failed application startup alike."""
+    try:
+        async with _application_lifespan(app):
+            yield
+    finally:
+        await shutdown_assay(app)
+
+
+@asynccontextmanager
+async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
     await apply_schema(app.state.db_pool)
@@ -99,7 +109,7 @@ async def _ensure_theme_catalogs(app: FastAPI) -> None:
 
 
 app = FastAPI(title="MTG Helper API", version="0.1.0", lifespan=lifespan)
-configure_logfire(app)
+configure_assay(app, settings)
 
 app.add_middleware(
     CORSMiddleware,

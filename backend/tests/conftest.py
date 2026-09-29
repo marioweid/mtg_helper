@@ -10,6 +10,8 @@ from uuid import UUID
 # Set required env vars before importing any app module that reads config at import time.
 os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test")
 os.environ.setdefault("OPENAI_API_KEY", "test")
+# Never send test traffic to a developer's configured Assay instance.
+os.environ.update(ASSAY_ENDPOINT="", ASSAY_API_KEY="", ASSAY_APPLICATION="")
 
 import asyncpg
 import pytest
