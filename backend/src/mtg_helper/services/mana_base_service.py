@@ -28,9 +28,10 @@ _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
 _LAND_SUGGEST_LIMIT = 12
 _RAMP_TAGS: frozenset[str] = frozenset({"ramp", "fast_mana"})
+_DRAW_TAGS: frozenset[str] = frozenset({"draw", "card_draw"})
 _RISKY_PER_COLOR_CAP = 5
 _LAND_REC_MIN = 32
-_LAND_REC_MAX = 42
+_LAND_REC_MAX = 40
 
 # Frank Karsten 99-card singleton table: sources needed for ~90% probability of
 # casting a spell with ``pip`` solid colored pips on ``turn``, on the play.
@@ -138,15 +139,16 @@ def _karsten_requirement(turn: int, pip_count: int) -> int:
     return _KARSTEN_99.get((turn_c, pip_c), 0)
 
 
-def _recommend_land_count(avg_cmc: float, ramp_count: int) -> int:
-    """Karsten-derived total-land recommendation, clamped to [32, 42].
+def _recommend_land_count(avg_cmc: float, ramp_count: int, draw_count: int = 0) -> int:
+    """Total-land recommendation, clamped to [32, 40].
 
-    Formula: ``31.42 + 3.13 * avg_cmc - 0.28 * ramp_count``. Source:
-    Frank Karsten's land-count study, adjusted for typical commander decks.
+    Formula: ``28.42 + 3.13 * avg_cmc - 0.28 * ramp_count - 0.25 * draw_count``.
+    Karsten-inspired, retuned so a midrange deck (avg CMC ~3.0) with no
+    ramp or draw tags lands at 38; ramp and draw reduce the recommendation.
     Clamped: even very low-CMC ramp-heavy decks should run at least 32, and
-    even very high-CMC ramp-light decks rarely benefit beyond 42.
+    even very high-CMC ramp-light decks rarely benefit beyond 40.
     """
-    raw = 31.42 + 3.13 * avg_cmc - 0.28 * ramp_count
+    raw = 28.42 + 3.13 * avg_cmc - 0.28 * ramp_count - 0.25 * draw_count
     return max(_LAND_REC_MIN, min(_LAND_REC_MAX, round(raw)))
 
 
@@ -175,6 +177,20 @@ def _ramp_count(deck: DeckDetailResponse, card_tags: dict[UUID, list[str]] | Non
             continue
         tags = set(card_tags.get(card.card_id, []))
         if tags & _RAMP_TAGS:
+            count += max(1, card.quantity)
+    return count
+
+
+def _draw_count(deck: DeckDetailResponse, card_tags: dict[UUID, list[str]] | None) -> int:
+    """Sum of quantities of cards tagged draw/card_draw (lands excluded)."""
+    if not card_tags:
+        return 0
+    count = 0
+    for card in deck.cards:
+        if _is_land(card):
+            continue
+        tags = set(card_tags.get(card.card_id, []))
+        if tags & _DRAW_TAGS:
             count += max(1, card.quantity)
     return count
 
@@ -239,8 +255,9 @@ def analyze_mana_base(
     Args:
         deck: Deck to analyze.
         card_tags: Optional map ``card_id -> tag list``. When provided, enables
-            ramp-count detection and the land-count recommendation. Absent
-            ⇒ ``ramp_count=0`` and the recommendation reflects avg CMC only.
+            ramp/draw-count detection and the land-count recommendation. Absent
+            ⇒ ``ramp_count=draw_count=0`` and the recommendation reflects
+            avg CMC only.
 
     Returns:
         ManaBaseReport with per-color status plus aggregate land
@@ -288,7 +305,8 @@ def analyze_mana_base(
 
     avg_cmc = _avg_nonland_cmc(deck)
     ramp = _ramp_count(deck, card_tags)
-    recommended = _recommend_land_count(avg_cmc, ramp)
+    draw = _draw_count(deck, card_tags)
+    recommended = _recommend_land_count(avg_cmc, ramp, draw)
     return ManaBaseReport(
         total_lands=total_lands,
         total_colored_pips=round(total_pips, 2),
