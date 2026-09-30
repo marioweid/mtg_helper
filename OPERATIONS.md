@@ -121,12 +121,39 @@ flushes pending spans. Collector outages/rejections do not fail API or AI reques
 are dropped and log `Assay trace export failed`. Check network reachability, project key, and slug
 if traces are missing. `Assay tracing enabled` confirms configuration, not remote connectivity.
 
-This is tracing integration only: it does not provision Assay projects, group conversations into
-Assay Sessions, or configure evaluation/scoring datasets. The pinned `assay-sdk==0.4.0` supplies
+This is tracing integration only: it does not provision Assay projects or configure
+evaluation/scoring datasets. The pinned `assay-sdk==0.4.0` supplies
 Assay's JSON exporter; its private exporter bridge is isolated in `observability.py` because the
 SDK has no public OpenTelemetry provider integration. OpenTelemetry versions match the SDK's pins.
 There is no Logfire configuration or fallback (Pydantic AI retains its own transitive `logfire-api`
 shim, which does not export to Logfire).
+
+### Assistant sessions
+
+Open **Sessions** in your Assay application to follow a chat across multiple assistant turns.
+No additional environment variables or database migrations are needed. Rebuild/redeploy both
+backend and frontend for the request wiring.
+
+- The assistant chat page generates a random conversation UUID per open chat and reuses it for
+  follow-ups. Reloading/reopening the page or switching decks starts a new chat/session, matching
+  the lifetime of the visible in-memory history. Retries in the same chat retain its session ID.
+- The backend derives an opaque Assay session ID scoped to the authenticated account, deck, and
+  conversation UUID. Reusing a client UUID for another account or deck cannot merge sessions.
+  This identifier is correlation metadata, never authentication or permission to read a transcript.
+- Each turn gets one independent `assistant.turn` root trace with the current question and visible
+  reply. Model/tool child spans retain detailed evidence and provider history. Memory-only commands
+  are included too. Background turns remain open until completion; failed turns record their error.
+- HTTP start requests and SSE connections remain ordinary traces, not duplicate session turns.
+  Each assistant turn links back to its initiating HTTP request.
+- API callers can send `conversation_id` (a UUID) in both `POST /api/v1/decks/{deck_id}/coach` and
+  `POST /api/v1/decks/{deck_id}/coach/start`. Reuse it for follow-ups and generate a new UUID when
+  clearing chat history. Omit it for a standalone one-turn session; invalid UUIDs return 422.
+
+Session grouping uses Assay's documented OpenTelemetry `session.id` root attribute and
+`gen_ai.conversation.id` on GenAI spans, on the same provider as the rest of our tracing.
+It does not load conversation history from Assay: the assistant still receives its bounded history
+from the chat page, and deck memory remains in the application's database. Existing traces are not
+retroactively grouped. Without Assay configuration, chat behavior is unchanged and nothing exports.
 
 ## Database
 

@@ -735,6 +735,8 @@ export interface CoachHistoryTurn {
 }
 
 export interface CommanderCoachRequest {
+  /** Stable for one chat; start a new UUID when clearing its history. */
+  conversation_id?: string;
   message: string;
   history?: CoachHistoryTurn[];
   mode?: CommanderCoachMode;

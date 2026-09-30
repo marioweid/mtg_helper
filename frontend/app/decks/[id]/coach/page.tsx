@@ -405,8 +405,13 @@ function AssistantMessage({
 
 export default function CoachPage() {
   const params = useParams();
-  const toast = useToast();
   const deckId = params["id"] as string;
+  return <CoachConversation key={deckId} deckId={deckId} />;
+}
+
+function CoachConversation({ deckId }: { deckId: string }) {
+  const toast = useToast();
+  const [conversationId] = useState(() => crypto.randomUUID());
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState(INITIAL_ASSISTANT_PROMPT);
@@ -455,6 +460,7 @@ export default function CoachPage() {
     setError(null);
     try {
       const started = await apiClient.startCoachDeck(deckId, {
+        conversation_id: conversationId,
         mode: "auto",
         message: content,
         history: buildCoachHistory(

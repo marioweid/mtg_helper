@@ -9,6 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
+from opentelemetry.trace import NoOpTracerProvider
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.config import settings
@@ -46,7 +47,6 @@ from mtg_helper.services import (
     agents,
     ai_service,
     coach_memory_service,
-    commander_coach,
     commander_suggestor_service,
     deck_optimizer_service,
     deck_service,
@@ -60,6 +60,7 @@ from mtg_helper.services import (
 )
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
 from mtg_helper.services.ai_service import DeckNotFoundError
+from mtg_helper.services.assistant_service import AssistantService
 from mtg_helper.services.commander_coach import jobs as coach_jobs
 from mtg_helper.services.feature_flag_service import FLAG_OPTIMIZER
 from mtg_helper.services.rate_limit_service import RateLimitExceeded
@@ -135,25 +136,9 @@ async def _require_deck(
     return deck
 
 
-async def _request_with_memory(
-    pool: Any,
-    deck_id: UUID,
-    account_id: UUID,
-    body: CommanderCoachRequest,
-) -> CommanderCoachRequest:
-    memory = await coach_memory_service.get_memory(pool, deck_id, account_id)
-    notes = memory.notes.strip() or None
-    return body.model_copy(update={"coach_memory_notes": notes})
-
-
-async def _handle_assistant_memory(
-    pool: Any,
-    deck: DeckDetailResponse,
-    account_id: UUID,
-    body: CommanderCoachRequest,
-) -> CommanderCoachResponse | None:
-    """Handle explicit memory commands without spending an LLM request."""
-    return await coach_memory_service.handle_memory_message(pool, deck.id, account_id, body)
+def _assistant_service(request: Request) -> AssistantService:
+    provider = getattr(request.app.state, "assay_provider", None) or NoOpTracerProvider()
+    return AssistantService(request.app.state.db_pool, provider.get_tracer("mtg-helper.assistant"))
 
 
 @router.post("/{deck_id}/build", response_model=DataResponse[BuildResponse])
@@ -272,28 +257,13 @@ async def coach_deck(
     """Run MTG Assistant for an existing deck."""
     _enforce_rate_limit(account, "coach_deck", _ANALYZE_LIMIT)
     deck = await _require_deck(request, deck_id, account)
-    body = await _request_with_memory(request.app.state.db_pool, deck_id, account.id, body)
-    routed_response = await _handle_assistant_memory(
-        request.app.state.db_pool,
-        deck,
-        account.id,
-        body,
-    )
-    if routed_response is not None:
-        return DataResponse(data=routed_response)
-
-    result = await commander_coach.run_coach(
-        request.app.state.db_pool,
-        deck,
-        body,
-        account_id=account.id,
-    )
+    result = await _assistant_service(request).run(deck, body, account.id)
     return DataResponse(data=result)
 
 
 async def _run_coach_job(
     job: coach_jobs.CoachJob,
-    pool: Any,
+    service: AssistantService,
     deck: DeckDetailResponse,
     body: CommanderCoachRequest,
 ) -> None:
@@ -303,32 +273,11 @@ async def _run_coach_job(
         await coach_jobs.emit(job, event, message)
 
     try:
-        result = await commander_coach.run_coach(
-            pool,
-            deck,
-            body,
-            progress=progress,
-            account_id=job.account_id,
-        )
+        result = await service.run(deck, body, job.account_id, progress=progress)
         await coach_jobs.finish_ok(job, result)
     except Exception as exc:  # noqa: BLE001 - surface job failures to stream clients
         _log.exception("Coach job %s failed", job.job_id)
         await coach_jobs.finish_error(job, str(exc))
-
-
-async def _finish_routed_job(
-    job: coach_jobs.CoachJob,
-    result: CommanderCoachResponse,
-) -> None:
-    """Publish routed non-specialist progress events and complete the stream."""
-    if result.mode == "memory" and result.memory_updated:
-        await coach_jobs.emit(job, "memory_writing", "Writing updated Assistant memory")
-        await coach_jobs.emit(job, "memory_written", "Assistant memory updated")
-    elif result.mode == "memory":
-        await coach_jobs.emit(job, "memory_read", "Reading Assistant memory")
-    else:
-        await coach_jobs.emit(job, "chat_reply", "MTG Assistant answered without deck tools")
-    await coach_jobs.finish_ok(job, result)
 
 
 @router.post("/{deck_id}/coach/start", response_model=DataResponse[CommanderCoachStartResponse])
@@ -343,19 +292,7 @@ async def coach_deck_start(
     deck = await _require_deck(request, deck_id, account)
     registry = request.app.state.coach_jobs
     job = coach_jobs.create(registry, account.id, deck_id)
-    await coach_jobs.emit(job, "memory_check", "Checking Assistant memory")
-    body = await _request_with_memory(request.app.state.db_pool, deck_id, account.id, body)
-    await coach_jobs.emit(job, "memory_loaded", "Loaded deck memory into Assistant context")
-    await coach_jobs.emit(job, "assistant_routing", "MTG Assistant is reading the request")
-    memory_response = await _handle_assistant_memory(
-        request.app.state.db_pool, deck, account.id, body
-    )
-    if memory_response is not None:
-        await coach_jobs.emit(job, "assistant_routed", "Handled by deterministic memory tools")
-        asyncio.create_task(_finish_routed_job(job, memory_response))
-        return DataResponse(data=CommanderCoachStartResponse(job_id=job.job_id))
-    await coach_jobs.emit(job, "assistant_routed", "MTG Assistant is selecting deck tools")
-    asyncio.create_task(_run_coach_job(job, request.app.state.db_pool, deck, body))
+    asyncio.create_task(_run_coach_job(job, _assistant_service(request), deck, body))
     return DataResponse(data=CommanderCoachStartResponse(job_id=job.job_id))
 
 

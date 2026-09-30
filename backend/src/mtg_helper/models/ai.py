@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Literal, Self
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -469,6 +469,8 @@ class CoachHistoryTurn(BaseModel):
 class CommanderCoachRequest(BaseModel):
     """Request body for the Commander Coach orchestrator."""
 
+    # Correlation only: access remains scoped by the authenticated account and deck.
+    conversation_id: UUID = Field(default_factory=uuid4)
     message: str = Field(default="Doctor this deck", min_length=1, max_length=4000)
     history: list[CoachHistoryTurn] = Field(default_factory=list, max_length=12)
     mode: CoachMode = "auto"

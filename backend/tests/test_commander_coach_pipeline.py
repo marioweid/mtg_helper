@@ -391,9 +391,7 @@ async def test_find_cards_passes_natural_theme_hints_to_discovery() -> None:
     with patch.object(mtg_assistant, "search_cards_service", search):
         result = await mtg_assistant.find_cards(SimpleNamespace(deps=deps), filters)
 
-    search.assert_awaited_once_with(
-        deps.pool, deps.deck, filters, owned_card_ids=None
-    )
+    search.assert_awaited_once_with(deps.pool, deps.deck, filters, owned_card_ids=None)
     assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
 
 
@@ -564,8 +562,11 @@ async def test_coach_endpoint_serializes_targeted_replacement(
     async def return_deck(*_args: object, **_kwargs: object) -> DeckDetailResponse:
         return deck
 
-    async def return_body(*_args: object, **_kwargs: object) -> CommanderCoachRequest:
-        return CommanderCoachRequest(message="Replace Medium Value Card")
+    from mtg_helper.models.ai import CoachMemoryResponse
+    from mtg_helper.services import assistant_service
+
+    async def return_memory(*_args: object, **_kwargs: object) -> CoachMemoryResponse:
+        return CoachMemoryResponse(deck_id=deck.id, account_id=uuid4(), notes="")
 
     async def no_memory(*_args: object, **_kwargs: object) -> None:
         return None
@@ -574,9 +575,9 @@ async def test_coach_endpoint_serializes_targeted_replacement(
         return response
 
     monkeypatch.setattr(ai, "_require_deck", return_deck)
-    monkeypatch.setattr(ai, "_request_with_memory", return_body)
-    monkeypatch.setattr(ai, "_handle_assistant_memory", no_memory)
-    monkeypatch.setattr(ai.commander_coach, "run_coach", return_response)
+    monkeypatch.setattr(assistant_service.coach_memory_service, "get_memory", return_memory)
+    monkeypatch.setattr(assistant_service.coach_memory_service, "handle_memory_message", no_memory)
+    monkeypatch.setattr(assistant_service.commander_coach, "run_coach", return_response)
     request = Request({"type": "http", "app": SimpleNamespace(state=SimpleNamespace(db_pool=None))})
     account = AccountResponse(
         id=uuid4(),
