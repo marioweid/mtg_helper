@@ -88,7 +88,8 @@ docker compose down
 See [`OPERATIONS.md`](OPERATIONS.md) for production deployment, data sync, Portainer setup, and operational commands.
 
 To connect an existing Assay instance, set `ASSAY_ENDPOINT`, `ASSAY_API_KEY` (project ingest key),
-and `ASSAY_APPLICATION` (application slug) on the backend. See
+and `ASSAY_APPLICATION` (application slug) on the backend. Assistant follow-up turns are grouped
+by chat in Assay's **Sessions** view. See
 [Assay tracing setup](OPERATIONS.md#assay-tracing) for Portainer, networking, and privacy details.
 
 ## Development checks
