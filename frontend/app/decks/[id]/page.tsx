@@ -39,6 +39,7 @@ import { DeckStats } from "@/components/deck-stats";
 import { GameChangerBadge } from "@/components/game-changer-badge";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
+import { NewCardsPanel } from "@/components/new-cards-panel";
 import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { TopPicksPanel } from "@/components/top-picks-panel";
@@ -46,7 +47,7 @@ import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
 import { deckTotal, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 
 type GroupMode = "tag" | "type";
-type DeckTab = "cards" | "top-picks" | "combos" | "history";
+type DeckTab = "cards" | "top-picks" | "new-cards" | "combos" | "history";
 
 const SORT_MODES: readonly SortMode[] = ["default", "name", "cmc", "price"];
 
@@ -95,6 +96,10 @@ export default function DeckDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load deck");
     }
+  }, [deckId]);
+
+  const refreshNewCardsPlan = useCallback(async () => {
+    setDeck(await apiClient.getDeck(deckId));
   }, [deckId]);
 
   useEffect(() => {
@@ -330,7 +335,7 @@ export default function DeckDetailPage() {
             aria-label="Deck view"
             className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-sm"
           >
-            {(["cards", "top-picks", "combos", "history"] as const).map((t) => {
+            {(["cards", "top-picks", "new-cards", "combos", "history"] as const).map((t) => {
               const active = tab === t;
               return (
                 <button
@@ -344,7 +349,7 @@ export default function DeckDetailPage() {
                       : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
                   }`}
                 >
-                  {t === "top-picks" ? "Top Picks" : t}
+                  {t === "top-picks" ? "Top Picks" : t === "new-cards" ? "New Cards" : t}
                 </button>
               );
             })}
@@ -442,6 +447,10 @@ export default function DeckDetailPage() {
           {tab === "combos" && <ComboTab deckId={deck.id} />}
 
           {tab === "top-picks" && <TopPicksPanel deckId={deck.id} onPlanChanged={load} />}
+
+          {tab === "new-cards" && (
+            <NewCardsPanel key={deck.id} deckId={deck.id} onPlanChanged={refreshNewCardsPlan} />
+          )}
 
           {tab === "history" && <DeckHistoryPanel deckId={deck.id} />}
         </div>
