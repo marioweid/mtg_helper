@@ -2,8 +2,9 @@
 
 ## Now
 
-Implementation is on `feat/new-cards-pilot`. Independent read-only review passed with no blockers;
-PR publication is the remaining handoff step.
+Implementation is published in [PR #13](https://github.com/marioweid/mtg_helper/pull/13) on
+`feat/new-cards-pilot`. Independent read-only review passed with no blockers. It is not merged or
+deployed; operator/browser/provider acceptance remains outstanding.
 No production deployment, production database write, or additional paid model call was performed.
 The existing research budgets remain exhausted. See [contract](new-cards-pilot-contract.md) and
 [operating instructions](../OPERATIONS.md#experimental-new-cards-pilot).

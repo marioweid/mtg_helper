@@ -3,8 +3,8 @@
 ## Now
 
 The user authorized an **experimental application pilot**, narrowed to released, Commander-legal
-cards. Implementation is on `feat/new-cards-pilot`; focused verification passed and independent
-review found no blockers. See [verification](new-cards-pilot-checks.md) for limitations and the
+cards. Implementation is published in [PR #13](https://github.com/marioweid/mtg_helper/pull/13)
+on `feat/new-cards-pilot`; focused verification passed and independent review found no blockers. See [verification](new-cards-pilot-checks.md) for limitations and the
 [pilot contract](new-cards-pilot-contract.md) for the implemented scope. The broader
 preview design below remains future work, not a claim about this pilot. Production is not deployed.
 See the [initial measurements](research/new-cards-spike-2026-10-05/README.md),
