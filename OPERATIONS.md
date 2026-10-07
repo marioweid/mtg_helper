@@ -9,7 +9,7 @@ Two files. The base file is local-dev only; the prod file is a standalone Portai
 | File | Purpose |
 |---|---|
 | `docker-compose.yml` | Local dev. Postgres + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in a Docker-managed named volume. |
-| `docker-compose.prod.yml` | Standalone production/Portainer stack. Uses host data under `${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}`, production frontend build, and weekly `scryfall-sync`. |
+| `docker-compose.prod.yml` | Standalone production/Portainer stack. Uses host data under `${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}`, production frontend build, and daily `scryfall-sync` (weekly tag/embedding refresh). |
 
 The production file intentionally does **not** use Compose merge tags (`!reset`, `!override`) so it
 works with current Portainer Git stacks. It publishes only the frontend to
@@ -202,7 +202,43 @@ curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/tag-cards"
 curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/embed-cards"
 ```
 
-Weekly auto-sync runs **only in prod** via the `scryfall-sync` service defined in `docker-compose.prod.yml`. Locally, trigger it manually from the Admin page (or with the curl commands above) when you want fresh card data. Initial sync also runs on backend startup if `cards` table is empty.
+Daily card auto-sync runs **only in prod** via `scryfall-sync` in `docker-compose.prod.yml`.
+It runs full refresh (sync + tag + embed) on startup and every seventh day; intervening daily runs
+only sync shared Scryfall facts/history. This does not run deck AI analysis. Locally, sync manually
+from Admin. Backend startup also syncs when `cards` is empty.
+
+### Experimental New Cards pilot
+
+After deploying the reviewed branch, restart the backend to apply the additive, idempotent schema.
+An existing populated database still needs **one Admin card sync**: startup does not silently redownload
+its catalog. Discovery then publishes Oracle facts plus full Default Cards printing history in the
+same transaction as canonical cards. Failed/truncated refreshes retain the previous catalog. Allow
+additional temporary disk/network space for the compressed history (130 MiB download cap) and memory
+for the existing Oracle export. No manual data migration or new credentials are needed.
+
+To test: open a deck → **New Cards**, inspect the source date and coverage, then click **Analyze next
+eight**. Reads/refreshes are free of model calls. Each click requests at most eight unassessed cards;
+rejected cards count toward coverage. Per account: one active lease across decks/workers, 30 batches
+per UTC day, 180 KB input cap, 7,000 output tokens, low reasoning, no retries, 90-second analysis
+bound. Provider failures still consume the reserved daily slot. After restart/interruption, an
+abandoned lease expires in two minutes; the user retries explicitly. There is no automatic resume.
+
+Advice is unverified: neither research evaluator passed trusted-recommendation acceptance. The pilot
+shows exact source rules separately and excludes previews, unknown origins, promo-only originals and
+unresolved special products. Original regular-product releases use the 60-day UTC window, not early
+promos or later representative printings. Coverage is conservative, not a complete spoiler feed.
+
+**Plan addition** is explicit and idempotent; it never edits physical cards or plans supporting swaps.
+Current physical cards, partners, goals, preferences, notes and pending plans invalidate affected
+cached advice. Pending additions are not support. Dismissals persist per account/deck; the UI can undo
+the latest dismissal. Saved plans survive age expiry. Pilot-origin plans recheck current local
+legality, color identity and copy limits during single/batch completion; failures roll back the whole
+revision. Manual/Rule 0 plans retain existing policy. A stale catalog is visibly flagged after two
+days; ask an admin to sync it rather than treating refresh-status as a sync button.
+
+Testing a PR locally or opening it does **not** deploy this feature. Do not merge solely on mechanical
+evidence checks: they verify identity/quotations, not MTG rules interpretation. Report deck goals,
+card name, generated claim, source text and expected interaction when giving pilot feedback.
 
 ## Deploy pipeline
 

@@ -22,6 +22,7 @@ from mtg_helper.routers import (
     feedback,
     health,
     me,
+    new_cards,
     onboarding,
     revisions,
     snapshots,
@@ -36,6 +37,7 @@ from mtg_helper.services import (
     theme_service,
 )
 from mtg_helper.services.admin_jobs import JobRegistry
+from mtg_helper.services.new_cards.repository import NewCardsError
 
 _log = logging.getLogger(__name__)
 
@@ -119,6 +121,14 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(NewCardsError)
+async def new_cards_error_handler(_request: Request, exc: NewCardsError) -> JSONResponse:
+    """Return actionable pilot failures without exposing private model/provider output."""
+    return JSONResponse(
+        status_code=exc.status, content={"error": {"code": "NEW_CARDS_ERROR", "message": str(exc)}}
+    )
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """Return a consistent error envelope for unhandled exceptions."""
@@ -138,6 +148,7 @@ app.include_router(cards.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(revisions.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(new_cards.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(ai.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(feedback.router, prefix="/api/v1", dependencies=_authed)

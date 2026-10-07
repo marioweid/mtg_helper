@@ -7,7 +7,7 @@
 # Stop:        docker compose down
 #
 # Production uses a standalone Portainer-friendly stack with host-bound data,
-# a production frontend build, and weekly Scryfall sync. See docker-compose.prod.yml.
+# a production frontend build, and daily Scryfall sync. See docker-compose.prod.yml.
 
 services:
   postgres:

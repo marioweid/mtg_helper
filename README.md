@@ -43,6 +43,7 @@ The application combines a local Scryfall-backed card database, deck management 
 - **Cardmarket buy lists** — Generate a buy list for missing deck cards that are not currently in your collection.
 - **Moxfield-oriented workflows** — Import, export, and work with deck lists from existing Magic deck-building tools.
 - **Fresh card data** — Scryfall bulk data is imported into PostgreSQL so card search and validation work locally.
+- **Experimental New Cards** — Explicitly analyze recent, released Commander-legal cards for your physical deck. Review unverified advice alongside source rules, then plan an addition or dismiss it. No previews or automatic deck edits. See [setup and limits](OPERATIONS.md#experimental-new-cards-pilot).
 
 ## Tech stack
 

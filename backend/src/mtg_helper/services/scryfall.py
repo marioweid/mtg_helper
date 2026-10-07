@@ -5,13 +5,14 @@ import io
 import json
 import logging
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 import asyncpg
 import httpx
 
 from mtg_helper.config import settings
+from mtg_helper.services.new_cards import catalog
 
 if TYPE_CHECKING:
     from mtg_helper.services.admin_jobs import ProgressCb
@@ -97,6 +98,16 @@ def _extract_image_uri(card: dict[str, Any]) -> str | None:
     return None
 
 
+def _full_rules(card: dict[str, Any]) -> str | None:
+    faces = card.get("card_faces") or []
+    if faces:
+        return "\n".join(
+            f"{face.get('name', '')} [{face.get('type_line', '')}]: {face.get('oracle_text') or ''}"
+            for face in faces
+        )
+    return card.get("oracle_text")
+
+
 def _map_card(card: dict[str, Any]) -> dict[str, Any]:
     """Map a Scryfall card dict to our database schema.
 
@@ -114,7 +125,7 @@ def _map_card(card: dict[str, Any]) -> dict[str, Any]:
         "mana_cost": card.get("mana_cost"),
         "cmc": card.get("cmc"),
         "type_line": card.get("type_line"),
-        "oracle_text": card.get("oracle_text"),
+        "oracle_text": _full_rules(card),
         "color_identity": card.get("color_identity") or [],
         "colors": card.get("colors") or [],
         "keywords": card.get("keywords") or [],
@@ -182,7 +193,10 @@ def _is_commander_playable(card: dict[str, Any]) -> bool:
     return True
 
 
-async def _fetch_bulk_data_url(client: httpx.AsyncClient) -> str:
+async def _fetch_bulk_data_url(
+    client: httpx.AsyncClient,
+    kind: str = "oracle_cards",
+) -> str:
     """Fetch the JSONL download URL for the oracle_cards bulk data file.
 
     Args:
@@ -198,13 +212,13 @@ async def _fetch_bulk_data_url(client: httpx.AsyncClient) -> str:
     response.raise_for_status()
     entries = response.json().get("data", [])
     for entry in entries:
-        if entry.get("type") == "oracle_cards":
+        if entry.get("type") == kind:
             download_uri = entry.get("jsonl_download_uri")
             if isinstance(download_uri, str) and download_uri:
                 return download_uri
-            msg = "oracle_cards bulk data entry is missing jsonl_download_uri"
+            msg = f"{kind} bulk data entry is missing jsonl_download_uri"
             raise ValueError(msg)
-    msg = "oracle_cards bulk data entry not found in Scryfall response"
+    msg = f"{kind} bulk data entry not found in Scryfall response"
     raise ValueError(msg)
 
 
@@ -341,13 +355,22 @@ async def run_sync(
 
     cb = progress or noop_progress
     start = time.monotonic()
+    started_at = datetime.now(UTC)
 
     cb("downloading", 0, 0)
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(
+        timeout=120,
+        headers={
+            "User-Agent": "MTGHelper/1.0",
+            "Accept": "application/json",
+        },
+    ) as client:
         download_url = await _fetch_bulk_data_url(client)
         response = await client.get(download_url)
         response.raise_for_status()
         all_cards = _parse_bulk_cards(response.content)
+        history_url = await _fetch_bulk_data_url(client, "default_cards")
+        history = await catalog.download_history(client, history_url)
 
     cb("filtering", 0, len(all_cards))
     relevant = [
@@ -357,12 +380,15 @@ async def run_sync(
     total = len(relevant)
     _log.info("Upserting %d Commander-relevant cards", total)
     async with pool.acquire() as conn, conn.transaction():
+        if not await catalog.lock_generation(conn, started_at, len(all_cards)):
+            return {"cards_processed": 0, "superseded": True}
         for i in range(0, total, _BATCH_SIZE):
             await _upsert_batch(conn, relevant[i : i + _BATCH_SIZE])
             done = min(i + _BATCH_SIZE, total)
             cb("upserting", done, total)
             _log.info("Upserted %d / %d cards", done, total)
         await _switch_canonical_rows(conn, relevant)
+        await catalog.publish(conn, all_cards, history, started_at)
 
     from mtg_helper.services import oracle_duplicate_repair_service
 

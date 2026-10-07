@@ -160,6 +160,7 @@ function PilotWarning() {
       <p>
         Catalog refresh is daily in production. Opening this tab or refreshing status never starts
         analysis or source sync. Planning adds one pending addition, not a physical deck edit.
+        Advice uses your current physical deck; planned additions are not present support.
       </p>
     </div>
   );
@@ -190,7 +191,10 @@ function NewCardsCoverage({ result }: { result: NewCardsResponse | null }) {
         count as assessed.
       </p>
       {result.stale && (
-        <p className="text-amber-300">Source or analysis is stale; refresh status.</p>
+        <p className="text-amber-300">
+          Source or analysis is stale. Ask an admin to sync old source data, or analyze remaining
+          cards.
+        </p>
       )}
       {result.remaining_count > 0 && (
         <p>Partial coverage. Unassessed cards are not evidence of no matches.</p>
@@ -293,7 +297,7 @@ function GeneratedAdvice({ pick }: { pick: NewCardPick }) {
       ) : (
         <p>No supporting changes reported; this is not a guarantee of fit.</p>
       )}
-      <h5 className="font-medium">Evidence from physical deck cards</h5>
+      <h5 className="font-medium">Source evidence: candidate and physical support</h5>
       {pick.evidence.length > 0 ? (
         <ul className="space-y-1">
           {pick.evidence.map((item, index) => (
