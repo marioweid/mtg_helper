@@ -171,8 +171,8 @@ async def _replace_plan_group(conn: asyncpg.Connection, rows: list[asyncpg.Recor
         """
         INSERT INTO deck_card_plans (
             deck_id, card_id, direction, quantity, collection_id,
-            categories, added_by, ai_reasoning, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            categories, added_by, ai_reasoning, created_at, new_cards_origin
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         """,
         first["deck_id"],
         first["canonical_card_id"],
@@ -183,6 +183,7 @@ async def _replace_plan_group(conn: asyncpg.Connection, rows: list[asyncpg.Recor
         added_by,
         reasoning,
         min(row["created_at"] for row in rows),
+        any(row["new_cards_origin"] for row in matching),
     )
 
 

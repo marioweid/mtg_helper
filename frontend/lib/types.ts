@@ -41,6 +41,46 @@ export interface CardResponse {
   game_changer: boolean;
 }
 
+// Experimental released-card pilot
+export interface NewCardsResponse {
+  status: "unavailable" | "idle" | "running" | "error";
+  catalog_updated_at: string | null;
+  analyzed_at: string | null;
+  stale: boolean;
+  eligible_count: number;
+  assessed_count: number;
+  remaining_count: number;
+  dismissed_count: number;
+  error: string | null;
+  picks: NewCardPick[];
+}
+
+export interface NewCardFace {
+  name: string;
+  mana_cost: string | null;
+  type_line: string | null;
+  oracle_text: string;
+  power: string | null;
+  toughness: string | null;
+}
+
+export interface NewCardPick extends NewCardFace {
+  oracle_id: string;
+  card_id: string;
+  scryfall_id: string;
+  faces: NewCardFace[];
+  image_uri: string | null;
+  scryfall_uri: string;
+  released_at: string;
+  expires_at: string;
+  price_eur_cents: number | null;
+  label: "strong" | "worth_testing";
+  reason: string;
+  caveat: string;
+  required_changes: string[];
+  evidence: { name: string; quote: string }[];
+}
+
 // Decks
 export interface DeckSummary {
   id: string;

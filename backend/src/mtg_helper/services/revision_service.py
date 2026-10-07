@@ -7,6 +7,7 @@ import asyncpg
 
 from mtg_helper.models.revisions import DeckRevision, DeckRevisionChange, DeckRevisionUpdate
 from mtg_helper.services import planned_change_service, snapshot_service
+from mtg_helper.services.new_cards.completion import validate_addition
 from mtg_helper.services.planned_change_service import (
     InsufficientQuantityError,
     PlanNotFoundError,
@@ -89,6 +90,8 @@ async def _apply_plan(
             plan["direction"],
         )
     if plan["direction"] == "addition":
+        if plan["new_cards_origin"]:
+            await validate_addition(conn, plan["deck_id"], plan["card_id"], quantity)
         await planned_change_service._complete_addition(conn, plan, quantity)
     else:
         await planned_change_service._complete_cut(conn, plan, quantity)

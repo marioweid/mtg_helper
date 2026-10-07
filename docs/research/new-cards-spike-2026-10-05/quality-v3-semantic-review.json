@@ -1,0 +1,96 @@
+{
+  "review_kind": "Independent arm-blinded agent review, followed by owner source verification; not human-judge certification or semantic accuracy.",
+  "reviewer_verdict": "reject",
+  "classifications": {
+    "S01": "no_material_error_observed",
+    "S02": "no_material_error_observed",
+    "S03": "no_material_error_observed",
+    "S04": "no_material_error_observed",
+    "S05": "error",
+    "S06": "no_material_error_observed",
+    "S07": "no_material_error_observed",
+    "S08": "no_material_error_observed",
+    "S09": "no_material_error_observed",
+    "S10": "no_material_error_observed",
+    "S11": "no_material_error_observed",
+    "S12": "no_material_error_observed",
+    "S13": "no_material_error_observed",
+    "S14": "no_material_error_observed",
+    "S15": "no_material_error_observed",
+    "S16": "no_material_error_observed",
+    "S17": "no_material_error_observed",
+    "S18": "no_material_error_observed",
+    "S19": "no_material_error_observed",
+    "S20": "no_material_error_observed",
+    "S21": "no_material_error_observed",
+    "S22": "no_material_error_observed",
+    "S23": "no_material_error_observed",
+    "S24": "no_material_error_observed",
+    "S25": "no_material_error_observed",
+    "S26": "no_material_error_observed",
+    "S27": "no_material_error_observed",
+    "S28": "error",
+    "S29": "error",
+    "S30": "no_material_error_observed",
+    "S31": "no_material_error_observed",
+    "S32": "no_material_error_observed",
+    "S33": "no_material_error_observed",
+    "S34": "no_material_error_observed",
+    "S35": "no_material_error_observed",
+    "S36": "no_material_error_observed",
+    "S37": "no_material_error_observed",
+    "S38": "no_material_error_observed",
+    "S39": "no_material_error_observed",
+    "S40": "no_material_error_observed",
+    "S41": "no_material_error_observed",
+    "S42": "no_material_error_observed",
+    "S43": "no_material_error_observed",
+    "S44": "error",
+    "S45": "no_material_error_observed",
+    "S46": "no_material_error_observed",
+    "S47": "no_material_error_observed",
+    "S48": "no_material_error_observed",
+    "S49": "no_material_error_observed",
+    "S50": "unclear",
+    "S51": "no_material_error_observed",
+    "S52": "no_material_error_observed",
+    "S53": "no_material_error_observed",
+    "S54": "no_material_error_observed",
+    "S55": "unclear",
+    "S56": "unclear",
+    "S57": "no_material_error_observed",
+    "S58": "no_material_error_observed",
+    "S59": "no_material_error_observed",
+    "S60": "error",
+    "S61": "no_material_error_observed",
+    "S62": "no_material_error_observed",
+    "S63": "no_material_error_observed",
+    "S64": "no_material_error_observed"
+  },
+  "unblinded_counts": {
+    "low": {
+      "holdout": {
+        "error": 2,
+        "unclear": 0,
+        "no_material_error_observed": 17
+      },
+      "regression": {
+        "error": 1,
+        "unclear": 2,
+        "no_material_error_observed": 10
+      }
+    },
+    "high": {
+      "holdout": {
+        "error": 1,
+        "unclear": 0,
+        "no_material_error_observed": 18
+      },
+      "regression": {
+        "error": 1,
+        "unclear": 1,
+        "no_material_error_observed": 11
+      }
+    }
+  }
+}

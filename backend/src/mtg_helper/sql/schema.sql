@@ -776,3 +776,52 @@ SELECT
     c.game_changer
 FROM deck_cards dc
 JOIN cards c ON dc.card_id = c.id;
+
+-- Experimental released-card discovery; additive and safe on existing databases.
+ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS new_card_catalog (
+    oracle_id UUID PRIMARY KEY,
+    first_paper DATE,
+    released_at DATE,
+    facts JSONB NOT NULL,
+    generation UUID NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_new_card_catalog_release ON new_card_catalog (released_at);
+
+CREATE TABLE IF NOT EXISTS new_card_catalog_state (
+    singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+    generation UUID NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL,
+    published_at TIMESTAMPTZ NOT NULL,
+    card_count INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS new_card_dismissals (
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    PRIMARY KEY (deck_id, account_id, oracle_id)
+);
+
+CREATE TABLE IF NOT EXISTS new_card_assessments (
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    input_hash TEXT NOT NULL,
+    assessment JSONB NOT NULL,
+    assessed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (deck_id, account_id, oracle_id)
+);
+
+-- One durable lease/quota row per account, not an in-process task registry.
+CREATE TABLE IF NOT EXISTS new_card_jobs (
+    account_id UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    deck_id UUID REFERENCES decks(id) ON DELETE SET NULL,
+    token UUID,
+    lease_until TIMESTAMPTZ,
+    quota_day DATE NOT NULL DEFAULT ((now() AT TIME ZONE 'UTC')::date),
+    calls INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    finished_at TIMESTAMPTZ
+);

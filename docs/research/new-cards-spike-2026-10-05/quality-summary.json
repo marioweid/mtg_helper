@@ -1,0 +1,96 @@
+{
+  "calls": 8,
+  "contract_valid_runs": 4,
+  "control_matches": 44,
+  "control_count": 46,
+  "control_note": "Excludes all-label Ashnod control; not semantic accuracy or recall.",
+  "input_tokens": 84158,
+  "output_tokens": 12848,
+  "seconds": [
+    14.279,
+    15.643,
+    12.565,
+    13.775,
+    15.161,
+    12.974,
+    14.108,
+    14.134
+  ],
+  "estimated_cost_upper_usd": 0.0364571,
+  "stability": [
+    {
+      "deck": "alela-artifacts",
+      "comparable": 14,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Mesa Enchantress",
+          "forward": "worth_testing",
+          "reverse": "reject"
+        },
+        {
+          "card": "The Lord of the Eagles",
+          "forward": "worth_testing",
+          "reverse": "reject"
+        },
+        {
+          "card": "Great Fierce Bee",
+          "forward": "worth_testing",
+          "reverse": "reject"
+        },
+        {
+          "card": "Wizard's Staff",
+          "forward": "worth_testing",
+          "reverse": "reject"
+        }
+      ]
+    },
+    {
+      "deck": "alela-enchantments",
+      "comparable": 14,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Sai, Master Thopterist",
+          "forward": "worth_testing",
+          "reverse": "reject"
+        },
+        {
+          "card": "Prophesied End",
+          "forward": "worth_testing",
+          "reverse": "reject"
+        }
+      ]
+    },
+    {
+      "deck": "camellia-food",
+      "comparable": 13,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Ashnod's Altar",
+          "forward": "worth_testing",
+          "reverse": "strong"
+        },
+        {
+          "card": "Hungering Puppetbeast",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        }
+      ]
+    },
+    {
+      "deck": "talrand-spells",
+      "comparable": 13,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Metallurgic Summonings",
+          "forward": "worth_testing",
+          "reverse": "strong"
+        }
+      ]
+    }
+  ],
+  "limitation": "One forward/reverse pair mixes order effects with sampling variance."
+}

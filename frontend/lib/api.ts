@@ -48,6 +48,7 @@ import type {
   KeywordExtractResponse,
   KeywordGroup,
   ManaFixResponse,
+  NewCardsResponse,
   OptimizeJobStatus,
   OptimizeRequest,
   OptimizeStartResponse,
@@ -183,6 +184,26 @@ export const apiClient = {
 
   getTopPicks: (deckId: string, source: TopPickSource = "combined") =>
     request<TopPicksResponse>(`/decks/${deckId}/top-picks?source=${source}`),
+
+  getNewCards: (deckId: string) => request<NewCardsResponse>(`/decks/${deckId}/new-cards`),
+
+  analyzeNewCards: (deckId: string) =>
+    request<NewCardsResponse>(`/decks/${deckId}/new-cards/analyze`, { method: "POST" }),
+
+  dismissNewCard: (deckId: string, oracleId: string) =>
+    request<NewCardsResponse>(`/decks/${deckId}/new-cards/${oracleId}/dismiss`, {
+      method: "POST",
+    }),
+
+  undoNewCardDismissal: (deckId: string, oracleId: string) =>
+    request<NewCardsResponse>(`/decks/${deckId}/new-cards/${oracleId}/dismiss`, {
+      method: "DELETE",
+    }),
+
+  planNewCard: (deckId: string, oracleId: string) =>
+    request<NewCardsResponse>(`/decks/${deckId}/new-cards/${oracleId}/plan`, {
+      method: "POST",
+    }),
 
   getDeckCombos: (id: string) => request<ComboListResponse>(`/decks/${id}/combos`),
 

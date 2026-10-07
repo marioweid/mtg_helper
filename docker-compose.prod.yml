@@ -90,8 +90,8 @@ services:
     depends_on:
       - backend
 
-  # Weekly Scryfall refresh. Initial sync also runs on backend startup when the
-  # cards table is empty.
+  # Daily Scryfall discovery; tag/embedding refresh remains weekly.
+  # Initial sync also runs on backend startup when the cards table is empty.
   scryfall-sync:
     image: alpine/curl:latest
     restart: unless-stopped
@@ -99,13 +99,17 @@ services:
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN must be set}
     entrypoint: >
       sh -c "
-        echo 'Scryfall weekly sync cron started';
+        echo 'Scryfall daily sync cron started';
+        day=0;
         while true; do
           echo 'Waiting for backend...';
           until curl -sf -o /dev/null http://backend:8000/health; do sleep 10; done;
-          echo 'Kicking off refresh-all (sync + tag + embed) in background...';
-          curl -sf --max-time 30 -X POST -H \"X-Internal-Token: $$INTERNAL_API_TOKEN\" http://backend:8000/api/v1/admin/refresh-all && echo 'Refresh kicked off' || echo 'Refresh kickoff failed';
-          sleep 604800;
+          endpoint=sync-cards;
+          if [ $$day -eq 0 ]; then endpoint=refresh-all; fi;
+          echo 'Kicking off shared card refresh in background...';
+          curl -sf --max-time 30 -X POST -H \"X-Internal-Token: $$INTERNAL_API_TOKEN\" http://backend:8000/api/v1/admin/$$endpoint && echo 'Refresh kicked off' || echo 'Refresh kickoff failed';
+          day=$$((($$day + 1) % 7));
+          sleep 86400;
         done
       "
     depends_on:

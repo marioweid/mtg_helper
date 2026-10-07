@@ -592,10 +592,13 @@ async def add_card_to_deck(
         CardNotFoundError: If the card is not in the local DB.
         ColorIdentityError: If the card violates the commander's color identity.
     """
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn, conn.transaction():
         if email is not None:
             await _assert_owner(conn, deck_id, email)
-        deck_row = await conn.fetchrow("SELECT commander_id FROM decks WHERE id = $1", deck_id)
+        # Physical additions and planned completion must share the same deck lock.
+        deck_row = await conn.fetchrow(
+            "SELECT commander_id FROM decks WHERE id = $1 FOR UPDATE", deck_id
+        )
         if deck_row is None:
             raise DeckNotFoundError(f"Deck {deck_id} not found")
 
