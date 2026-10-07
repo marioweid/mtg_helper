@@ -1,1 +1,4 @@
 * text=auto eol=lf
+# Keep frozen experiment evidence byte-for-byte across platforms.
+docs/research/new-cards-spike-2026-10-05/*.json -text
+docs/research/new-cards-spike-2026-10-05/*.txt -text

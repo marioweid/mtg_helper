@@ -1,0 +1,322 @@
+{
+  "S01": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "0caccec3-4942-499a-9434-0c94389afcf8",
+    "reasoning_effort": "low"
+  },
+  "S02": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "6b071146-2f83-4fda-a55a-46fcb74e6f28",
+    "reasoning_effort": "high"
+  },
+  "S03": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "c02c5547-b9c9-4b2d-9d12-e87bfba8f2d2",
+    "reasoning_effort": "low"
+  },
+  "S04": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "994bc16d-fdc6-475c-96df-beeb4d5aa03e",
+    "reasoning_effort": "low"
+  },
+  "S05": {
+    "deck_id": "camellia-food",
+    "oracle_id": "0636b6c3-0662-420a-b30d-f0a14e7c512d",
+    "reasoning_effort": "low"
+  },
+  "S06": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "ecdfee75-15fd-41ea-89d4-4bfc1fa4d032",
+    "reasoning_effort": "high"
+  },
+  "S07": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "33017203-233e-498e-806e-94b1dccf5c35",
+    "reasoning_effort": "high"
+  },
+  "S08": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "7d5149c6-0e7e-438c-a554-5235c85e2426",
+    "reasoning_effort": "high"
+  },
+  "S09": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "8c0520fa-276b-4d21-b4a9-dce1fce59f6b",
+    "reasoning_effort": "low"
+  },
+  "S10": {
+    "deck_id": "camellia-food",
+    "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+    "reasoning_effort": "low"
+  },
+  "S11": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "3640c29b-1534-4952-b297-619ade948431",
+    "reasoning_effort": "low"
+  },
+  "S12": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "e110ee80-37af-4989-a5fb-95d51dc7f102",
+    "reasoning_effort": "low"
+  },
+  "S13": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "2975590d-6a5b-41e5-8a3b-e9325e71226a",
+    "reasoning_effort": "high"
+  },
+  "S14": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "45f4d057-5134-40a2-9590-ddba73a65582",
+    "reasoning_effort": "high"
+  },
+  "S15": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "ecdfee75-15fd-41ea-89d4-4bfc1fa4d032",
+    "reasoning_effort": "low"
+  },
+  "S16": {
+    "deck_id": "camellia-food",
+    "oracle_id": "63788566-e25a-44bb-bb55-197e1b93b3e8",
+    "reasoning_effort": "low"
+  },
+  "S17": {
+    "deck_id": "camellia-food",
+    "oracle_id": "4e58ad76-37c7-4531-b207-6890b39a2679",
+    "reasoning_effort": "low"
+  },
+  "S18": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "0caccec3-4942-499a-9434-0c94389afcf8",
+    "reasoning_effort": "high"
+  },
+  "S19": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "994bc16d-fdc6-475c-96df-beeb4d5aa03e",
+    "reasoning_effort": "high"
+  },
+  "S20": {
+    "deck_id": "camellia-food",
+    "oracle_id": "63788566-e25a-44bb-bb55-197e1b93b3e8",
+    "reasoning_effort": "high"
+  },
+  "S21": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "45f4d057-5134-40a2-9590-ddba73a65582",
+    "reasoning_effort": "low"
+  },
+  "S22": {
+    "deck_id": "camellia-food",
+    "oracle_id": "5ea93956-085d-409b-bd95-dd669fa69eeb",
+    "reasoning_effort": "high"
+  },
+  "S23": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "d2ae893f-52af-4645-8712-d62fb78f901e",
+    "reasoning_effort": "low"
+  },
+  "S24": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+    "reasoning_effort": "high"
+  },
+  "S25": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "89ed0598-a3ee-4d14-9a35-25e0dd80d9fb",
+    "reasoning_effort": "low"
+  },
+  "S26": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "43355ac4-bf8c-48f6-a322-fafbc9d132d1",
+    "reasoning_effort": "low"
+  },
+  "S27": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "f8c2a972-e38f-47e5-a355-6f30ad09b1ae",
+    "reasoning_effort": "high"
+  },
+  "S28": {
+    "deck_id": "camellia-food",
+    "oracle_id": "0636b6c3-0662-420a-b30d-f0a14e7c512d",
+    "reasoning_effort": "high"
+  },
+  "S29": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "6b071146-2f83-4fda-a55a-46fcb74e6f28",
+    "reasoning_effort": "low"
+  },
+  "S30": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "6467cbb7-1e4e-482d-a20f-6cb9fc0f1ad1",
+    "reasoning_effort": "low"
+  },
+  "S31": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+    "reasoning_effort": "high"
+  },
+  "S32": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "25c983e0-a8c9-4784-91a4-8fe04c6df882",
+    "reasoning_effort": "low"
+  },
+  "S33": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "7d5149c6-0e7e-438c-a554-5235c85e2426",
+    "reasoning_effort": "low"
+  },
+  "S34": {
+    "deck_id": "camellia-food",
+    "oracle_id": "916bd025-c44f-49c9-8d76-4b7b2f9a8ba3",
+    "reasoning_effort": "low"
+  },
+  "S35": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+    "reasoning_effort": "high"
+  },
+  "S36": {
+    "deck_id": "camellia-food",
+    "oracle_id": "916bd025-c44f-49c9-8d76-4b7b2f9a8ba3",
+    "reasoning_effort": "high"
+  },
+  "S37": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "89ed0598-a3ee-4d14-9a35-25e0dd80d9fb",
+    "reasoning_effort": "high"
+  },
+  "S38": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "25c983e0-a8c9-4784-91a4-8fe04c6df882",
+    "reasoning_effort": "high"
+  },
+  "S39": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+    "reasoning_effort": "low"
+  },
+  "S40": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+    "reasoning_effort": "high"
+  },
+  "S41": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "2975590d-6a5b-41e5-8a3b-e9325e71226a",
+    "reasoning_effort": "low"
+  },
+  "S42": {
+    "deck_id": "camellia-food",
+    "oracle_id": "62511d43-8eaf-405a-9c81-7bd593d3a01e",
+    "reasoning_effort": "high"
+  },
+  "S43": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "6467cbb7-1e4e-482d-a20f-6cb9fc0f1ad1",
+    "reasoning_effort": "high"
+  },
+  "S44": {
+    "deck_id": "camellia-food",
+    "oracle_id": "62511d43-8eaf-405a-9c81-7bd593d3a01e",
+    "reasoning_effort": "low"
+  },
+  "S45": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "22d7048e-d538-4fd3-9fb3-2e99e74875fe",
+    "reasoning_effort": "high"
+  },
+  "S46": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "3640c29b-1534-4952-b297-619ade948431",
+    "reasoning_effort": "high"
+  },
+  "S47": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+    "reasoning_effort": "low"
+  },
+  "S48": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+    "reasoning_effort": "low"
+  },
+  "S49": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "8c0520fa-276b-4d21-b4a9-dce1fce59f6b",
+    "reasoning_effort": "high"
+  },
+  "S50": {
+    "deck_id": "camellia-food",
+    "oracle_id": "4421ab7d-6d9b-4edd-b5a0-53a8ed84da6f",
+    "reasoning_effort": "low"
+  },
+  "S51": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "f8c2a972-e38f-47e5-a355-6f30ad09b1ae",
+    "reasoning_effort": "low"
+  },
+  "S52": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "22d7048e-d538-4fd3-9fb3-2e99e74875fe",
+    "reasoning_effort": "low"
+  },
+  "S53": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "c02c5547-b9c9-4b2d-9d12-e87bfba8f2d2",
+    "reasoning_effort": "high"
+  },
+  "S54": {
+    "deck_id": "camellia-food",
+    "oracle_id": "4e58ad76-37c7-4531-b207-6890b39a2679",
+    "reasoning_effort": "high"
+  },
+  "S55": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "67c603cc-ad66-4a1c-8386-5901c9c01bfb",
+    "reasoning_effort": "low"
+  },
+  "S56": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "67c603cc-ad66-4a1c-8386-5901c9c01bfb",
+    "reasoning_effort": "high"
+  },
+  "S57": {
+    "deck_id": "talrand-spells",
+    "oracle_id": "43355ac4-bf8c-48f6-a322-fafbc9d132d1",
+    "reasoning_effort": "high"
+  },
+  "S58": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+    "reasoning_effort": "low"
+  },
+  "S59": {
+    "deck_id": "camellia-food",
+    "oracle_id": "5ea93956-085d-409b-bd95-dd669fa69eeb",
+    "reasoning_effort": "low"
+  },
+  "S60": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "d2ae893f-52af-4645-8712-d62fb78f901e",
+    "reasoning_effort": "high"
+  },
+  "S61": {
+    "deck_id": "alela-artifacts",
+    "oracle_id": "e110ee80-37af-4989-a5fb-95d51dc7f102",
+    "reasoning_effort": "high"
+  },
+  "S62": {
+    "deck_id": "camellia-food",
+    "oracle_id": "4421ab7d-6d9b-4edd-b5a0-53a8ed84da6f",
+    "reasoning_effort": "high"
+  },
+  "S63": {
+    "deck_id": "camellia-food",
+    "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+    "reasoning_effort": "high"
+  },
+  "S64": {
+    "deck_id": "alela-enchantments",
+    "oracle_id": "33017203-233e-498e-806e-94b1dccf5c35",
+    "reasoning_effort": "low"
+  }
+}

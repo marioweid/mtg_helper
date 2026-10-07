@@ -1,0 +1,106 @@
+{
+  "calls": 8,
+  "contract_valid_runs": 5,
+  "control_matches": 44,
+  "control_count": 46,
+  "control_note": "Excludes all-label Ashnod control; not semantic accuracy or recall.",
+  "input_tokens": 111132,
+  "output_tokens": 20008,
+  "seconds": [
+    21.481,
+    20.958,
+    21.791,
+    22.501,
+    28.748,
+    24.473,
+    21.178,
+    25.003
+  ],
+  "estimated_cost_upper_usd": 0.0517926,
+  "stability": [
+    {
+      "deck": "alela-artifacts",
+      "comparable": 14,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Unflinching Hortimancer",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        },
+        {
+          "card": "Fateful Discovery",
+          "forward": "worth_testing",
+          "reverse": "strong"
+        },
+        {
+          "card": "Wizard's Staff",
+          "forward": "worth_testing",
+          "reverse": "strong"
+        }
+      ]
+    },
+    {
+      "deck": "alela-enchantments",
+      "comparable": 14,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Vedalken Archmage",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        },
+        {
+          "card": "Desperate Futurescribe",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        },
+        {
+          "card": "Unflinching Hortimancer",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        },
+        {
+          "card": "Wizard's Staff",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        }
+      ]
+    },
+    {
+      "deck": "camellia-food",
+      "comparable": 14,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Gardenize",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        },
+        {
+          "card": "Compel Brutality",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        }
+      ]
+    },
+    {
+      "deck": "talrand-spells",
+      "comparable": 14,
+      "expected": 14,
+      "changes": [
+        {
+          "card": "Mystic Sanctuary",
+          "forward": "worth_testing",
+          "reverse": "strong"
+        },
+        {
+          "card": "Variable Chaser // Arc of Fortune",
+          "forward": "reject",
+          "reverse": "worth_testing"
+        }
+      ]
+    }
+  ],
+  "limitation": "One forward/reverse pair mixes order effects with sampling variance."
+}

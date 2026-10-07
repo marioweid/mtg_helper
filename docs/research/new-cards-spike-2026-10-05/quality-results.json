@@ -1,0 +1,1568 @@
+{
+  "prompt_version": "new-cards-feasibility-v1",
+  "model": "gpt-5.6-luna",
+  "runs": [
+    {
+      "deck_id": "alela-artifacts",
+      "reversed": false,
+      "model": "gpt-5.6-luna",
+      "seconds": 14.279,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"52241b9c-7a69-4176-9234-8bdab09d8e64\",\"label\":\"strong\",\"reason\":\"Artifact casts create both a Faerie from Alela, Artful Provocateur and a Thopter, while sacrificing two artifacts can draw a card.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Ichor Wellspring\",\"Chromatic Star\"],\"caveat\":\"Requires Sai, Master Thopterist to survive and enough expendable artifacts.\",\"required_changes\":[]},{\"oracle_id\":\"568cf486-0261-4634-ac36-a6507101b2d0\",\"label\":\"strong\",\"reason\":\"Turns the deck's many artifact casts into reliable card draw while also triggering Alela, Artful Provocateur.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Thoughtcast\",\"Ichor Wellspring\"],\"caveat\":\"Four mana and double blue compete with other card engines.\",\"required_changes\":[]},{\"oracle_id\":\"96b87445-6362-4a17-91b2-cbf203fd03fd\",\"label\":\"strong\",\"reason\":\"A cheap artifact creature that reduces the cost of the deck's numerous artifact spells and triggers Alela, Artful Provocateur.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Foundry Inspector\",\"Thoughtcast\"],\"caveat\":\"Redundant with Foundry Inspector and vulnerable as a creature.\",\"required_changes\":[]},{\"oracle_id\":\"8f4b8a19-72f4-48ed-ac05-62a7c7525797\",\"label\":\"worth_testing\",\"reason\":\"Draws from enchantment casts and triggers Alela, Artful Provocateur, but the deck has substantially more artifacts than enchantments.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Efficient Construction\",\"Thopter Spy Network\"],\"caveat\":\"Requires replacing a card and retaining enough enchantments to justify the creature.\",\"required_changes\":[]},{\"oracle_id\":\"77ccbea1-70af-4194-adad-39a904221c75\",\"label\":\"reject\",\"reason\":\"Green color identity is outside Alela, Artful Provocateur's white-blue-black color identity.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"6ad8011d-3471-4369-9d68-b264cc027487\",\"label\":\"reject\",\"reason\":\"Already present in the physical deck.\",\"support_names\":[\"Sol Ring\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"3b38f314-d997-4c2a-b4c9-40dbe780993d\",\"label\":\"worth_testing\",\"reason\":\"A large flying threat can become cheaper as Alela, Artful Provocateur's Faeries and other flyers accumulate, but it provides no artifact-cast trigger or card advantage.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Efficient Construction\",\"Thopter Spy Network\"],\"caveat\":\"Its nine-mana base cost makes it dependent on already having a substantial flying board.\",\"required_changes\":[]},{\"oracle_id\":\"0caccec3-4942-499a-9434-0c94389afcf8\",\"label\":\"reject\",\"reason\":\"Its creature removal is narrow and its alternative is only modest card advantage, with no artifact or Faerie synergy.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Swords to Plowshares\",\"Path to Exile\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"83c12f50-e5a1-479d-afab-edb0b40412f2\",\"label\":\"reject\",\"reason\":\"Provides only a small combat buff and has no artifact-cast, token, or card-advantage role.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Tempered Steel\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"7cd0bd74-2463-4e9d-9802-69ac4ef6d543\",\"label\":\"reject\",\"reason\":\"Life gain from Alela, Artful Provocateur does not compensate for this low-impact creature's lack of artifact or token synergy.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"worth_testing\",\"reason\":\"Every artifact entering draws a card while also triggering Alela, Artful Provocateur, offering a strong engine in this artifact-dense deck.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Ichor Wellspring\",\"Scrap Trawler\"],\"caveat\":\"Five mana is expensive and it requires an artifact-heavy replacement package to be worthwhile.\",\"required_changes\":[]},{\"oracle_id\":\"45f4d057-5134-40a2-9590-ddba73a65582\",\"label\":\"reject\",\"reason\":\"Creature-only removal that gives a card when the target was not attacking is redundant with the deck's broader removal.\",\"support_names\":[\"Swords to Plowshares\",\"Reality Shift\",\"Vindicate\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c\",\"label\":\"worth_testing\",\"reason\":\"A flying creature that scries whenever other creatures die can benefit from board wipes and token trades, though it does not advance the artifact engine directly.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Wrath of God\",\"Damn\"],\"caveat\":\"Its trigger is reactive and offers selection rather than cards or board development.\",\"required_changes\":[]},{\"oracle_id\":\"30c3c700-46f4-4a77-8c45-5c7e3a21bd62\",\"label\":\"worth_testing\",\"reason\":\"An artifact cast triggers Alela, Artful Provocateur, and equipping it to Alela can double Alela's triggered ability.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Foundry Inspector\",\"Efficient Construction\"],\"caveat\":\"Alela cannot use Equip Wizard, so the generic three-mana equip cost is required; the card needs a supporting swap for a lower-impact artifact.\",\"required_changes\":[\"Replace a lower-impact artifact or equipment with Wizard's Staff.\"]}]}",
+      "usage": {
+        "input_tokens": 10097,
+        "input_tokens_details": {
+          "cache_write_tokens": 10094,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1492,
+        "output_tokens_details": {
+          "reasoning_tokens": 150
+        },
+        "total_tokens": 11589
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.00431465,
+      "assessments": [
+        {
+          "oracle_id": "52241b9c-7a69-4176-9234-8bdab09d8e64",
+          "label": "strong",
+          "reason": "Artifact casts create both a Faerie from Alela, Artful Provocateur and a Thopter, while sacrificing two artifacts can draw a card.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Ichor Wellspring",
+            "Chromatic Star"
+          ],
+          "caveat": "Requires Sai, Master Thopterist to survive and enough expendable artifacts.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "568cf486-0261-4634-ac36-a6507101b2d0",
+          "label": "strong",
+          "reason": "Turns the deck's many artifact casts into reliable card draw while also triggering Alela, Artful Provocateur.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Thoughtcast",
+            "Ichor Wellspring"
+          ],
+          "caveat": "Four mana and double blue compete with other card engines.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "96b87445-6362-4a17-91b2-cbf203fd03fd",
+          "label": "strong",
+          "reason": "A cheap artifact creature that reduces the cost of the deck's numerous artifact spells and triggers Alela, Artful Provocateur.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Foundry Inspector",
+            "Thoughtcast"
+          ],
+          "caveat": "Redundant with Foundry Inspector and vulnerable as a creature.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "8f4b8a19-72f4-48ed-ac05-62a7c7525797",
+          "label": "worth_testing",
+          "reason": "Draws from enchantment casts and triggers Alela, Artful Provocateur, but the deck has substantially more artifacts than enchantments.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Efficient Construction",
+            "Thopter Spy Network"
+          ],
+          "caveat": "Requires replacing a card and retaining enough enchantments to justify the creature.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "77ccbea1-70af-4194-adad-39a904221c75",
+          "label": "reject",
+          "reason": "Green color identity is outside Alela, Artful Provocateur's white-blue-black color identity.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "label": "reject",
+          "reason": "Already present in the physical deck.",
+          "support_names": [
+            "Sol Ring"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3b38f314-d997-4c2a-b4c9-40dbe780993d",
+          "label": "worth_testing",
+          "reason": "A large flying threat can become cheaper as Alela, Artful Provocateur's Faeries and other flyers accumulate, but it provides no artifact-cast trigger or card advantage.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Efficient Construction",
+            "Thopter Spy Network"
+          ],
+          "caveat": "Its nine-mana base cost makes it dependent on already having a substantial flying board.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0caccec3-4942-499a-9434-0c94389afcf8",
+          "label": "reject",
+          "reason": "Its creature removal is narrow and its alternative is only modest card advantage, with no artifact or Faerie synergy.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Swords to Plowshares",
+            "Path to Exile"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "83c12f50-e5a1-479d-afab-edb0b40412f2",
+          "label": "reject",
+          "reason": "Provides only a small combat buff and has no artifact-cast, token, or card-advantage role.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Tempered Steel"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7cd0bd74-2463-4e9d-9802-69ac4ef6d543",
+          "label": "reject",
+          "reason": "Life gain from Alela, Artful Provocateur does not compensate for this low-impact creature's lack of artifact or token synergy.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "worth_testing",
+          "reason": "Every artifact entering draws a card while also triggering Alela, Artful Provocateur, offering a strong engine in this artifact-dense deck.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Ichor Wellspring",
+            "Scrap Trawler"
+          ],
+          "caveat": "Five mana is expensive and it requires an artifact-heavy replacement package to be worthwhile.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "45f4d057-5134-40a2-9590-ddba73a65582",
+          "label": "reject",
+          "reason": "Creature-only removal that gives a card when the target was not attacking is redundant with the deck's broader removal.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Reality Shift",
+            "Vindicate"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c",
+          "label": "worth_testing",
+          "reason": "A flying creature that scries whenever other creatures die can benefit from board wipes and token trades, though it does not advance the artifact engine directly.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Wrath of God",
+            "Damn"
+          ],
+          "caveat": "Its trigger is reactive and offers selection rather than cards or board development.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+          "label": "worth_testing",
+          "reason": "An artifact cast triggers Alela, Artful Provocateur, and equipping it to Alela can double Alela's triggered ability.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Foundry Inspector",
+            "Efficient Construction"
+          ],
+          "caveat": "Alela cannot use Equip Wizard, so the generic three-mana equip cost is required; the card needs a supporting swap for a lower-impact artifact.",
+          "required_changes": [
+            "Replace a lower-impact artifact or equipment with Wizard's Staff."
+          ]
+        }
+      ],
+      "validation_errors": [],
+      "controls": {
+        "matched": 6,
+        "total": 6,
+        "misses": {}
+      }
+    },
+    {
+      "deck_id": "alela-artifacts",
+      "reversed": true,
+      "model": "gpt-5.6-luna",
+      "seconds": 15.643,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"30c3c700-46f4-4a77-8c45-5c7e3a21bd62\",\"label\":\"reject\",\"reason\":\"Artifact cast triggers Alela, Artful Provocateur, but Wizard's Staff needs an equipped Wizard and provides little value otherwise.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Alela, Artful Provocateur is not a Wizard.\",\"required_changes\":[]},{\"oracle_id\":\"37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c\",\"label\":\"reject\",\"reason\":\"A low-impact creature whose death scry effect does not advance the artifact-cast or Faerie-token plan.\",\"support_names\":[],\"caveat\":\"It can benefit from creature-heavy games, but has no meaningful deck synergy.\",\"required_changes\":[]},{\"oracle_id\":\"45f4d057-5134-40a2-9590-ddba73a65582\",\"label\":\"reject\",\"reason\":\"Narrow creature removal that gives the opponent a card when the creature was not attacking; the deck already has stronger removal.\",\"support_names\":[\"Swords to Plowshares\",\"Path to Exile\",\"Reality Shift\"],\"caveat\":\"Its low mana cost is useful, but the drawback and restriction are substantial.\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"worth_testing\",\"reason\":\"A repeatable draw engine that triggers from the deck's many artifact entries and also triggers Alela, Artful Provocateur.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Ichor Wellspring\",\"Thought Monitor\",\"Efficient Construction\"],\"caveat\":\"Its five-mana cost and lack of immediate card draw make it slower than existing engines.\",\"required_changes\":[]},{\"oracle_id\":\"7cd0bd74-2463-4e9d-9802-69ac4ef6d543\",\"label\":\"reject\",\"reason\":\"A two-mana creature with only modest scaling from life gain; it does not support the artifact engine or evasive-token plan.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Alela, Artful Provocateur can provide life gain, but that is not enough support for this card.\",\"required_changes\":[]},{\"oracle_id\":\"83c12f50-e5a1-479d-afab-edb0b40412f2\",\"label\":\"reject\",\"reason\":\"Provides a small combat buff but does not materially improve artifact casting, token production, or card advantage.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Its flying body fits the combat theme, but the effect is low impact.\",\"required_changes\":[]},{\"oracle_id\":\"0caccec3-4942-499a-9434-0c94389afcf8\",\"label\":\"reject\",\"reason\":\"Its removal mode is restricted to large creatures, while its alternate mode is only a modest cantrip and life gain.\",\"support_names\":[\"Swords to Plowshares\",\"Path to Exile\",\"Damn\"],\"caveat\":\"The flexibility is useful, but existing interaction is broader or more efficient.\",\"required_changes\":[]},{\"oracle_id\":\"3b38f314-d997-4c2a-b4c9-40dbe780993d\",\"label\":\"reject\",\"reason\":\"Even with a flying-token board, its base cost is extremely high and the supplied text gives no clear payoff beyond flying.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Efficient Construction\",\"Thopter Spy Network\"],\"caveat\":\"Its cost reduction depends on already controlling substantial flying power.\",\"required_changes\":[]},{\"oracle_id\":\"6ad8011d-3471-4369-9d68-b264cc027487\",\"label\":\"reject\",\"reason\":\"Sol Ring is already in the physical deck.\",\"support_names\":[\"Sol Ring\"],\"caveat\":\"No duplicate copy can be added in Commander.\",\"required_changes\":[]},{\"oracle_id\":\"77ccbea1-70af-4194-adad-39a904221c75\",\"label\":\"reject\",\"reason\":\"Green color identity is outside Alela, Artful Provocateur's color identity.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"It is also unsupported by the deck's enchantment count.\",\"required_changes\":[]},{\"oracle_id\":\"8f4b8a19-72f4-48ed-ac05-62a7c7525797\",\"label\":\"reject\",\"reason\":\"Its enchantment-only draw trigger has too few supporting enchantments and does not contribute to the artifact engine.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Efficient Construction\",\"Thopter Spy Network\"],\"caveat\":\"It would require a substantially more enchantment-focused build.\",\"required_changes\":[\"Add substantially more enchantments to support repeated cast triggers.\"]},{\"oracle_id\":\"96b87445-6362-4a17-91b2-cbf203fd03fd\",\"label\":\"strong\",\"reason\":\"A two-mana artifact creature that reduces every artifact spell, improving the deck's central engine while also triggering Alela, Artful Provocateur.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Foundry Inspector\",\"Thoughtcast\",\"Thought Monitor\"],\"caveat\":\"It overlaps with Foundry Inspector, but its lower cost makes the effect more efficient.\",\"required_changes\":[]},{\"oracle_id\":\"568cf486-0261-4634-ac36-a6507101b2d0\",\"label\":\"strong\",\"reason\":\"Draws a card from every artifact cast, directly amplifying the deck's large artifact package and Alela, Artful Provocateur's token production.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Thoughtcast\",\"Thought Monitor\",\"Ichor Wellspring\"],\"caveat\":\"Its double-blue cost and four-mana body make it less efficient when mana is constrained.\",\"required_changes\":[]},{\"oracle_id\":\"52241b9c-7a69-4176-9234-8bdab09d8e64\",\"label\":\"strong\",\"reason\":\"Adds another Faerie-adjacent evasive token engine for artifact casts and provides a sacrifice-based draw outlet for the deck's expendable artifacts and tokens.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Efficient Construction\",\"Ichor Wellspring\",\"Chromatic Star\"],\"caveat\":\"Its token effect overlaps with Efficient Construction, and sacrificing two artifacts requires preserving expendable material.\",\"required_changes\":[]},{\"oracle_id\":\"e018773f-95b3-49a3-9674-6f04ddef2092\",\"label\":\"reject\",\"reason\":\"Already in the physical deck.\",\"support_names\":[\"Sol Ring\"],\"caveat\":\"The supplied physical list contains this oracle ID under Sol Ring, so this candidate is ineligible as a duplicate.\",\"required_changes\":[]}]}",
+      "usage": {
+        "input_tokens": 10097,
+        "input_tokens_details": {
+          "cache_write_tokens": 10094,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1808,
+        "output_tokens_details": {
+          "reasoning_tokens": 355
+        },
+        "total_tokens": 11905
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.00469385,
+      "assessments": [
+        {
+          "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+          "label": "reject",
+          "reason": "Artifact cast triggers Alela, Artful Provocateur, but Wizard's Staff needs an equipped Wizard and provides little value otherwise.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Alela, Artful Provocateur is not a Wizard.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c",
+          "label": "reject",
+          "reason": "A low-impact creature whose death scry effect does not advance the artifact-cast or Faerie-token plan.",
+          "support_names": [],
+          "caveat": "It can benefit from creature-heavy games, but has no meaningful deck synergy.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "45f4d057-5134-40a2-9590-ddba73a65582",
+          "label": "reject",
+          "reason": "Narrow creature removal that gives the opponent a card when the creature was not attacking; the deck already has stronger removal.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Path to Exile",
+            "Reality Shift"
+          ],
+          "caveat": "Its low mana cost is useful, but the drawback and restriction are substantial.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "worth_testing",
+          "reason": "A repeatable draw engine that triggers from the deck's many artifact entries and also triggers Alela, Artful Provocateur.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Ichor Wellspring",
+            "Thought Monitor",
+            "Efficient Construction"
+          ],
+          "caveat": "Its five-mana cost and lack of immediate card draw make it slower than existing engines.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7cd0bd74-2463-4e9d-9802-69ac4ef6d543",
+          "label": "reject",
+          "reason": "A two-mana creature with only modest scaling from life gain; it does not support the artifact engine or evasive-token plan.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Alela, Artful Provocateur can provide life gain, but that is not enough support for this card.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "83c12f50-e5a1-479d-afab-edb0b40412f2",
+          "label": "reject",
+          "reason": "Provides a small combat buff but does not materially improve artifact casting, token production, or card advantage.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Its flying body fits the combat theme, but the effect is low impact.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0caccec3-4942-499a-9434-0c94389afcf8",
+          "label": "reject",
+          "reason": "Its removal mode is restricted to large creatures, while its alternate mode is only a modest cantrip and life gain.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Path to Exile",
+            "Damn"
+          ],
+          "caveat": "The flexibility is useful, but existing interaction is broader or more efficient.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3b38f314-d997-4c2a-b4c9-40dbe780993d",
+          "label": "reject",
+          "reason": "Even with a flying-token board, its base cost is extremely high and the supplied text gives no clear payoff beyond flying.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Efficient Construction",
+            "Thopter Spy Network"
+          ],
+          "caveat": "Its cost reduction depends on already controlling substantial flying power.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "label": "reject",
+          "reason": "Sol Ring is already in the physical deck.",
+          "support_names": [
+            "Sol Ring"
+          ],
+          "caveat": "No duplicate copy can be added in Commander.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "77ccbea1-70af-4194-adad-39a904221c75",
+          "label": "reject",
+          "reason": "Green color identity is outside Alela, Artful Provocateur's color identity.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "It is also unsupported by the deck's enchantment count.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "8f4b8a19-72f4-48ed-ac05-62a7c7525797",
+          "label": "reject",
+          "reason": "Its enchantment-only draw trigger has too few supporting enchantments and does not contribute to the artifact engine.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Efficient Construction",
+            "Thopter Spy Network"
+          ],
+          "caveat": "It would require a substantially more enchantment-focused build.",
+          "required_changes": [
+            "Add substantially more enchantments to support repeated cast triggers."
+          ]
+        },
+        {
+          "oracle_id": "96b87445-6362-4a17-91b2-cbf203fd03fd",
+          "label": "strong",
+          "reason": "A two-mana artifact creature that reduces every artifact spell, improving the deck's central engine while also triggering Alela, Artful Provocateur.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Foundry Inspector",
+            "Thoughtcast",
+            "Thought Monitor"
+          ],
+          "caveat": "It overlaps with Foundry Inspector, but its lower cost makes the effect more efficient.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "568cf486-0261-4634-ac36-a6507101b2d0",
+          "label": "strong",
+          "reason": "Draws a card from every artifact cast, directly amplifying the deck's large artifact package and Alela, Artful Provocateur's token production.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Thoughtcast",
+            "Thought Monitor",
+            "Ichor Wellspring"
+          ],
+          "caveat": "Its double-blue cost and four-mana body make it less efficient when mana is constrained.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "52241b9c-7a69-4176-9234-8bdab09d8e64",
+          "label": "strong",
+          "reason": "Adds another Faerie-adjacent evasive token engine for artifact casts and provides a sacrifice-based draw outlet for the deck's expendable artifacts and tokens.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Efficient Construction",
+            "Ichor Wellspring",
+            "Chromatic Star"
+          ],
+          "caveat": "Its token effect overlaps with Efficient Construction, and sacrificing two artifacts requires preserving expendable material.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "e018773f-95b3-49a3-9674-6f04ddef2092",
+          "label": "reject",
+          "reason": "Already in the physical deck.",
+          "support_names": [
+            "Sol Ring"
+          ],
+          "caveat": "The supplied physical list contains this oracle ID under Sol Ring, so this candidate is ineligible as a duplicate.",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [
+        "missing, duplicate or foreign candidate IDs"
+      ],
+      "controls": {
+        "matched": 6,
+        "total": 6,
+        "misses": {}
+      }
+    },
+    {
+      "deck_id": "alela-enchantments",
+      "reversed": false,
+      "model": "gpt-5.6-luna",
+      "seconds": 12.565,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"8f4b8a19-72f4-48ed-ac05-62a7c7525797\",\"label\":\"strong\",\"reason\":\"Efficiently draws cards from the deck's many enchantment casts while also triggering Alela, Artful Provocateur.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Omen of the Sea\",\"Hallowed Haunting\"],\"caveat\":\"Requires reliable white-white mana.\",\"required_changes\":[]},{\"oracle_id\":\"48a99dce-0aa9-4aac-81df-cec5f94c639d\",\"label\":\"strong\",\"reason\":\"Each enchantment entering creates an additional flying token, substantially advancing the Faerie-and-pillowfort plan.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Hallowed Haunting\",\"Ghostly Prison\"],\"caveat\":\"Four mana and requires enchantments to enter after it resolves.\",\"required_changes\":[]},{\"oracle_id\":\"52241b9c-7a69-4176-9234-8bdab09d8e64\",\"label\":\"worth_testing\",\"reason\":\"Turns artifact casts into extra flying tokens and can convert spare artifacts into cards, but the deck has fewer artifacts than enchantments.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Sol Ring\",\"Arcane Signet\"],\"caveat\":\"Its draw ability needs two artifacts to sacrifice.\",\"required_changes\":[]},{\"oracle_id\":\"568cf486-0261-4634-ac36-a6507101b2d0\",\"label\":\"reject\",\"reason\":\"Only draws from artifact casts, while the deck's primary engine is enchantments.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Alela, Artful Provocateur\"],\"caveat\":\"Would require substantially more artifact support.\",\"required_changes\":[\"Add more artifact cards.\"]},{\"oracle_id\":\"77ccbea1-70af-4194-adad-39a904221c75\",\"label\":\"reject\",\"reason\":\"Green is outside Alela, Artful Provocateur's color identity.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Not Commander-legal in this deck.\",\"required_changes\":[]},{\"oracle_id\":\"6ad8011d-3471-4369-9d68-b264cc027487\",\"label\":\"reject\",\"reason\":\"Already present in the physical deck.\",\"support_names\":[\"Sol Ring\"],\"caveat\":\"No duplicate copy can be added in Commander.\",\"required_changes\":[]},{\"oracle_id\":\"3b38f314-d997-4c2a-b4c9-40dbe780993d\",\"label\":\"reject\",\"reason\":\"A nine-mana creature with no token, card-advantage, or defensive effect is too inefficient for this plan.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Favorable Winds\"],\"caveat\":\"Its cost reduction depends on an established flying board.\",\"required_changes\":[]},{\"oracle_id\":\"0caccec3-4942-499a-9434-0c94389afcf8\",\"label\":\"reject\",\"reason\":\"Its creature removal is narrow, and its alternative is only modest card and life gain compared with existing draw spells.\",\"support_names\":[\"Swords to Plowshares\",\"Read the Bones\",\"Night's Whisper\"],\"caveat\":\"Could be more useful in a creature-heavy metagame.\",\"required_changes\":[]},{\"oracle_id\":\"83c12f50-e5a1-479d-afab-edb0b40412f2\",\"label\":\"reject\",\"reason\":\"Provides only a small combat boost and does not advance the enchantment engine, token production, or pillowfort plan.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Omen of the Sea\"],\"caveat\":\"Its counter mode needs a scry or surveil effect in the same turn.\",\"required_changes\":[]},{\"oracle_id\":\"7cd0bd74-2463-4e9d-9802-69ac4ef6d543\",\"label\":\"reject\",\"reason\":\"A small creature that only grows from life gain is less relevant than the deck's existing token and enchantment payoffs.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Omen of the Sun\",\"Court of Grace\"],\"caveat\":\"Life-gain triggers exist but are not the deck's central plan.\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"reject\",\"reason\":\"It draws only from artifact entries, and its five-mana cost is excessive for the deck's limited artifact count.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Alela, Artful Provocateur\"],\"caveat\":\"Would require substantially more artifact support.\",\"required_changes\":[\"Add more artifact cards.\"]},{\"oracle_id\":\"45f4d057-5134-40a2-9590-ddba73a65582\",\"label\":\"worth_testing\",\"reason\":\"A cheap creature answer that complements the deck's existing enchantment-based removal, despite giving a card when the target was not attacking.\",\"support_names\":[\"Swords to Plowshares\",\"Darksteel Mutation\",\"Mortify\"],\"caveat\":\"It cannot answer noncreature permanents and rewards opponents for removing nonattacking creatures.\",\"required_changes\":[]},{\"oracle_id\":\"37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c\",\"label\":\"reject\",\"reason\":\"A three-mana body with conditional scry is too low-impact and does not support the enchantment or flying-token engines.\",\"support_names\":[\"Doomwake Giant\",\"Alela, Artful Provocateur\"],\"caveat\":\"Needs repeated creature deaths to generate meaningful value.\",\"required_changes\":[]},{\"oracle_id\":\"30c3c700-46f4-4a77-8c45-5c7e3a21bd62\",\"label\":\"worth_testing\",\"reason\":\"As an artifact cast it triggers Alela, and doubling an equipped Alela trigger can produce additional Faeries, though the equipment is expensive to equip.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Sol Ring\",\"Favorable Winds\"],\"caveat\":\"Requires equipping Alela for three mana and offers little value on other creatures.\",\"required_changes\":[] }]}",
+      "usage": {
+        "input_tokens": 10519,
+        "input_tokens_details": {
+          "cache_write_tokens": 10516,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1521,
+        "output_tokens_details": {
+          "reasoning_tokens": 198
+        },
+        "total_tokens": 12040
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.00445495,
+      "assessments": [
+        {
+          "oracle_id": "8f4b8a19-72f4-48ed-ac05-62a7c7525797",
+          "label": "strong",
+          "reason": "Efficiently draws cards from the deck's many enchantment casts while also triggering Alela, Artful Provocateur.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Omen of the Sea",
+            "Hallowed Haunting"
+          ],
+          "caveat": "Requires reliable white-white mana.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "48a99dce-0aa9-4aac-81df-cec5f94c639d",
+          "label": "strong",
+          "reason": "Each enchantment entering creates an additional flying token, substantially advancing the Faerie-and-pillowfort plan.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Hallowed Haunting",
+            "Ghostly Prison"
+          ],
+          "caveat": "Four mana and requires enchantments to enter after it resolves.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "52241b9c-7a69-4176-9234-8bdab09d8e64",
+          "label": "worth_testing",
+          "reason": "Turns artifact casts into extra flying tokens and can convert spare artifacts into cards, but the deck has fewer artifacts than enchantments.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Sol Ring",
+            "Arcane Signet"
+          ],
+          "caveat": "Its draw ability needs two artifacts to sacrifice.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "568cf486-0261-4634-ac36-a6507101b2d0",
+          "label": "reject",
+          "reason": "Only draws from artifact casts, while the deck's primary engine is enchantments.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Would require substantially more artifact support.",
+          "required_changes": [
+            "Add more artifact cards."
+          ]
+        },
+        {
+          "oracle_id": "77ccbea1-70af-4194-adad-39a904221c75",
+          "label": "reject",
+          "reason": "Green is outside Alela, Artful Provocateur's color identity.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Not Commander-legal in this deck.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "label": "reject",
+          "reason": "Already present in the physical deck.",
+          "support_names": [
+            "Sol Ring"
+          ],
+          "caveat": "No duplicate copy can be added in Commander.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3b38f314-d997-4c2a-b4c9-40dbe780993d",
+          "label": "reject",
+          "reason": "A nine-mana creature with no token, card-advantage, or defensive effect is too inefficient for this plan.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Favorable Winds"
+          ],
+          "caveat": "Its cost reduction depends on an established flying board.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0caccec3-4942-499a-9434-0c94389afcf8",
+          "label": "reject",
+          "reason": "Its creature removal is narrow, and its alternative is only modest card and life gain compared with existing draw spells.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Read the Bones",
+            "Night's Whisper"
+          ],
+          "caveat": "Could be more useful in a creature-heavy metagame.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "83c12f50-e5a1-479d-afab-edb0b40412f2",
+          "label": "reject",
+          "reason": "Provides only a small combat boost and does not advance the enchantment engine, token production, or pillowfort plan.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Omen of the Sea"
+          ],
+          "caveat": "Its counter mode needs a scry or surveil effect in the same turn.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7cd0bd74-2463-4e9d-9802-69ac4ef6d543",
+          "label": "reject",
+          "reason": "A small creature that only grows from life gain is less relevant than the deck's existing token and enchantment payoffs.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Omen of the Sun",
+            "Court of Grace"
+          ],
+          "caveat": "Life-gain triggers exist but are not the deck's central plan.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "reject",
+          "reason": "It draws only from artifact entries, and its five-mana cost is excessive for the deck's limited artifact count.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Would require substantially more artifact support.",
+          "required_changes": [
+            "Add more artifact cards."
+          ]
+        },
+        {
+          "oracle_id": "45f4d057-5134-40a2-9590-ddba73a65582",
+          "label": "worth_testing",
+          "reason": "A cheap creature answer that complements the deck's existing enchantment-based removal, despite giving a card when the target was not attacking.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Darksteel Mutation",
+            "Mortify"
+          ],
+          "caveat": "It cannot answer noncreature permanents and rewards opponents for removing nonattacking creatures.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c",
+          "label": "reject",
+          "reason": "A three-mana body with conditional scry is too low-impact and does not support the enchantment or flying-token engines.",
+          "support_names": [
+            "Doomwake Giant",
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Needs repeated creature deaths to generate meaningful value.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+          "label": "worth_testing",
+          "reason": "As an artifact cast it triggers Alela, and doubling an equipped Alela trigger can produce additional Faeries, though the equipment is expensive to equip.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Sol Ring",
+            "Favorable Winds"
+          ],
+          "caveat": "Requires equipping Alela for three mana and offers little value on other creatures.",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [],
+      "controls": {
+        "matched": 6,
+        "total": 6,
+        "misses": {}
+      }
+    },
+    {
+      "deck_id": "alela-enchantments",
+      "reversed": true,
+      "model": "gpt-5.6-luna",
+      "seconds": 13.775,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"30c3c700-46f4-4a77-8c45-5c7e3a21bd62\",\"label\":\"worth_testing\",\"reason\":\"Artifact cast triggers Alela, and equipping Alela can double her Faerie trigger; otherwise the equipment is narrow.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Requires three mana to equip Alela; Equip Wizard does not apply.\",\"required_changes\":[]},{\"oracle_id\":\"37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c\",\"label\":\"reject\",\"reason\":\"A low-impact creature with only a modest death-trigger scry effect and no enchantment synergy.\",\"support_names\":[],\"caveat\":\"Its flying body does not justify the inclusion.\",\"required_changes\":[]},{\"oracle_id\":\"45f4d057-5134-40a2-9590-ddba73a65582\",\"label\":\"reject\",\"reason\":\"Conditional creature removal that replaces itself with an opponent card when the target is not attacking; the deck already has stronger removal.\",\"support_names\":[\"Swords to Plowshares\",\"Path to Exile\",\"Damn\"],\"caveat\":\"Only two mana, but its drawback is substantial.\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"reject\",\"reason\":\"Five-mana artifact payoff is unsupported by the deck's relatively low artifact density and does not reward enchantment casts.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Commander's Sphere\",\"Fellwar Stone\",\"Mind Stone\",\"Thought Vessel\"],\"caveat\":\"Would need substantially more artifacts.\",\"required_changes\":[]},{\"oracle_id\":\"7cd0bd74-2463-4e9d-9802-69ac4ef6d543\",\"label\":\"reject\",\"reason\":\"Life gain from Alela is incidental, making this a small creature with a slow personal-growth ability and no enchantment payoff.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Alela's lifelink can trigger it, but that is not enough support.\",\"required_changes\":[]},{\"oracle_id\":\"83c12f50-e5a1-479d-afab-edb0b40412f2\",\"label\":\"reject\",\"reason\":\"Provides only a modest combat buff and conditional counters, without contributing to the enchantment engine or pillowfort plan.\",\"support_names\":[\"Omen of the Sea\",\"Omen of the Sun\",\"Omen of the Dead\"],\"caveat\":\"Existing scry effects can enable its condition, but the payoff remains weak.\",\"required_changes\":[]},{\"oracle_id\":\"0caccec3-4942-499a-9434-0c94389afcf8\",\"label\":\"reject\",\"reason\":\"Narrow sorcery-speed removal or minor card draw is weaker and less flexible than existing answers and draw spells.\",\"support_names\":[\"Swords to Plowshares\",\"Path to Exile\",\"Read the Bones\",\"Night's Whisper\"],\"caveat\":\"The draw mode is reliable but inefficient for this deck.\",\"required_changes\":[]},{\"oracle_id\":\"3b38f314-d997-4c2a-b4c9-40dbe780993d\",\"label\":\"reject\",\"reason\":\"A nine-mana creature with only flash and flying is too expensive despite cost reduction from Alela's Faeries.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Requires a substantial flying board before becoming reasonably castable.\",\"required_changes\":[]},{\"oracle_id\":\"6ad8011d-3471-4369-9d68-b264cc027487\",\"label\":\"reject\",\"reason\":\"Already present in the physical deck.\",\"support_names\":[\"Sol Ring\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"77ccbea1-70af-4194-adad-39a904221c75\",\"label\":\"reject\",\"reason\":\"Outside Alela's white-blue-black color identity.\",\"support_names\":[\"Alela, Artful Provocateur\"],\"caveat\":\"Green mana in its cost makes it ineligible.\",\"required_changes\":[]},{\"oracle_id\":\"568cf486-0261-4634-ac36-a6507101b2d0\",\"label\":\"reject\",\"reason\":\"Draws only from artifact casts, while the deck is primarily enchantment-based and has limited artifact density.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Commander's Sphere\",\"Fellwar Stone\",\"Mind Stone\",\"Thought Vessel\"],\"caveat\":\"Would need substantially more artifacts to become consistent.\",\"required_changes\":[]},{\"oracle_id\":\"52241b9c-7a69-4176-9234-8bdab09d8e64\",\"label\":\"reject\",\"reason\":\"Its artifact-cast tokens and sacrifice ability are poorly supported by the deck's limited artifacts and do not advance the enchantment engine.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Commander's Sphere\",\"Fellwar Stone\",\"Mind Stone\",\"Thought Vessel\"],\"caveat\":\"Would require a dedicated artifact package.\",\"required_changes\":[]},{\"oracle_id\":\"48a99dce-0aa9-4aac-81df-cec5f94c639d\",\"label\":\"strong\",\"reason\":\"Each enchantment entering creates an additional flying token, directly compounding Alela's enchantment-cast Faeries and supporting the flying-token plan.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Hallowed Haunting\",\"Sigil of the Empty Throne\"],\"caveat\":\"Its token ability triggers on entering, so it must remain on the battlefield first.\",\"required_changes\":[]},{\"oracle_id\":\"8f4b8a19-72f4-48ed-ac05-62a7c7525797\",\"label\":\"strong\",\"reason\":\"Directly draws cards whenever enchantment spells are cast, complementing Alela's core engine and the deck's high enchantment count.\",\"support_names\":[\"Alela, Artful Provocateur\",\"Omen of the Sea\",\"Ghostly Prison\",\"Hallowed Haunting\"],\"caveat\":\"The ability is vulnerable to creature removal and triggers only on cast, not merely entry.\",\"required_changes\":[]}]}",
+      "usage": {
+        "input_tokens": 10519,
+        "input_tokens_details": {
+          "cache_write_tokens": 10516,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1715,
+        "output_tokens_details": {
+          "reasoning_tokens": 413
+        },
+        "total_tokens": 12234
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.00468775,
+      "assessments": [
+        {
+          "oracle_id": "30c3c700-46f4-4a77-8c45-5c7e3a21bd62",
+          "label": "worth_testing",
+          "reason": "Artifact cast triggers Alela, and equipping Alela can double her Faerie trigger; otherwise the equipment is narrow.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Requires three mana to equip Alela; Equip Wizard does not apply.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "37f82ad8-4f0b-4b17-abcc-03f43d4fdf1c",
+          "label": "reject",
+          "reason": "A low-impact creature with only a modest death-trigger scry effect and no enchantment synergy.",
+          "support_names": [],
+          "caveat": "Its flying body does not justify the inclusion.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "45f4d057-5134-40a2-9590-ddba73a65582",
+          "label": "reject",
+          "reason": "Conditional creature removal that replaces itself with an opponent card when the target is not attacking; the deck already has stronger removal.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Path to Exile",
+            "Damn"
+          ],
+          "caveat": "Only two mana, but its drawback is substantial.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "reject",
+          "reason": "Five-mana artifact payoff is unsupported by the deck's relatively low artifact density and does not reward enchantment casts.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Commander's Sphere",
+            "Fellwar Stone",
+            "Mind Stone",
+            "Thought Vessel"
+          ],
+          "caveat": "Would need substantially more artifacts.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7cd0bd74-2463-4e9d-9802-69ac4ef6d543",
+          "label": "reject",
+          "reason": "Life gain from Alela is incidental, making this a small creature with a slow personal-growth ability and no enchantment payoff.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Alela's lifelink can trigger it, but that is not enough support.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "83c12f50-e5a1-479d-afab-edb0b40412f2",
+          "label": "reject",
+          "reason": "Provides only a modest combat buff and conditional counters, without contributing to the enchantment engine or pillowfort plan.",
+          "support_names": [
+            "Omen of the Sea",
+            "Omen of the Sun",
+            "Omen of the Dead"
+          ],
+          "caveat": "Existing scry effects can enable its condition, but the payoff remains weak.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0caccec3-4942-499a-9434-0c94389afcf8",
+          "label": "reject",
+          "reason": "Narrow sorcery-speed removal or minor card draw is weaker and less flexible than existing answers and draw spells.",
+          "support_names": [
+            "Swords to Plowshares",
+            "Path to Exile",
+            "Read the Bones",
+            "Night's Whisper"
+          ],
+          "caveat": "The draw mode is reliable but inefficient for this deck.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3b38f314-d997-4c2a-b4c9-40dbe780993d",
+          "label": "reject",
+          "reason": "A nine-mana creature with only flash and flying is too expensive despite cost reduction from Alela's Faeries.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Requires a substantial flying board before becoming reasonably castable.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "label": "reject",
+          "reason": "Already present in the physical deck.",
+          "support_names": [
+            "Sol Ring"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "77ccbea1-70af-4194-adad-39a904221c75",
+          "label": "reject",
+          "reason": "Outside Alela's white-blue-black color identity.",
+          "support_names": [
+            "Alela, Artful Provocateur"
+          ],
+          "caveat": "Green mana in its cost makes it ineligible.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "568cf486-0261-4634-ac36-a6507101b2d0",
+          "label": "reject",
+          "reason": "Draws only from artifact casts, while the deck is primarily enchantment-based and has limited artifact density.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Commander's Sphere",
+            "Fellwar Stone",
+            "Mind Stone",
+            "Thought Vessel"
+          ],
+          "caveat": "Would need substantially more artifacts to become consistent.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "52241b9c-7a69-4176-9234-8bdab09d8e64",
+          "label": "reject",
+          "reason": "Its artifact-cast tokens and sacrifice ability are poorly supported by the deck's limited artifacts and do not advance the enchantment engine.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Commander's Sphere",
+            "Fellwar Stone",
+            "Mind Stone",
+            "Thought Vessel"
+          ],
+          "caveat": "Would require a dedicated artifact package.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "48a99dce-0aa9-4aac-81df-cec5f94c639d",
+          "label": "strong",
+          "reason": "Each enchantment entering creates an additional flying token, directly compounding Alela's enchantment-cast Faeries and supporting the flying-token plan.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Hallowed Haunting",
+            "Sigil of the Empty Throne"
+          ],
+          "caveat": "Its token ability triggers on entering, so it must remain on the battlefield first.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "8f4b8a19-72f4-48ed-ac05-62a7c7525797",
+          "label": "strong",
+          "reason": "Directly draws cards whenever enchantment spells are cast, complementing Alela's core engine and the deck's high enchantment count.",
+          "support_names": [
+            "Alela, Artful Provocateur",
+            "Omen of the Sea",
+            "Ghostly Prison",
+            "Hallowed Haunting"
+          ],
+          "caveat": "The ability is vulnerable to creature removal and triggers only on cast, not merely entry.",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [],
+      "controls": {
+        "matched": 6,
+        "total": 6,
+        "misses": {}
+      }
+    },
+    {
+      "deck_id": "camellia-food",
+      "reversed": false,
+      "model": "gpt-5.6-luna",
+      "seconds": 15.161,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"f36d1d8b-8303-44a9-ab56-531931641ea2\",\"label\":\"strong\",\"reason\":\"Turns each Food creation into a Food, Clue, and Treasure, greatly increasing Camellia, the Seedmiser triggers and sacrifice resources.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Trail of Crumbs\",\"Tireless Provisioner\"],\"caveat\":\"Three-mana creature is vulnerable and does not itself create tokens.\",\"required_changes\":[]},{\"oracle_id\":\"188da0ad-8524-4fb2-915e-1876dc9df89f\",\"label\":\"strong\",\"reason\":\"Adds a Food whenever your token effects create tokens and can convert three Foods into a card.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Trail of Crumbs\",\"Tireless Provisioner\"],\"caveat\":\"Its token replacement also adds Foods to non-Food token creation, which may increase sacrifice demands.\",\"required_changes\":[]},{\"oracle_id\":\"0636b6c3-0662-420a-b30d-f0a14e7c512d\",\"label\":\"strong\",\"reason\":\"Repeatedly drains opponents whenever this deck creates or sacrifices Foods, Squirrels, and other tokens.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Nadier's Nightblade\",\"Zulaport Cutthroat\"],\"caveat\":\"Four mana and only a 2/1 body make it vulnerable.\",\"required_changes\":[]},{\"oracle_id\":\"4d18bcba-a346-445e-a182-6cc30b7e066d\",\"label\":\"worth_testing\",\"reason\":\"Provides a free sacrifice outlet and converts expendable Squirrels into substantial colorless mana.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Viscera Seer\",\"Carrion Feeder\"],\"caveat\":\"It does not trigger Camellia because it sacrifices creatures rather than Foods, and existing sacrifice outlets are plentiful.\",\"required_changes\":[]},{\"oracle_id\":\"77ccbea1-70af-4194-adad-39a904221c75\",\"label\":\"worth_testing\",\"reason\":\"Can draw cards from the deck's enchantments, including Trail of Crumbs, Insidious Roots, and Night of the Sweets' Revenge.\",\"support_names\":[\"Trail of Crumbs\",\"Insidious Roots\",\"Night of the Sweets' Revenge\"],\"caveat\":\"At four mana, its draw depends on drawing and casting additional enchantments.\",\"required_changes\":[]},{\"oracle_id\":\"7246d45b-2185-4cdd-981b-5419b7d52bce\",\"label\":\"reject\",\"reason\":\"White is outside Camellia, the Seedmiser's black-green color identity.\",\"support_names\":[\"Camellia, the Seedmiser\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"e74a2a4c-ca3c-49e8-9b0f-b4d1bb91fb54\",\"label\":\"worth_testing\",\"reason\":\"Turns creature deaths from sacrifice outlets and combat into delayed green-mana production.\",\"support_names\":[\"Viscera Seer\",\"Carrion Feeder\",\"Zulaport Cutthroat\"],\"caveat\":\"The mana arrives only at the beginning of your first main phase, so it does not help immediately with the sacrifice that generated it.\",\"required_changes\":[]},{\"oracle_id\":\"3a9059ac-c595-4e71-b704-b04d2d47db70\",\"label\":\"reject\",\"reason\":\"Its creature-removal mode requires a suitable creature you control and offers no Food, token, or sacrifice synergy; its planeswalker mode is unsupported.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Beast Within\"],\"caveat\":\"It can be situationally useful as creature-based removal, but the deck already has broader interaction.\",\"required_changes\":[]},{\"oracle_id\":\"0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2\",\"label\":\"reject\",\"reason\":\"Provides combat stats but no Food, Squirrel, sacrifice, drain, or card-advantage synergy and duplicates the role of Skullclamp less effectively.\",\"support_names\":[\"Skullclamp\"],\"caveat\":\"Its vigilance and first strike matter only when investing additional mana to equip.\",\"required_changes\":[]},{\"oracle_id\":\"690ae865-87bd-46b2-8e65-c53bd80c1a18\",\"label\":\"reject\",\"reason\":\"A five-mana body with a single Heartwood token and artifact-sacrifice payoff is too expensive and does not advance the deck's primary engines.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Night of the Sweets' Revenge\"],\"caveat\":\"It can consume spare Foods or artifacts for counters, but those resources have stronger existing uses.\",\"required_changes\":[]},{\"oracle_id\":\"5ea93956-085d-409b-bd95-dd669fa69eeb\",\"label\":\"worth_testing\",\"reason\":\"Creates a recurring Gingerbrute token while monarch, providing repeatable artifact creatures for Camellia and sacrifice payoffs.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Nadier's Nightblade\",\"Zulaport Cutthroat\"],\"caveat\":\"Six mana and the monarch requirement make it slow, and Gingerbrute creation is not guaranteed if the monarch is lost.\",\"required_changes\":[]},{\"oracle_id\":\"58285b70-0d13-4723-b5a4-91fb6f9ccf03\",\"label\":\"reject\",\"reason\":\"Its graveyard recursion and menace do not meaningfully support Food creation, Squirrel production, or token drain.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Eternal Witness\"],\"caveat\":\"It is a recursive threat, but the activation is expensive and requires exiling another creature card.\",\"required_changes\":[]},{\"oracle_id\":\"4421ab7d-6d9b-4edd-b5a0-53a8ed84da6f\",\"label\":\"reject\",\"reason\":\"Its ten-mana cost is unsupported, and its ward requires sacrificing three permanents, competing with the deck's own sacrifice resources.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Sol Ring\"],\"caveat\":\"The hand ability can accelerate one land, but it still does not establish the Food or Squirrel plan.\",\"required_changes\":[]},{\"oracle_id\":\"372d7086-b7dc-4b6d-bdf6-e9ed9c995456\",\"label\":\"reject\",\"reason\":\"Requires Wolves to attack and creates Wolves rather than Squirrels or Foods, with no meaningful interaction with the deck's engines.\",\"support_names\":[\"Camellia, the Seedmiser\"],\"caveat\":\"Its upkeep token can be sacrificed, but the deck has better token producers and no Wolf support.\",\"required_changes\":[]}]}",
+      "usage": {
+        "input_tokens": 11273,
+        "input_tokens_details": {
+          "cache_write_tokens": 11270,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1711,
+        "output_tokens_details": {
+          "reasoning_tokens": 273
+        },
+        "total_tokens": 12984
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.004871449999999999,
+      "assessments": [
+        {
+          "oracle_id": "f36d1d8b-8303-44a9-ab56-531931641ea2",
+          "label": "strong",
+          "reason": "Turns each Food creation into a Food, Clue, and Treasure, greatly increasing Camellia, the Seedmiser triggers and sacrifice resources.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Trail of Crumbs",
+            "Tireless Provisioner"
+          ],
+          "caveat": "Three-mana creature is vulnerable and does not itself create tokens.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "188da0ad-8524-4fb2-915e-1876dc9df89f",
+          "label": "strong",
+          "reason": "Adds a Food whenever your token effects create tokens and can convert three Foods into a card.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Trail of Crumbs",
+            "Tireless Provisioner"
+          ],
+          "caveat": "Its token replacement also adds Foods to non-Food token creation, which may increase sacrifice demands.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0636b6c3-0662-420a-b30d-f0a14e7c512d",
+          "label": "strong",
+          "reason": "Repeatedly drains opponents whenever this deck creates or sacrifices Foods, Squirrels, and other tokens.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Nadier's Nightblade",
+            "Zulaport Cutthroat"
+          ],
+          "caveat": "Four mana and only a 2/1 body make it vulnerable.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "label": "worth_testing",
+          "reason": "Provides a free sacrifice outlet and converts expendable Squirrels into substantial colorless mana.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Viscera Seer",
+            "Carrion Feeder"
+          ],
+          "caveat": "It does not trigger Camellia because it sacrifices creatures rather than Foods, and existing sacrifice outlets are plentiful.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "77ccbea1-70af-4194-adad-39a904221c75",
+          "label": "worth_testing",
+          "reason": "Can draw cards from the deck's enchantments, including Trail of Crumbs, Insidious Roots, and Night of the Sweets' Revenge.",
+          "support_names": [
+            "Trail of Crumbs",
+            "Insidious Roots",
+            "Night of the Sweets' Revenge"
+          ],
+          "caveat": "At four mana, its draw depends on drawing and casting additional enchantments.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7246d45b-2185-4cdd-981b-5419b7d52bce",
+          "label": "reject",
+          "reason": "White is outside Camellia, the Seedmiser's black-green color identity.",
+          "support_names": [
+            "Camellia, the Seedmiser"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "e74a2a4c-ca3c-49e8-9b0f-b4d1bb91fb54",
+          "label": "worth_testing",
+          "reason": "Turns creature deaths from sacrifice outlets and combat into delayed green-mana production.",
+          "support_names": [
+            "Viscera Seer",
+            "Carrion Feeder",
+            "Zulaport Cutthroat"
+          ],
+          "caveat": "The mana arrives only at the beginning of your first main phase, so it does not help immediately with the sacrifice that generated it.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3a9059ac-c595-4e71-b704-b04d2d47db70",
+          "label": "reject",
+          "reason": "Its creature-removal mode requires a suitable creature you control and offers no Food, token, or sacrifice synergy; its planeswalker mode is unsupported.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Beast Within"
+          ],
+          "caveat": "It can be situationally useful as creature-based removal, but the deck already has broader interaction.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2",
+          "label": "reject",
+          "reason": "Provides combat stats but no Food, Squirrel, sacrifice, drain, or card-advantage synergy and duplicates the role of Skullclamp less effectively.",
+          "support_names": [
+            "Skullclamp"
+          ],
+          "caveat": "Its vigilance and first strike matter only when investing additional mana to equip.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "690ae865-87bd-46b2-8e65-c53bd80c1a18",
+          "label": "reject",
+          "reason": "A five-mana body with a single Heartwood token and artifact-sacrifice payoff is too expensive and does not advance the deck's primary engines.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Night of the Sweets' Revenge"
+          ],
+          "caveat": "It can consume spare Foods or artifacts for counters, but those resources have stronger existing uses.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "5ea93956-085d-409b-bd95-dd669fa69eeb",
+          "label": "worth_testing",
+          "reason": "Creates a recurring Gingerbrute token while monarch, providing repeatable artifact creatures for Camellia and sacrifice payoffs.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Nadier's Nightblade",
+            "Zulaport Cutthroat"
+          ],
+          "caveat": "Six mana and the monarch requirement make it slow, and Gingerbrute creation is not guaranteed if the monarch is lost.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "58285b70-0d13-4723-b5a4-91fb6f9ccf03",
+          "label": "reject",
+          "reason": "Its graveyard recursion and menace do not meaningfully support Food creation, Squirrel production, or token drain.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Eternal Witness"
+          ],
+          "caveat": "It is a recursive threat, but the activation is expensive and requires exiling another creature card.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "4421ab7d-6d9b-4edd-b5a0-53a8ed84da6f",
+          "label": "reject",
+          "reason": "Its ten-mana cost is unsupported, and its ward requires sacrificing three permanents, competing with the deck's own sacrifice resources.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Sol Ring"
+          ],
+          "caveat": "The hand ability can accelerate one land, but it still does not establish the Food or Squirrel plan.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "372d7086-b7dc-4b6d-bdf6-e9ed9c995456",
+          "label": "reject",
+          "reason": "Requires Wolves to attack and creates Wolves rather than Squirrels or Foods, with no meaningful interaction with the deck's engines.",
+          "support_names": [
+            "Camellia, the Seedmiser"
+          ],
+          "caveat": "Its upkeep token can be sacrificed, but the deck has better token producers and no Wolf support.",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [],
+      "controls": {
+        "matched": 6,
+        "total": 6,
+        "misses": {}
+      }
+    },
+    {
+      "deck_id": "camellia-food",
+      "reversed": true,
+      "model": "gpt-5.6-luna",
+      "seconds": 12.974,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"372d7086-b7dc-4b6d-bdf6-e9ed9c995456\",\"label\":\"reject\",\"reason\":\"Wolf tribal card with no meaningful Wolf support; its upkeep token does not advance the Food/Squirrel plan enough.\",\"support_names\":[],\"caveat\":\"Requires multiple Wolves to attack.\",\"required_changes\":[]},{\"oracle_id\":\"4421ab7d-6d9b-4edd-b5a0-53a8ed84da6f\",\"label\":\"reject\",\"reason\":\"Legal colorless card, but its ten-mana cost is unsupported and inefficient for this deck.\",\"support_names\":[\"Camellia, the Seedmiser\"],\"caveat\":\"Its cast trigger and ward require substantial mana and permanents.\",\"required_changes\":[]},{\"oracle_id\":\"58285b70-0d13-4723-b5a4-91fb6f9ccf03\",\"label\":\"reject\",\"reason\":\"Expensive graveyard recursion does not create Food, Squirrels, or reliable sacrifice value.\",\"support_names\":[\"Feasting Troll King\"],\"caveat\":\"Competes with existing recursion and costs five mana plus another graveyard creature.\",\"required_changes\":[]},{\"oracle_id\":\"5ea93956-085d-409b-bd95-dd669fa69eeb\",\"label\":\"worth_testing\",\"reason\":\"Provides a Food-producing artifact creature and recurring token generation if you become monarch.\",\"support_names\":[\"Gingerbrute\",\"Camellia, the Seedmiser\"],\"caveat\":\"Six mana and monarch dependence make it a slower payoff.\",\"required_changes\":[]},{\"oracle_id\":\"690ae865-87bd-46b2-8e65-c53bd80c1a18\",\"label\":\"worth_testing\",\"reason\":\"Creates an artifact token on entry and turns spare Foods or artifacts into a growing threat.\",\"support_names\":[\"Night of the Sweets' Revenge\",\"Witch's Oven\"],\"caveat\":\"Five mana and only one token make it less efficient than dedicated Food engines.\",\"required_changes\":[]},{\"oracle_id\":\"0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2\",\"label\":\"reject\",\"reason\":\"Equipment combat bonuses do not support the deck's Food, Squirrel, or drain engines.\",\"support_names\":[],\"caveat\":\"Requires a creature and separate equip investment.\",\"required_changes\":[]},{\"oracle_id\":\"3a9059ac-c595-4e71-b704-b04d2d47db70\",\"label\":\"reject\",\"reason\":\"A narrow fight effect lacks the removal flexibility and sacrifice synergy of the deck's existing interaction.\",\"support_names\":[],\"caveat\":\"Requires a sufficiently large creature or planeswalker.\",\"required_changes\":[]},{\"oracle_id\":\"e74a2a4c-ca3c-49e8-9b0f-b4d1bb91fb54\",\"label\":\"worth_testing\",\"reason\":\"Turns routine creature sacrifices into later green mana, supporting repeated Food and Squirrel development.\",\"support_names\":[\"Witch's Oven\",\"Viscera Seer\",\"Camellia, the Seedmiser\"],\"caveat\":\"It does not produce mana until the following main phase and needs creatures to die.\",\"required_changes\":[]},{\"oracle_id\":\"7246d45b-2185-4cdd-981b-5419b7d52bce\",\"label\":\"reject\",\"reason\":\"White color identity is outside Camellia, the Seedmiser's black-green identity.\",\"support_names\":[\"Camellia, the Seedmiser\"],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"77ccbea1-70af-4194-adad-39a904221c75\",\"label\":\"worth_testing\",\"reason\":\"Can draw cards from the deck's existing enchantments, including Food and sacrifice engines.\",\"support_names\":[\"Trail of Crumbs\",\"Night of the Sweets' Revenge\",\"Scavenger's Talent\"],\"caveat\":\"Four mana and only about a handful of enchantments limit its immediate value.\",\"required_changes\":[]},{\"oracle_id\":\"4d18bcba-a346-445e-a182-6cc30b7e066d\",\"label\":\"strong\",\"reason\":\"A free creature sacrifice outlet that also generates two mana directly supports Camellia, the Seedmiser's sacrifice triggers and token plan.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Zulaport Cutthroat\",\"Nadier's Nightblade\"],\"caveat\":\"It produces colorless mana and should not be used to pursue an infinite combo.\",\"required_changes\":[]},{\"oracle_id\":\"0636c3c3-0662-420a-b30d-f0a14e7c512d\",\"label\":\"strong\",\"reason\":\"Triggers from both creating and sacrificing tokens, converting the deck's Food and Squirrel production into repeatable drain.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Nadier's Nightblade\",\"Trail of Crumbs\"],\"caveat\":\"Four mana and vulnerable as a creature make timing important.\",\"required_changes\":[]},{\"oracle_id\":\"188da0ad-8524-4fb2-915e-1876dc9df89f\",\"label\":\"strong\",\"reason\":\"Adds a Food whenever the deck creates a token and provides a reliable three-Food card draw outlet.\",\"support_names\":[\"Camellia, the Seedmiser\",\"Trail of Crumbs\",\"Greta, Sweettooth Scourge\"],\"caveat\":\"Its extra Food does not itself create an additional Squirrel.\",\"required_changes\":[]},{\"oracle_id\":\"f36d1d8b-8303-44a9-ab56-531931641ea2\",\"label\":\"strong\",\"reason\":\"Converts existing Food and Treasure creation into additional Clues, Foods, and Treasures, greatly increasing sacrifice and draw resources.\",\"support_names\":[\"Tireless Provisioner\",\"Gilded Goose\",\"Deadly Dispute\"],\"caveat\":\"Requires a Food, Clue, or Treasure creation effect to provide value.\",\"required_changes\":[]}]}",
+      "usage": {
+        "input_tokens": 11273,
+        "input_tokens_details": {
+          "cache_write_tokens": 11270,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1507,
+        "output_tokens_details": {
+          "reasoning_tokens": 256
+        },
+        "total_tokens": 12780
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.0046266499999999995,
+      "assessments": [
+        {
+          "oracle_id": "372d7086-b7dc-4b6d-bdf6-e9ed9c995456",
+          "label": "reject",
+          "reason": "Wolf tribal card with no meaningful Wolf support; its upkeep token does not advance the Food/Squirrel plan enough.",
+          "support_names": [],
+          "caveat": "Requires multiple Wolves to attack.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "4421ab7d-6d9b-4edd-b5a0-53a8ed84da6f",
+          "label": "reject",
+          "reason": "Legal colorless card, but its ten-mana cost is unsupported and inefficient for this deck.",
+          "support_names": [
+            "Camellia, the Seedmiser"
+          ],
+          "caveat": "Its cast trigger and ward require substantial mana and permanents.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "58285b70-0d13-4723-b5a4-91fb6f9ccf03",
+          "label": "reject",
+          "reason": "Expensive graveyard recursion does not create Food, Squirrels, or reliable sacrifice value.",
+          "support_names": [
+            "Feasting Troll King"
+          ],
+          "caveat": "Competes with existing recursion and costs five mana plus another graveyard creature.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "5ea93956-085d-409b-bd95-dd669fa69eeb",
+          "label": "worth_testing",
+          "reason": "Provides a Food-producing artifact creature and recurring token generation if you become monarch.",
+          "support_names": [
+            "Gingerbrute",
+            "Camellia, the Seedmiser"
+          ],
+          "caveat": "Six mana and monarch dependence make it a slower payoff.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "690ae865-87bd-46b2-8e65-c53bd80c1a18",
+          "label": "worth_testing",
+          "reason": "Creates an artifact token on entry and turns spare Foods or artifacts into a growing threat.",
+          "support_names": [
+            "Night of the Sweets' Revenge",
+            "Witch's Oven"
+          ],
+          "caveat": "Five mana and only one token make it less efficient than dedicated Food engines.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2",
+          "label": "reject",
+          "reason": "Equipment combat bonuses do not support the deck's Food, Squirrel, or drain engines.",
+          "support_names": [],
+          "caveat": "Requires a creature and separate equip investment.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3a9059ac-c595-4e71-b704-b04d2d47db70",
+          "label": "reject",
+          "reason": "A narrow fight effect lacks the removal flexibility and sacrifice synergy of the deck's existing interaction.",
+          "support_names": [],
+          "caveat": "Requires a sufficiently large creature or planeswalker.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "e74a2a4c-ca3c-49e8-9b0f-b4d1bb91fb54",
+          "label": "worth_testing",
+          "reason": "Turns routine creature sacrifices into later green mana, supporting repeated Food and Squirrel development.",
+          "support_names": [
+            "Witch's Oven",
+            "Viscera Seer",
+            "Camellia, the Seedmiser"
+          ],
+          "caveat": "It does not produce mana until the following main phase and needs creatures to die.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7246d45b-2185-4cdd-981b-5419b7d52bce",
+          "label": "reject",
+          "reason": "White color identity is outside Camellia, the Seedmiser's black-green identity.",
+          "support_names": [
+            "Camellia, the Seedmiser"
+          ],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "77ccbea1-70af-4194-adad-39a904221c75",
+          "label": "worth_testing",
+          "reason": "Can draw cards from the deck's existing enchantments, including Food and sacrifice engines.",
+          "support_names": [
+            "Trail of Crumbs",
+            "Night of the Sweets' Revenge",
+            "Scavenger's Talent"
+          ],
+          "caveat": "Four mana and only about a handful of enchantments limit its immediate value.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "label": "strong",
+          "reason": "A free creature sacrifice outlet that also generates two mana directly supports Camellia, the Seedmiser's sacrifice triggers and token plan.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Zulaport Cutthroat",
+            "Nadier's Nightblade"
+          ],
+          "caveat": "It produces colorless mana and should not be used to pursue an infinite combo.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0636c3c3-0662-420a-b30d-f0a14e7c512d",
+          "label": "strong",
+          "reason": "Triggers from both creating and sacrificing tokens, converting the deck's Food and Squirrel production into repeatable drain.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Nadier's Nightblade",
+            "Trail of Crumbs"
+          ],
+          "caveat": "Four mana and vulnerable as a creature make timing important.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "188da0ad-8524-4fb2-915e-1876dc9df89f",
+          "label": "strong",
+          "reason": "Adds a Food whenever the deck creates a token and provides a reliable three-Food card draw outlet.",
+          "support_names": [
+            "Camellia, the Seedmiser",
+            "Trail of Crumbs",
+            "Greta, Sweettooth Scourge"
+          ],
+          "caveat": "Its extra Food does not itself create an additional Squirrel.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "f36d1d8b-8303-44a9-ab56-531931641ea2",
+          "label": "strong",
+          "reason": "Converts existing Food and Treasure creation into additional Clues, Foods, and Treasures, greatly increasing sacrifice and draw resources.",
+          "support_names": [
+            "Tireless Provisioner",
+            "Gilded Goose",
+            "Deadly Dispute"
+          ],
+          "caveat": "Requires a Food, Clue, or Treasure creation effect to provide value.",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [
+        "missing, duplicate or foreign candidate IDs"
+      ],
+      "controls": {
+        "matched": 5,
+        "total": 6,
+        "misses": {
+          "0636b6c3-0662-420a-b30d-f0a14e7c512d": {
+            "expected": [
+              "strong"
+            ],
+            "actual": null
+          }
+        }
+      }
+    },
+    {
+      "deck_id": "talrand-spells",
+      "reversed": false,
+      "model": "gpt-5.6-luna",
+      "seconds": 14.108,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"8305d576-21d8-4ce7-8eda-a7cd9793aca5\",\"label\":\"strong\",\"reason\":\"Four-mana Wizard draws a card whenever you cast or copy an instant or sorcery, directly supporting Talrand, Sky Summoner's spell-heavy plan.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Baral, Chief of Compliance\"],\"caveat\":\"Does not itself create tokens and competes at four mana.\",\"required_changes\":[]},{\"oracle_id\":\"7d5149c6-0e7e-438c-a554-5235c85e2426\",\"label\":\"worth_testing\",\"reason\":\"Each instant or sorcery also creates a Construct, adding a second payoff to the deck's many cheap spells.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Sapphire Medallion\"],\"caveat\":\"Five mana and its Constructs are not Drakes or evasive; the graveyard return requires six artifacts.\",\"required_changes\":[]},{\"oracle_id\":\"17b60106-a4c7-410a-8ac3-ec8e74e29a7c\",\"label\":\"strong\",\"reason\":\"An Island that can recur a key instant or sorcery supports the spell plan with little opportunity cost when three other Islands are present.\",\"support_names\":[\"Island\",\"Ponder\",\"Counterspell\"],\"caveat\":\"It enters tapped unless you control three other Islands.\",\"required_changes\":[]},{\"oracle_id\":\"76678885-3674-443d-b9a2-2a460cf6aac0\",\"label\":\"reject\",\"reason\":\"It does not double Talrand, Sky Summoner's cast trigger, because that trigger is not caused by a permanent entering the battlefield.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"Provides no meaningful improvement to the listed token triggers.\",\"required_changes\":[]},{\"oracle_id\":\"2e2ace5b-4018-43af-8e72-ebafec1a7739\",\"label\":\"reject\",\"reason\":\"Red mana in its color identity makes it illegal in this mono-blue deck.\",\"support_names\":[],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"457af74a-02b3-4659-846d-63e482667f34\",\"label\":\"reject\",\"reason\":\"Black mana in its color identity makes it illegal in this mono-blue deck.\",\"support_names\":[],\"caveat\":\"\",\"required_changes\":[]},{\"oracle_id\":\"d0259f7d-9bd7-4722-8fb9-439768308516\",\"label\":\"reject\",\"reason\":\"Although colorless and legal, nine mana is unsupported by the cheap-spell plan and it does not advance Talrand, Sky Summoner's token strategy.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Sol Ring\"],\"caveat\":\"Its defensive text is powerful but disconnected from the stated win condition.\",\"required_changes\":[]},{\"oracle_id\":\"37513bd8-7303-4ac6-a7a7-224184faf758\",\"label\":\"reject\",\"reason\":\"Its enters-tapped condition requires beholding a Jace, and the deck contains no supplied Jace support; its activated ability is likewise irrelevant.\",\"support_names\":[\"Island\"],\"caveat\":\"It can produce blue mana, but with substantial unsupported text.\",\"required_changes\":[]},{\"oracle_id\":\"0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2\",\"label\":\"reject\",\"reason\":\"This Equipment requires combat-focused mana and a creature to equip, offering little support for casting cheap instants and sorceries or protecting Talrand, Sky Summoner.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"Could improve combat damage only after additional setup.\",\"required_changes\":[]},{\"oracle_id\":\"ecdfee75-15fd-41ea-89d4-4bfc1fa4d032\",\"label\":\"reject\",\"reason\":\"Its Jace-token ability is unrelated to the listed deck plan and has no supplied Jace support.\",\"support_names\":[],\"caveat\":\"The body does not reward casting instants or sorceries.\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"reject\",\"reason\":\"Five mana for card draw only when artifacts enter is weakly supported by the listed artifact count and does not reward the core spell casts.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Mind Stone\"],\"caveat\":\"Would improve with substantially more artifact-token or artifact-ramp support.\",\"required_changes\":[\"Add more reliable artifact-entering support\"]},{\"oracle_id\":\"67c603cc-ad66-4a1c-8386-5901c9c01bfb\",\"label\":\"worth_testing\",\"reason\":\"The creature is a three-mana flying prowess Wizard and its prepared spell can be copied, giving both a threat and an additional spell cast for Talrand, Sky Summoner.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Sapphire Medallion\"],\"caveat\":\"Arc of Fortune is symmetrical and may refill opponents, while the copy requires the creature to be prepared.\",\"required_changes\":[]},{\"oracle_id\":\"612c7807-be70-4e2f-afd2-3d3c03eddbbe\",\"label\":\"worth_testing\",\"reason\":\"A cheap instant that answers creature or legendary spells and can serve as another spell to trigger Talrand, Sky Summoner.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Counterspell\",\"Essence Scatter\"],\"caveat\":\"The counter mode is conditional and does not answer nonlegendary noncreature spells.\",\"required_changes\":[]},{\"oracle_id\":\"3cc333a1-c854-4b7c-8002-910e48222371\",\"label\":\"reject\",\"reason\":\"This Equipment provides minor combat stats but does not advance the cheap-spell, Drake-token, or Talrand, Sky Summoner protection plan.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"Its life gain is negligible for the listed strategy.\",\"required_changes\":[]},{\"oracle_id\":\"fateful-discovery-placeholder\",\"label\":\"reject\",\"reason\":\"No candidate with this oracle_id was supplied.\",\"support_names\":[],\"caveat\":\"\",\"required_changes\":[]}]}",
+      "usage": {
+        "input_tokens": 10190,
+        "input_tokens_details": {
+          "cache_write_tokens": 10187,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1498,
+        "output_tokens_details": {
+          "reasoning_tokens": 186
+        },
+        "total_tokens": 11688
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.0043451,
+      "assessments": [
+        {
+          "oracle_id": "8305d576-21d8-4ce7-8eda-a7cd9793aca5",
+          "label": "strong",
+          "reason": "Four-mana Wizard draws a card whenever you cast or copy an instant or sorcery, directly supporting Talrand, Sky Summoner's spell-heavy plan.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Baral, Chief of Compliance"
+          ],
+          "caveat": "Does not itself create tokens and competes at four mana.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7d5149c6-0e7e-438c-a554-5235c85e2426",
+          "label": "worth_testing",
+          "reason": "Each instant or sorcery also creates a Construct, adding a second payoff to the deck's many cheap spells.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Sapphire Medallion"
+          ],
+          "caveat": "Five mana and its Constructs are not Drakes or evasive; the graveyard return requires six artifacts.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "17b60106-a4c7-410a-8ac3-ec8e74e29a7c",
+          "label": "strong",
+          "reason": "An Island that can recur a key instant or sorcery supports the spell plan with little opportunity cost when three other Islands are present.",
+          "support_names": [
+            "Island",
+            "Ponder",
+            "Counterspell"
+          ],
+          "caveat": "It enters tapped unless you control three other Islands.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "76678885-3674-443d-b9a2-2a460cf6aac0",
+          "label": "reject",
+          "reason": "It does not double Talrand, Sky Summoner's cast trigger, because that trigger is not caused by a permanent entering the battlefield.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "Provides no meaningful improvement to the listed token triggers.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "2e2ace5b-4018-43af-8e72-ebafec1a7739",
+          "label": "reject",
+          "reason": "Red mana in its color identity makes it illegal in this mono-blue deck.",
+          "support_names": [],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "457af74a-02b3-4659-846d-63e482667f34",
+          "label": "reject",
+          "reason": "Black mana in its color identity makes it illegal in this mono-blue deck.",
+          "support_names": [],
+          "caveat": "",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "d0259f7d-9bd7-4722-8fb9-439768308516",
+          "label": "reject",
+          "reason": "Although colorless and legal, nine mana is unsupported by the cheap-spell plan and it does not advance Talrand, Sky Summoner's token strategy.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Sol Ring"
+          ],
+          "caveat": "Its defensive text is powerful but disconnected from the stated win condition.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "37513bd8-7303-4ac6-a7a7-224184faf758",
+          "label": "reject",
+          "reason": "Its enters-tapped condition requires beholding a Jace, and the deck contains no supplied Jace support; its activated ability is likewise irrelevant.",
+          "support_names": [
+            "Island"
+          ],
+          "caveat": "It can produce blue mana, but with substantial unsupported text.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2",
+          "label": "reject",
+          "reason": "This Equipment requires combat-focused mana and a creature to equip, offering little support for casting cheap instants and sorceries or protecting Talrand, Sky Summoner.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "Could improve combat damage only after additional setup.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "ecdfee75-15fd-41ea-89d4-4bfc1fa4d032",
+          "label": "reject",
+          "reason": "Its Jace-token ability is unrelated to the listed deck plan and has no supplied Jace support.",
+          "support_names": [],
+          "caveat": "The body does not reward casting instants or sorceries.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "reject",
+          "reason": "Five mana for card draw only when artifacts enter is weakly supported by the listed artifact count and does not reward the core spell casts.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Mind Stone"
+          ],
+          "caveat": "Would improve with substantially more artifact-token or artifact-ramp support.",
+          "required_changes": [
+            "Add more reliable artifact-entering support"
+          ]
+        },
+        {
+          "oracle_id": "67c603cc-ad66-4a1c-8386-5901c9c01bfb",
+          "label": "worth_testing",
+          "reason": "The creature is a three-mana flying prowess Wizard and its prepared spell can be copied, giving both a threat and an additional spell cast for Talrand, Sky Summoner.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Sapphire Medallion"
+          ],
+          "caveat": "Arc of Fortune is symmetrical and may refill opponents, while the copy requires the creature to be prepared.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "612c7807-be70-4e2f-afd2-3d3c03eddbbe",
+          "label": "worth_testing",
+          "reason": "A cheap instant that answers creature or legendary spells and can serve as another spell to trigger Talrand, Sky Summoner.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Counterspell",
+            "Essence Scatter"
+          ],
+          "caveat": "The counter mode is conditional and does not answer nonlegendary noncreature spells.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "3cc333a1-c854-4b7c-8002-910e48222371",
+          "label": "reject",
+          "reason": "This Equipment provides minor combat stats but does not advance the cheap-spell, Drake-token, or Talrand, Sky Summoner protection plan.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "Its life gain is negligible for the listed strategy.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "fateful-discovery-placeholder",
+          "label": "reject",
+          "reason": "No candidate with this oracle_id was supplied.",
+          "support_names": [],
+          "caveat": "",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [
+        "missing, duplicate or foreign candidate IDs"
+      ],
+      "controls": {
+        "matched": 5,
+        "total": 6,
+        "misses": {
+          "7d5149c6-0e7e-438c-a554-5235c85e2426": {
+            "expected": [
+              "strong"
+            ],
+            "actual": "worth_testing"
+          }
+        }
+      }
+    },
+    {
+      "deck_id": "talrand-spells",
+      "reversed": true,
+      "model": "gpt-5.6-luna",
+      "seconds": 14.134,
+      "status": "completed",
+      "output": "{\"assessments\":[{\"oracle_id\":\"3cc333a1-c854-4b7c-8002-910e48222371\",\"label\":\"reject\",\"reason\":\"Life gain and a small equipment bonus do not support the cheap-spell Drake plan.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"Requires an equipment-oriented role absent from the deck.\",\"required_changes\":[]},{\"oracle_id\":\"612c7807-be70-4e2f-afd2-3d3c03eddbbe\",\"label\":\"worth_testing\",\"reason\":\"A cheap instant that can answer creatures or legendary spells while preserving Talrand's trigger plan.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Counterspell\",\"Rapid Hybridization\"],\"caveat\":\"The counter mode is conditional and it cannot answer most noncreature spells.\",\"required_changes\":[]},{\"oracle_id\":\"67c603cc-ad66-4a1c-8386-5901c9c01bfb\",\"label\":\"worth_testing\",\"reason\":\"A three-mana Wizard with prowess is on-theme, and its prepared sorcery copy can generate additional spell value.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Baral, Chief of Compliance\"],\"caveat\":\"Arc of Fortune refills every player's hand, so its symmetric effect may be risky.\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"reject\",\"reason\":\"Its five-mana artifact-draw engine has too few relevant artifact entries in this spell-focused deck.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Mind Stone\"],\"caveat\":\"Would need substantially more artifact support.\",\"required_changes\":[]},{\"oracle_id\":\"ecdfee75-15fd-41ea-89d4-4b1fcfa4d032\",\"label\":\"reject\",\"reason\":\"The Jace-specific enter-the-battlefield ability has no supplied Jace support.\",\"support_names\":[],\"caveat\":\"Its body provides no meaningful instant-or-sorcery payoff.\",\"required_changes\":[]},{\"oracle_id\":\"0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2\",\"label\":\"reject\",\"reason\":\"Equipment combat bonuses are redundant with the deck's Drake-token spell plan.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"Would require an equipment or creature-combat subtheme.\",\"required_changes\":[]},{\"oracle_id\":\"37513bd8-7303-4ac6-a7a7-224184faf758\",\"label\":\"reject\",\"reason\":\"Its Jace condition and empowerment ability are unsupported, and it can enter tapped.\",\"support_names\":[],\"caveat\":\"An ordinary Island is more reliable here.\",\"required_changes\":[]},{\"oracle_id\":\"d0259f7d-9bd7-4722-8fb9-439768308516\",\"label\":\"reject\",\"reason\":\"A nine-mana creature does not advance the cheap-spell plan and has no supporting ramp or reanimation package.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\"],\"caveat\":\"Its defensive text is powerful but too disconnected from the stated win plan.\",\"required_changes\":[]},{\"oracle_id\":\"457af74a-02b3-4659-846d-63e482667f34\",\"label\":\"reject\",\"reason\":\"It is outside Talrand's blue color identity.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"No supporting changes can make this card Commander-legal under this commander.\",\"required_changes\":[]},{\"oracle_id\":\"2e2ace5b-4018-43af-8e72-ebafec1a7739\",\"label\":\"reject\",\"reason\":\"It is outside Talrand's blue color identity.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"No supporting changes can make this card Commander-legal under this commander.\",\"required_changes\":[]},{\"oracle_id\":\"76678885-3674-443d-b9a2-2a460cf6aac0\",\"label\":\"reject\",\"reason\":\"Panharmonicon does not double Talrand's cast-triggered Drake ability, and the deck has few relevant enter triggers.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Sol Ring\",\"Arcane Signet\"],\"caveat\":\"It would improve a substantially stronger artifact-or-enter-the-battlefield package.\",\"required_changes\":[]},{\"oracle_id\":\"17b60106-a4c7-410a-8ac3-ec8e74e29a7c\",\"label\":\"strong\",\"reason\":\"With 37 Islands, it can often enter untapped and repeatedly recover key instants or sorceries from the graveyard.\",\"support_names\":[\"Island\",\"Ponder\",\"Counterspell\",\"Mystic Sanctuary\"],\"caveat\":\"It enters tapped when fewer than three other Islands are controlled.\",\"required_changes\":[]},{\"oracle_id\":\"7d5149c6-0e7e-438c-a554-5235c85e2426\",\"label\":\"strong\",\"reason\":\"Every instant or sorcery produces an additional Construct while directly supporting the deck's core casting plan.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Sapphire Medallion\",\"Baral, Chief of Compliance\"],\"caveat\":\"At five mana, it is slower than the deck's cheapest payoffs and its recursion mode needs six artifacts.\",\"required_changes\":[]},{\"oracle_id\":\"8305d576-21d8-4ce7-8eda-a7cd9793aca5\",\"label\":\"strong\",\"reason\":\"It draws a card whenever the deck casts or copies its abundant instants and sorceries, directly improving velocity.\",\"support_names\":[\"Talrand, Sky Summoner\",\"Counterspell\",\"Ponder\",\"Archmage Emeritus\"],\"caveat\":\"It costs four mana and is vulnerable before generating value.\",\"required_changes\":[]},{\"oracle_id\":\"d0259f7d-9bd7-4722-8fb9-439768308516\",\"label\":\"reject\",\"reason\":\"This duplicate candidate is still a nine-mana threat disconnected from the cheap-spell Drake plan.\",\"support_names\":[\"Talrand, Sky Summoner\"],\"caveat\":\"Its defensive text does not compensate for its cost here.\",\"required_changes\":[]},{\"oracle_id\":\"72c6174c-fa2c-4ff2-b76e-eb6e890e97c9\",\"label\":\"reject\",\"reason\":\"This duplicate candidate remains a slow artifact-trigger engine with limited artifact support.\",\"support_names\":[\"Sol Ring\",\"Arcane Signet\",\"Mind Stone\"],\"caveat\":\"It would need substantially more artifact entries to become compelling.\",\"required_changes\":[]}]}",
+      "usage": {
+        "input_tokens": 10190,
+        "input_tokens_details": {
+          "cache_write_tokens": 10187,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1596,
+        "output_tokens_details": {
+          "reasoning_tokens": 213
+        },
+        "total_tokens": 11786
+      },
+      "response_model": "gpt-5.6-luna",
+      "estimated_cost_upper_usd": 0.0044627,
+      "assessments": [
+        {
+          "oracle_id": "3cc333a1-c854-4b7c-8002-910e48222371",
+          "label": "reject",
+          "reason": "Life gain and a small equipment bonus do not support the cheap-spell Drake plan.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "Requires an equipment-oriented role absent from the deck.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "612c7807-be70-4e2f-afd2-3d3c03eddbbe",
+          "label": "worth_testing",
+          "reason": "A cheap instant that can answer creatures or legendary spells while preserving Talrand's trigger plan.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Counterspell",
+            "Rapid Hybridization"
+          ],
+          "caveat": "The counter mode is conditional and it cannot answer most noncreature spells.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "67c603cc-ad66-4a1c-8386-5901c9c01bfb",
+          "label": "worth_testing",
+          "reason": "A three-mana Wizard with prowess is on-theme, and its prepared sorcery copy can generate additional spell value.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Baral, Chief of Compliance"
+          ],
+          "caveat": "Arc of Fortune refills every player's hand, so its symmetric effect may be risky.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "reject",
+          "reason": "Its five-mana artifact-draw engine has too few relevant artifact entries in this spell-focused deck.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Mind Stone"
+          ],
+          "caveat": "Would need substantially more artifact support.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "ecdfee75-15fd-41ea-89d4-4b1fcfa4d032",
+          "label": "reject",
+          "reason": "The Jace-specific enter-the-battlefield ability has no supplied Jace support.",
+          "support_names": [],
+          "caveat": "Its body provides no meaningful instant-or-sorcery payoff.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "0eaec4ec-0f50-4470-a7bf-acd8c6c52dc2",
+          "label": "reject",
+          "reason": "Equipment combat bonuses are redundant with the deck's Drake-token spell plan.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "Would require an equipment or creature-combat subtheme.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "37513bd8-7303-4ac6-a7a7-224184faf758",
+          "label": "reject",
+          "reason": "Its Jace condition and empowerment ability are unsupported, and it can enter tapped.",
+          "support_names": [],
+          "caveat": "An ordinary Island is more reliable here.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "d0259f7d-9bd7-4722-8fb9-439768308516",
+          "label": "reject",
+          "reason": "A nine-mana creature does not advance the cheap-spell plan and has no supporting ramp or reanimation package.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet"
+          ],
+          "caveat": "Its defensive text is powerful but too disconnected from the stated win plan.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "457af74a-02b3-4659-846d-63e482667f34",
+          "label": "reject",
+          "reason": "It is outside Talrand's blue color identity.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "No supporting changes can make this card Commander-legal under this commander.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "2e2ace5b-4018-43af-8e72-ebafec1a7739",
+          "label": "reject",
+          "reason": "It is outside Talrand's blue color identity.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "No supporting changes can make this card Commander-legal under this commander.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "76678885-3674-443d-b9a2-2a460cf6aac0",
+          "label": "reject",
+          "reason": "Panharmonicon does not double Talrand's cast-triggered Drake ability, and the deck has few relevant enter triggers.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Sol Ring",
+            "Arcane Signet"
+          ],
+          "caveat": "It would improve a substantially stronger artifact-or-enter-the-battlefield package.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "17b60106-a4c7-410a-8ac3-ec8e74e29a7c",
+          "label": "strong",
+          "reason": "With 37 Islands, it can often enter untapped and repeatedly recover key instants or sorceries from the graveyard.",
+          "support_names": [
+            "Island",
+            "Ponder",
+            "Counterspell",
+            "Mystic Sanctuary"
+          ],
+          "caveat": "It enters tapped when fewer than three other Islands are controlled.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "7d5149c6-0e7e-438c-a554-5235c85e2426",
+          "label": "strong",
+          "reason": "Every instant or sorcery produces an additional Construct while directly supporting the deck's core casting plan.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Sapphire Medallion",
+            "Baral, Chief of Compliance"
+          ],
+          "caveat": "At five mana, it is slower than the deck's cheapest payoffs and its recursion mode needs six artifacts.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "8305d576-21d8-4ce7-8eda-a7cd9793aca5",
+          "label": "strong",
+          "reason": "It draws a card whenever the deck casts or copies its abundant instants and sorceries, directly improving velocity.",
+          "support_names": [
+            "Talrand, Sky Summoner",
+            "Counterspell",
+            "Ponder",
+            "Archmage Emeritus"
+          ],
+          "caveat": "It costs four mana and is vulnerable before generating value.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "d0259f7d-9bd7-4722-8fb9-439768308516",
+          "label": "reject",
+          "reason": "This duplicate candidate is still a nine-mana threat disconnected from the cheap-spell Drake plan.",
+          "support_names": [
+            "Talrand, Sky Summoner"
+          ],
+          "caveat": "Its defensive text does not compensate for its cost here.",
+          "required_changes": []
+        },
+        {
+          "oracle_id": "72c6174c-fa2c-4ff2-b76e-eb6e890e97c9",
+          "label": "reject",
+          "reason": "This duplicate candidate remains a slow artifact-trigger engine with limited artifact support.",
+          "support_names": [
+            "Sol Ring",
+            "Arcane Signet",
+            "Mind Stone"
+          ],
+          "caveat": "It would need substantially more artifact entries to become compelling.",
+          "required_changes": []
+        }
+      ],
+      "validation_errors": [
+        "missing, duplicate or foreign candidate IDs",
+        "17b60106-a4c7-410a-8ac3-ec8e74e29a7c: unsupported reference",
+        "8305d576-21d8-4ce7-8eda-a7cd9793aca5: unsupported reference"
+      ],
+      "controls": {
+        "matched": 6,
+        "total": 6,
+        "misses": {}
+      }
+    }
+  ],
+  "pricing_source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna.md"
+}

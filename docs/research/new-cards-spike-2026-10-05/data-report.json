@@ -1,0 +1,103 @@
+{
+  "observed_at": "2026-10-05T05:19:33.034844+00:00",
+  "as_of": "2026-10-05",
+  "scope": "full default-printing export + oracle representatives; no database writes",
+  "caveat": "paper shape is not positive proof of upcoming Commander eligibility",
+  "sources": [
+    {
+      "type": "default_cards",
+      "updated_at": "2026-10-04T21:05:43.112+00:00",
+      "bytes": 78697099,
+      "sha256": "2fd92d99ac3f9e4f252f03df8ffe8cb4c3f2456445c368ba04bfb5241070cc2b",
+      "download_seconds": 2.564
+    },
+    {
+      "type": "oracle_cards",
+      "updated_at": "2026-10-04T21:01:57.080+00:00",
+      "bytes": 24595465,
+      "sha256": "cd5f442a93459d65850bacce748996b0e77b631b5a0c68ebcfcf62a8bd35eae8",
+      "download_seconds": 0.783
+    }
+  ],
+  "counts": {
+    "all_printings": 118475,
+    "paper_printings": 98755,
+    "oracle_records": 38705,
+    "paper_expired": 32551,
+    "paper_face_text_lost": 866,
+    "paper_upcoming": 168,
+    "upcoming_retained_by_current_importer": 0,
+    "upcoming_missing_preview_metadata": 167,
+    "upcoming_missing_edhrec_rank": 1,
+    "upcoming_face_text_lost": 0,
+    "false_new_from_representative_date": 204,
+    "paper_recent": 495,
+    "recent_retained_by_current_importer": 492,
+    "recent_missing_preview_metadata": 348,
+    "recent_missing_edhrec_rank": 0,
+    "recent_face_text_lost": 38
+  },
+  "active_sets": {
+    "trk": 75,
+    "fra": 268,
+    "hob": 185,
+    "mbc": 60,
+    "hoc": 21,
+    "trc": 36,
+    "frc": 18
+  },
+  "active_legalities": {
+    "not_legal": 171,
+    "legal": 492
+  },
+  "samples": {
+    "upcoming_dropped": [
+      "Munitions Enthusiast",
+      "Saurian Explorer",
+      "Autumn Willow, Harmony",
+      "Ashaya's Enduring Bond",
+      "Battle-Scarred Survivalist",
+      "Shields Up!",
+      "Bat'leth",
+      "Beckett Mariner, Impetuous Ensign",
+      "Brad Boimler, Eager Ensign",
+      "Tresserhorn's Lord, Returned",
+      "Joven and Chandler",
+      "Tactical Officer"
+    ],
+    "false_new_from_representative_date": [
+      "Errand-Rider of Gondor",
+      "Talisman of Progress",
+      "Dreadhorde Invasion",
+      "Glacial Fortress",
+      "Rootborn Defenses",
+      "Elspeth, Sun's Champion",
+      "Skrelv's Hive",
+      "Chaos Warp",
+      "Invisible Woman",
+      "Command Tower",
+      "Haunt of the Dead Marshes",
+      "Lingering Souls"
+    ],
+    "recent_face_text_lost": [
+      "Gollum, Silent Slinker // Meager Meal",
+      "The Arkenstone // Seek the Heart",
+      "Fatehold Chronologist // Peer Review",
+      "Semester Foreseer // Peer Review",
+      "Great Ugly-Looking Goblin // Clap! Snap!",
+      "Glamdring, Foe-hammer // Gleam of Death",
+      "Beorn, Reluctant Host // Till and Tend",
+      "My Precious // Allure of Power",
+      "Pompous Battlemage // Improvised Act",
+      "Most Decrepit Old Bird // Speak Secrets",
+      "An Unexpected Party // At the Door",
+      "Paradox Shaper // Omit Variables"
+    ],
+    "recent_dropped": [
+      "Spock, Logical Choice",
+      "Picard, Steadfast Captain",
+      "Benjamin Sisko, Besieged"
+    ]
+  },
+  "analysis_seconds": 5.384
+}

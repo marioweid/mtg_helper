@@ -223,6 +223,8 @@ __marimo__/
 .DS_Store
 *.csv
 *.json
+# Public/synthetic feasibility evidence is intentionally versioned; bulk caches remain ignored.
+!docs/research/new-cards-spike-2026-10-05/*.json
 
 # Terraform
 infra/terraform/.terraform/

@@ -1,0 +1,59 @@
+{
+  "arms": {
+    "low": {
+      "calls": 4,
+      "completed": 4,
+      "contract_valid_runs": 4,
+      "judgments": 32,
+      "broad_labels": {
+        "holdout": {
+          "matched": 15,
+          "total": 15
+        },
+        "regression": {
+          "matched": 8,
+          "total": 8
+        }
+      },
+      "seconds": [
+        16.673,
+        17.517,
+        18.505,
+        17.412
+      ],
+      "median_seconds": 17.4645,
+      "input_tokens": 51393,
+      "output_tokens": 7297,
+      "reasoning_tokens": 1287,
+      "estimated_cost_upper_usd": 0.02160465
+    },
+    "high": {
+      "calls": 4,
+      "completed": 4,
+      "contract_valid_runs": 2,
+      "judgments": 32,
+      "broad_labels": {
+        "holdout": {
+          "matched": 14,
+          "total": 15
+        },
+        "regression": {
+          "matched": 8,
+          "total": 8
+        }
+      },
+      "seconds": [
+        60.193,
+        73.091,
+        143.965,
+        113.087
+      ],
+      "median_seconds": 93.089,
+      "input_tokens": 51393,
+      "output_tokens": 40457,
+      "reasoning_tokens": 33978,
+      "estimated_cost_upper_usd": 0.06139665
+    }
+  },
+  "note": "Broad labels are not semantic accuracy. All-label cases excluded. One observation per arm/deck; no statistical causal claim."
+}

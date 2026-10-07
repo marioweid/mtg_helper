@@ -1,0 +1,50 @@
+{
+  "experiment": "new-cards-reasoning-v3",
+  "scope": "Candidate holdouts on the existing four physical decks, not unseen decks. Historical cards bypass age only for this diagnostic.",
+  "arms": ["low", "high"],
+  "max_output_tokens": 16000,
+  "maximum_calls": 8,
+  "estimated_budget_usd": 0.5,
+  "decks": {
+    "alela-artifacts": [
+      {"name": "Losheel, Clockwork Scholar", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Artifact-creature entries draw at most once each turn. Alela's Faeries are not artifact creatures. Combat damage prevention applies to attacking artifact creatures, not all attackers."},
+      {"name": "Mystic Forge", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Top-of-library permission covers artifact spells and colorless spells, not every spell and not playing lands. Colored nonartifact spells can obstruct it; exile activation costs tap and one life."},
+      {"name": "Shimmer Myr", "kind": "holdout", "labels": ["strong", "worth_testing", "reject"], "check": "Flash permission is for artifacts, not all permanents. Casting artifact spells on opponents' turns can trigger Alela; merely putting an artifact onto the battlefield does not."},
+      {"name": "Herald's Horn", "kind": "holdout", "labels": ["reject", "worth_testing"], "check": "Choose a creature type, not Artifact. Faerie tokens are not creature spells cast and are not library cards. Upkeep selection is conditional, not unconditional draw."},
+      {"name": "Whirlwind of Thought", "kind": "holdout", "labels": ["reject"], "check": "Red color identity makes this ineligible for Alela regardless of the appealing noncreature-cast effect."},
+      {"name": "Wizard's Staff", "kind": "regression", "labels": ["strong", "worth_testing", "reject"], "check": "Ordinary Equip {3} can equip Alela. Trigger doubling does not double activated abilities. Do not invent a Wizard restriction or miscount supplied Wizards."},
+      {"name": "Fateful Discovery", "kind": "regression", "labels": ["strong", "worth_testing"], "check": "Artifact entries trigger Discovery, not Alela. Discovery itself is an enchantment and casting it does trigger Alela."},
+      {"name": "Surgical Precision", "kind": "regression", "labels": ["reject", "worth_testing"], "check": "Sorcery: destroy a creature with toughness 4 or greater and gain 1 life, or draw a card and gain 2 life. Do not substitute Prophesied End's text."}
+    ],
+    "alela-enchantments": [
+      {"name": "Moon-Blessed Cleric", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "ETB tutors an enchantment to the top of the library, not hand or battlefield. The Cleric is not itself an enchantment."},
+      {"name": "Ondu Spiritdancer", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Copy an entering enchantment at most once each turn. Token copies enter but are not cast, so do not directly retrigger Alela or enchantment-cast payoffs."},
+      {"name": "Starfield Mystic", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Discount is generic mana for enchantment spells. Counters result from controlled enchantments going from battlefield to graveyard, not casting or entering."},
+      {"name": "Tocasia's Welcome", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Entry threshold is mana value 3 or less, not power or toughness. Ordinary Alela tokens have mana value zero. Draw triggers only once each turn, not per token."},
+      {"name": "Eidolon of Rhetoric", "kind": "holdout", "labels": ["strong", "worth_testing", "reject"], "check": "One spell per turn applies to each player including its controller; this can hinder chaining enchantments even if pillowfort benefits. Not one spell per round or opponents-only."},
+      {"name": "Wizard's Staff", "kind": "regression", "labels": ["strong", "worth_testing", "reject"], "check": "Alela can be equipped for {3} and her cast trigger doubled. A rejection needs an actual opportunity-cost argument, not an assumption that she cannot be equipped."},
+      {"name": "Fateful Discovery", "kind": "regression", "labels": ["reject", "worth_testing"], "check": "Casting Discovery itself triggers Alela because it is an enchantment. Its subsequent draw condition is artifact entry, not enchantment casts or Faerie entries."},
+      {"name": "Prophesied End", "kind": "regression", "labels": ["reject", "worth_testing"], "check": "Instant, not sorcery. Destroy a target creature; its controller draws if it was not attacking. No lifegain and no toughness threshold."}
+    ],
+    "camellia-food": [
+      {"name": "Ruthless Technomancer", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "ETB optionally sacrifices another creature for Treasures equal to power, not toughness. Recursion sacrifices X artifacts, X nonzero, and returns a creature with power at most X. A Food creature qualifies for ETB; noncreature Food does not."},
+      {"name": "Ygra, Eater of All", "kind": "holdout", "labels": ["strong", "worth_testing", "reject"], "check": "Other creatures, including opponents', become Food artifacts; Ygra excludes itself. Ward cost belongs to targeting opponent. Food-to-graveyard triggers are not limited to own sacrifices. Respect no-infinite-combo goal; another candidate is not current support."},
+      {"name": "Trading Post", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Every mode costs one mana and tap, plus its stated resource. Artifact sacrifice can consume noncreature Food and draw; creature sacrifice returns an artifact to hand, not battlefield. One sacrifice cannot pay two modes."},
+      {"name": "Night of Souls' Betrayal", "kind": "holdout", "labels": ["reject"], "check": "Global -1/-1 hits own creatures too; ordinary 1/1 Squirrels die absent a buff. Do not describe it as opponents-only or an anthem for the deck."},
+      {"name": "Mirkwood Bats", "kind": "regression", "labels": ["strong"], "check": "Body is 2/3. Creating or sacrificing each token drains each opponent; do not invent a nontoken or once-per-turn restriction."},
+      {"name": "Ashnod's Altar", "kind": "regression", "labels": ["strong", "worth_testing", "reject"], "check": "Sacrifices creatures, including Food creatures such as Tough Cookie and Gingerbrute, which can trigger Camellia. Does not sacrifice noncreature Foods. Other outlets do not share one payment."},
+      {"name": "Emrakul, the Exigent Doom", "kind": "regression", "labels": ["reject", "worth_testing"], "check": "Ward sacrifice is paid by the targeting opponent, not the permanent's controller. Nonpayment counters the opposing spell/ability. Review hand ability as printed rather than inventing costs."},
+      {"name": "Ginger, Queen of Sweets", "kind": "regression", "labels": ["strong", "worth_testing", "reject"], "check": "Its upkeep Gingerbrute tokens are Food artifact creatures. Monarch dependence and six mana are real costs, but denying Food support is not."}
+    ],
+    "talrand-spells": [
+      {"name": "Roaming Throne", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Choose Wizard or Merfolk to double Talrand's triggered ability. Does not double all spells, static abilities, or its own triggers. Its ward cost is paid by targeting opponent."},
+      {"name": "Shark Typhoon", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Noncreature-spell casts make Sharks by mana value. Cycling draws and creates a Shark but is not casting an instant/sorcery and does not itself trigger Talrand."},
+      {"name": "Deekah, Fractal Theorist", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Casting or copying an instant/sorcery triggers Deekah; ordinary copies are not cast and do not trigger Talrand. Token starts 0/0 with counters equal to mana value, not power."},
+      {"name": "Jace's Sanctum", "kind": "holdout", "labels": ["strong", "worth_testing"], "check": "Reduces generic cost of instants/sorceries and scries on their casts. Does not draw cards, discount colored symbols or require a Jace planeswalker."},
+      {"name": "Talrand's Invocation", "kind": "holdout", "labels": ["strong", "worth_testing", "reject"], "check": "Sorcery creates two 2/2 flying Drakes; casting it with Talrand present adds one more from the cast trigger. Token creation itself does not retrigger Talrand."},
+      {"name": "Variable Chaser // Arc of Fortune", "kind": "regression", "labels": ["strong", "worth_testing", "reject"], "check": "Printed prepared reminder allows casting a copy and unprepares the creature. Do not deny that explicit access; do not invent free casting or fully specified novel-keyword timing."},
+      {"name": "Keeper of the Quiet Hour", "kind": "regression", "labels": ["reject", "worth_testing"], "check": "Empower reminder creates a Jace token if absent and puts loyalty counters on it. Existing Jace support is not necessary for the printed self-contained effect."},
+      {"name": "Metallurgic Summonings", "kind": "regression", "labels": ["strong", "worth_testing"], "check": "Instant/sorcery casts create Constructs by mana value. Five-mana opportunity cost is defensible; its graveyard-return activation needs six artifacts and exiles the enchantment."}
+    ]
+  }
+}
