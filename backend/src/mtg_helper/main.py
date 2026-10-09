@@ -24,6 +24,7 @@ from mtg_helper.routers import (
     me,
     new_cards,
     onboarding,
+    recommendations,
     revisions,
     snapshots,
     tags,
@@ -38,6 +39,7 @@ from mtg_helper.services import (
 )
 from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.new_cards.repository import NewCardsError
+from mtg_helper.services.recommendations.repository import DiscoveryError
 
 _log = logging.getLogger(__name__)
 
@@ -129,6 +131,15 @@ async def new_cards_error_handler(_request: Request, exc: NewCardsError) -> JSON
     )
 
 
+@app.exception_handler(DiscoveryError)
+async def discovery_error_handler(_request: Request, exc: DiscoveryError) -> JSONResponse:
+    """Return bounded actionable pilot errors without exposing private provider fragments."""
+    return JSONResponse(
+        status_code=exc.status,
+        content={"error": {"code": "DISCOVERY_ERROR", "message": str(exc)}},
+    )
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """Return a consistent error envelope for unhandled exceptions."""
@@ -149,6 +160,7 @@ app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(revisions.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(new_cards.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(recommendations.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(ai.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(feedback.router, prefix="/api/v1", dependencies=_authed)

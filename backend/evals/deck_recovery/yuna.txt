@@ -1,0 +1,101 @@
+1 Adarkar Wastes
+1 An Offer You Can't Refuse
+1 Armored Scrapgorger
+1 Arwen, Weaver of Hope
+1 Badgermole Cub
+1 Barkchannel Pathway
+1 Basking Broodscale
+1 Benevolent Hydra
+1 Birds of Paradise
+1 Bloodspore Thrinax
+1 Bloom Tender
+1 Bountiful Promenade
+1 Branching Evolution
+1 Branchloft Pathway
+1 Breeding Pool
+1 Brushland
+1 Bugenhagen, Wise Elder
+1 Cankerbloom
+1 Captain America, Living Legend
+1 Chocobo Knights
+1 Collector's Cage
+1 Command Tower
+1 Counterspell
+1 Crystalline Crawler
+1 Damning Verdict
+1 Danny Pink
+1 Dreamroot Cascade
+1 Envoy of the Ancestors
+1 Esper Sentinel
+1 Exotic Orchard
+1 Fathom Mage
+1 Flooded Strand
+3 Forest
+1 Garruk's Uprising
+1 Generous Pup
+1 Giggling Skitterspike
+1 Glen Elendra Archmage
+1 Greater Good
+1 Gyre Sage
+1 Hallowed Fountain
+1 Hengegate Pathway
+1 Herald of Secret Streams
+1 Heroic Intervention
+1 Incubation Druid
+1 Innkeeper's Talent
+1 Inspiring Call
+1 Iron Man, Armored Avenger
+2 Island
+1 Kami of Whispered Hopes
+1 Karn's Bastion
+1 King T'Challa
+1 Kiora, Behemoth Beckoner
+1 Kutzil, Malamet Exemplar
+1 Master Biomancer
+1 Mikey & Leo, Chaos & Order
+1 Minamo, School at Water's Edge
+1 Misty Rainforest
+1 Mosswort Bridge
+1 Mystic Remora
+1 Nesting Grounds
+1 Noble Hierarch
+1 Ouroboroid
+1 Overflowing Basin
+1 Overgrown Farmland
+1 Ozolith, the Shattered Spire
+1 Path to Exile
+1 Pensive Professor
+1 Plains
+1 Pollywog Prodigy
+1 Rejuvenating Springs
+1 Reliquary Tower
+1 Reluctant Role Model
+1 Repulsive Mutation
+1 Resourceful Defense
+1 Ripples of Potential
+1 Rishkar's Expertise
+1 Sab-Sunen, Luxa Embodied
+1 Sakura-Tribe Elder
+1 Sea of Clouds
+1 Selfless Savior
+1 Skycloud Expanse
+1 Spara's Headquarters
+1 Sphere Grid
+1 Staff of Compleation
+1 Sungrass Prairie
+1 Swords to Plowshares
+1 Temple Garden
+1 Terrasymbiosis
+1 The Ozolith
+1 Tribute to the World Tree
+1 Troop of Ponies
+1 Twitching Doll
+1 Warden of the Grove
+1 Wave Goodbye
+1 Windswept Heath
+1 Yavimaya Coast
+
+SIDEBOARD:
+1 Guiding Hydra
+
+1 Yuna, Grand Summoner

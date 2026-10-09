@@ -1,5 +1,6 @@
 """Scryfall bulk data pipeline: download, parse, and upsert cards into PostgreSQL."""
 
+import asyncio
 import gzip
 import io
 import json
@@ -372,6 +373,9 @@ async def run_sync(
         history_url = await _fetch_bulk_data_url(client, "default_cards")
         history = await catalog.download_history(client, history_url)
 
+    from mtg_helper.services.recommendations import source_repository
+
+    source = await asyncio.to_thread(source_repository.prepare, all_cards)
     cb("filtering", 0, len(all_cards))
     relevant = [
         _map_card(c) for c in all_cards if _is_commander_relevant(c) and _is_commander_playable(c)
@@ -388,7 +392,7 @@ async def run_sync(
             cb("upserting", done, total)
             _log.info("Upserted %d / %d cards", done, total)
         await _switch_canonical_rows(conn, relevant)
-        await catalog.publish(conn, all_cards, history, started_at)
+        await catalog.publish(conn, all_cards, history, started_at, source=source)
 
     from mtg_helper.services import oracle_duplicate_repair_service
 

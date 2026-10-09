@@ -12,7 +12,8 @@ from uuid import UUID
 import asyncpg
 
 FLAG_OPTIMIZER = "optimizer"
-FeatureFlag = Literal["optimizer"]
+FLAG_RECOMMENDATIONS = "recommendations"
+FeatureFlag = Literal["optimizer", "recommendations"]
 
 
 async def is_enabled(

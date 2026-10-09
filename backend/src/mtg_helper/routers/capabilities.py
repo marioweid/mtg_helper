@@ -25,4 +25,7 @@ async def get_capabilities(
     optimizer = await feature_flag_service.is_enabled(
         request.app.state.db_pool, FLAG_OPTIMIZER, account.id, settings.enable_optimizer
     )
-    return DataResponse(data={"optimizer": optimizer})
+    recommendations = await feature_flag_service.is_enabled(
+        request.app.state.db_pool, "recommendations", account.id, False
+    )
+    return DataResponse(data={"optimizer": optimizer, "recommendations": recommendations})

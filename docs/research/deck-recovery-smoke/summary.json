@@ -1,0 +1,1666 @@
+{
+  "attempts": 4,
+  "planned_attempts": 4,
+  "runs": [
+    {
+      "deck_id": "yuna",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 19.307862599991495,
+      "estimated_cost_usd": 0.0022727,
+      "exact_hits": 15,
+      "suggestion_count": 50,
+      "target_count": 65,
+      "top_ten_hits": 4,
+      "invalid_or_duplicate_count": 0,
+      "off_list_count": 35,
+      "cards": [
+        {
+          "rank": 1,
+          "name": "Hardened Scales",
+          "reason": "Efficiently amplifies every counter Yuna and your creatures create.",
+          "oracle_id": "a1f3da21-af6d-450e-bf0b-985d158418e6",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 2,
+          "name": "Branching Evolution",
+          "reason": "Doubles +1/+1 counters entering on your creatures.",
+          "oracle_id": "28fe909b-06e0-424c-9f75-c824a25f5865",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 3,
+          "name": "Conclave Mentor",
+          "reason": "Adds counters while gaining life when your creatures grow.",
+          "oracle_id": "a2fe5937-212c-4e71-8d6e-f408b38100aa",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 4,
+          "name": "Doubling Season",
+          "reason": "Premium multiplier for both creature counters and token production.",
+          "oracle_id": "01546b7d-a233-4176-8843-d732074dc5b6",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 5,
+          "name": "Vorinclex, Monstrous Raider",
+          "reason": "Doubles your counters and halves opposing counter progress.",
+          "oracle_id": "5a3fdf5a-bff8-4896-b288-3f43f9a72d9b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 6,
+          "name": "The Ozolith",
+          "reason": "Preserves counters from creatures that die for later redistribution.",
+          "oracle_id": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 7,
+          "name": "Resourceful Defense",
+          "reason": "Moves counters from dying permanents onto your best creature.",
+          "oracle_id": "83e78565-e61f-4bbc-b834-f47941f7e3ec",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 8,
+          "name": "Kami of Whispered Hopes",
+          "reason": "Scales its mana production with counters and proliferates growth.",
+          "oracle_id": "f122624f-f30d-444e-a62a-939829241045",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 9,
+          "name": "Evolution Sage",
+          "reason": "Turns land plays into repeatable proliferate triggers.",
+          "oracle_id": "b45fdeab-00cc-4422-af9f-66f30a880a7c",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 10,
+          "name": "Deepglow Skate",
+          "reason": "Dramatically multiplies counters across your board.",
+          "oracle_id": "debce64a-18bd-42f5-9e85-158c2242e9e9",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 11,
+          "name": "Cathars' Crusade",
+          "reason": "Makes every creature entering grow your entire team.",
+          "oracle_id": "cc65ac73-5bef-4ecb-ad8e-39199084c027",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 12,
+          "name": "Greater Good",
+          "reason": "Sacrifices oversized creatures for cards while triggering Yuna.",
+          "oracle_id": "dc0593c2-ccb4-4648-a592-c5bcd121dc72",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 13,
+          "name": "Rishkar, Peema Renegade",
+          "reason": "Converts counters into creature-based mana acceleration.",
+          "oracle_id": "761021ce-4559-464e-aa03-85c2fe78e267",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 14,
+          "name": "Incubation Druid",
+          "reason": "Produces extra mana and becomes a strong counter recipient.",
+          "oracle_id": "34428f42-03ac-4795-8286-6cbea796df2b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 15,
+          "name": "Bloom Tender",
+          "reason": "Efficient creature ramp that benefits from your growing board.",
+          "oracle_id": "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 16,
+          "name": "Birds of Paradise",
+          "reason": "One-mana creature acceleration that supports all Bant colors.",
+          "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 17,
+          "name": "Sol Ring",
+          "reason": "Fast acceleration toward Yuna and your major counter engines.",
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 18,
+          "name": "Arcane Signet",
+          "reason": "Reliable fixing for the deck’s three-color requirements.",
+          "oracle_id": "0bc7f093-bef0-4f1a-852c-4b75ebf54838",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 19,
+          "name": "Nature's Lore",
+          "reason": "Efficient early ramp that fixes your colors.",
+          "oracle_id": "78826359-fe63-44ad-adc4-a17ffcd710e4",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 20,
+          "name": "Cultivate",
+          "reason": "Provides dependable land development and color consistency.",
+          "oracle_id": "8b755881-a72d-4e21-a369-d2924eb4585a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 21,
+          "name": "Master Biomancer",
+          "reason": "Makes every subsequent creature enter with additional counters.",
+          "oracle_id": "afeba4d7-b659-4fb1-84dd-27704fbb2621",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 22,
+          "name": "Good-Fortune Unicorn",
+          "reason": "Adds a counter whenever another creature enters.",
+          "oracle_id": "1e0cdff3-3ec5-41fc-8053-f072bae156b3",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 23,
+          "name": "Forgotten Ancient",
+          "reason": "Accumulates counters passively and redistributes them at will.",
+          "oracle_id": "2ef75cf3-30dc-4852-a6d1-1d6391fad022",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 24,
+          "name": "Juniper Order Ranger",
+          "reason": "Grows itself and other creatures as your board develops.",
+          "oracle_id": "18ca77c9-e7d2-4afc-a72b-98772578fad7",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 25,
+          "name": "Fathom Mage",
+          "reason": "Turns your counter growth into substantial card draw.",
+          "oracle_id": "93d0e129-e3b5-4aff-9e50-f34771ed00ff",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 26,
+          "name": "Herald of Secret Streams",
+          "reason": "Makes counter-bearing creatures unblockable for a strong finish.",
+          "oracle_id": "366a218e-84d3-4cf9-bbc8-f2f8ecce92a3",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 27,
+          "name": "Champion of Lambholt",
+          "reason": "Grows with your creature entries and eventually shuts off blocks.",
+          "oracle_id": "c549b0fd-1e08-4873-952e-a14dc45a0fd2",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 28,
+          "name": "Pir, Imaginative Rascal",
+          "reason": "Adds an extra counter whenever one would be placed on a permanent.",
+          "oracle_id": "7683c2b2-a06f-4691-9cc5-1968dc032885",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 29,
+          "name": "Skullclamp",
+          "reason": "Converts small creatures and expendable bodies into cards.",
+          "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 30,
+          "name": "Ashnod's Altar",
+          "reason": "Provides a sacrifice outlet, mana, and reliable Yuna death triggers.",
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 31,
+          "name": "Aura Shards",
+          "reason": "Turns creature entries into repeatable artifact and enchantment removal.",
+          "oracle_id": "8d03d050-391c-4311-8c42-4ee632d40fdc",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 32,
+          "name": "Swords to Plowshares",
+          "reason": "Efficient answer to problematic creatures.",
+          "oracle_id": "b1544f21-7e98-461b-aed5-e748b0168c52",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 33,
+          "name": "Path to Exile",
+          "reason": "Cheap instant-speed creature removal.",
+          "oracle_id": "d683d985-9888-4d21-8b5f-69e69ce4a03b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 34,
+          "name": "Beast Within",
+          "reason": "Flexible instant-speed answer to nearly any permanent.",
+          "oracle_id": "7735eeba-693b-47e2-bd51-414379cf1016",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 35,
+          "name": "Generous Gift",
+          "reason": "Broad removal that handles otherwise difficult permanents.",
+          "oracle_id": "fae37e28-e137-4177-b973-fa8b4dd8f409",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 36,
+          "name": "Swan Song",
+          "reason": "Efficient protection against key noncreature spells.",
+          "oracle_id": "8ddfc283-c9b4-41a5-af88-cf0068e986cc",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 37,
+          "name": "Heroic Intervention",
+          "reason": "Protects your counter engine from removal and sweepers.",
+          "oracle_id": "24882fa2-3fe9-4c1b-aa3d-0e6488b9db27",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 38,
+          "name": "Teferi's Protection",
+          "reason": "Provides exceptional protection during pivotal turns.",
+          "oracle_id": "0d4ecdb1-ec90-497f-a7a4-1c68092b8757",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 39,
+          "name": "Counterspell",
+          "reason": "Cleanly protects your board and stops opposing haymakers.",
+          "oracle_id": "cc187110-1148-4090-bbb8-e205694a39f5",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 40,
+          "name": "Walking Ballista",
+          "reason": "Uses accumulated counters as scalable removal and a finisher.",
+          "oracle_id": "4b515bb0-f275-4400-8032-3173b799ab40",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 41,
+          "name": "Simic Ascendancy",
+          "reason": "Converts your counter growth into an alternate victory condition.",
+          "oracle_id": "57c1a98e-c4fb-4144-9e3e-d0fe6789ba26",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 42,
+          "name": "Finale of Devastation",
+          "reason": "Tutors key creatures early or grants a lethal overrun late.",
+          "oracle_id": "69872a9a-fe54-4e58-940c-89395af71acd",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 43,
+          "name": "Craterhoof Behemoth",
+          "reason": "Turns a developed creature board into immediate lethal damage.",
+          "oracle_id": "8c52bd39-0586-48ca-b263-17210cf9feb6",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 44,
+          "name": "Avenger of Zendikar",
+          "reason": "Creates a wide board that scales powerfully with counters.",
+          "oracle_id": "4ba5b3f6-503b-43e6-b66e-4f8c55cffed7",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 45,
+          "name": "Enduring Scalelord",
+          "reason": "Grows whenever counters are placed on another creature.",
+          "oracle_id": "270a21c1-4c44-46ef-8c4f-e08484f360e1",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 46,
+          "name": "Sage of Hours",
+          "reason": "Converts surplus counters into extra turns and rewards heavy proliferation.",
+          "oracle_id": "bdbf70da-af38-4827-9b8b-39f553ebd34a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 47,
+          "name": "Luminous Broodmoth",
+          "reason": "Returns nonflying creatures after death, creating more counter value.",
+          "oracle_id": "28c7c816-07e7-42fb-923c-bf149ba28b38",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 48,
+          "name": "Akroma's Will",
+          "reason": "Protects your board or gives a wide counter army a decisive attack.",
+          "oracle_id": "fd949f82-fc10-4e37-8aa9-6c7569fe3c55",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 49,
+          "name": "Ascend from Avernus",
+          "reason": "Recovers a counter-heavy creature suite after a mass removal spell.",
+          "oracle_id": "451e8ece-7389-4d52-8bc9-450cb5e53e6a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 50,
+          "name": "The Great Henge",
+          "reason": "Provides mana, life, cards, and counters after your creatures grow.",
+          "oracle_id": "78427103-9543-41fb-b6d4-72963fe87275",
+          "error": null,
+          "exact_hit": false
+        }
+      ]
+    },
+    {
+      "deck_id": "yuna",
+      "model": "gpt-5.6-terra",
+      "status": "completed",
+      "seconds": 48.3816710000101,
+      "estimated_cost_usd": 0.037331,
+      "exact_hits": 16,
+      "suggestion_count": 50,
+      "target_count": 65,
+      "top_ten_hits": 5,
+      "invalid_or_duplicate_count": 0,
+      "off_list_count": 34,
+      "cards": [
+        {
+          "rank": 1,
+          "name": "The Ozolith",
+          "reason": "Banks counters from dying creatures, complementing Yuna's redistribution trigger.",
+          "oracle_id": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 2,
+          "name": "Branching Evolution",
+          "reason": "Doubles Yuna's extra counters and nearly every growth effect.",
+          "oracle_id": "28fe909b-06e0-424c-9f75-c824a25f5865",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 3,
+          "name": "Hardened Scales",
+          "reason": "Efficiently increases counters placed by Yuna and the deck's engines.",
+          "oracle_id": "a1f3da21-af6d-450e-bf0b-985d158418e6",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 4,
+          "name": "Conclave Mentor",
+          "reason": "Adds an extra counter to each placement while providing a creature body.",
+          "oracle_id": "a2fe5937-212c-4e71-8d6e-f408b38100aa",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 5,
+          "name": "Cathars' Crusade",
+          "reason": "Turns every creature entry into a team-wide counter explosion.",
+          "oracle_id": "cc65ac73-5bef-4ecb-ad8e-39199084c027",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 6,
+          "name": "Resourceful Defense",
+          "reason": "Moves counters from any departing permanent onto your best threat.",
+          "oracle_id": "83e78565-e61f-4bbc-b834-f47941f7e3ec",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 7,
+          "name": "Doubling Season",
+          "reason": "Doubles counter placement and token production for major snowball turns.",
+          "oracle_id": "01546b7d-a233-4176-8843-d732074dc5b6",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 8,
+          "name": "Vorinclex, Monstrous Raider",
+          "reason": "Doubles your counters while severely constraining opposing counter decks.",
+          "oracle_id": "5a3fdf5a-bff8-4896-b288-3f43f9a72d9b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 9,
+          "name": "Ozolith, the Shattered Spire",
+          "reason": "Adds another counter multiplier and a repeatable way to grow creatures.",
+          "oracle_id": "41fed659-237c-4d8e-ad31-d17fa0d3f764",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 10,
+          "name": "Kami of Whispered Hopes",
+          "reason": "Converts your growing creatures into substantial creature-casting mana.",
+          "oracle_id": "f122624f-f30d-444e-a62a-939829241045",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 11,
+          "name": "Incubation Druid",
+          "reason": "Yuna upgrades it immediately, enabling its large mana production.",
+          "oracle_id": "34428f42-03ac-4795-8286-6cbea796df2b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 12,
+          "name": "Gyre Sage",
+          "reason": "Rapidly becomes a powerful mana creature as counters accumulate.",
+          "oracle_id": "e3aa16cf-079b-4737-9ffd-7bfdffef0cb2",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 13,
+          "name": "Rishkar, Peema Renegade",
+          "reason": "Places counters and turns your counter-bearing creatures into mana sources.",
+          "oracle_id": "761021ce-4559-464e-aa03-85c2fe78e267",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 14,
+          "name": "Bloom Tender",
+          "reason": "Produces exceptional mana once your Bant commander is in play.",
+          "oracle_id": "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 15,
+          "name": "Faeburrow Elder",
+          "reason": "A scalable mana creature that readily taps for all three colors.",
+          "oracle_id": "70a6f08e-854d-4e2f-9d8c-c45ec3231157",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 16,
+          "name": "Birds of Paradise",
+          "reason": "Cheap creature-based fixing that advances your commander quickly.",
+          "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 17,
+          "name": "Sol Ring",
+          "reason": "Premium early acceleration for deploying engines and expensive finishers.",
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 18,
+          "name": "Arcane Signet",
+          "reason": "Reliable Bant fixing for a multicolor commander deck.",
+          "oracle_id": "0bc7f093-bef0-4f1a-852c-4b75ebf54838",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 19,
+          "name": "Esper Sentinel",
+          "reason": "Efficient early card advantage that opponents must respect.",
+          "oracle_id": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 20,
+          "name": "Guardian Project",
+          "reason": "Sustains cards through your creature-heavy development plan.",
+          "oracle_id": "4f9e07ae-6341-4b46-9f77-f17ab659d266",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 21,
+          "name": "Beast Whisperer",
+          "reason": "Turns your repeated creature casts into steady card flow.",
+          "oracle_id": "5da7eea8-bb9e-47ce-a554-8a1ee058bd7a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 22,
+          "name": "The Great Henge",
+          "reason": "Provides mana, cards, life, and an additional counter on each creature.",
+          "oracle_id": "78427103-9543-41fb-b6d4-72963fe87275",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 23,
+          "name": "Fathom Mage",
+          "reason": "Converts large counter placements into bursts of card draw.",
+          "oracle_id": "93d0e129-e3b5-4aff-9e50-f34771ed00ff",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 24,
+          "name": "Inspiring Call",
+          "reason": "Draws heavily from your board while protecting it from destruction.",
+          "oracle_id": "9b9a10ff-5a5d-4df8-88aa-18d84ff9117c",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 25,
+          "name": "Shalai, Voice of Plenty",
+          "reason": "Protects you and your creatures while offering a team-wide counter sink.",
+          "oracle_id": "a0c47ab6-dfb4-46ee-a3f7-9e1521b4bb4b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 26,
+          "name": "Herald of Secret Streams",
+          "reason": "Makes your counter-laden army unblockable for decisive attacks.",
+          "oracle_id": "366a218e-84d3-4cf9-bbc8-f2f8ecce92a3",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 27,
+          "name": "Champion of Lambholt",
+          "reason": "Grows with your creature development and makes blocks impossible.",
+          "oracle_id": "c549b0fd-1e08-4873-952e-a14dc45a0fd2",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 28,
+          "name": "Walking Ballista",
+          "reason": "Yuna upgrades it on cast, and excess counters become direct damage.",
+          "oracle_id": "4b515bb0-f275-4400-8032-3173b799ab40",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 29,
+          "name": "Hangarback Walker",
+          "reason": "Enters large, leaves behind an army, and rewards counter multiplication.",
+          "oracle_id": "dde55256-5259-44e7-a267-fca45a7f0d04",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 30,
+          "name": "Stonecoil Serpent",
+          "reason": "A flexible X-threat whose counters and protection make it resilient.",
+          "oracle_id": "78124cd1-2658-43f3-a339-0755d84154d2",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 31,
+          "name": "Kalonian Hydra",
+          "reason": "A huge combat threat that doubles counters across your board.",
+          "oracle_id": "7bd36106-04fe-481f-b16e-e076dcbb183b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 32,
+          "name": "Avenger of Zendikar",
+          "reason": "Creates a wide board that quickly becomes lethal with counter support.",
+          "oracle_id": "4ba5b3f6-503b-43e6-b66e-4f8c55cffed7",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 33,
+          "name": "Luminarch Aspirant",
+          "reason": "Supplies dependable recurring counters and an early creature curve.",
+          "oracle_id": "cb9994b9-924b-4e10-9075-9cfbec88f2bf",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 34,
+          "name": "Evolution Sage",
+          "reason": "Land drops proliferate your entire counter infrastructure.",
+          "oracle_id": "b45fdeab-00cc-4422-af9f-66f30a880a7c",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 35,
+          "name": "Deepglow Skate",
+          "reason": "Doubles counters on your key permanents for explosive turns.",
+          "oracle_id": "debce64a-18bd-42f5-9e85-158c2242e9e9",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 36,
+          "name": "Sovereign Okinec Ahau",
+          "reason": "Converts attacking power into enormous additional counters.",
+          "oracle_id": "087b2490-e415-44e2-a674-3b5619a0fad5",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 37,
+          "name": "Simic Ascendancy",
+          "reason": "Provides a credible alternate victory from your constant counter production.",
+          "oracle_id": "57c1a98e-c4fb-4144-9e3e-d0fe6789ba26",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 38,
+          "name": "Sage of Hours",
+          "reason": "Can convert Yuna-enhanced counters into extra turns, especially with doublers.",
+          "oracle_id": "bdbf70da-af38-4827-9b8b-39f553ebd34a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 39,
+          "name": "Swords to Plowshares",
+          "reason": "Efficiently answers problematic creatures for one mana.",
+          "oracle_id": "b1544f21-7e98-461b-aed5-e748b0168c52",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 40,
+          "name": "Beast Within",
+          "reason": "Versatile instant-speed removal for any problematic permanent.",
+          "oracle_id": "7735eeba-693b-47e2-bd51-414379cf1016",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 41,
+          "name": "Generous Gift",
+          "reason": "A second flexible answer that handles any permanent type.",
+          "oracle_id": "fae37e28-e137-4177-b973-fa8b4dd8f409",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 42,
+          "name": "Cyclonic Rift",
+          "reason": "A powerful reset that clears opposing boards while preserving yours.",
+          "oracle_id": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 43,
+          "name": "Aura Shards",
+          "reason": "Turns creature casting into repeatable artifact and enchantment removal.",
+          "oracle_id": "8d03d050-391c-4311-8c42-4ee632d40fdc",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 44,
+          "name": "Damning Verdict",
+          "reason": "A one-sided-style sweeper when your creatures are covered in counters.",
+          "oracle_id": "355ed7ef-bfa6-4538-99fb-a2d203eb7005",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 45,
+          "name": "Teferi's Protection",
+          "reason": "Protects your developed board and counter engines from wipes.",
+          "oracle_id": "0d4ecdb1-ec90-497f-a7a4-1c68092b8757",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 46,
+          "name": "Heroic Intervention",
+          "reason": "Efficiently protects creatures and permanents from removal or sweepers.",
+          "oracle_id": "24882fa2-3fe9-4c1b-aa3d-0e6488b9db27",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 47,
+          "name": "Flawless Maneuver",
+          "reason": "Often free protection while Yuna is out, preserving your board.",
+          "oracle_id": "4e183439-17d2-47ff-9d99-5e22821d91e3",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 48,
+          "name": "Together Forever",
+          "reason": "Places counters early and recovers key counter-bearing creatures after removal.",
+          "oracle_id": "36b19ec0-d581-4213-bfae-1d7808a2f60d",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 49,
+          "name": "Luminous Broodmoth",
+          "reason": "Returns many dead creatures with counters, creating further redistribution value.",
+          "oracle_id": "28c7c816-07e7-42fb-923c-bf149ba28b38",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 50,
+          "name": "Thousand-Year Elixir",
+          "reason": "Lets Yuna activate immediately and can untap her for another enhanced cast.",
+          "oracle_id": "4dc5726e-2f7e-4c2b-9616-c3301d212f78",
+          "error": null,
+          "exact_hit": false
+        }
+      ]
+    },
+    {
+      "deck_id": "meren",
+      "model": "gpt-5.6-terra",
+      "status": "completed",
+      "seconds": 23.010857200002647,
+      "estimated_cost_usd": 0.0174935,
+      "exact_hits": 19,
+      "suggestion_count": 50,
+      "target_count": 66,
+      "top_ten_hits": 8,
+      "invalid_or_duplicate_count": 1,
+      "off_list_count": 30,
+      "cards": [
+        {
+          "rank": 1,
+          "name": "Viscera Seer",
+          "reason": "Free repeatable sacrifice outlet that fuels experience and fixes draws.",
+          "oracle_id": "f82a4e85-526d-4456-b700-7760043a31be",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 2,
+          "name": "Ashnod's Altar",
+          "reason": "Turns recurring creatures into large mana bursts while enabling sacrifice loops.",
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 3,
+          "name": "Phyrexian Altar",
+          "reason": "Free sacrifice outlet that converts recursive bodies into colored mana.",
+          "oracle_id": "8d02b297-97c4-4379-9862-0a462400f66f",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 4,
+          "name": "Yawgmoth, Thran Physician",
+          "reason": "Premium sacrifice outlet, card draw engine, and creature-control piece.",
+          "oracle_id": "a1e232c0-dc38-47be-a5a0-f68bc1d86a29",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 5,
+          "name": "Protean Hulk",
+          "reason": "A sacrificed or dying Hulk can assemble a powerful creature-value package from the library.",
+          "oracle_id": "10180e2f-90c5-4d41-ba44-16b14948f923",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 6,
+          "name": "Living Death",
+          "reason": "Mass reanimation and sacrifice reset that heavily rewards your stocked graveyard.",
+          "oracle_id": "9e6a3df4-67a3-452e-a6ef-f04dbadb21ef",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 7,
+          "name": "Victimize",
+          "reason": "Efficiently trades a disposable creature for two reanimated threats.",
+          "oracle_id": "240e85d3-e495-4877-8609-4b4056c402f7",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 8,
+          "name": "Animate Dead",
+          "reason": "Cheap reanimation for your best sacrificed creature or an opposing threat.",
+          "oracle_id": "c0d8fef4-65f4-4769-982d-b397d2b7e977",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 9,
+          "name": "Reanimate",
+          "reason": "One-mana access to the best creature in any graveyard.",
+          "oracle_id": "a044474a-cd72-4e9d-bd8d-a08f2de9cdc0",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 10,
+          "name": "Necromancy",
+          "reason": "Flexible instant-speed-capable reanimation that can reuse key creatures.",
+          "oracle_id": "699b192c-f3f2-4ac5-9ca9-e35bcf08ad8a",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 11,
+          "name": "Mikaeus, the Unhallowed",
+          "reason": "Gives many non-Human creatures an extra death trigger and enables potent loops.",
+          "oracle_id": "5d27c63e-d1ef-48af-b51d-01ebc6daeac9",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 12,
+          "name": "Triskelion",
+          "reason": "Combines with Mikaeus, the Unhallowed for a deterministic damage loop; useful removal otherwise.",
+          "oracle_id": "74f67dcf-5afb-45aa-8d4b-3cdb23f6f2a1",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 13,
+          "name": "Grave Pact",
+          "reason": "Every sacrifice becomes a punishing edict for each opponent.",
+          "oracle_id": "6f4ac4a4-53ec-4bc9-8f5c-d4b801d867b2",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 14,
+          "name": "Dictate of Erebos",
+          "reason": "A second Grave Pact effect that can be flashed in around a sacrifice.",
+          "oracle_id": "7c777a41-e40a-4b40-96bf-8ddd5c12924c",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 15,
+          "name": "Pitiless Plunderer",
+          "reason": "Creates Treasure from every dying creature to power recursion and explosive turns.",
+          "oracle_id": "a784481f-eccb-4112-bb38-04a659319660",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 16,
+          "name": "Skullclamp",
+          "reason": "Converts small recurring creatures and tokens into exceptional card draw.",
+          "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 17,
+          "name": "Phyrexian Arena",
+          "reason": "Reliable long-game card flow for a value-oriented sacrifice deck.",
+          "oracle_id": "ee579a32-a048-4335-b966-231ba731cdea",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 18,
+          "name": "Morbid Opportunist",
+          "reason": "Draws repeatedly as creatures die around the table, including your fodder.",
+          "oracle_id": "322f44f0-e6da-4ee0-b474-e7d5e9a461c5",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 19,
+          "name": "Liliana, Dreadhorde General",
+          "reason": "Draws from your creature deaths, supplies sacrifice fodder, and offers a strong board reset.",
+          "oracle_id": "5e958212-6a5b-4288-8d31-f1572619d7dc",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 20,
+          "name": "Eternal Witness",
+          "reason": "Recurring any key spell makes it one of Meren's best repeatable value creatures.",
+          "oracle_id": "30b24e8e-3b0e-4d8e-90f3-f66eb7c1858c",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 21,
+          "name": "Timeless Witness",
+          "reason": "A second Eternal Witness that can later unearth itself for another recursion trigger.",
+          "oracle_id": "a52a06aa-56fc-4845-bbcd-a54f16369b34",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 22,
+          "name": "Disciple of Bolas",
+          "reason": "Sacrifices a large reanimated creature for a major burst of cards and life.",
+          "oracle_id": "8f2c8498-5b10-4ec7-8678-598c90987556",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 23,
+          "name": "Plaguecrafter",
+          "reason": "Repeatable edict interaction that you can recur each end step.",
+          "oracle_id": "2e3ee458-fa3f-4452-ab95-5a7fb5a0483b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 24,
+          "name": "Fleshbag Marauder",
+          "reason": "Efficient recurring creature sacrifice effect that also feeds experience.",
+          "oracle_id": "4b1bf05e-753e-4350-a913-894cf3cecc0c",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 25,
+          "name": "Merciless Executioner",
+          "reason": "Additional Fleshbag effect for consistently pressuring opposing creatures.",
+          "oracle_id": "c3c45d50-9038-41df-bb2f-9bc40071845b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 26,
+          "name": "Shriekmaw",
+          "reason": "Cheap evoke removal early and a recurring creature-kill spell later.",
+          "oracle_id": "717bbb9d-0a5b-4979-a24b-9d54aac7657a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 27,
+          "name": "Ravenous Chupacabra",
+          "reason": "Straightforward repeatable creature removal on a Meren-friendly body.",
+          "oracle_id": "7b459306-149b-4f43-abc1-2dd70c748c0e",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 28,
+          "name": "Reclamation Sage",
+          "reason": "Reusable answer to artifacts and enchantments.",
+          "oracle_id": "032ec6e2-6cc3-4a97-9cc7-3233f5e11904",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 29,
+          "name": "Caustic Caterpillar",
+          "reason": "One-mana sacrificial artifact/enchantment removal that is easy to recur.",
+          "oracle_id": "45d35128-76e6-43f9-8d23-41f7506c3a71",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 30,
+          "name": "Haywire Mite",
+          "reason": "Cheap exiling answer to problematic noncreature artifacts and enchantments.",
+          "oracle_id": "749d2994-44e7-40d3-8630-7bebed239e9e",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 31,
+          "name": "Acidic Slime",
+          "reason": "Repeatable removal that can also answer troublesome lands.",
+          "oracle_id": "21f45043-5419-4019-8b6c-e5294bd5f549",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 32,
+          "name": "Bane of Progress",
+          "reason": "Powerful artifact/enchantment reset that leaves behind a threatening creature.",
+          "oracle_id": "51f9a6cc-8eb2-44ed-a2d9-913ac514ad67",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 33,
+          "name": "Spore Frog",
+          "reason": "Recurring Fog can lock combat-focused opponents out once Meren has experience.",
+          "oracle_id": "97db6c39-e690-49b6-93a6-e51b8dfad10b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 34,
+          "name": "Sakura-Tribe Elder",
+          "reason": "Early ramp that sacrifices itself to immediately begin building experience.",
+          "oracle_id": "e3afc704-220f-498f-9eaa-0821b17dc24c",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 35,
+          "name": "Wood Elves",
+          "reason": "Creature-based land ramp that Meren can recover after a board wipe.",
+          "oracle_id": "8973bd99-20f8-4867-90ef-50392147ee1b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 36,
+          "name": "Yavimaya Granger",
+          "reason": "Ramp body with echo that naturally dies and feeds Meren.",
+          "oracle_id": "fac9ff8d-8342-4099-b224-d48a044bcc9a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 37,
+          "name": "Burnished Hart",
+          "reason": "Reusable sacrifice-based ramp that provides two basic lands.",
+          "oracle_id": "893fed41-c144-433f-af88-bc7d419b7fb3",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 38,
+          "name": "Solemn Simulacrum",
+          "reason": "Ramps on entry and draws on death, making every recursion cycle valuable.",
+          "oracle_id": "00c0543c-2a1f-4425-8283-4062d74a1637",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 39,
+          "name": "Springbloom Druid",
+          "reason": "Turns a basic land into two more basics and is easily replayed from the graveyard.",
+          "oracle_id": "788a4896-3414-40bf-b391-d2efea2fb5f9",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 40,
+          "name": "Birthing Pod",
+          "reason": "Converts disposable creatures into tailored toolbox threats while stocking the graveyard.",
+          "oracle_id": "f8b9dd54-0837-47f4-ad14-7a0322d46d5f",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 41,
+          "name": "Evolutionary Leap",
+          "reason": "Sacrifice outlet that turns creatures into more creatures and protects them from exile-based removal.",
+          "oracle_id": "44cf5ef4-2b0f-4d9d-bf87-8835424721d0",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 42,
+          "name": "Greater Good",
+          "reason": "Free sacrifice outlet and explosive card selection with your larger reanimated creatures.",
+          "oracle_id": "dc0593c2-ccb4-4648-a592-c5bcd121dc72",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 43,
+          "name": "Altar of Dementia",
+          "reason": "Free sacrifice outlet that can self-mill for Meren targets or mill opponents as a finisher.",
+          "oracle_id": "d64e9152-ef24-4394-aeb0-9c3befc56549",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 44,
+          "name": "Blood Artist",
+          "reason": "Drains opponents whenever your sacrifice engine cycles creatures.",
+          "oracle_id": "310f141c-7f37-4729-aed6-dd9c09db448d",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 45,
+          "name": "Zulaport Cutthroat",
+          "reason": "A second resilient death-drain payoff that turns recursion into a win condition.",
+          "oracle_id": "76b003e0-15af-4f22-bdf2-1ade5430964a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 46,
+          "name": "Bastion of Remembrance",
+          "reason": "Harder-to-remove death-drain effect that also supplies an initial sacrifice body.",
+          "oracle_id": "c7f33cea-2ec8-4081-9208-a5b1d86721b3",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 47,
+          "name": "Kokusho, the Evening Star",
+          "reason": "Repeatedly sacrificing and reanimating it rapidly swings life totals.",
+          "oracle_id": "cf631c93-b7fb-4e4f-b405-3778c15b1117",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 48,
+          "name": "Gray Merchant of Asphodel",
+          "reason": "Provides substantial life drain when repeatedly reanimated alongside black permanents.",
+          "oracle_id": "38f3b157-0df4-409b-89cc-086e1531cd5b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 49,
+          "name": "Noxious Gearhulk",
+          "reason": "Recurring removal plus life gain on a sizable body stabilizes creature-heavy games.",
+          "oracle_id": "a77b5be2-f361-4135-ba25-670a74d268ac",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 50,
+          "name": "Bojuka Bog",
+          "reason": "Not included because it is a land-front card and land recommendations are excluded.",
+          "oracle_id": "04b7362d-0490-4cb0-b5d7-2a7732f659ce",
+          "error": "land",
+          "exact_hit": false
+        }
+      ]
+    },
+    {
+      "deck_id": "meren",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 19.673318400004064,
+      "estimated_cost_usd": 0.0025125499999999997,
+      "exact_hits": 19,
+      "suggestion_count": 50,
+      "target_count": 66,
+      "top_ten_hits": 7,
+      "invalid_or_duplicate_count": 0,
+      "off_list_count": 31,
+      "cards": [
+        {
+          "rank": 1,
+          "name": "Viscera Seer",
+          "reason": "One-mana sacrifice outlet that repeatedly converts creatures into useful scrying.",
+          "oracle_id": "f82a4e85-526d-4456-b700-7760043a31be",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 2,
+          "name": "Carrion Feeder",
+          "reason": "Free sacrifice outlet that grows while enabling Meren triggers.",
+          "oracle_id": "a1cc5e37-b09a-4b7f-afd5-77c1c35aa425",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 3,
+          "name": "Ashnod's Altar",
+          "reason": "Produces mana from sacrificed creatures and enables explosive recursion turns.",
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 4,
+          "name": "Altar of Dementia",
+          "reason": "Free sacrifice outlet that mills opponents or fills your graveyard.",
+          "oracle_id": "d64e9152-ef24-4394-aeb0-9c3befc56549",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 5,
+          "name": "Yawgmoth, Thran Physician",
+          "reason": "Sacrifice outlet, card draw, removal, and proliferate in one engine.",
+          "oracle_id": "a1e232c0-dc38-47be-a5a0-f68bc1d86a29",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 6,
+          "name": "Greater Good",
+          "reason": "Turns large creatures into massive card selection and graveyard fueling.",
+          "oracle_id": "dc0593c2-ccb4-4648-a592-c5bcd121dc72",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 7,
+          "name": "Birthing Pod",
+          "reason": "Repeatedly converts expendable creatures into increasingly powerful creatures.",
+          "oracle_id": "f8b9dd54-0837-47f4-ad14-7a0322d46d5f",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 8,
+          "name": "Skullclamp",
+          "reason": "Efficiently draws cards from disposable small creatures and tokens.",
+          "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 9,
+          "name": "Sol Ring",
+          "reason": "Fast acceleration toward Meren and high-impact recursion plays.",
+          "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 10,
+          "name": "Arcane Signet",
+          "reason": "Reliable two-color acceleration.",
+          "oracle_id": "0bc7f093-bef0-4f1a-852c-4b75ebf54838",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 11,
+          "name": "Nature's Lore",
+          "reason": "Efficiently accelerates while fixing both commander colors.",
+          "oracle_id": "78826359-fe63-44ad-adc4-a17ffcd710e4",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 12,
+          "name": "Sakura-Tribe Elder",
+          "reason": "Ramp that naturally sacrifices for an experience counter.",
+          "oracle_id": "e3afc704-220f-498f-9eaa-0821b17dc24c",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 13,
+          "name": "Wood Elves",
+          "reason": "Fetches a Forest and becomes a reusable recursion target.",
+          "oracle_id": "8973bd99-20f8-4867-90ef-50392147ee1b",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 14,
+          "name": "Spore Frog",
+          "reason": "Repeatable combat prevention when Meren can recur it.",
+          "oracle_id": "97db6c39-e690-49b6-93a6-e51b8dfad10b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 15,
+          "name": "Stitcher's Supplier",
+          "reason": "Excellent early self-mill creature that provides multiple death triggers.",
+          "oracle_id": "7fd61a18-6e4f-40c5-aa00-3d101ec1ec82",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 16,
+          "name": "Satyr Wayfinder",
+          "reason": "Finds lands while stocking the graveyard with recursion targets.",
+          "oracle_id": "ead4c01a-e2ae-49c9-95d9-651d81005907",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 17,
+          "name": "Caustic Caterpillar",
+          "reason": "Reusable artifact and enchantment removal attached to a sacrifice-friendly body.",
+          "oracle_id": "45d35128-76e6-43f9-8d23-41f7506c3a71",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 18,
+          "name": "Reclamation Sage",
+          "reason": "Versatile permanent removal that Meren can repeatedly reuse.",
+          "oracle_id": "032ec6e2-6cc3-4a97-9cc7-3233f5e11904",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 19,
+          "name": "Eternal Witness",
+          "reason": "Returns any key card from the graveyard and is an excellent recursion target.",
+          "oracle_id": "30b24e8e-3b0e-4d8e-90f3-f66eb7c1858c",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 20,
+          "name": "Plaguecrafter",
+          "reason": "Repeated edict effect that handles creatures, planeswalkers, and difficult protection.",
+          "oracle_id": "2e3ee458-fa3f-4452-ab95-5a7fb5a0483b",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 21,
+          "name": "Fleshbag Marauder",
+          "reason": "A disposable edict creature that becomes repeatable with Meren.",
+          "oracle_id": "4b1bf05e-753e-4350-a913-894cf3cecc0c",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 22,
+          "name": "Shriekmaw",
+          "reason": "Efficient creature removal with an evasion body and recursion value.",
+          "oracle_id": "717bbb9d-0a5b-4979-a24b-9d54aac7657a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 23,
+          "name": "Ravenous Chupacabra",
+          "reason": "Reliable creature removal without targeting restrictions from destruction.",
+          "oracle_id": "7b459306-149b-4f43-abc1-2dd70c748c0e",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 24,
+          "name": "Bane of Progress",
+          "reason": "Powerful reset against artifact- and enchantment-heavy boards.",
+          "oracle_id": "51f9a6cc-8eb2-44ed-a2d9-913ac514ad67",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 25,
+          "name": "Agent of Erebos",
+          "reason": "Graveyard hate attached to a creature that can be reused.",
+          "oracle_id": "3fa5e109-4a67-4523-8183-90e48a906400",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 26,
+          "name": "Solemn Simulacrum",
+          "reason": "Provides ramp, card draw, and a valuable death trigger.",
+          "oracle_id": "00c0543c-2a1f-4425-8283-4062d74a1637",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 27,
+          "name": "Endrek Sahr, Master Breeder",
+          "reason": "Creates a steady supply of sacrifice fodder for the engine.",
+          "oracle_id": "47a0079f-3544-45bc-a32a-bd93844c8c43",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 28,
+          "name": "Pitiless Plunderer",
+          "reason": "Turns creature deaths into Treasure, enabling large recursion chains.",
+          "oracle_id": "a784481f-eccb-4112-bb38-04a659319660",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 29,
+          "name": "Blood Artist",
+          "reason": "Converts every sacrifice into life drain and helps close games.",
+          "oracle_id": "310f141c-7f37-4729-aed6-dd9c09db448d",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 30,
+          "name": "Zulaport Cutthroat",
+          "reason": "A resilient death-trigger finisher that punishes opposing life totals.",
+          "oracle_id": "76b003e0-15af-4f22-bdf2-1ade5430964a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 31,
+          "name": "Moldervine Reclamation",
+          "reason": "Draws cards and gains life whenever your creatures die.",
+          "oracle_id": "68639a3d-2192-4921-8298-c76bb0cd6b02",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 32,
+          "name": "Guardian Project",
+          "reason": "Sustained card advantage in a creature-heavy, recursion-focused deck.",
+          "oracle_id": "4f9e07ae-6341-4b46-9f77-f17ab659d266",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 33,
+          "name": "Beast Whisperer",
+          "reason": "Draws cards as the deck casts its many creature-based answers.",
+          "oracle_id": "5da7eea8-bb9e-47ce-a554-8a1ee058bd7a",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 34,
+          "name": "Phyrexian Arena",
+          "reason": "Reliable long-term card advantage for a grindy attrition strategy.",
+          "oracle_id": "ee579a32-a048-4335-b966-231ba731cdea",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 35,
+          "name": "Village Rites",
+          "reason": "One-mana instant draw spell that rewards sacrificing expendable creatures.",
+          "oracle_id": "365548fb-5acc-4a8a-b20b-26d28b7d029f",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 36,
+          "name": "Deadly Dispute",
+          "reason": "Efficient instant-speed draw and Treasure generation from a sacrifice.",
+          "oracle_id": "457af74a-02b3-4659-846d-63e482667f34",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 37,
+          "name": "Entomb",
+          "reason": "Places the exact creature or utility card needed into the graveyard.",
+          "oracle_id": "299fc083-0834-4064-8344-f895aff68867",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 38,
+          "name": "Buried Alive",
+          "reason": "Loads several synergistic creatures into the graveyard for Meren to recover.",
+          "oracle_id": "8203c621-a1a0-4865-8c9a-0d4064c86107",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 39,
+          "name": "Demonic Tutor",
+          "reason": "Finds sacrifice outlets, engines, answers, or finishers as needed.",
+          "oracle_id": "82004860-e589-4e38-8d61-8c0210e4ea39",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 40,
+          "name": "Finale of Devastation",
+          "reason": "Tutors creatures and can become a decisive graveyard-fueled finisher.",
+          "oracle_id": "69872a9a-fe54-4e58-940c-89395af71acd",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 41,
+          "name": "Victimize",
+          "reason": "Trades one expendable creature for two powerful creatures from the graveyard.",
+          "oracle_id": "240e85d3-e495-4877-8609-4b4056c402f7",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 42,
+          "name": "Living Death",
+          "reason": "Massive recovery spell that doubles as a board reset and finisher.",
+          "oracle_id": "9e6a3df4-67a3-452e-a6ef-f04dbadb21ef",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 43,
+          "name": "Toxic Deluge",
+          "reason": "Efficient unconditional sweeper that preserves the deck's recursion plan.",
+          "oracle_id": "afaef788-34d1-460b-b884-9d7ae6ddeb18",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 44,
+          "name": "Assassin's Trophy",
+          "reason": "Flexible answer to any problematic permanent.",
+          "oracle_id": "ac10d218-f9a6-4058-9cda-a15ca1b0b7b5",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 45,
+          "name": "Beast Within",
+          "reason": "Instant-speed universal removal with a manageable drawback.",
+          "oracle_id": "7735eeba-693b-47e2-bd51-414379cf1016",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 46,
+          "name": "Putrefy",
+          "reason": "Clean instant-speed creature or artifact removal.",
+          "oracle_id": "9b271430-f53d-42d6-a547-2f286dd9bcb6",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 47,
+          "name": "Heroic Intervention",
+          "reason": "Protects the board and key permanents from removal and sweepers.",
+          "oracle_id": "24882fa2-3fe9-4c1b-aa3d-0e6488b9db27",
+          "error": null,
+          "exact_hit": true
+        },
+        {
+          "rank": 48,
+          "name": "Lightning Greaves",
+          "reason": "Protects Meren and gives important creatures immediate haste.",
+          "oracle_id": "ca204b66-8d0c-431a-8d34-282f7c2d17da",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 49,
+          "name": "Mikaeus, the Unhallowed",
+          "reason": "Grants undying to most of the deck and enables powerful sacrifice combos.",
+          "oracle_id": "5d27c63e-d1ef-48af-b51d-01ebc6daeac9",
+          "error": null,
+          "exact_hit": false
+        },
+        {
+          "rank": 50,
+          "name": "Triskelion",
+          "reason": "Combines with Mikaeus, the Unhallowed for a lethal damage loop.",
+          "oracle_id": "74f67dcf-5afb-45aa-8d4b-3cdb23f6f2a1",
+          "error": null,
+          "exact_hit": false
+        }
+      ]
+    }
+  ]
+}

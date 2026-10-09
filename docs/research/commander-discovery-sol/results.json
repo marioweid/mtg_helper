@@ -1,0 +1,68 @@
+{
+  "started_at": "2026-10-08T10:19:15.167973+00:00",
+  "runs": [
+    {
+      "phase": "plan",
+      "case_id": "meren",
+      "model": "gpt-6.1-sol",
+      "state": "returned",
+      "input_sha256": "e33e8fd35e515ca154abe74f24cfd18ae0b7f893f4c628d028de94c80d56616c",
+      "seconds": 33.05583969998406,
+      "status": "completed",
+      "output": "{\n  \"intents\": [\n    \"Use repeatable sacrifice outlets and expendable creatures to build experience while controlling when death effects happen.\",\n    \"Prioritize low-mana-value utility creatures for early battlefield recursion; higher-value targets still provide cards through Meren's hand-return fallback.\",\n    \"Reuse entry and death interaction, remembering that Meren returns creatures rather than casting them.\",\n    \"Convert sacrificed bodies into mana, cards, and replacement bodies to sustain the value engine.\",\n    \"Fill the graveyard selectively and add independent recursion so the deck retains value without Meren.\",\n    \"Sacrifice useful creatures before the end-step trigger to establish targets and reach experience thresholds; token deaths also generate experience while Meren is present.\"\n  ],\n  \"searches\": [\n    {\n      \"purpose\": \"Find sacrifice outlets that let the deck choose when creatures die; inspect activation costs and timing restrictions.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [\"Sacrifice a creature\", \"Sacrifice another creature\"],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find cheap death-effect creatures that can be returned to the battlefield with few experience counters.\",\n      \"oracle_text_all\": [\"dies\"],\n      \"oracle_text_any\": [],\n      \"type_line_any\": [\"Creature\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": 3\n    },\n    {\n      \"purpose\": \"Find reusable creature-based interaction associated with entering the battlefield.\",\n      \"oracle_text_all\": [\"enters\"],\n      \"oracle_text_any\": [\"destroy target\", \"exile target\", \"sacrifices a creature\", \"sacrifices a permanent\"],\n      \"type_line_any\": [\"Creature\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find creatures that stock the graveyard while remaining potential sacrifice and recursion targets.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [\"mill\", \"into your graveyard\"],\n      \"type_line_any\": [\"Creature\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": 4\n    },\n    {\n      \"purpose\": \"Find creature-based token production to supply expendable bodies and increase deaths per recursion cycle.\",\n      \"oracle_text_all\": [\"create\", \"token\"],\n      \"oracle_text_any\": [],\n      \"type_line_any\": [\"Creature\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find death-triggered payoffs that convert the sacrifice engine into additional resources or pressure.\",\n      \"oracle_text_all\": [\"whenever\"],\n      \"oracle_text_any\": [\"creature dies\", \"creature you control dies\", \"one or more creatures\"],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find sacrificial utility creatures that turn themselves or other bodies into mana or searched resources.\",\n      \"oracle_text_all\": [\"sacrifice\"],\n      \"oracle_text_any\": [\"add \", \"search your library\"],\n      \"type_line_any\": [\"Creature\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": 3\n    },\n    {\n      \"purpose\": \"Find independent creature recovery to preserve access to utility bodies when Meren is unavailable.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [\"return target creature card\", \"return a creature card\", \"return all creature cards\"],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    }\n  ],\n  \"named_cards\": [\n    \"Viscera Seer\",\n    \"Carrion Feeder\",\n    \"Sakura-Tribe Elder\",\n    \"Spore Frog\",\n    \"Plaguecrafter\",\n    \"Fleshbag Marauder\",\n    \"Shriekmaw\",\n    \"Eternal Witness\",\n    \"Skullclamp\",\n    \"Pitiless Plunderer\",\n    \"Stitcher's Supplier\",\n    \"Living Death\"\n  ],\n  \"uncertainties\": [\n    \"Literal text searches produce hypotheses, not guaranteed interactions; inspect whose creatures die, whether effects require casting, and any timing or activation limits.\",\n    \"Meren's battlefield-return threshold uses mana value, not discounted casting costs; expensive targets may initially return only to hand.\",\n    \"The desired balance between attrition, combat pressure, and combo finishes is unspecified; no combo restriction is assumed.\"\n  ]\n}",
+      "response_model": "gpt-6.1-sol",
+      "service_tier": "default",
+      "usage": {
+        "input_tokens": 971,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1341,
+        "output_tokens_details": {
+          "reasoning_tokens": 279
+        },
+        "total_tokens": 2312
+      },
+      "incomplete_details": null,
+      "estimated_cost_usd": 0.0158375
+    },
+    {
+      "phase": "plan",
+      "case_id": "saheeli",
+      "model": "gpt-6.1-sol",
+      "state": "returned",
+      "input_sha256": "7eef1795f237b975ca0f83065b7de69216a4e74e8851d95822d35d100d63e230",
+      "seconds": 37.486253500013845,
+      "status": "completed",
+      "output": "{\n  \"intents\": [\n    \"Generate at least three energy per turn through inexpensive artifact/Artificer casts and supplemental energy engines.\",\n    \"Copy permanents with valuable entry, attack, or death abilities; Saheeli's tokens enter but are not cast.\",\n    \"Turn temporary 5/5 attackers into lasting resources through death triggers, additional copies, or sacrifice outlets.\",\n    \"Reduce artifact casting costs and multiply energy or token production to sustain the engine.\",\n    \"Distinguish sacrifice from destruction: indestructible does not preserve Saheeli's tokens.\"\n  ],\n  \"searches\": [\n    {\n      \"purpose\": \"Find supplemental energy producers, energy multipliers, and alternative energy outlets.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [\"{E}\"],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find inexpensive spells that trigger Saheeli while developing mana, cards, or utility.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [],\n      \"type_line_any\": [\"Artifact\", \"Artificer\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": 2\n    },\n    {\n      \"purpose\": \"Find artifact copy targets and engines that produce value when permanents enter.\",\n      \"oracle_text_all\": [\"enters\"],\n      \"oracle_text_any\": [],\n      \"type_line_any\": [\"Artifact\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find artifact creatures whose death can convert an expiring copy into lasting value.\",\n      \"oracle_text_all\": [\"dies\"],\n      \"oracle_text_any\": [],\n      \"type_line_any\": [\"Artifact\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find copy targets with attack or combat-damage rewards that haste enables immediately.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [\"whenever\", \"combat damage\"],\n      \"type_line_any\": [\"Creature\"],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": 5,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find ways to preserve temporary value by ending the turn, populating, or sacrificing a token before its scheduled sacrifice.\",\n      \"oracle_text_all\": [],\n      \"oracle_text_any\": [\"end the turn\", \"populate\", \"sacrifice an artifact\", \"sacrifice a creature\"],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find casting discounts that make repeated artifact casts and their energy triggers sustainable.\",\n      \"oracle_text_all\": [\"artifact spells\", \"cost\"],\n      \"oracle_text_any\": [],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    },\n    {\n      \"purpose\": \"Find token-production modifiers that can multiply Saheeli's combat copies or supporting resource tokens.\",\n      \"oracle_text_all\": [\"token\"],\n      \"oracle_text_any\": [\"twice\", \"double\", \"additional\"],\n      \"type_line_any\": [],\n      \"keywords_any\": [],\n      \"mana_cost_all\": [],\n      \"mana_value_min\": null,\n      \"mana_value_max\": null\n    }\n  ],\n  \"named_cards\": [\n    \"Aether Refinery\",\n    \"Gonti's Aether Heart\",\n    \"Decoction Module\",\n    \"Whirler Virtuoso\",\n    \"Enthusiastic Mechanaut\",\n    \"Panharmonicon\",\n    \"Wurmcoil Engine\",\n    \"Triplicate Titan\",\n    \"Ancient Copper Dragon\",\n    \"Sundial of the Infinite\",\n    \"Brudiclad, Telchor Engineer\",\n    \"Academy Manufactor\"\n  ],\n  \"uncertainties\": [\n    \"The combat-reward search is deliberately broad; results require checking whether their triggers actually reward attacking or connecting.\",\n    \"Legendary copy targets generally lose one copy to the legend rule unless another effect changes that outcome.\",\n    \"Sundial requires timing around the delayed sacrifice trigger; extra token copies and Brudiclad transformations need individual rules review.\",\n    \"No budget, power-level, or combo restriction is supplied, so expensive targets and potentially powerful engine interactions remain candidates.\"\n  ]\n}",
+      "response_model": "gpt-6.1-sol",
+      "service_tier": "default",
+      "usage": {
+        "input_tokens": 997,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1401,
+        "output_tokens_details": {
+          "reasoning_tokens": 382
+        },
+        "total_tokens": 2398
+      },
+      "incomplete_details": null,
+      "estimated_cost_usd": 0.0165025
+    },
+    {
+      "phase": "review",
+      "case_id": "meren",
+      "model": "gpt-6.1-sol",
+      "state": "returned",
+      "input_sha256": "2875d84a19eb1686c0673c984aea96ee240e7b26f1111fdbfec0b63fc6070622",
+      "seconds": 120.0045453000057,
+      "error": "APITimeoutError"
+    }
+  ],
+  "reserved_usd": 0.75,
+  "stopped": "Unknown usage, model or service-tier pricing; no further requests"
+}

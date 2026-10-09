@@ -1,0 +1,43 @@
+{
+  "meren": {
+    "commander": "Meren of Clan Nel Toth",
+    "goal": "Build a Golgari sacrifice and creature-recursion value deck, reusing useful entry/death effects and interaction. Explore direct and indirect support. No existing decklist, budget, bracket, or combo restriction is supplied.",
+    "diagnostics": {
+      "Viscera Seer": "Reusable sacrifice of other creatures, unlike a self-sacrificing creature.",
+      "Yawgmoth, Thran Physician": "Sacrifice/draw/control plus proliferating player experience and discarding creature targets.",
+      "Cankerbloom": "Self-sacrifice utility plus proliferation of existing player experience.",
+      "Evolution Sage": "Landfall can proliferate player experience without a death event.",
+      "Plaguecrafter": "Recurring entry-based interaction, not a general on-demand outlet.",
+      "Spore Frog": "Self-sacrifice and recurring protection, not an outlet for other creatures.",
+      "Sakura-Tribe Elder": "Self-sacrifice ramp can be reused; it does not sacrifice other creatures.",
+      "Grim Haruspex": "Death draw excludes tokens and itself.",
+      "Morbid Opportunist": "Other creature deaths draw only once per turn.",
+      "Beast Whisperer": "Cast draw does not trigger on direct battlefield reanimation; still useful for casting.",
+      "Doubling Season": "Its counter clause does not double player experience; token relevance is conditional.",
+      "Grafdigger's Cage": "Blocks Meren's battlefield-return mode, although her hand-return mode remains possible.",
+      "Ground Seal": "Prevents Meren from targeting creature cards in graveyards."
+    }
+  },
+  "saheeli": {
+    "commander": "Saheeli, Radiant Creator",
+    "goal": "Build a Temur artifact/energy-and-copy value deck with combat payoffs. Develop sustained energy and useful copy targets. No existing decklist, budget, bracket, or combo restriction is supplied.",
+    "diagnostics": {
+      "Whirler Virtuoso": "An Artificer, not originally an artifact; copied entry refunds three energy.",
+      "Izzet Generatorium": "Adds energy to each future gain event; Saheeli's three-energy payment alone does not unlock its four-energy draw condition.",
+      "Decoction Module": "Saheeli copies enter as creatures, triggering energy generation.",
+      "Evolution Sage": "Proliferate can increase existing energy on the player, not create the first counter.",
+      "Thought Monitor": "Affinity can discount the original; copies give entry-based draw.",
+      "Solemn Simulacrum": "Copied entry ramps and copied death draws.",
+      "Myr Battlesphere": "Entry-created Myr remain after the Saheeli copy is sacrificed.",
+      "Wurmcoil Engine": "The temporary copy has a 5/5 base, and its death creates lasting Wurms.",
+      "Meteor Golem": "A copy provides entry-based nonland removal but the original is expensive.",
+      "Panharmonicon": "Doubles relevant entry triggers, not Saheeli's cast/combat triggers directly.",
+      "Second Harvest": "Independent copies do not inherit Saheeli's separate delayed sacrifice.",
+      "Sundial of the Infinite": "Wait for the sacrifice trigger to be on the stack; using it before the end step postpones the trigger.",
+      "Brudiclad, Telchor Engineer": "Resolve Saheeli before Brudiclad to select the new copy; ordinary tokens do not acquire its delayed sacrifice.",
+      "Doubling Season": "Doubles created tokens but not energy counters on players; both original-event copies remain subject to sacrifice.",
+      "Hangarback Walker": "Existing counters are not copied and X is zero; a Saheeli copy has a 5/5 base but no inherited counters for its death payoff.",
+      "Torpor Orb": "Suppresses creature-entry triggers including those of Saheeli's creature copies, not her cast/combat triggers."
+    }
+  }
+}

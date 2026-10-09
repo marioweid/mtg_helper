@@ -76,6 +76,14 @@ import type {
   TopPickSource,
 } from "@/lib/types";
 
+import type {
+  DiscoverGenerate,
+  DiscoverPage,
+  DiscoverPreview,
+  DiscoverRun,
+  DiscoverStatus,
+} from "@/lib/discovery-types";
+
 const CLIENT_BASE =
   typeof window !== "undefined"
     ? "/api/v1"
@@ -129,6 +137,39 @@ export const apiClient = {
     request<AccountResponse>("/me", {
       method: "PATCH",
       body: JSON.stringify(body),
+    }),
+
+  getDiscoverStatus: (deckId: string) =>
+    request<DiscoverStatus>(`/decks/${deckId}/recommendations/status`),
+  previewDiscover: (deckId: string, body: DiscoverPreview) =>
+    request<DiscoverPage>(`/decks/${deckId}/recommendations/preview-query`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  generateDiscover: (deckId: string, body: DiscoverGenerate) =>
+    request<DiscoverRun>(`/decks/${deckId}/recommendations/runs`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getDiscoverTrace: (deckId: string, runId: string) =>
+    request<Record<string, unknown>>(`/decks/${deckId}/recommendations/runs/${runId}/trace`),
+  planDiscover: (deckId: string, oracleId: string, runId: string | null) =>
+    request<boolean>(
+      runId
+        ? `/decks/${deckId}/recommendations/runs/${runId}/candidates/${oracleId}/plan`
+        : `/decks/${deckId}/recommendations/candidates/${oracleId}/plan`,
+      { method: "POST" },
+    ),
+  feedbackDiscover: (
+    deckId: string,
+    runId: string,
+    oracleId: string,
+    verdict: "useful" | "incorrect" | "uncertain",
+    note: string,
+  ) =>
+    request<boolean>(`/decks/${deckId}/recommendations/runs/${runId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ oracle_id: oracleId, verdict, note }),
     }),
 
   // Cards

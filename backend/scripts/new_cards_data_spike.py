@@ -18,22 +18,11 @@ from urllib.parse import urlparse
 
 import httpx
 
+from mtg_helper.services.recommendations.source import paper_design
+
 Card = dict[str, Any]
 CACHE = Path(".cache/new-cards-spike")
 _HEADERS = {"User-Agent": "MTGHelper-Feasibility/1.0", "Accept": "application/json"}
-_EXCLUDED_LAYOUTS = {"token", "double_faced_token", "art_series", "emblem", "planar", "scheme"}
-
-
-def paper_design(card: Card) -> bool:
-    """Identify plausible paper gameplay objects, not certify future legality."""
-    return bool(
-        "paper" in card.get("games", [])
-        and card.get("oracle_id")
-        and card.get("layout") not in _EXCLUDED_LAYOUTS
-        and card.get("border_color") not in {"silver", "gold"}
-        and card.get("security_stamp") != "acorn"
-        and card.get("set_type") not in {"memorabilia", "token", "vanguard"}
-    )
 
 
 def rules_text(card: Card) -> str:

@@ -122,7 +122,7 @@ function TopPicksHeader({ result }: { result: TopPicksResponse | null }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
       <h2 className="text-base font-semibold text-white">
-        Top picks for {result?.commander_name ?? "this commander"}
+        Community picks for {result?.commander_name ?? "this commander"}
       </h2>
       <p className="mt-1 text-xs text-gray-400">
         Common cards from highly visible public commander decks. Evidence is cached for 28 days.
