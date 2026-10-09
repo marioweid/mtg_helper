@@ -28,6 +28,7 @@ class Transport:
         self.calls = []
         self.status = 200
         self.bad_quote = False
+        self.strategy_goal = "Build around the commander's printed abilities."
 
     async def handle(self, request):
         body = json.loads(request.content)
@@ -38,7 +39,13 @@ class Transport:
         assert json.loads(saved["request"]) == body
         self.calls.append(body)
         payload = json.loads(body["input"])
-        if "candidates" in payload:
+        if "goal" in body["text"]["format"]["schema"]["properties"]:
+            output = {
+                "goal": self.strategy_goal,
+                "explanation": "A commander-only proposed direction, not existing-deck analysis.",
+                "uncertainties": ["Unverified advice"],
+            }
+        elif "candidates" in payload:
             rows = {}
             for index, card in enumerate(payload["candidates"]):
                 text = card["oracle_text"]
@@ -204,13 +211,17 @@ async def test_quote_failure_keeps_neighbor_and_feedback_does_not_touch_legacy(
     assert await db_pool.fetchval("SELECT count(*) FROM deck_feedback") == 0
 
 
-async def test_unknown_billing_blocks_new_runs_and_is_never_retried(pilot, client, db_pool):
+@pytest.mark.parametrize(("endpoint", "held"), [("runs", 11_000), ("strategy-drafts", 7_400)])
+async def test_unknown_billing_blocks_new_runs_and_is_never_retried(
+    pilot, client, db_pool, endpoint, held
+):
     deck, _, _, transport = pilot
     transport.status = 500
-    start = await client.post(path(deck) + "/runs", json=request())
+    body = request() if endpoint == "runs" else {"request_key": str(uuid4())}
+    start = await client.post(path(deck) + f"/{endpoint}", json=body)
     run_id = start.json()["data"]["id"]
     result = (await client.get(path(deck) + f"/runs/{run_id}")).json()["data"]
-    assert result["status"] == "unknown" and result["held_microusd"] == 11_000
+    assert result["status"] == "unknown" and result["held_microusd"] == held
     assert len(transport.calls) == 1
     await db_pool.execute("UPDATE recommendation_runs SET created_at = now() - interval '2 days'")
     await db_pool.execute(
@@ -218,6 +229,8 @@ async def test_unknown_billing_blocks_new_runs_and_is_never_retried(pilot, clien
     )
     blocked = await client.post(path(deck) + "/runs", json=request())
     assert blocked.status_code == 409 and len(transport.calls) == 1
+    draft = await client.post(path(deck) + "/strategy-drafts", json={"request_key": str(uuid4())})
+    assert draft.status_code == 409 and len(transport.calls) == 1
     assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 1
 
 

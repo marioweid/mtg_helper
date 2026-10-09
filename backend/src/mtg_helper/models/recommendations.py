@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field, field_validator
 from mtg_helper.services.recommendations.discovery import StrictModel
 from mtg_helper.services.recommendations.pipeline import LiteralQuery
 from mtg_helper.services.recommendations.refinement import KeyedAssessment, RuleQuery
+from mtg_helper.services.recommendations.strategy import StrategyDraft
+
+
+class StrategyDraftRequest(StrictModel):
+    request_key: UUID
 
 
 class GenerateRequest(StrictModel):
@@ -61,6 +66,7 @@ class RunView(BaseModel):
     error: str | None = None
     stale: bool = False
     candidates: list[CandidateView] = Field(default_factory=list)
+    strategy: StrategyDraft | None = None
     known_cost_microusd: int = 0
     held_microusd: int = 0
 
@@ -73,6 +79,10 @@ class DiscoveryStatus(BaseModel):
     catalog_updated_at: datetime | None = None
     goal_seed: str = ""
     run: RunView | None = None
+    strategy_run: RunView | None = None
+    strategy_cap_microusd: int = 10_000
+    strategy_reserved_microusd: int = 7_400
+    strategy_maximum_calls: int = 1
     run_cap_microusd: int = 100_000
     daily_cap_microusd: int = 1_000_000
     reserved_microusd: int = 67_750

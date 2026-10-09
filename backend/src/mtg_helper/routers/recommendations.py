@@ -1,4 +1,4 @@
-"""Default-off, owner-scoped Discover endpoints; only POST /runs starts paid work."""
+"""Default-off Discover; only explicit run and strategy-draft POSTs start paid work."""
 
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
@@ -20,6 +20,7 @@ from mtg_helper.models.recommendations import (
     QueryPage,
     QueryPreview,
     RunView,
+    StrategyDraftRequest,
 )
 from mtg_helper.services import feature_flag_service
 from mtg_helper.services.recommendations.provider import Provider
@@ -54,8 +55,9 @@ class PilotRoute(APIRoute):
                     content={
                         "error": {
                             "code": "INVALID_DISCOVERY_REQUEST",
-                            "message": "Malformed or unsupported Discover request; use literal "
-                            "filters, a nonblank goal of at most 1000 chars and valid IDs.",
+                            "message": "Malformed or unsupported Discover request; use valid IDs "
+                            "and literal filters. Card-run goals must be nonblank and at most "
+                            "1000 chars; strategy drafts accept a request key only.",
                         }
                     },
                 )
@@ -110,6 +112,21 @@ async def generate(
 ) -> DataResponse[RunView]:
     engine = service(request)
     run_id, work = await engine.generate(owner(account), deck_id, body)
+    if work:
+        background.add_task(engine.run, work)
+    return DataResponse(data=await engine.view(owner(account), deck_id, run_id))
+
+
+@router.post("/strategy-drafts", status_code=202)
+async def draft_strategy(
+    deck_id: UUID,
+    body: StrategyDraftRequest,
+    request: Request,
+    account: Account,
+    background: BackgroundTasks,
+) -> DataResponse[RunView]:
+    engine = service(request)
+    run_id, work = await engine.draft_strategy(owner(account), deck_id, body)
     if work:
         background.add_task(engine.run, work)
     return DataResponse(data=await engine.view(owner(account), deck_id, run_id))

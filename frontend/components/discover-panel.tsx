@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DiscoverController, type DiscoverState } from "@/components/discover-state";
+import { CommanderStrategyPanel } from "@/components/commander-strategy-panel";
 import { ManaCost } from "@/components/mana-cost";
 import type {
   DiscoverCandidate,
@@ -41,6 +42,14 @@ export function DiscoverPanel({ deckId, onPlanChanged }: Props) {
   return (
     <section aria-label="Discover" className="space-y-4">
       <PilotBanner />
+      <CommanderStrategyPanel
+        state={state}
+        controller={controller}
+        onInspect={() => {
+          setView("trace");
+          void controller.inspect(true);
+        }}
+      />
       <DiscoverControls state={state} controller={controller} />
       {state.error && (
         <p role="alert" className="text-red-300">
@@ -90,9 +99,9 @@ function PilotBanner() {
         Partner decks and collection scopes are not yet supported.
       </p>
       <p className="text-sm text-gray-300">
-        Opening, searching and refreshing are free of model calls. Generate explicitly starts at
-        most three Luna calls. Planning creates a pending addition, never a physical edit. AI can
-        take several minutes; source browsing stays usable.
+        Opening, searching and refreshing are free of model calls. Draft strategy explicitly starts
+        one separate Luna call; Generate cards starts at most three. Planning creates a pending
+        addition, never a physical edit. AI can take several minutes; source browsing stays usable.
       </p>
     </div>
   );
@@ -117,11 +126,12 @@ function DiscoverControls({ state, controller }: StateProps) {
         mana_value_max: maximum ? Number(maximum) : null,
       }
     : null;
-  const running = state.status?.run?.status === "running";
+  const running =
+    state.status?.run?.status === "running" || state.status?.strategy_run?.status === "running";
   return (
     <div className={BOX}>
       <label className="block">
-        Commander-only goal
+        Commander-only goal (editable)
         <textarea
           className={`${INPUT} mt-1 w-full`}
           maxLength={1000}
@@ -151,7 +161,7 @@ function DiscoverControls({ state, controller }: StateProps) {
         </button>
         <button
           className={BUTTON}
-          disabled={!state.status?.ready || state.generating || running}
+          disabled={!state.status?.ready || state.generating || state.drafting || running}
           onClick={() => void controller.generate(constraint)}
         >
           Generate · up to ${((state.status?.run_cap_microusd ?? 100000) / 1e6).toFixed(2)}
@@ -442,19 +452,20 @@ function RulesBrowser({ state, controller }: StateProps) {
 }
 
 function DiscoverTrace({ state, controller }: StateProps) {
+  const strategy = state.trace?.["profile"] === "app-strategy-v1";
   return (
     <div className={BOX}>
       <RulesBrowser state={state} controller={controller} />
-      <h3>Private plan/search trace</h3>
+      <h3>{strategy ? "Private commander strategy trace" : "Private plan/search trace"}</h3>
       <p className="text-sm text-gray-400">
-        Initial and replacement plans, actual queries/counts/errors, native rules pages, raw
-        assessments and usage. Dropped initial discoveries are not silently retained. Trace exports
-        may contain your private goal; share only deliberately.
+        Private source context, raw answers, attempts and usage. Card runs also include initial and
+        replacement plans, actual queries/counts/errors and native rules pages. Dropped initial
+        discoveries are not silently retained. Exports may contain your goal; share deliberately.
       </p>
       <button
         className={BUTTON}
-        disabled={!state.status?.run}
-        onClick={() => void controller.inspect()}
+        disabled={strategy ? !state.status?.strategy_run : !state.status?.run}
+        onClick={() => void controller.inspect(strategy)}
       >
         Refresh trace (no model call)
       </button>

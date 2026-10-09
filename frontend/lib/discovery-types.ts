@@ -43,6 +43,12 @@ export interface DiscoverCandidate {
   excluded: boolean;
 }
 
+export interface CommanderStrategyDraft {
+  goal: string;
+  explanation: string;
+  uncertainties: string[];
+}
+
 export interface DiscoverRun {
   id: string;
   status: "running" | "completed" | "failed" | "interrupted" | "unknown";
@@ -57,6 +63,7 @@ export interface DiscoverRun {
   candidates: DiscoverCandidate[];
   known_cost_microusd: number;
   held_microusd: number;
+  strategy?: CommanderStrategyDraft | null;
 }
 
 export interface DiscoverStatus {
@@ -67,6 +74,10 @@ export interface DiscoverStatus {
   catalog_updated_at: string | null;
   goal_seed: string;
   run: DiscoverRun | null;
+  strategy_run?: DiscoverRun | null;
+  strategy_cap_microusd?: number;
+  strategy_reserved_microusd?: number;
+  strategy_maximum_calls?: number;
   run_cap_microusd: number;
   daily_cap_microusd: number;
   reserved_microusd: number;

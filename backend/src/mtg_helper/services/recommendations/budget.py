@@ -4,6 +4,9 @@ from typing import Any
 
 MODEL = "gpt-5.6-luna"
 VERSION = "app-pilot-v1"
+STRATEGY_VERSION = "app-strategy-v1"
+STRATEGY_BOUNDS = {"plan": (20_000, 2_000)}
+STRATEGY_CAP = 10_000
 BOUNDS = {"plan": (20_000, 5_000), "revise": (60_000, 5_000), "review": (95_000, 10_000)}
 RUN_CAP = 100_000
 DAILY_CAP = 1_000_000
@@ -16,10 +19,25 @@ def cost(input_tokens: int, output_tokens: int) -> int:
     return (input_tokens * 5 + output_tokens * 24 + 19) // 20
 
 
-def reservation() -> int:
-    """Reserve all three fixed calls; this is not a provider-enforced spending limit."""
-    total = sum(cost(*bound) for bound in BOUNDS.values())
-    if total > RUN_CAP:
+def bounds(profile: str) -> dict[str, tuple[int, int]]:
+    """Return only a known paid protocol's fixed stages; unknown profiles cannot spend."""
+    if profile == VERSION:
+        return BOUNDS
+    if profile == STRATEGY_VERSION:
+        return STRATEGY_BOUNDS
+    raise ValueError("Unknown Discover spending profile")
+
+
+def run_cap(profile: str) -> int:
+    """Resolve a known protocol's estimate ceiling without changing the shared daily limit."""
+    bounds(profile)
+    return STRATEGY_CAP if profile == STRATEGY_VERSION else RUN_CAP
+
+
+def reservation(profile: str = VERSION) -> int:
+    """Reserve every fixed call; this is not a provider-enforced spending limit."""
+    total = sum(cost(*bound) for bound in bounds(profile).values())
+    if total > run_cap(profile):
         raise ValueError("Discovery reservation exceeds its run cap")
     return total
 
