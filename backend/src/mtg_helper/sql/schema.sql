@@ -825,3 +825,71 @@ CREATE TABLE IF NOT EXISTS new_card_jobs (
     error TEXT,
     finished_at TIMESTAMPTZ
 );
+
+-- Default-off source-backed Discover pilot; legacy tables and judgments are unchanged.
+ALTER TABLE new_card_catalog ADD COLUMN IF NOT EXISTS source_facts JSONB;
+ALTER TABLE new_card_catalog_state ADD COLUMN IF NOT EXISTS source_sha256 TEXT;
+ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS recommendation_origin BOOLEAN
+    NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS recommendation_sources (
+    sha256 TEXT PRIMARY KEY CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+    kind TEXT NOT NULL CHECK (kind IN ('cards', 'rules')),
+    payload BYTEA NOT NULL CHECK (octet_length(payload) <= 136314880),
+    published_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS recommendation_accounts (
+    account_id UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS recommendation_runs (
+    id UUID PRIMARY KEY,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    -- Deleting a deck must not erase spend or unresolved billing holds.
+    deck_id UUID REFERENCES decks(id) ON DELETE SET NULL,
+    request_key UUID NOT NULL,
+    request_hash TEXT NOT NULL,
+    source_hash TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    rules_hash TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    profile TEXT NOT NULL,
+    context JSONB NOT NULL,
+    data JSONB NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'completed', 'failed', 'interrupted', 'unknown')),
+    phase TEXT NOT NULL DEFAULT 'plan' CHECK (phase IN ('plan', 'revise', 'review', 'done')),
+    token UUID NOT NULL,
+    lease_until TIMESTAMPTZ NOT NULL DEFAULT now() + interval '10 minutes',
+    held_microusd INTEGER NOT NULL CHECK (held_microusd >= 0),
+    known_cost_microusd INTEGER NOT NULL DEFAULT 0 CHECK (known_cost_microusd >= 0),
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    UNIQUE (account_id, request_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS recommendation_one_active_account
+    ON recommendation_runs (account_id) WHERE status = 'running';
+CREATE INDEX IF NOT EXISTS recommendation_runs_deck ON recommendation_runs (deck_id, created_at);
+
+CREATE TABLE IF NOT EXISTS recommendation_attempts (
+    run_id UUID NOT NULL REFERENCES recommendation_runs(id) ON DELETE CASCADE,
+    phase TEXT NOT NULL CHECK (phase IN ('plan', 'revise', 'review')),
+    status TEXT NOT NULL DEFAULT 'attempted' CHECK (status IN ('attempted', 'known', 'unknown')),
+    request JSONB NOT NULL,
+    receipt JSONB,
+    reservation_microusd INTEGER NOT NULL CHECK (reservation_microusd >= 0),
+    cost_microusd INTEGER CHECK (cost_microusd >= 0),
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    settled_at TIMESTAMPTZ,
+    PRIMARY KEY (run_id, phase)
+);
+
+-- Feedback must not affect legacy deck_feedback weights or cross-deck profiles.
+CREATE TABLE IF NOT EXISTS recommendation_feedback (
+    run_id UUID NOT NULL REFERENCES recommendation_runs(id) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    verdict TEXT NOT NULL CHECK (verdict IN ('useful', 'incorrect', 'uncertain')),
+    note TEXT NOT NULL CHECK (length(note) <= 1000),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (run_id, oracle_id)
+);

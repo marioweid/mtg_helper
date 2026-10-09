@@ -849,6 +849,7 @@ export interface OptimizeStartResponse {
 
 export interface Capabilities {
   optimizer: boolean;
+  recommendations: boolean;
 }
 
 export interface OptimizeJobStatus {

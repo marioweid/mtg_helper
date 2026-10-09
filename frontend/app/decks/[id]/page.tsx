@@ -40,6 +40,7 @@ import { GameChangerBadge } from "@/components/game-changer-badge";
 import { ManaCurve } from "@/components/mana-curve";
 import { ManaFixPanel } from "@/components/mana-fix-panel";
 import { NewCardsPanel } from "@/components/new-cards-panel";
+import { DiscoverPanel } from "@/components/discover-panel";
 import { PlannedChangesPanel } from "@/components/planned-changes-panel";
 import { StatsModal } from "@/components/stats-modal";
 import { TopPicksPanel } from "@/components/top-picks-panel";
@@ -47,7 +48,7 @@ import { BRACKET_LABELS, STAGE_LABELS } from "@/lib/constants";
 import { deckTotal, totalCardCount, type DeckCardItem, type DeckDetailResponse } from "@/lib/types";
 
 type GroupMode = "tag" | "type";
-type DeckTab = "cards" | "top-picks" | "new-cards" | "combos" | "history";
+type DeckTab = "cards" | "top-picks" | "discover" | "new-cards" | "combos" | "history";
 
 const SORT_MODES: readonly SortMode[] = ["default", "name", "cmc", "price"];
 
@@ -80,6 +81,8 @@ export default function DeckDetailPage() {
     tag: new Set(),
   }));
   const [tab, setTab] = useState<DeckTab>("cards");
+  const [discoverEnabled, setDiscoverEnabled] = useState(false);
+  const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [filter, setFilter] = useState<DeckFilter>({
@@ -105,6 +108,25 @@ export default function DeckDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    void apiClient
+      .getCapabilities()
+      .then((caps) => {
+        if (active) {
+          setDiscoverEnabled(caps.recommendations);
+          setCapabilityError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active)
+          setCapabilityError(err instanceof Error ? err.message : "Capability lookup failed");
+      });
+    return () => {
+      active = false;
+    };
+  }, [deckId]);
 
   // Restore the per-deck view mode + sort the user last chose.
   useEffect(() => {
@@ -335,25 +357,39 @@ export default function DeckDetailPage() {
             aria-label="Deck view"
             className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-sm"
           >
-            {(["cards", "top-picks", "new-cards", "combos", "history"] as const).map((t) => {
-              const active = tab === t;
-              return (
-                <button
-                  key={t}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setTab(t)}
-                  className={`px-4 py-1.5 capitalize transition-colors ${
-                    active
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                  }`}
-                >
-                  {t === "top-picks" ? "Top Picks" : t === "new-cards" ? "New Cards" : t}
-                </button>
-              );
-            })}
+            {(["cards", "top-picks", "discover", "new-cards", "combos", "history"] as const)
+              .filter((t) => t !== "discover" || discoverEnabled)
+              .map((t) => {
+                const active = tab === t;
+                return (
+                  <button
+                    key={t}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(t)}
+                    className={`px-4 py-1.5 capitalize transition-colors ${
+                      active
+                        ? "bg-indigo-600 text-white"
+                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                    }`}
+                  >
+                    {t === "top-picks"
+                      ? "Community Picks"
+                      : t === "discover"
+                        ? "Discover · Experimental"
+                        : t === "new-cards"
+                          ? "New Cards"
+                          : t}
+                  </button>
+                );
+              })}
           </div>
+
+          {capabilityError && (
+            <p role="alert" className="text-sm text-amber-300">
+              Experimental capability unavailable: {capabilityError}. Refresh to retry.
+            </p>
+          )}
 
           {tab === "cards" && (
             <>
@@ -447,6 +483,10 @@ export default function DeckDetailPage() {
           {tab === "combos" && <ComboTab deckId={deck.id} />}
 
           {tab === "top-picks" && <TopPicksPanel deckId={deck.id} onPlanChanged={load} />}
+
+          {tab === "discover" && discoverEnabled && (
+            <DiscoverPanel key={deck.id} deckId={deck.id} onPlanChanged={refreshNewCardsPlan} />
+          )}
 
           {tab === "new-cards" && (
             <NewCardsPanel key={deck.id} deckId={deck.id} onPlanChanged={refreshNewCardsPlan} />

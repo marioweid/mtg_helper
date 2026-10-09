@@ -515,6 +515,10 @@ async def _complete_addition(
     plan: asyncpg.Record,
     quantity: int,
 ) -> None:
+    if plan["recommendation_origin"]:
+        from mtg_helper.services.recommendations.planning import validate_addition
+
+        await validate_addition(conn, plan["deck_id"], plan["card_id"], quantity)
     cards = [(plan["card_id"], quantity)]
     if plan["collection_id"] is not None:
         cards = await _consume_collection_cards(

@@ -20,6 +20,7 @@ from mtg_helper.services.new_cards.discovery import (
     paper_card,
     release_history,
 )
+from mtg_helper.services.recommendations import source_repository
 
 _MAX_BYTES = 130 * 1024 * 1024
 
@@ -78,8 +79,12 @@ async def publish(
     cards: list[dict[str, Any]],
     history: dict[str, ReleaseHistory],
     started: datetime,
+    *,
+    source: source_repository.Publication | None = None,
 ) -> None:
     """Publish complete source facts/history atomically; never delete user plans or cards."""
+    source = source or await asyncio.to_thread(source_repository.prepare, cards)
+    await source_repository.publish(conn, source)
     generation = uuid4()
     rows = []
     for card in cards:
@@ -94,16 +99,18 @@ async def publish(
                 entry.release if paper_card(card) else None,
                 facts.model_dump_json(),
                 generation,
+                json.dumps(source.cards[str(facts.oracle_id)]),
             )
         )
     for offset in range(0, len(rows), 500):
         await conn.executemany(
             """
-            INSERT INTO new_card_catalog (oracle_id, first_paper, released_at, facts, generation)
-            VALUES ($1, $2, $3, $4::jsonb, $5)
+            INSERT INTO new_card_catalog
+                (oracle_id, first_paper, released_at, facts, generation, source_facts)
+            VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb)
             ON CONFLICT (oracle_id) DO UPDATE SET first_paper = EXCLUDED.first_paper,
                 released_at = EXCLUDED.released_at, facts = EXCLUDED.facts,
-                generation = EXCLUDED.generation
+                generation = EXCLUDED.generation, source_facts = EXCLUDED.source_facts
             """,
             rows[offset : offset + 500],
         )
@@ -114,13 +121,14 @@ async def publish(
     await conn.execute(
         """
         INSERT INTO new_card_catalog_state
-            (singleton, generation, started_at, published_at, card_count)
-        VALUES (true, $1, $2, now(), $3)
+            (singleton, generation, started_at, published_at, card_count, source_sha256)
+        VALUES (true, $1, $2, now(), $3, $4)
         ON CONFLICT (singleton) DO UPDATE SET generation = EXCLUDED.generation,
             started_at = EXCLUDED.started_at, published_at = EXCLUDED.published_at,
-            card_count = EXCLUDED.card_count
+            card_count = EXCLUDED.card_count, source_sha256 = EXCLUDED.source_sha256
         """,
         generation,
         started,
         len(cards),
+        source.digest,
     )
