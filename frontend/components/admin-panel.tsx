@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AdminDiscoverPanel } from "@/components/admin-discover-panel";
 import { ThemeManager } from "@/components/theme-manager";
 
 type Job = "sync" | "tag" | "refresh-all";
@@ -256,6 +257,7 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-4">
+      <AdminDiscoverPanel />
       {JOBS.map(({ id, label, path, description }) => {
         const snapshot = status[SLOT_BY_ID[id]];
         const running = snapshot.status === "running";
