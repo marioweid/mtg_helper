@@ -225,6 +225,17 @@ __marimo__/
 *.json
 # Public/synthetic feasibility evidence is intentionally versioned; bulk caches remain ignored.
 !docs/research/new-cards-spike-2026-10-05/*.json
+# Selected recovery evidence contains only user-approved decks/model outputs, never credentials.
+!docs/research/deck-recovery-smoke/*.json
+# Public discovery experiment inputs/results, with no credentials or production deck data.
+!backend/evals/commander_discovery/*.json
+!docs/research/commander-discovery-smoke/*.json
+!docs/research/commander-discovery-sol/*.json
+!docs/research/commander-discovery-sol-assessment/*.json
+!docs/research/commander-discovery-refinement/*.json
+!docs/research/commander-discovery-luna-refined/*.json
+!docs/research/commander-discovery-luna-refined/requests/*.json
+!docs/research/commander-discovery-luna-refined/observations/*.json
 
 # Terraform
 infra/terraform/.terraform/

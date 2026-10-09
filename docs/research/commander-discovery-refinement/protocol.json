@@ -1,0 +1,1045 @@
+{
+  "version": "offline-refinement-foundations-v1",
+  "baseline_model": "gpt-5.6-luna",
+  "paid_calls": 0,
+  "rules_sha256": "8d860e451f20f38865b725b42d82feb714c725373dd8f3b32b8652b3eeb070ca",
+  "source": {
+    "type": "oracle_cards",
+    "updated_at": "2026-10-04T21:01:57.080+00:00",
+    "bytes": 24595465,
+    "sha256": "cd5f442a93459d65850bacce748996b0e77b631b5a0c68ebcfcf62a8bd35eae8",
+    "download_seconds": 0.783
+  },
+  "plan_schema": {
+    "$defs": {
+      "Query": {
+        "additionalProperties": false,
+        "description": "Executable source filters, not classifications of Magic interactions.",
+        "properties": {
+          "purpose": {
+            "maxLength": 220,
+            "minLength": 1,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "oracle_text_all": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Oracle Text All",
+            "type": "array"
+          },
+          "oracle_text_any": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Oracle Text Any",
+            "type": "array"
+          },
+          "type_line_any": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Type Line Any",
+            "type": "array"
+          },
+          "keywords_any": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Keywords Any",
+            "type": "array"
+          },
+          "mana_cost_all": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Mana Cost All",
+            "type": "array"
+          },
+          "mana_value_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Value Min"
+          },
+          "mana_value_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Value Max"
+          }
+        },
+        "required": [
+          "purpose",
+          "oracle_text_all",
+          "oracle_text_any",
+          "type_line_any",
+          "keywords_any",
+          "mana_cost_all",
+          "mana_value_min",
+          "mana_value_max"
+        ],
+        "title": "Query",
+        "type": "object"
+      },
+      "RuleQuery": {
+        "additionalProperties": false,
+        "description": "Literal full-source lookup, with no fixed mechanic or interaction labels.",
+        "properties": {
+          "purpose": {
+            "maxLength": 220,
+            "minLength": 1,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "text_all": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Text All",
+            "type": "array"
+          },
+          "text_any": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Text Any",
+            "type": "array"
+          }
+        },
+        "required": [
+          "purpose",
+          "text_all",
+          "text_any"
+        ],
+        "title": "RuleQuery",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "Card hypotheses plus requests against the unclassified, complete rules corpus.",
+    "properties": {
+      "intents": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 8,
+        "minItems": 1,
+        "title": "Intents",
+        "type": "array"
+      },
+      "searches": {
+        "items": {
+          "$ref": "#/$defs/Query"
+        },
+        "maxItems": 8,
+        "title": "Searches",
+        "type": "array"
+      },
+      "named_cards": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 12,
+        "title": "Named Cards",
+        "type": "array"
+      },
+      "uncertainties": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 4,
+        "title": "Uncertainties",
+        "type": "array"
+      },
+      "rule_searches": {
+        "items": {
+          "$ref": "#/$defs/RuleQuery"
+        },
+        "maxItems": 8,
+        "title": "Rule Searches",
+        "type": "array"
+      }
+    },
+    "required": [
+      "intents",
+      "searches",
+      "named_cards",
+      "uncertainties",
+      "rule_searches"
+    ],
+    "title": "RefinementPlan",
+    "type": "object"
+  },
+  "review_schemas": {
+    "meren": {
+      "$defs": {
+        "CandidateCoverage": {
+          "additionalProperties": false,
+          "properties": {
+            "C00": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C01": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C02": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C03": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C04": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C05": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C06": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C07": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C08": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C09": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C10": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C11": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C12": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C13": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C14": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C15": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C16": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C17": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C18": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C19": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C20": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C21": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C22": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C23": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C24": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C25": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C26": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C27": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C28": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C29": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C30": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C31": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C32": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C33": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C34": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C35": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C36": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C37": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C38": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C39": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C40": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C41": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C42": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C43": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C44": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C45": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C46": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C47": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C48": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C49": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C50": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C51": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C52": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C53": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C54": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C55": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C56": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C57": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C58": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C59": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C60": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C61": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C62": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C63": {
+              "$ref": "#/$defs/KeyedAssessment"
+            }
+          },
+          "required": [
+            "C00",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "C06",
+            "C07",
+            "C08",
+            "C09",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C17",
+            "C18",
+            "C19",
+            "C20",
+            "C21",
+            "C22",
+            "C23",
+            "C24",
+            "C25",
+            "C26",
+            "C27",
+            "C28",
+            "C29",
+            "C30",
+            "C31",
+            "C32",
+            "C33",
+            "C34",
+            "C35",
+            "C36",
+            "C37",
+            "C38",
+            "C39",
+            "C40",
+            "C41",
+            "C42",
+            "C43",
+            "C44",
+            "C45",
+            "C46",
+            "C47",
+            "C48",
+            "C49",
+            "C50",
+            "C51",
+            "C52",
+            "C53",
+            "C54",
+            "C55",
+            "C56",
+            "C57",
+            "C58",
+            "C59",
+            "C60",
+            "C61",
+            "C62",
+            "C63"
+          ],
+          "title": "CandidateCoverage",
+          "type": "object"
+        },
+        "Evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "title": "Key",
+              "type": "string"
+            },
+            "quote": {
+              "maxLength": 160,
+              "minLength": 10,
+              "title": "Quote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "quote"
+          ],
+          "title": "Evidence",
+          "type": "object"
+        },
+        "KeyedAssessment": {
+          "additionalProperties": false,
+          "description": "The enclosing candidate key is authoritative; the model cannot supply another one.",
+          "properties": {
+            "fit": {
+              "enum": [
+                "core",
+                "support",
+                "conditional",
+                "weak",
+                "uncertain"
+              ],
+              "title": "Fit",
+              "type": "string"
+            },
+            "reason": {
+              "maxLength": 220,
+              "minLength": 1,
+              "title": "Reason",
+              "type": "string"
+            },
+            "caveat": {
+              "maxLength": 140,
+              "title": "Caveat",
+              "type": "string"
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/Evidence"
+              },
+              "maxItems": 2,
+              "minItems": 1,
+              "title": "Evidence",
+              "type": "array"
+            }
+          },
+          "required": [
+            "fit",
+            "reason",
+            "caveat",
+            "evidence"
+          ],
+          "title": "KeyedAssessment",
+          "type": "object"
+        },
+        "candidate_id": {
+          "enum": [
+            "C00",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "C06",
+            "C07",
+            "C08",
+            "C09",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C17",
+            "C18",
+            "C19",
+            "C20",
+            "C21",
+            "C22",
+            "C23",
+            "C24",
+            "C25",
+            "C26",
+            "C27",
+            "C28",
+            "C29",
+            "C30",
+            "C31",
+            "C32",
+            "C33",
+            "C34",
+            "C35",
+            "C36",
+            "C37",
+            "C38",
+            "C39",
+            "C40",
+            "C41",
+            "C42",
+            "C43",
+            "C44",
+            "C45",
+            "C46",
+            "C47",
+            "C48",
+            "C49",
+            "C50",
+            "C51",
+            "C52",
+            "C53",
+            "C54",
+            "C55",
+            "C56",
+            "C57",
+            "C58",
+            "C59",
+            "C60",
+            "C61",
+            "C62",
+            "C63"
+          ],
+          "title": "candidate_id",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "recommendations": {
+          "items": {
+            "$ref": "#/$defs/candidate_id"
+          },
+          "maxItems": 15,
+          "title": "Recommendations",
+          "type": "array"
+        },
+        "assessments": {
+          "$ref": "#/$defs/CandidateCoverage"
+        }
+      },
+      "required": [
+        "recommendations",
+        "assessments"
+      ],
+      "title": "GroundedReview",
+      "type": "object"
+    },
+    "saheeli": {
+      "$defs": {
+        "CandidateCoverage": {
+          "additionalProperties": false,
+          "properties": {
+            "C00": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C01": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C02": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C03": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C04": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C05": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C06": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C07": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C08": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C09": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C10": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C11": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C12": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C13": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C14": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C15": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C16": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C17": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C18": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C19": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C20": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C21": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C22": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C23": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C24": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C25": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C26": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C27": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C28": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C29": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C30": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C31": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C32": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C33": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C34": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C35": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C36": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C37": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C38": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C39": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C40": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C41": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C42": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C43": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C44": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C45": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C46": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C47": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C48": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C49": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C50": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C51": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C52": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C53": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C54": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C55": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C56": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C57": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C58": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C59": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C60": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C61": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C62": {
+              "$ref": "#/$defs/KeyedAssessment"
+            },
+            "C63": {
+              "$ref": "#/$defs/KeyedAssessment"
+            }
+          },
+          "required": [
+            "C00",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "C06",
+            "C07",
+            "C08",
+            "C09",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C17",
+            "C18",
+            "C19",
+            "C20",
+            "C21",
+            "C22",
+            "C23",
+            "C24",
+            "C25",
+            "C26",
+            "C27",
+            "C28",
+            "C29",
+            "C30",
+            "C31",
+            "C32",
+            "C33",
+            "C34",
+            "C35",
+            "C36",
+            "C37",
+            "C38",
+            "C39",
+            "C40",
+            "C41",
+            "C42",
+            "C43",
+            "C44",
+            "C45",
+            "C46",
+            "C47",
+            "C48",
+            "C49",
+            "C50",
+            "C51",
+            "C52",
+            "C53",
+            "C54",
+            "C55",
+            "C56",
+            "C57",
+            "C58",
+            "C59",
+            "C60",
+            "C61",
+            "C62",
+            "C63"
+          ],
+          "title": "CandidateCoverage",
+          "type": "object"
+        },
+        "Evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "title": "Key",
+              "type": "string"
+            },
+            "quote": {
+              "maxLength": 160,
+              "minLength": 10,
+              "title": "Quote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "quote"
+          ],
+          "title": "Evidence",
+          "type": "object"
+        },
+        "KeyedAssessment": {
+          "additionalProperties": false,
+          "description": "The enclosing candidate key is authoritative; the model cannot supply another one.",
+          "properties": {
+            "fit": {
+              "enum": [
+                "core",
+                "support",
+                "conditional",
+                "weak",
+                "uncertain"
+              ],
+              "title": "Fit",
+              "type": "string"
+            },
+            "reason": {
+              "maxLength": 220,
+              "minLength": 1,
+              "title": "Reason",
+              "type": "string"
+            },
+            "caveat": {
+              "maxLength": 140,
+              "title": "Caveat",
+              "type": "string"
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/Evidence"
+              },
+              "maxItems": 2,
+              "minItems": 1,
+              "title": "Evidence",
+              "type": "array"
+            }
+          },
+          "required": [
+            "fit",
+            "reason",
+            "caveat",
+            "evidence"
+          ],
+          "title": "KeyedAssessment",
+          "type": "object"
+        },
+        "candidate_id": {
+          "enum": [
+            "C00",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "C06",
+            "C07",
+            "C08",
+            "C09",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C17",
+            "C18",
+            "C19",
+            "C20",
+            "C21",
+            "C22",
+            "C23",
+            "C24",
+            "C25",
+            "C26",
+            "C27",
+            "C28",
+            "C29",
+            "C30",
+            "C31",
+            "C32",
+            "C33",
+            "C34",
+            "C35",
+            "C36",
+            "C37",
+            "C38",
+            "C39",
+            "C40",
+            "C41",
+            "C42",
+            "C43",
+            "C44",
+            "C45",
+            "C46",
+            "C47",
+            "C48",
+            "C49",
+            "C50",
+            "C51",
+            "C52",
+            "C53",
+            "C54",
+            "C55",
+            "C56",
+            "C57",
+            "C58",
+            "C59",
+            "C60",
+            "C61",
+            "C62",
+            "C63"
+          ],
+          "title": "candidate_id",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "recommendations": {
+          "items": {
+            "$ref": "#/$defs/candidate_id"
+          },
+          "maxItems": 15,
+          "title": "Recommendations",
+          "type": "array"
+        },
+        "assessments": {
+          "$ref": "#/$defs/CandidateCoverage"
+        }
+      },
+      "required": [
+        "recommendations",
+        "assessments"
+      ],
+      "title": "GroundedReview",
+      "type": "object"
+    }
+  },
+  "scope": "offline prototype only; no app integration or improved-model-output claim"
+}

@@ -1,0 +1,3015 @@
+{
+  "before": {
+    "card_searches": {
+      "nomination_errors": [],
+      "queries": []
+    },
+    "rule_searches": [],
+    "source_prefixes": [
+      {
+        "text": "Flying",
+        "count": 534
+      },
+      {
+        "text": "Trample",
+        "count": 342
+      },
+      {
+        "text": "Enchant creature",
+        "count": 262
+      },
+      {
+        "text": "Deathtouch",
+        "count": 160
+      },
+      {
+        "text": "Flash",
+        "count": 150
+      },
+      {
+        "text": "Reach",
+        "count": 144
+      },
+      {
+        "text": "{T}: Add one mana of any color.",
+        "count": 109
+      },
+      {
+        "text": "Choose one —",
+        "count": 107
+      },
+      {
+        "text": "Menace",
+        "count": 102
+      },
+      {
+        "text": "Equip {2}",
+        "count": 98
+      },
+      {
+        "text": "Vigilance",
+        "count": 73
+      },
+      {
+        "text": "Reach (This creature can block creatures with flying.)",
+        "count": 72
+      }
+    ],
+    "note": "Matches are hypotheses, not fit; broad/zero/error results need explicit revision."
+  },
+  "after": {
+    "card_searches": {
+      "nomination_errors": [],
+      "queries": [
+        {
+          "query": {
+            "purpose": "Repeatable sacrifice outlets that do not require a creature to tap",
+            "oracle_text_all": [
+              "sacrifice a creature"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 235,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "d6912f52-e478-4cc6-a34c-67e372abc4fa",
+              "name": "Plagued Rusalka",
+              "mana_cost": "{B}",
+              "type_line": "Creature — Spirit",
+              "oracle_text": "{B}, Sacrifice a creature: Target creature gets -1/-1 until end of turn.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 1.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "4013b4c2-c9ed-4d14-90f0-97214ec1fded",
+              "name": "Contamination",
+              "mana_cost": "{2}{B}",
+              "type_line": "Enchantment",
+              "oracle_text": "At the beginning of your upkeep, sacrifice this enchantment unless you sacrifice a creature.\nIf a land is tapped for mana, it produces {B} instead of any other type and amount.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Sacrifice outlets that also produce mana or another reusable resource",
+            "oracle_text_all": [
+              "sacrifice a creature"
+            ],
+            "oracle_text_any": [
+              "Add",
+              "draw a card",
+              "create a"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 100,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "4d98aea2-b4ff-4903-ba28-a53fbfaad6b1",
+              "name": "Final Strike",
+              "mana_cost": "{2}{B}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nFinal Strike deals damage to target opponent or planeswalker equal to the sacrificed creature's power.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "f6f927f3-dc3f-446c-aa7b-81048eb73243",
+              "name": "Vivien on the Hunt",
+              "mana_cost": "{4}{G}{G}",
+              "type_line": "Legendary Planeswalker — Vivien",
+              "oracle_text": "+2: You may sacrifice a creature. If you do, search your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put it onto the battlefield, then shuffle.\n+1: Mill five cards, then put any number of creature cards milled this way into your hand.\n−1: Create a 4/4 green Rhino Warrior creature token.",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": "4",
+              "defense": null,
+              "mana_value": 6.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Creatures that reward their own or another creature's death with cards, mana, or tokens",
+            "oracle_text_all": [
+              "dies"
+            ],
+            "oracle_text_any": [
+              "draw a card",
+              "Add",
+              "create a token",
+              "each opponent"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 154,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "51b9d8ea-b0df-4a57-804e-6d395e301242",
+              "name": "Elvish Dreadlord",
+              "mana_cost": "{3}{B}{B}",
+              "type_line": "Creature — Zombie Elf",
+              "oracle_text": "Deathtouch\nWhen this creature dies, non-Elf creatures get -3/-3 until end of turn.\nEncore {5}{B}{B} ({5}{B}{B}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Encore",
+                "Deathtouch"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "284db94d-e583-4355-89fd-6c0906f9d17e",
+              "name": "Feral Ghoul",
+              "mana_cost": "{2}{B}",
+              "type_line": "Creature — Zombie Mutant",
+              "oracle_text": "Menace\nWhenever another creature you control dies, put a +1/+1 counter on this creature.\nWhen this creature dies, each opponent gets a number of rad counters equal to its power.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Menace"
+              ],
+              "layout": "normal",
+              "power": "2",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Creature-based removal and interaction that can be repeatedly returned",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [
+              "destroy target",
+              "exile target",
+              "return target",
+              "-1/-1"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 0,
+          "truncated": false,
+          "selected": [],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Creatures that stock the graveyard or find creatures for reliable recursion",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "mill",
+              "put a card from your library into your graveyard",
+              "search your library for a creature card",
+              "return a creature card from your graveyard"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 166,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "f20f27d1-2c50-41d5-b1af-44a0e7ca2e00",
+              "name": "Mindwrack Harpy",
+              "mana_cost": "{3}{B}",
+              "type_line": "Enchantment Creature — Harpy",
+              "oracle_text": "Flying\nAt the beginning of combat on your turn, each player mills three cards.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Flying",
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "f78db9ad-d4a3-4e49-a76e-bd31124b7837",
+              "name": "Kagha, Shadow Archdruid",
+              "mana_cost": "{2}{B}{G}",
+              "type_line": "Legendary Creature — Elf Druid",
+              "oracle_text": "Whenever Kagha attacks, it gains deathtouch until end of turn. Mill two cards. (Put the top two cards of your library into your graveyard.)\nOnce during each of your turns, you may play a land or cast a permanent spell from among cards in your graveyard that were put there from your library this turn.",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "4",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Ways to protect Meren or a creature-based engine from removal",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "hexproof",
+              "indestructible",
+              "protection from",
+              "regenerate"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 652,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "342daae1-f7f0-4bce-94bc-e9bdce53e48e",
+              "name": "Dark Dabbling",
+              "mana_cost": "{2}{B}",
+              "type_line": "Instant",
+              "oracle_text": "Regenerate target creature. Draw a card. (The next time the creature would be destroyed this turn, instead tap it, remove it from combat, and heal all damage on it.)\nSpell mastery — If there are two or more instant and/or sorcery cards in your graveyard, also regenerate each other creature you control.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Heal",
+                "Regenerate",
+                "Spell mastery"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "2676d0c3-0a24-4e93-ae80-8f3fe03da483",
+              "name": "War Historian",
+              "mana_cost": "{2}{G}",
+              "type_line": "Creature — Human Monk",
+              "oracle_text": "Reach\nThis creature has indestructible as long as it attacked a battle this turn.",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Reach"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Additional recursion that returns creatures to the battlefield or hand",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "return target creature card from your graveyard to the battlefield",
+              "return a creature card from your graveyard to your hand"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 69,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "64a9a6b4-26b5-4d23-be86-85c54e9c4727",
+              "name": "Liliana, the Last Hope",
+              "mana_cost": "{1}{B}{B}",
+              "type_line": "Legendary Planeswalker — Liliana",
+              "oracle_text": "+1: Up to one target creature gets -2/-1 until your next turn.\n−2: Mill two cards, then you may return a creature card from your graveyard to your hand.\n−7: You get an emblem with \"At the beginning of your end step, create X 2/2 black Zombie creature tokens, where X is two plus the number of Zombies you control.\"",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": "3",
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "dc367b23-d1f4-4c5c-b300-a44a726e3f74",
+              "name": "Live or Die",
+              "mana_cost": "{3}{B}{B}",
+              "type_line": "Instant",
+              "oracle_text": "Choose one —\n• Return target creature card from your graveyard to the battlefield.\n• Destroy target creature.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "sample_limit": 2
+        },
+        {
+          "query": {
+            "purpose": "Low-mana-value utility creatures suited to repeated Meren recursion",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 1.0,
+            "mana_value_max": 3.0
+          },
+          "matching_count": 0,
+          "truncated": false,
+          "selected": [],
+          "sample_limit": 2
+        }
+      ]
+    },
+    "rule_searches": [
+      {
+        "query": {
+          "purpose": "Verify the rules definition and consequences of a creature dying.",
+          "text_all": [
+            "dies"
+          ],
+          "text_any": [],
+          "cursor": null
+        },
+        "matching_count": 10,
+        "truncated": true,
+        "next_cursor": "701.23f",
+        "selected": [
+          {
+            "key": "700.4",
+            "text": "700.4. The term dies means “is put into a graveyard from the battlefield.”"
+          },
+          {
+            "key": "G:Dies",
+            "text": "Dies\nA creature or planeswalker “dies” if it is put into a graveyard from the battlefield. See rule 700.4."
+          },
+          {
+            "key": "701.66a",
+            "text": "701.66a “Earthbend N” means “Target land you control becomes a 0/0 land creature with haste in addition to its other types. Put N +1/+1 counters on it. When that land dies or is put into exile, return it to the battlefield tapped under your control.”"
+          },
+          {
+            "key": "G:Earthbend",
+            "text": "Earthbend\nA keyword action that causes a land to become a 0/0 creature with haste in addition to its other types and puts a number of +1/+1 counters on it. When that land dies or is put into exile, return it to the battlefield tapped under your control. See 701.66, “Earthbend.”"
+          },
+          {
+            "key": "712.21",
+            "text": "712.21. If a melded permanent leaves the battlefield, one permanent leaves the battlefield and two cards are put into the appropriate zone.\nExample: Chittering Host, a melded permanent, dies. An ability that triggers “whenever a creature dies” triggers once. An ability that triggers “whenever a card is put into a graveyard from anywhere” triggers twice."
+          },
+          {
+            "key": "113.6k",
+            "text": "113.6k A trigger condition that can’t trigger from the battlefield functions in all zones it can trigger from. Other trigger conditions of the same triggered ability may function in different zones.\nExample: Absolver Thrull has the ability “When this creature enters or the creature it haunts dies, destroy target enchantment.” The first trigger condition functions from the battlefield and the second trigger condition functions from the exile zone. (See rule 702.55, “Haunt.”)"
+          },
+          {
+            "key": "603.10a",
+            "text": "603.10a Some zone-change triggers look back in time. These are leaves-the-battlefield abilities, abilities that trigger when a player sacrifices a permanent, abilities that trigger when a card leaves a graveyard, and abilities that trigger when an object that all players can see is put into a hand or library.\nExample: Two creatures are on the battlefield along with an artifact that has the ability “Whenever a creature dies, you gain 1 life.” Someone casts a spell that destroys all artifacts, creatures, and enchantments. The artifact’s ability triggers twice, even though the artifact goes to its owner’s graveyard at the same time as the creatures."
+          },
+          {
+            "key": "701.23f",
+            "text": "701.23f If searching a zone is replaced with searching a portion of that zone, any other instructions that refer to searching the zone still apply. Any abilities that trigger on a library being searched will trigger.\nExample: Aven Mindcensor says, in part, “If an opponent would search a library, that player searches the top four cards of that library instead.” Veteran Explorer says “When this creature dies, each player may search their library for up to two basic land cards, put them onto the battlefield, then shuffle.” An opponent who searched the top four cards of their library because of Veteran Explorer’s ability would shuffle the entire library."
+          }
+        ]
+      },
+      {
+        "query": {
+          "purpose": "Clarify sacrifice as a cost and when a sacrificed creature is put into the graveyard.",
+          "text_all": [
+            "sacrifice"
+          ],
+          "text_any": [],
+          "cursor": null
+        },
+        "matching_count": 73,
+        "truncated": true,
+        "next_cursor": "702.110a",
+        "selected": [
+          {
+            "key": "701.21",
+            "text": "701.21. Sacrifice"
+          },
+          {
+            "key": "701.61a",
+            "text": "701.61a To forage means “Exile three cards from your graveyard or sacrifice a Food.”"
+          },
+          {
+            "key": "G:Sacrifice",
+            "text": "Sacrifice\nTo move a permanent you control to its owner’s graveyard. See rule 701.21, “Sacrifice.”"
+          },
+          {
+            "key": "111.10f",
+            "text": "111.10f A Clue token is a colorless Clue artifact token with “{2}, Sacrifice this token: Draw a card.”"
+          },
+          {
+            "key": "G:Exploit",
+            "text": "Exploit\nA keyword ability that lets you sacrifice a creature for a benefit. See rule 702.110, “Exploit.”"
+          },
+          {
+            "key": "111.10b",
+            "text": "111.10b A Food token is a colorless Food artifact token with “{2}, {T}, Sacrifice this token: You gain 3 life.”"
+          },
+          {
+            "key": "111.10c",
+            "text": "111.10c A Gold token is a colorless Gold artifact token with “Sacrifice this token: Add one mana of any color.”"
+          },
+          {
+            "key": "702.110a",
+            "text": "702.110a Exploit is a triggered ability. “Exploit” means “When this creature enters, you may sacrifice a creature.”"
+          }
+        ]
+      },
+      {
+        "query": {
+          "purpose": "Check how triggered abilities are put on the stack and resolve after sacrifice or death events.",
+          "text_all": [
+            "triggered ability"
+          ],
+          "text_any": [
+            "stack"
+          ],
+          "cursor": null
+        },
+        "matching_count": 48,
+        "truncated": true,
+        "next_cursor": "G:Trigger",
+        "selected": [
+          {
+            "key": "G:Mana Ability",
+            "text": "Mana Ability\nAn activated or triggered ability that could create mana and doesn’t use the stack. See rule 605, “Mana Abilities.”"
+          },
+          {
+            "key": "113.1c",
+            "text": "113.1c An ability can be an activated or triggered ability on the stack. This kind of ability is an object. (See section 6, “Spells, Abilities, and Effects.”)"
+          },
+          {
+            "key": "608.2a",
+            "text": "608.2a If a triggered ability has an intervening “if” clause, it checks whether the clause’s condition is true. If it isn’t, the ability is removed from the stack and does nothing. Otherwise, it continues to resolve. See rule 603.4."
+          },
+          {
+            "key": "G:Ability",
+            "text": "Ability\n1. Text on an object that explains what that object does or can do.\n2. An activated or triggered ability on the stack. This kind of ability is an object.\nSee rule 113, “Abilities,” and section 6, “Spells, Abilities, and Effects.”"
+          },
+          {
+            "key": "704.6f",
+            "text": "704.6f In a Planechase game, if a phenomenon card is face up in the command zone, and it isn’t the source of a triggered ability that has triggered but not yet left the stack, the planar controller planeswalks. See rule 901, “Planechase.”"
+          },
+          {
+            "key": "603.1a",
+            "text": "603.1a A triggered ability may include instructions after its effects that limit what the ability may target or state that it can’t be countered. This text is not part of the ability’s effect. It functions while the ability is on the stack."
+          },
+          {
+            "key": "702.40a",
+            "text": "702.40a Storm is a triggered ability that functions on the stack. “Storm” means “When you cast this spell, copy it for each other spell that was cast before it this turn. If the spell has any targets, you may choose new targets for any of the copies.”"
+          },
+          {
+            "key": "G:Trigger",
+            "text": "Trigger\nWhenever a game event or game state matches a triggered ability’s trigger event, that ability automatically “triggers.” That means its controller puts it on the stack the next time a player would receive priority. See rule 603, “Handling Triggered Abilities.”"
+          }
+        ]
+      },
+      {
+        "query": {
+          "purpose": "Verify how returning a creature card from a graveyard to the battlefield works.",
+          "text_all": [
+            "return"
+          ],
+          "text_any": [
+            "battlefield"
+          ],
+          "cursor": null
+        },
+        "matching_count": 29,
+        "truncated": true,
+        "next_cursor": "702.93a",
+        "selected": [
+          {
+            "key": "610.3c",
+            "text": "610.3c An object returned to the battlefield this way returns under its owner’s control unless otherwise specified."
+          },
+          {
+            "key": "G:Persist",
+            "text": "Persist\nA keyword ability that can return a creature from the graveyard to the battlefield. See rule 702.79, “Persist.”"
+          },
+          {
+            "key": "G:Undying",
+            "text": "Undying\nA keyword ability that can return a creature from the graveyard to the battlefield. See rule 702.93, “Undying.”"
+          },
+          {
+            "key": "G:Unearth",
+            "text": "Unearth\nA keyword ability that lets a player return a creature card from their graveyard to the battlefield. See rule 702.84, “Unearth.”"
+          },
+          {
+            "key": "702.49c",
+            "text": "702.49c The creature put onto the battlefield with the ninjutsu ability enters attacking the same player, planeswalker, or battle as the creature that was returned to its owner’s hand."
+          },
+          {
+            "key": "702.46a",
+            "text": "702.46a Soulshift is a triggered ability. “Soulshift N” means “When this permanent is put into a graveyard from the battlefield, you may return target Spirit card with mana value N or less from your graveyard to your hand.”"
+          },
+          {
+            "key": "702.79a",
+            "text": "702.79a Persist is a triggered ability. “Persist” means “When this permanent is put into a graveyard from the battlefield, if it had no -1/-1 counters on it, return it to the battlefield under its owner’s control with a -1/-1 counter on it.”"
+          },
+          {
+            "key": "702.93a",
+            "text": "702.93a Undying is a triggered ability. “Undying” means “When this permanent is put into a graveyard from the battlefield, if it had no +1/+1 counters on it, return it to the battlefield under its owner’s control with a +1/+1 counter on it.”"
+          }
+        ]
+      },
+      {
+        "query": {
+          "purpose": "Clarify triggered abilities that trigger when a creature enters the battlefield.",
+          "text_all": [
+            "enters the battlefield"
+          ],
+          "text_any": [],
+          "cursor": null
+        },
+        "matching_count": 79,
+        "truncated": true,
+        "next_cursor": "712.14",
+        "selected": [
+          {
+            "key": "G:Enter",
+            "text": "Enter\nIn rules text, to enter the battlefield. See “Enters the Battlefield.”"
+          },
+          {
+            "key": "614.13",
+            "text": "614.13. An effect that modifies how a permanent enters the battlefield may cause other objects to change zones."
+          },
+          {
+            "key": "111.2",
+            "text": "111.2. The player who creates a token is its owner. The token enters the battlefield under that player’s control."
+          },
+          {
+            "key": "G:Squad",
+            "text": "Squad\nA keyword ability that creates copies of a creature when it enters the battlefield. See rule 702.157, “Squad.”"
+          },
+          {
+            "key": "G:Evoke",
+            "text": "Evoke\nA keyword ability that causes a permanent to be sacrificed when it enters the battlefield. See rule 702.74, “Evoke.”"
+          },
+          {
+            "key": "701.53a",
+            "text": "701.53a To incubate N, create an Incubator token that enters the battlefield with N +1/+1 counters on it. See rule 111.10i."
+          },
+          {
+            "key": "702.146b",
+            "text": "702.146b A resolving double-faced spell that was cast using its disturb ability enters the battlefield with its back face up."
+          },
+          {
+            "key": "712.14",
+            "text": "712.14. A double-faced card put onto the battlefield from a zone other than the stack enters the battlefield with its front face up by default."
+          }
+        ]
+      },
+      {
+        "query": {
+          "purpose": "Clarify last-known information for death triggers and abilities of creatures that leave the battlefield.",
+          "text_all": [
+            "last known information"
+          ],
+          "text_any": [],
+          "cursor": null
+        },
+        "matching_count": 15,
+        "truncated": true,
+        "next_cursor": "G:Last Known Information",
+        "selected": [
+          {
+            "key": "604.7",
+            "text": "604.7. Unlike spells and other kinds of abilities, static abilities can’t use an object’s last known information for purposes of determining how their effects are applied."
+          },
+          {
+            "key": "702.80b",
+            "text": "702.80b If an object is no longer in the zone it’s expected to be in as an effect causes it to deal damage, its last known information is used to determine whether it had wither."
+          },
+          {
+            "key": "702.90d",
+            "text": "702.90d If an object is no longer in the zone it’s expected to be in as an effect causes it to deal damage, its last known information is used to determine whether it had infect."
+          },
+          {
+            "key": "702.15c",
+            "text": "702.15c If an object is no longer in the zone it’s expected to be in as an effect causes it to deal damage, its last known information is used to determine whether it had lifelink."
+          },
+          {
+            "key": "702.2e",
+            "text": "702.2e If an object is no longer in the zone it’s expected to be in as an effect causes it to deal damage, its last known information is used to determine whether it had deathtouch."
+          },
+          {
+            "key": "701.44c",
+            "text": "701.44c If a permanent is no longer on the battlefield as an effect instructs it to explore, its last known information is used to determine which object explored and who controlled it."
+          },
+          {
+            "key": "701.50b",
+            "text": "701.50b If a permanent is no longer on the battlefield as an effect instructs it to connive, its last known information is used to determine which object connived and who controlled it."
+          },
+          {
+            "key": "G:Last Known Information",
+            "text": "Last Known Information\nInformation about an object that’s no longer in the zone it’s expected to be in, or information about a player who’s no longer in the game. This information captures that object’s last existence in that zone or that player’s last existence in the game. See rules 113.7a, 608.2b, 608.2h, and 800.4h."
+          }
+        ]
+      }
+    ],
+    "source_prefixes": [
+      {
+        "text": "Flying",
+        "count": 534
+      },
+      {
+        "text": "Trample",
+        "count": 342
+      },
+      {
+        "text": "Enchant creature",
+        "count": 262
+      },
+      {
+        "text": "Deathtouch",
+        "count": 160
+      },
+      {
+        "text": "Flash",
+        "count": 150
+      },
+      {
+        "text": "Reach",
+        "count": 144
+      },
+      {
+        "text": "{T}: Add one mana of any color.",
+        "count": 109
+      },
+      {
+        "text": "Choose one —",
+        "count": 107
+      },
+      {
+        "text": "Menace",
+        "count": 102
+      },
+      {
+        "text": "Equip {2}",
+        "count": 98
+      },
+      {
+        "text": "Vigilance",
+        "count": 73
+      },
+      {
+        "text": "Reach (This creature can block creatures with flying.)",
+        "count": 72
+      }
+    ],
+    "note": "Matches are hypotheses, not fit; broad/zero/error results need explicit revision."
+  },
+  "admission": {
+    "initial": {
+      "nominations": [],
+      "nomination_errors": [],
+      "shortlist": [],
+      "matching_identity_count": 0,
+      "queries": []
+    },
+    "replacement": {
+      "nominations": [
+        {
+          "oracle_id": "f82a4e85-526d-4456-b700-7760043a31be",
+          "name": "Viscera Seer",
+          "mana_cost": "{B}",
+          "type_line": "Creature — Vampire Wizard",
+          "oracle_text": "Sacrifice a creature: Scry 1. (Look at the top card of your library. You may put that card on the bottom.)",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Scry"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "a1cc5e37-b09a-4b7f-afd5-77c1c35aa425",
+          "name": "Carrion Feeder",
+          "mana_cost": "{B}",
+          "type_line": "Creature — Zombie",
+          "oracle_text": "This creature can't block.\nSacrifice a creature: Put a +1/+1 counter on this creature.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "name": "Ashnod's Altar",
+          "mana_cost": "{3}",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add {C}{C}.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "8d02b297-97c4-4379-9862-0a462400f66f",
+          "name": "Phyrexian Altar",
+          "mana_cost": "{3}",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add one mana of any color.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "310f141c-7f37-4729-aed6-dd9c09db448d",
+          "name": "Blood Artist",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature — Vampire",
+          "oracle_text": "Whenever this creature or another creature dies, target player loses 1 life and you gain 1 life.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "76b003e0-15af-4f22-bdf2-1ade5430964a",
+          "name": "Zulaport Cutthroat",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature — Human Rogue Ally",
+          "oracle_text": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+          "name": "Skullclamp",
+          "mana_cost": "{1}",
+          "type_line": "Artifact — Equipment",
+          "oracle_text": "Equipped creature gets +1/-1.\nWhenever equipped creature dies, draw two cards.\nEquip {1}",
+          "color_identity": [],
+          "keywords": [
+            "Equip"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "e3afc704-220f-498f-9eaa-0821b17dc24c",
+          "name": "Sakura-Tribe Elder",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Snake Shaman",
+          "oracle_text": "Sacrifice this creature: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "30b24e8e-3b0e-4d8e-90f3-f66eb7c1858c",
+          "name": "Eternal Witness",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Creature — Human Shaman",
+          "oracle_text": "When this creature enters, you may return target card from your graveyard to your hand.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "032ec6e2-6cc3-4a97-9cc7-3233f5e11904",
+          "name": "Reclamation Sage",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Elf Shaman",
+          "oracle_text": "When this creature enters, you may destroy target artifact or enchantment.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "717bbb9d-0a5b-4979-a24b-9d54aac7657a",
+          "name": "Shriekmaw",
+          "mana_cost": "{4}{B}",
+          "type_line": "Creature — Elemental",
+          "oracle_text": "Fear (This creature can't be blocked except by artifact creatures and/or black creatures.)\nWhen this creature enters, destroy target nonartifact, nonblack creature.\nEvoke {1}{B} (You may cast this spell for its evoke cost. If you do, it's sacrificed when it enters.)",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Evoke",
+            "Fear"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "2e3ee458-fa3f-4452-ab95-5a7fb5a0483b",
+          "name": "Plaguecrafter",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature — Human Shaman",
+          "oracle_text": "When this creature enters, each player sacrifices a creature or planeswalker of their choice. Each player who can't discards a card.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        }
+      ],
+      "nomination_errors": [],
+      "shortlist": [
+        {
+          "oracle_id": "f82a4e85-526d-4456-b700-7760043a31be",
+          "name": "Viscera Seer",
+          "mana_cost": "{B}",
+          "type_line": "Creature — Vampire Wizard",
+          "oracle_text": "Sacrifice a creature: Scry 1. (Look at the top card of your library. You may put that card on the bottom.)",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Scry"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "d6912f52-e478-4cc6-a34c-67e372abc4fa",
+          "name": "Plagued Rusalka",
+          "mana_cost": "{B}",
+          "type_line": "Creature — Spirit",
+          "oracle_text": "{B}, Sacrifice a creature: Target creature gets -1/-1 until end of turn.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "a1cc5e37-b09a-4b7f-afd5-77c1c35aa425",
+          "name": "Carrion Feeder",
+          "mana_cost": "{B}",
+          "type_line": "Creature — Zombie",
+          "oracle_text": "This creature can't block.\nSacrifice a creature: Put a +1/+1 counter on this creature.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "4d98aea2-b4ff-4903-ba28-a53fbfaad6b1",
+          "name": "Final Strike",
+          "mana_cost": "{2}{B}{B}",
+          "type_line": "Sorcery",
+          "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nFinal Strike deals damage to target opponent or planeswalker equal to the sacrificed creature's power.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+          "name": "Ashnod's Altar",
+          "mana_cost": "{3}",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add {C}{C}.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "51b9d8ea-b0df-4a57-804e-6d395e301242",
+          "name": "Elvish Dreadlord",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Creature — Zombie Elf",
+          "oracle_text": "Deathtouch\nWhen this creature dies, non-Elf creatures get -3/-3 until end of turn.\nEncore {5}{B}{B} ({5}{B}{B}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Encore",
+            "Deathtouch"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "8d02b297-97c4-4379-9862-0a462400f66f",
+          "name": "Phyrexian Altar",
+          "mana_cost": "{3}",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add one mana of any color.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "f20f27d1-2c50-41d5-b1af-44a0e7ca2e00",
+          "name": "Mindwrack Harpy",
+          "mana_cost": "{3}{B}",
+          "type_line": "Enchantment Creature — Harpy",
+          "oracle_text": "Flying\nAt the beginning of combat on your turn, each player mills three cards.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Flying",
+            "Mill"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "310f141c-7f37-4729-aed6-dd9c09db448d",
+          "name": "Blood Artist",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature — Vampire",
+          "oracle_text": "Whenever this creature or another creature dies, target player loses 1 life and you gain 1 life.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "342daae1-f7f0-4bce-94bc-e9bdce53e48e",
+          "name": "Dark Dabbling",
+          "mana_cost": "{2}{B}",
+          "type_line": "Instant",
+          "oracle_text": "Regenerate target creature. Draw a card. (The next time the creature would be destroyed this turn, instead tap it, remove it from combat, and heal all damage on it.)\nSpell mastery — If there are two or more instant and/or sorcery cards in your graveyard, also regenerate each other creature you control.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Heal",
+            "Regenerate",
+            "Spell mastery"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "76b003e0-15af-4f22-bdf2-1ade5430964a",
+          "name": "Zulaport Cutthroat",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature — Human Rogue Ally",
+          "oracle_text": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "64a9a6b4-26b5-4d23-be86-85c54e9c4727",
+          "name": "Liliana, the Last Hope",
+          "mana_cost": "{1}{B}{B}",
+          "type_line": "Legendary Planeswalker — Liliana",
+          "oracle_text": "+1: Up to one target creature gets -2/-1 until your next turn.\n−2: Mill two cards, then you may return a creature card from your graveyard to your hand.\n−7: You get an emblem with \"At the beginning of your end step, create X 2/2 black Zombie creature tokens, where X is two plus the number of Zombies you control.\"",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Mill"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": "3",
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+          "name": "Skullclamp",
+          "mana_cost": "{1}",
+          "type_line": "Artifact — Equipment",
+          "oracle_text": "Equipped creature gets +1/-1.\nWhenever equipped creature dies, draw two cards.\nEquip {1}",
+          "color_identity": [],
+          "keywords": [
+            "Equip"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "4013b4c2-c9ed-4d14-90f0-97214ec1fded",
+          "name": "Contamination",
+          "mana_cost": "{2}{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "At the beginning of your upkeep, sacrifice this enchantment unless you sacrifice a creature.\nIf a land is tapped for mana, it produces {B} instead of any other type and amount.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "e3afc704-220f-498f-9eaa-0821b17dc24c",
+          "name": "Sakura-Tribe Elder",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Snake Shaman",
+          "oracle_text": "Sacrifice this creature: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "f6f927f3-dc3f-446c-aa7b-81048eb73243",
+          "name": "Vivien on the Hunt",
+          "mana_cost": "{4}{G}{G}",
+          "type_line": "Legendary Planeswalker — Vivien",
+          "oracle_text": "+2: You may sacrifice a creature. If you do, search your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put it onto the battlefield, then shuffle.\n+1: Mill five cards, then put any number of creature cards milled this way into your hand.\n−1: Create a 4/4 green Rhino Warrior creature token.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Mill"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": "4",
+          "defense": null,
+          "mana_value": 6.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "30b24e8e-3b0e-4d8e-90f3-f66eb7c1858c",
+          "name": "Eternal Witness",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Creature — Human Shaman",
+          "oracle_text": "When this creature enters, you may return target card from your graveyard to your hand.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "284db94d-e583-4355-89fd-6c0906f9d17e",
+          "name": "Feral Ghoul",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature — Zombie Mutant",
+          "oracle_text": "Menace\nWhenever another creature you control dies, put a +1/+1 counter on this creature.\nWhen this creature dies, each opponent gets a number of rad counters equal to its power.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Menace"
+          ],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "032ec6e2-6cc3-4a97-9cc7-3233f5e11904",
+          "name": "Reclamation Sage",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Elf Shaman",
+          "oracle_text": "When this creature enters, you may destroy target artifact or enchantment.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "f78db9ad-d4a3-4e49-a76e-bd31124b7837",
+          "name": "Kagha, Shadow Archdruid",
+          "mana_cost": "{2}{B}{G}",
+          "type_line": "Legendary Creature — Elf Druid",
+          "oracle_text": "Whenever Kagha attacks, it gains deathtouch until end of turn. Mill two cards. (Put the top two cards of your library into your graveyard.)\nOnce during each of your turns, you may play a land or cast a permanent spell from among cards in your graveyard that were put there from your library this turn.",
+          "color_identity": [
+            "B",
+            "G"
+          ],
+          "keywords": [
+            "Mill"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "4",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "717bbb9d-0a5b-4979-a24b-9d54aac7657a",
+          "name": "Shriekmaw",
+          "mana_cost": "{4}{B}",
+          "type_line": "Creature — Elemental",
+          "oracle_text": "Fear (This creature can't be blocked except by artifact creatures and/or black creatures.)\nWhen this creature enters, destroy target nonartifact, nonblack creature.\nEvoke {1}{B} (You may cast this spell for its evoke cost. If you do, it's sacrificed when it enters.)",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Evoke",
+            "Fear"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "2676d0c3-0a24-4e93-ae80-8f3fe03da483",
+          "name": "War Historian",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Human Monk",
+          "oracle_text": "Reach\nThis creature has indestructible as long as it attacked a battle this turn.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Reach"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "2e3ee458-fa3f-4452-ab95-5a7fb5a0483b",
+          "name": "Plaguecrafter",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature — Human Shaman",
+          "oracle_text": "When this creature enters, each player sacrifices a creature or planeswalker of their choice. Each player who can't discards a card.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "dc367b23-d1f4-4c5c-b300-a44a726e3f74",
+          "name": "Live or Die",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Instant",
+          "oracle_text": "Choose one —\n• Return target creature card from your graveyard to the battlefield.\n• Destroy target creature.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "6bf5dcf1-5c93-42f4-adaf-a6f2e5807596",
+          "name": "Black Carriage",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Creature — Horse",
+          "oracle_text": "Trample\nThis creature doesn't untap during your untap step.\nSacrifice a creature: Untap this creature. Activate only during your upkeep.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [
+            "Trample"
+          ],
+          "layout": "normal",
+          "power": "4",
+          "toughness": "4",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "7739311a-682b-48a6-8db2-c07f44141751",
+          "name": "The Gitrog, Ravenous Ride",
+          "mana_cost": "{3}{B}{G}",
+          "type_line": "Legendary Creature — Frog Horror Mount",
+          "oracle_text": "Trample, haste\nWhenever The Gitrog deals combat damage to a player, you may sacrifice a creature that saddled it this turn. If you do, draw X cards, then put up to X land cards from your hand onto the battlefield tapped, where X is the sacrificed creature's power.\nSaddle 1",
+          "color_identity": [
+            "B",
+            "G"
+          ],
+          "keywords": [
+            "Saddle",
+            "Haste",
+            "Trample"
+          ],
+          "layout": "normal",
+          "power": "6",
+          "toughness": "5",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "3688ad0d-653b-4d5d-a57e-444db679d83e",
+          "name": "The Serpent Society",
+          "mana_cost": "{1}{B}{G}",
+          "type_line": "Legendary Creature — Human Snake Villain",
+          "oracle_text": "Deathtouch\nWard—Get five poison counters. (A player with ten or more poison counters loses the game.)\nWhenever another creature you control with deathtouch dies, each opponent sacrifices a nontoken creature of their choice.",
+          "color_identity": [
+            "B",
+            "G"
+          ],
+          "keywords": [
+            "Ward",
+            "Deathtouch"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "4",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "9dc61ef6-da22-42a8-b348-dfd5722deadf",
+          "name": "Town Greeter",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Human Citizen",
+          "oracle_text": "When this creature enters, mill four cards. You may put a land card from among them into your hand. If you put a Town card into your hand this way, you gain 2 life. (To mill four cards, a player puts the top four cards of their library into their graveyard.)",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Mill"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "1bf04a2a-7f96-412c-9d91-034bef26e1b6",
+          "name": "Dread Linnorm // Scale Deflection",
+          "mana_cost": "{6}{G} // {3}{G}",
+          "type_line": "Creature — Snake Dragon // Instant — Adventure",
+          "oracle_text": null,
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "adventure",
+          "power": "7",
+          "toughness": "6",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 7.0,
+          "faces": [
+            {
+              "name": "Dread Linnorm",
+              "mana_cost": "{6}{G}",
+              "type_line": "Creature — Snake Dragon",
+              "oracle_text": "This creature can't be blocked by creatures with power 3 or less.",
+              "power": "7",
+              "toughness": "6",
+              "loyalty": null,
+              "defense": null
+            },
+            {
+              "name": "Scale Deflection",
+              "mana_cost": "{3}{G}",
+              "type_line": "Instant — Adventure",
+              "oracle_text": "Put two +1/+1 counters on target creature and untap it. It gains hexproof until end of turn. (Then exile this card. You may cast the creature later from exile.)",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null
+            }
+          ],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "155422a0-a0cd-4399-8ed9-fa68ac2c80a6",
+          "name": "Doomed Necromancer",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature — Human Cleric Mercenary",
+          "oracle_text": "{B}, {T}, Sacrifice this creature: Return target creature card from your graveyard to the battlefield.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "e94297af-1236-4c9a-860f-2ee6a0d12e5e",
+          "name": "Corpse Traders",
+          "mana_cost": "{3}{B}",
+          "type_line": "Creature — Human Rogue",
+          "oracle_text": "{2}{B}, Sacrifice a creature: Target opponent reveals their hand. You choose a card from it. That player discards that card. Activate only as a sorcery.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal"
+        },
+        {
+          "oracle_id": "7aad0a80-cf7b-4224-8e72-d611e0be3383",
+          "name": "Wicked Reward",
+          "mana_cost": "{1}{B}",
+          "type_line": "Instant",
+          "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nTarget creature gets +4/+2 until end of turn.",
+          "color_identity": [
+            "B"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal"
+        }
+      ],
+      "matching_identity_count": 1242,
+      "queries": [
+        {
+          "query": {
+            "purpose": "Repeatable sacrifice outlets that do not require a creature to tap",
+            "oracle_text_all": [
+              "sacrifice a creature"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 235,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "d6912f52-e478-4cc6-a34c-67e372abc4fa",
+              "name": "Plagued Rusalka",
+              "mana_cost": "{B}",
+              "type_line": "Creature — Spirit",
+              "oracle_text": "{B}, Sacrifice a creature: Target creature gets -1/-1 until end of turn.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 1.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "4013b4c2-c9ed-4d14-90f0-97214ec1fded",
+              "name": "Contamination",
+              "mana_cost": "{2}{B}",
+              "type_line": "Enchantment",
+              "oracle_text": "At the beginning of your upkeep, sacrifice this enchantment unless you sacrifice a creature.\nIf a land is tapped for mana, it produces {B} instead of any other type and amount.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "6bf5dcf1-5c93-42f4-adaf-a6f2e5807596",
+              "name": "Black Carriage",
+              "mana_cost": "{3}{B}{B}",
+              "type_line": "Creature — Horse",
+              "oracle_text": "Trample\nThis creature doesn't untap during your untap step.\nSacrifice a creature: Untap this creature. Activate only during your upkeep.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Trample"
+              ],
+              "layout": "normal",
+              "power": "4",
+              "toughness": "4",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "e94297af-1236-4c9a-860f-2ee6a0d12e5e",
+              "name": "Corpse Traders",
+              "mana_cost": "{3}{B}",
+              "type_line": "Creature — Human Rogue",
+              "oracle_text": "{2}{B}, Sacrifice a creature: Target opponent reveals their hand. You choose a card from it. That player discards that card. Activate only as a sorcery.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "2948b1d5-c12c-45c4-a3e8-aa470fcee1af",
+              "name": "Wake of Vultures",
+              "mana_cost": "{3}{B}",
+              "type_line": "Creature — Bird",
+              "oracle_text": "Flying\n{1}{B}, Sacrifice a creature: Regenerate this creature.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Flying",
+                "Regenerate"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "f7cac691-960f-4e36-8eae-f24bcdc1269b",
+              "name": "Tip the Scales",
+              "mana_cost": "{2}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "Sacrifice a creature. When you do, all creatures get -X/-X until end of turn, where X is the sacrificed creature's toughness.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "77dd6ce0-91fc-4e71-99ff-47cdf3359067",
+              "name": "Yuna's Decision",
+              "mana_cost": "{3}{G}",
+              "type_line": "Sorcery",
+              "oracle_text": "Choose one —\n• Continue the Pilgrimage — Sacrifice a creature. If you do, draw a card, then you may put a creature card and/or a land card from your hand onto the battlefield.\n• Find Another Way — Return one or two target permanent cards from your graveyard to your hand.",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Find Another Way",
+                "Continue the Pilgrimage"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "4d98aea2-b4ff-4903-ba28-a53fbfaad6b1",
+              "name": "Final Strike",
+              "mana_cost": "{2}{B}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nFinal Strike deals damage to target opponent or planeswalker equal to the sacrificed creature's power.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "diagnostic_matches": [
+            "Viscera Seer"
+          ]
+        },
+        {
+          "query": {
+            "purpose": "Sacrifice outlets that also produce mana or another reusable resource",
+            "oracle_text_all": [
+              "sacrifice a creature"
+            ],
+            "oracle_text_any": [
+              "Add",
+              "draw a card",
+              "create a"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 100,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "4d98aea2-b4ff-4903-ba28-a53fbfaad6b1",
+              "name": "Final Strike",
+              "mana_cost": "{2}{B}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nFinal Strike deals damage to target opponent or planeswalker equal to the sacrificed creature's power.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "f6f927f3-dc3f-446c-aa7b-81048eb73243",
+              "name": "Vivien on the Hunt",
+              "mana_cost": "{4}{G}{G}",
+              "type_line": "Legendary Planeswalker — Vivien",
+              "oracle_text": "+2: You may sacrifice a creature. If you do, search your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put it onto the battlefield, then shuffle.\n+1: Mill five cards, then put any number of creature cards milled this way into your hand.\n−1: Create a 4/4 green Rhino Warrior creature token.",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": "4",
+              "defense": null,
+              "mana_value": 6.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "7739311a-682b-48a6-8db2-c07f44141751",
+              "name": "The Gitrog, Ravenous Ride",
+              "mana_cost": "{3}{B}{G}",
+              "type_line": "Legendary Creature — Frog Horror Mount",
+              "oracle_text": "Trample, haste\nWhenever The Gitrog deals combat damage to a player, you may sacrifice a creature that saddled it this turn. If you do, draw X cards, then put up to X land cards from your hand onto the battlefield tapped, where X is the sacrificed creature's power.\nSaddle 1",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [
+                "Saddle",
+                "Haste",
+                "Trample"
+              ],
+              "layout": "normal",
+              "power": "6",
+              "toughness": "5",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "7aad0a80-cf7b-4224-8e72-d611e0be3383",
+              "name": "Wicked Reward",
+              "mana_cost": "{1}{B}",
+              "type_line": "Instant",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nTarget creature gets +4/+2 until end of turn.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "b45e35df-9032-4482-89a6-c7c50c6d0a79",
+              "name": "Corrupted Conviction",
+              "mana_cost": "{B}",
+              "type_line": "Instant",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nDraw two cards.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 1.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "db982577-1c75-4bc9-ab15-1888ea0be16d",
+              "name": "Endemic Plague",
+              "mana_cost": "{3}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nDestroy all creatures that share a creature type with the sacrificed creature. They can't be regenerated.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "239fea8d-c49d-40bc-96e1-b84d328a0e1e",
+              "name": "Transmogrant Altar",
+              "mana_cost": "{3}",
+              "type_line": "Artifact",
+              "oracle_text": "{B}, {T}, Sacrifice a creature: Add {C}{C}{C}.\n{2}, {T}, Sacrifice a creature: Create a 3/3 colorless Zombie artifact creature token. Activate only as a sorcery.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "d33aa11b-011b-4d12-85a9-4f956153fb1d",
+              "name": "Ichor Explosion",
+              "mana_cost": "{5}{B}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "As an additional cost to cast this spell, sacrifice a creature.\nAll creatures get -X/-X until end of turn, where X is the sacrificed creature's power.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 7.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "diagnostic_matches": []
+        },
+        {
+          "query": {
+            "purpose": "Creatures that reward their own or another creature's death with cards, mana, or tokens",
+            "oracle_text_all": [
+              "dies"
+            ],
+            "oracle_text_any": [
+              "draw a card",
+              "Add",
+              "create a token",
+              "each opponent"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 154,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "51b9d8ea-b0df-4a57-804e-6d395e301242",
+              "name": "Elvish Dreadlord",
+              "mana_cost": "{3}{B}{B}",
+              "type_line": "Creature — Zombie Elf",
+              "oracle_text": "Deathtouch\nWhen this creature dies, non-Elf creatures get -3/-3 until end of turn.\nEncore {5}{B}{B} ({5}{B}{B}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Encore",
+                "Deathtouch"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "284db94d-e583-4355-89fd-6c0906f9d17e",
+              "name": "Feral Ghoul",
+              "mana_cost": "{2}{B}",
+              "type_line": "Creature — Zombie Mutant",
+              "oracle_text": "Menace\nWhenever another creature you control dies, put a +1/+1 counter on this creature.\nWhen this creature dies, each opponent gets a number of rad counters equal to its power.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Menace"
+              ],
+              "layout": "normal",
+              "power": "2",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "3688ad0d-653b-4d5d-a57e-444db679d83e",
+              "name": "The Serpent Society",
+              "mana_cost": "{1}{B}{G}",
+              "type_line": "Legendary Creature — Human Snake Villain",
+              "oracle_text": "Deathtouch\nWard—Get five poison counters. (A player with ten or more poison counters loses the game.)\nWhenever another creature you control with deathtouch dies, each opponent sacrifices a nontoken creature of their choice.",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [
+                "Ward",
+                "Deathtouch"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "4",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "e7a80464-1522-48d7-bf82-f9894f5c3ae0",
+              "name": "Cleopatra, Exiled Pharaoh",
+              "mana_cost": "{2}{B}{G}",
+              "type_line": "Legendary Creature — Human Noble",
+              "oracle_text": "Allies — At the beginning of your end step, put a +1/+1 counter on each of up to two other target legendary creatures.\nBetrayal — Whenever a legendary creature with counters on it dies, draw a card for each counter on it. You lose 2 life.",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [
+                "Allies",
+                "Betrayal"
+              ],
+              "layout": "normal",
+              "power": "2",
+              "toughness": "4",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "e4f4c41b-2533-497f-96bb-7083ef597268",
+              "name": "Kinzu of the Bleak Coven",
+              "mana_cost": "{4}{B}",
+              "type_line": "Legendary Creature — Phyrexian Vampire",
+              "oracle_text": "Flying\nWhenever another nontoken creature you control dies, you may pay 2 life and exile it. If you do, create a token that's a copy of that creature, except it's 1/1 and has toxic 1. (Players dealt combat damage by it also get a poison counter.)",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Flying"
+              ],
+              "layout": "normal",
+              "power": "5",
+              "toughness": "4",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "bbfee53c-30a6-4ed0-beef-5c254be75fc5",
+              "name": "Jewel-Eyed Cobra",
+              "mana_cost": "{2}{G}",
+              "type_line": "Creature — Snake",
+              "oracle_text": "Deathtouch\nWhen this creature dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Treasure",
+                "Deathtouch"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "ac3d07cd-88c4-4e22-9d86-f92d34f406d4",
+              "name": "Wolfkin Outcast // Wedding Crasher",
+              "mana_cost": null,
+              "type_line": "Creature — Human Werewolf // Creature — Werewolf",
+              "oracle_text": null,
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Transform",
+                "Daybound",
+                "Nightbound"
+              ],
+              "layout": "transform",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 6.0,
+              "faces": [
+                {
+                  "name": "Wolfkin Outcast",
+                  "mana_cost": "{5}{G}",
+                  "type_line": "Creature — Human Werewolf",
+                  "oracle_text": "This spell costs {2} less to cast if you control a Wolf or Werewolf.\nDaybound (If a player casts no spells during their own turn, it becomes night next turn.)",
+                  "power": "5",
+                  "toughness": "4",
+                  "loyalty": null,
+                  "defense": null
+                },
+                {
+                  "name": "Wedding Crasher",
+                  "mana_cost": "",
+                  "type_line": "Creature — Werewolf",
+                  "oracle_text": "Whenever this creature or another Wolf or Werewolf you control dies, draw a card.\nNightbound (If a player casts at least two spells during their own turn, it becomes day next turn.)",
+                  "power": "6",
+                  "toughness": "5",
+                  "loyalty": null,
+                  "defense": null
+                }
+              ],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "a426a258-fd8b-489c-8642-9868ee47de85",
+              "name": "Golgari Thug",
+              "mana_cost": "{1}{B}",
+              "type_line": "Creature — Human Warrior",
+              "oracle_text": "When this creature dies, put target creature card from your graveyard on top of your library.\nDredge 4 (If you would draw a card, you may mill four cards instead. If you do, return this card from your graveyard to your hand.)",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Dredge",
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "diagnostic_matches": [
+            "Grim Haruspex"
+          ]
+        },
+        {
+          "query": {
+            "purpose": "Creature-based removal and interaction that can be repeatedly returned",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [
+              "destroy target",
+              "exile target",
+              "return target",
+              "-1/-1"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 0,
+          "truncated": false,
+          "selected": [],
+          "diagnostic_matches": []
+        },
+        {
+          "query": {
+            "purpose": "Creatures that stock the graveyard or find creatures for reliable recursion",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "mill",
+              "put a card from your library into your graveyard",
+              "search your library for a creature card",
+              "return a creature card from your graveyard"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 166,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "f20f27d1-2c50-41d5-b1af-44a0e7ca2e00",
+              "name": "Mindwrack Harpy",
+              "mana_cost": "{3}{B}",
+              "type_line": "Enchantment Creature — Harpy",
+              "oracle_text": "Flying\nAt the beginning of combat on your turn, each player mills three cards.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Flying",
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "f78db9ad-d4a3-4e49-a76e-bd31124b7837",
+              "name": "Kagha, Shadow Archdruid",
+              "mana_cost": "{2}{B}{G}",
+              "type_line": "Legendary Creature — Elf Druid",
+              "oracle_text": "Whenever Kagha attacks, it gains deathtouch until end of turn. Mill two cards. (Put the top two cards of your library into your graveyard.)\nOnce during each of your turns, you may play a land or cast a permanent spell from among cards in your graveyard that were put there from your library this turn.",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "4",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "9dc61ef6-da22-42a8-b348-dfd5722deadf",
+              "name": "Town Greeter",
+              "mana_cost": "{1}{G}",
+              "type_line": "Creature — Human Citizen",
+              "oracle_text": "When this creature enters, mill four cards. You may put a land card from among them into your hand. If you put a Town card into your hand this way, you gain 2 life. (To mill four cards, a player puts the top four cards of their library into their graveyard.)",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "81ff5764-72ce-4b9a-a14f-07413700d935",
+              "name": "Lluwen, Imperfect Naturalist",
+              "mana_cost": "{B/G}{B/G}",
+              "type_line": "Legendary Creature — Elf Druid",
+              "oracle_text": "When Lluwen enters, mill four cards, then you may put a creature or land card from among the milled cards on top of your library.\n{2}{B/G}{B/G}{B/G}, {T}, Discard a land card: Create a 1/1 black and green Worm creature token for each land card in your graveyard.",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "a7c96442-706b-4fd8-9b38-052872dafe58",
+              "name": "Throne of the Grim Captain // The Grim Captain",
+              "mana_cost": null,
+              "type_line": "Legendary Artifact // Legendary Creature — Skeleton Spirit Pirate",
+              "oracle_text": null,
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Lifelink",
+                "Craft",
+                "Transform",
+                "Hexproof",
+                "Trample",
+                "Menace",
+                "Mill"
+              ],
+              "layout": "transform",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [
+                {
+                  "name": "Throne of the Grim Captain",
+                  "mana_cost": "{2}",
+                  "type_line": "Legendary Artifact",
+                  "oracle_text": "{T}: Mill two cards.\nCraft with a Dinosaur, a Merfolk, a Pirate, and a Vampire {4} ({4}, Exile this artifact, Exile the four from among permanents you control and/or cards in your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+                  "power": null,
+                  "toughness": null,
+                  "loyalty": null,
+                  "defense": null
+                },
+                {
+                  "name": "The Grim Captain",
+                  "mana_cost": "",
+                  "type_line": "Legendary Creature — Skeleton Spirit Pirate",
+                  "oracle_text": "Menace, trample, lifelink, hexproof\nWhenever The Grim Captain attacks, each opponent sacrifices a nonland permanent of their choice. Then you may put an exiled creature card used to craft The Grim Captain onto the battlefield under your control tapped and attacking.",
+                  "power": "7",
+                  "toughness": "7",
+                  "loyalty": null,
+                  "defense": null
+                }
+              ],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "cb7edb5e-3a90-41c7-ae52-dc564086bf22",
+              "name": "Teachings of the Kirin // Kirin-Touched Orochi",
+              "mana_cost": null,
+              "type_line": "Enchantment — Saga // Enchantment Creature — Snake Monk",
+              "oracle_text": null,
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Transform",
+                "Mill"
+              ],
+              "layout": "transform",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [
+                {
+                  "name": "Teachings of the Kirin",
+                  "mana_cost": "{1}{G}",
+                  "type_line": "Enchantment — Saga",
+                  "oracle_text": "(As this Saga enters and after your draw step, add a lore counter.)\nI — Mill three cards. Create a 1/1 colorless Spirit creature token.\nII — Put a +1/+1 counter on target creature you control.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.",
+                  "power": null,
+                  "toughness": null,
+                  "loyalty": null,
+                  "defense": null
+                },
+                {
+                  "name": "Kirin-Touched Orochi",
+                  "mana_cost": "",
+                  "type_line": "Enchantment Creature — Snake Monk",
+                  "oracle_text": "Whenever this creature attacks, choose one —\n• Exile target creature card from a graveyard. When you do, create a 1/1 colorless Spirit creature token.\n• Exile target noncreature card from a graveyard. When you do, put a +1/+1 counter on target creature you control.",
+                  "power": "1",
+                  "toughness": "1",
+                  "loyalty": null,
+                  "defense": null
+                }
+              ],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "4e94f685-f392-40a8-8ad4-683351877fd9",
+              "name": "Forsaken Drifters",
+              "mana_cost": "{3}{B}",
+              "type_line": "Creature — Zombie",
+              "oracle_text": "When this creature dies, mill four cards.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": "4",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "e574bfdb-505b-4d61-a376-6d26f03cd9b1",
+              "name": "Reito Sentinel",
+              "mana_cost": "{3}",
+              "type_line": "Artifact Creature — Construct",
+              "oracle_text": "Defender\nWhen this creature enters, target player mills three cards. (They put the top three cards of their library into their graveyard.)\n{3}: Put target card from a graveyard on the bottom of its owner's library.",
+              "color_identity": [],
+              "keywords": [
+                "Mill",
+                "Defender"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "diagnostic_matches": []
+        },
+        {
+          "query": {
+            "purpose": "Ways to protect Meren or a creature-based engine from removal",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "hexproof",
+              "indestructible",
+              "protection from",
+              "regenerate"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 652,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "342daae1-f7f0-4bce-94bc-e9bdce53e48e",
+              "name": "Dark Dabbling",
+              "mana_cost": "{2}{B}",
+              "type_line": "Instant",
+              "oracle_text": "Regenerate target creature. Draw a card. (The next time the creature would be destroyed this turn, instead tap it, remove it from combat, and heal all damage on it.)\nSpell mastery — If there are two or more instant and/or sorcery cards in your graveyard, also regenerate each other creature you control.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Heal",
+                "Regenerate",
+                "Spell mastery"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "2676d0c3-0a24-4e93-ae80-8f3fe03da483",
+              "name": "War Historian",
+              "mana_cost": "{2}{G}",
+              "type_line": "Creature — Human Monk",
+              "oracle_text": "Reach\nThis creature has indestructible as long as it attacked a battle this turn.",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Reach"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "3",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "1bf04a2a-7f96-412c-9d91-034bef26e1b6",
+              "name": "Dread Linnorm // Scale Deflection",
+              "mana_cost": "{6}{G} // {3}{G}",
+              "type_line": "Creature — Snake Dragon // Instant — Adventure",
+              "oracle_text": null,
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [],
+              "layout": "adventure",
+              "power": "7",
+              "toughness": "6",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 7.0,
+              "faces": [
+                {
+                  "name": "Dread Linnorm",
+                  "mana_cost": "{6}{G}",
+                  "type_line": "Creature — Snake Dragon",
+                  "oracle_text": "This creature can't be blocked by creatures with power 3 or less.",
+                  "power": "7",
+                  "toughness": "6",
+                  "loyalty": null,
+                  "defense": null
+                },
+                {
+                  "name": "Scale Deflection",
+                  "mana_cost": "{3}{G}",
+                  "type_line": "Instant — Adventure",
+                  "oracle_text": "Put two +1/+1 counters on target creature and untap it. It gains hexproof until end of turn. (Then exile this card. You may cast the creature later from exile.)",
+                  "power": null,
+                  "toughness": null,
+                  "loyalty": null,
+                  "defense": null
+                }
+              ],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "fdba89eb-1cf5-46e6-9d09-1adb9bc40fcd",
+              "name": "Yahenni, Undying Partisan",
+              "mana_cost": "{2}{B}",
+              "type_line": "Legendary Creature — Aetherborn Vampire",
+              "oracle_text": "Haste\nWhenever a creature an opponent controls dies, put a +1/+1 counter on Yahenni.\nSacrifice another creature: Yahenni gains indestructible until end of turn.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Haste"
+              ],
+              "layout": "normal",
+              "power": "2",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "e3d82066-d8b9-47bf-8821-1370c506970b",
+              "name": "Barbed Servitor",
+              "mana_cost": "{3}{B}",
+              "type_line": "Artifact Creature — Construct",
+              "oracle_text": "Indestructible\nWhen this creature enters, suspect it. (It has menace and can't block.)\nWhenever this creature deals combat damage to a player, you draw a card and you lose 1 life.\nWhenever this creature is dealt damage, target opponent loses that much life.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Indestructible",
+                "Suspect"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "f1190fb9-72a2-48f8-bc2d-61240f1e9119",
+              "name": "Zodiark, Umbral God",
+              "mana_cost": "{B}{B}{B}{B}{B}",
+              "type_line": "Legendary Creature — God",
+              "oracle_text": "Indestructible\nWhen Zodiark enters, each player sacrifices half the non-God creatures they control of their choice, rounded down.\nWhenever a player sacrifices another creature, put a +1/+1 counter on Zodiark.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Indestructible"
+              ],
+              "layout": "normal",
+              "power": "5",
+              "toughness": "5",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "2f6f49a4-f2ea-4147-a6d3-69cf875c302e",
+              "name": "Dragon-Scarred Bear",
+              "mana_cost": "{2}{G}",
+              "type_line": "Creature — Bear",
+              "oracle_text": "Formidable — {1}{G}: Regenerate this creature. Activate only if creatures you control have total power 8 or greater.",
+              "color_identity": [
+                "G"
+              ],
+              "keywords": [
+                "Regenerate",
+                "Formidable"
+              ],
+              "layout": "normal",
+              "power": "3",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "13cfc92c-142a-4016-b86f-ace6bda1a69c",
+              "name": "Chilling Apparition",
+              "mana_cost": "{2}{B}",
+              "type_line": "Creature — Spirit",
+              "oracle_text": "{B}: Regenerate this creature.\nWhenever this creature deals combat damage to a player, that player discards a card.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Regenerate"
+              ],
+              "layout": "normal",
+              "power": "1",
+              "toughness": "1",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "diagnostic_matches": [
+            "Yawgmoth, Thran Physician"
+          ]
+        },
+        {
+          "query": {
+            "purpose": "Additional recursion that returns creatures to the battlefield or hand",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "return target creature card from your graveyard to the battlefield",
+              "return a creature card from your graveyard to your hand"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          "matching_count": 69,
+          "truncated": true,
+          "selected": [
+            {
+              "oracle_id": "64a9a6b4-26b5-4d23-be86-85c54e9c4727",
+              "name": "Liliana, the Last Hope",
+              "mana_cost": "{1}{B}{B}",
+              "type_line": "Legendary Planeswalker — Liliana",
+              "oracle_text": "+1: Up to one target creature gets -2/-1 until your next turn.\n−2: Mill two cards, then you may return a creature card from your graveyard to your hand.\n−7: You get an emblem with \"At the beginning of your end step, create X 2/2 black Zombie creature tokens, where X is two plus the number of Zombies you control.\"",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": "3",
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "dc367b23-d1f4-4c5c-b300-a44a726e3f74",
+              "name": "Live or Die",
+              "mana_cost": "{3}{B}{B}",
+              "type_line": "Instant",
+              "oracle_text": "Choose one —\n• Return target creature card from your graveyard to the battlefield.\n• Destroy target creature.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "155422a0-a0cd-4399-8ed9-fa68ac2c80a6",
+              "name": "Doomed Necromancer",
+              "mana_cost": "{2}{B}",
+              "type_line": "Creature — Human Cleric Mercenary",
+              "oracle_text": "{B}, {T}, Sacrifice this creature: Return target creature card from your graveyard to the battlefield.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": "2",
+              "toughness": "2",
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "2c04371a-af69-4e42-8cda-096cf8312b5e",
+              "name": "Edgar's Awakening",
+              "mana_cost": "{3}{B}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "Return target creature card from your graveyard to the battlefield.\nWhen you discard this card, you may pay {B}. When you do, return target creature card from your graveyard to your hand.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "da8a93c6-66e2-492d-8894-397ba9ec5a87",
+              "name": "Graveyard Shift",
+              "mana_cost": "{4}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "This spell has flash as long as there are five or more mana values among cards in your graveyard.\nReturn target creature card from your graveyard to the battlefield.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 5.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "a2f8cde8-bf7b-4234-89f0-a95f9dc937e3",
+              "name": "Cauldron of Essence",
+              "mana_cost": "{1}{B}{G}",
+              "type_line": "Artifact",
+              "oracle_text": "Whenever a creature you control dies, each opponent loses 1 life and you gain 1 life.\n{1}{B}{G}, {T}, Sacrifice a creature: Return target creature card from your graveyard to the battlefield. Activate only as a sorcery.",
+              "color_identity": [
+                "B",
+                "G"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 3.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "1ae29791-aa7c-4050-bf72-dd0f739b11b8",
+              "name": "Will of the Abzan",
+              "mana_cost": "{3}{B}",
+              "type_line": "Sorcery",
+              "oracle_text": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Any number of target opponents each sacrifice a creature with the greatest power among creatures that player controls and lose 3 life.\n• Return target creature card from your graveyard to the battlefield.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 4.0,
+              "faces": [],
+              "commander_legality": "legal"
+            },
+            {
+              "oracle_id": "4777fa96-12a5-42d5-840f-ddd85f4a4b68",
+              "name": "Villainous Syndication",
+              "mana_cost": "{1}{B}",
+              "type_line": "Enchantment — Plan",
+              "oracle_text": "Tap an untapped Villain you control: Mill a card. Put a plan counter on this enchantment. Activate only as a sorcery. (To mill a card, put the top card of your library into your graveyard.)\nWhen the fourth plan counter is put on this enchantment, sacrifice it. When you do, return target creature card from your graveyard to the battlefield.",
+              "color_identity": [
+                "B"
+              ],
+              "keywords": [
+                "Mill"
+              ],
+              "layout": "normal",
+              "power": null,
+              "toughness": null,
+              "loyalty": null,
+              "defense": null,
+              "mana_value": 2.0,
+              "faces": [],
+              "commander_legality": "legal"
+            }
+          ],
+          "diagnostic_matches": []
+        },
+        {
+          "query": {
+            "purpose": "Low-mana-value utility creatures suited to repeated Meren recursion",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 1.0,
+            "mana_value_max": 3.0
+          },
+          "matching_count": 0,
+          "truncated": false,
+          "selected": [],
+          "diagnostic_matches": []
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "prompt": "You are an experienced Commander brewer. Given the commander's source facts and\nstrategy, recommend a ranked package of exactly 50 unique nonland cards to build this deck.\nUse your card knowledge; no tools, external decklists, or hidden reference list are available.\nPrioritize strong engine connections, then an appropriate balance of acceleration, draw,\ninteraction, protection and finishers. Give each card's exact name and a short deck-specific reason.\nRespect combined color identity and Commander legality. Do not suggest the commander itself.\nLand-front cards, including Dryad Arbor, are excluded; spell-front modal double-faced cards are\nallowed. Do not invent a budget, bracket or prohibition of infinite combos. Do not invent cards.\nRank your strongest recommendations first. Reasons are strategic advice, not official rules.\n",
+  "inputs": {
+    "yuna": {
+      "commander": {
+        "name": "Yuna, Grand Summoner",
+        "mana_cost": "{1}{G}{W}{U}",
+        "type_line": "Legendary Creature — Human Cleric",
+        "oracle_text": "Grand Summon — {T}: Add one mana of any color. When you next cast a creature spell this turn, that creature enters with two additional +1/+1 counters on it.\nWhenever another permanent you control is put into a graveyard from the battlefield, if it had one or more counters on it, you may put that number of +1/+1 counters on target creature.",
+        "color_identity": [
+          "G",
+          "U",
+          "W"
+        ],
+        "power": "1",
+        "toughness": "5"
+      },
+      "strategy": "Bant +1/+1 counter growth and redistribution, with creature-based acceleration."
+    },
+    "meren": {
+      "commander": {
+        "name": "Meren of Clan Nel Toth",
+        "mana_cost": "{2}{B}{G}",
+        "type_line": "Legendary Creature — Human Shaman",
+        "oracle_text": "Whenever another creature you control dies, you get an experience counter.\nAt the beginning of your end step, choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of experience counters you have, return it to the battlefield. Otherwise, put it into your hand.",
+        "color_identity": [
+          "B",
+          "G"
+        ],
+        "power": "3",
+        "toughness": "4"
+      },
+      "strategy": "Golgari sacrifice and creature-recursion value, reusing enter/death effects and interaction."
+    }
+  },
+  "call_plan": [
+    [
+      "yuna",
+      "gpt-5.6-luna"
+    ],
+    [
+      "yuna",
+      "gpt-5.6-terra"
+    ],
+    [
+      "meren",
+      "gpt-5.6-terra"
+    ],
+    [
+      "meren",
+      "gpt-5.6-luna"
+    ]
+  ],
+  "source": {
+    "type": "oracle_cards",
+    "updated_at": "2026-10-04T21:01:57.080+00:00",
+    "bytes": 24595465,
+    "sha256": "cd5f442a93459d65850bacce748996b0e77b631b5a0c68ebcfcf62a8bd35eae8",
+    "download_seconds": 0.783
+  },
+  "schema": {
+    "$defs": {
+      "Suggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "reason"
+        ],
+        "title": "Suggestion",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "cards": {
+        "items": {
+          "$ref": "#/$defs/Suggestion"
+        },
+        "maxItems": 50,
+        "minItems": 50,
+        "title": "Cards",
+        "type": "array"
+      }
+    },
+    "required": [
+      "cards"
+    ],
+    "title": "Suggestions",
+    "type": "object"
+  },
+  "fixture_sha256": {
+    "yuna": "7959a2ba18f7ed491317b212fecb51d324ad6070cabfdd1e3863f8006ed104a5",
+    "meren": "c722aa715d19c06afa518af9fded00482b0172df84ebc8c9a63ba914c0ccfb94"
+  },
+  "settings": {
+    "reasoning": "low",
+    "max_output_tokens": 7000,
+    "retries": 0,
+    "store": false
+  },
+  "pricing": {
+    "gpt-5.6-luna": [
+      0.25,
+      1.2
+    ],
+    "gpt-5.6-terra": [
+      2.5,
+      12.0
+    ]
+  },
+  "budget_usd": 0.5,
+  "reserved_usd": 0.2069265,
+  "pricing_sources": [
+    "https://developers.openai.com/api/docs/models/gpt-5.6-luna.md",
+    "https://developers.openai.com/api/docs/models/gpt-5.6-terra.md"
+  ]
+}

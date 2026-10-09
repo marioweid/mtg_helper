@@ -1,0 +1,3055 @@
+{
+  "attempts": 6,
+  "authorized_maximum": 6,
+  "budget_usd": 0.25,
+  "estimated_cost_usd": 0.03395705,
+  "known_estimated_cost_usd": 0.03395705,
+  "unpriced_attempts": 0,
+  "stopped": null,
+  "runs": [
+    {
+      "phase": "plan",
+      "case_id": "meren",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 6.887530200008769,
+      "estimated_cost_usd": 0.0007580499999999999,
+      "usage": {
+        "input_tokens": 1549,
+        "input_tokens_details": {
+          "cache_write_tokens": 1546,
+          "cached_tokens": 0
+        },
+        "output_tokens": 309,
+        "output_tokens_details": {
+          "reasoning_tokens": 171
+        },
+        "total_tokens": 1858
+      },
+      "plan": {
+        "intents": [
+          "Accumulate experience through repeatable sacrifice outlets and disposable creatures.",
+          "Reuse enters-the-battlefield and dies-triggered effects for removal, ramp, card advantage, and graveyard control.",
+          "Support Meren with self-mill, creature tutors, mana acceleration, and ways to protect or recover the engine.",
+          "Investigate timing and rules distinctions between dying, entering, returning, and triggered abilities.],",
+          "searches [{",
+          "purpose",
+          "oracle_text_any",
+          "oracle_text_all"
+        ],
+        "searches": [],
+        "named_cards": [],
+        "uncertainties": [],
+        "rule_searches": []
+      }
+    },
+    {
+      "phase": "plan",
+      "case_id": "saheeli",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 15.56593789998442,
+      "estimated_cost_usd": 0.0019965,
+      "usage": {
+        "input_tokens": 1578,
+        "input_tokens_details": {
+          "cache_write_tokens": 545,
+          "cached_tokens": 1030
+        },
+        "output_tokens": 1335,
+        "output_tokens_details": {
+          "reasoning_tokens": 311
+        },
+        "total_tokens": 2913
+      },
+      "plan": {
+        "intents": [
+          "Build a high-density Temur artifact shell that steadily produces energy through artifact and Artificer casts.",
+          "Use energy on Saheeli’s temporary 5/5 copies, prioritizing permanents with strong entry, activated, attack, or death value.",
+          "Exploit haste and temporary combat bodies with attack triggers, sacrifice value, and ways to preserve or multiply token value.",
+          "Include resilient copy targets and artifact engines so the deck remains functional when Saheeli is unavailable."
+        ],
+        "searches": [
+          {
+            "purpose": "Find repeatable energy production attached to artifacts or permanents.",
+            "oracle_text_all": [
+              "energy counter"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Artifact"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find spells that reward casting artifacts or Artificers with energy.",
+            "oracle_text_all": [
+              "energy counter"
+            ],
+            "oracle_text_any": [
+              "Whenever you cast",
+              "Whenever you cast an artifact"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find useful permanents whose entry triggers become powerful temporary copies.",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [
+              "draw",
+              "create",
+              "destroy",
+              "return"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 3.0,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find permanents that directly support copying or multiplying tokens.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "copy of",
+              "token you control",
+              "tokens you control"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find combat payoffs for Saheeli’s hasty temporary copies.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "attacks",
+              "combat damage",
+              "whenever a creature you control attacks"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find artifacts and creatures that turn temporary deaths or sacrifices into resources.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "sacrifice",
+              "dies",
+              "is put into a graveyard from the battlefield"
+            ],
+            "type_line_any": [
+              "Artifact",
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find artifact-based mana and card-advantage engines that are good Saheeli copy targets.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "Add",
+              "draw a card",
+              "draw cards"
+            ],
+            "type_line_any": [
+              "Artifact"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 2.0,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find ways to retain value from tokens or exploit their temporary existence.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "exile",
+              "sacrifice",
+              "create a token"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          }
+        ],
+        "named_cards": [
+          "Aetherworks Marvel",
+          "Decoction Module",
+          "Fabrication Module",
+          "Era of Innovation",
+          "Whirler Virtuoso",
+          "Gonti’s Aether Heart",
+          "Saheeli, Sublime Artificer",
+          "Brudiclad, Telchor Engineer",
+          "Panharmonicon",
+          "Lithoform Engine",
+          "Mimic Vat",
+          "Reckless Fireweaver"
+        ],
+        "uncertainties": [
+          "Verify which energy engines are legal in Temur and whether their output is fast enough to support paying three energy every combat.",
+          "Confirm how copied permanents’ enters-the-battlefield abilities, replacement effects, loyalty abilities, and delayed sacrifice interact with Saheeli’s copy effect.",
+          "Check whether token-copy multipliers preserve Saheeli’s specified 5/5, artifact, haste, and sacrifice modifications.",
+          "Determine whether death-trigger and sacrifice outlets can meaningfully convert the temporary token into value before the delayed sacrifice."
+        ],
+        "rule_searches": [
+          {
+            "purpose": "Clarify the comprehensive rules for energy counters and paying energy costs.",
+            "text_all": [
+              "energy counter"
+            ],
+            "text_any": [],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify copy effects, copied characteristics, and exceptions such as becoming a 5/5 artifact creature.",
+            "text_all": [
+              "copy effect"
+            ],
+            "text_any": [
+              "except"
+            ],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify token creation and what characteristics a token copy receives.",
+            "text_all": [
+              "token"
+            ],
+            "text_any": [
+              "copy"
+            ],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify when enters-the-battlefield abilities trigger on copied permanents.",
+            "text_all": [
+              "enters the battlefield"
+            ],
+            "text_any": [
+              "copy"
+            ],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify the timing of Saheeli’s delayed sacrifice at the next end step.",
+            "text_all": [
+              "beginning of the next end step"
+            ],
+            "text_any": [],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify haste and attacking with a temporary copied creature created during combat setup.",
+            "text_all": [
+              "haste"
+            ],
+            "text_any": [
+              "summoning sickness",
+              "attack"
+            ],
+            "cursor": null
+          }
+        ]
+      }
+    },
+    {
+      "phase": "revise",
+      "case_id": "meren",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 12.932435099995928,
+      "estimated_cost_usd": 0.0018539,
+      "usage": {
+        "input_tokens": 2054,
+        "input_tokens_details": {
+          "cache_write_tokens": 2051,
+          "cached_tokens": 0
+        },
+        "output_tokens": 1117,
+        "output_tokens_details": {
+          "reasoning_tokens": 50
+        },
+        "total_tokens": 3171
+      },
+      "plan": {
+        "intents": [
+          "Build a sacrifice engine that reliably creates experience counters while converting expendable creatures into cards, mana, removal, or board control.",
+          "Reuse creatures with strong enters-the-battlefield, dies, or sacrifice abilities through Meren and other recursion effects.",
+          "Fill the graveyard and selectively find creatures whose mana values align with Meren's end-step recursion threshold.",
+          "Protect the recursion engine and retain value when creatures are exiled, returned to hand, or otherwise unavailable.",
+          "Investigate exact rules for dies triggers, returning cards to the battlefield, triggered-ability timing, and sacrifice costs."
+        ],
+        "searches": [
+          {
+            "purpose": "Repeatable sacrifice outlets that do not require a creature to tap",
+            "oracle_text_all": [
+              "sacrifice a creature"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Sacrifice outlets that also produce mana or another reusable resource",
+            "oracle_text_all": [
+              "sacrifice a creature"
+            ],
+            "oracle_text_any": [
+              "Add",
+              "draw a card",
+              "create a"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Creatures that reward their own or another creature's death with cards, mana, or tokens",
+            "oracle_text_all": [
+              "dies"
+            ],
+            "oracle_text_any": [
+              "draw a card",
+              "Add",
+              "create a token",
+              "each opponent"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Creature-based removal and interaction that can be repeatedly returned",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [
+              "destroy target",
+              "exile target",
+              "return target",
+              "-1/-1"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Creatures that stock the graveyard or find creatures for reliable recursion",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "mill",
+              "put a card from your library into your graveyard",
+              "search your library for a creature card",
+              "return a creature card from your graveyard"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Ways to protect Meren or a creature-based engine from removal",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "hexproof",
+              "indestructible",
+              "protection from",
+              "regenerate"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Additional recursion that returns creatures to the battlefield or hand",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "return target creature card from your graveyard to the battlefield",
+              "return a creature card from your graveyard to your hand"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Low-mana-value utility creatures suited to repeated Meren recursion",
+            "oracle_text_all": [
+              "enters the battlefield"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 1.0,
+            "mana_value_max": 3.0
+          }
+        ],
+        "named_cards": [
+          "Viscera Seer",
+          "Carrion Feeder",
+          "Ashnod's Altar",
+          "Phyrexian Altar",
+          "Blood Artist",
+          "Zulaport Cutthroat",
+          "Skullclamp",
+          "Sakura-Tribe Elder",
+          "Eternal Witness",
+          "Reclamation Sage",
+          "Shriekmaw",
+          "Plaguecrafter"
+        ],
+        "uncertainties": [
+          "The exact available card pool and wording for sacrifice outlets, death-payoff creatures, and recursion spells must be verified locally.",
+          "Meren's end-step ability targets a creature card before checking its mana value; replacement effects, exile effects, and graveyard changes may affect whether the target remains available.",
+          "Whether a creature's ability triggers on entering, dying, being sacrificed, or leaving the battlefield must be checked from its exact Oracle text.",
+          "Potential loops or high-power interactions are not being excluded because no combo, budget, or bracket restrictions were supplied."
+        ],
+        "rule_searches": [
+          {
+            "purpose": "Verify the rules definition and consequences of a creature dying.",
+            "text_all": [
+              "dies"
+            ],
+            "text_any": [],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify sacrifice as a cost and when a sacrificed creature is put into the graveyard.",
+            "text_all": [
+              "sacrifice"
+            ],
+            "text_any": [],
+            "cursor": null
+          },
+          {
+            "purpose": "Check how triggered abilities are put on the stack and resolve after sacrifice or death events.",
+            "text_all": [
+              "triggered ability"
+            ],
+            "text_any": [
+              "stack"
+            ],
+            "cursor": null
+          },
+          {
+            "purpose": "Verify how returning a creature card from a graveyard to the battlefield works.",
+            "text_all": [
+              "return"
+            ],
+            "text_any": [
+              "battlefield"
+            ],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify triggered abilities that trigger when a creature enters the battlefield.",
+            "text_all": [
+              "enters the battlefield"
+            ],
+            "text_any": [],
+            "cursor": null
+          },
+          {
+            "purpose": "Clarify last-known information for death triggers and abilities of creatures that leave the battlefield.",
+            "text_all": [
+              "last known information"
+            ],
+            "text_any": [],
+            "cursor": null
+          }
+        ]
+      }
+    },
+    {
+      "phase": "revise",
+      "case_id": "saheeli",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 13.727549399976851,
+      "estimated_cost_usd": 0.0042058500000000006,
+      "usage": {
+        "input_tokens": 10905,
+        "input_tokens_details": {
+          "cache_write_tokens": 9722,
+          "cached_tokens": 1180
+        },
+        "output_tokens": 1233,
+        "output_tokens_details": {
+          "reasoning_tokens": 99
+        },
+        "total_tokens": 12138
+      },
+      "plan": {
+        "intents": [
+          "Prioritize artifact and Artificer density so Saheeli reliably accumulates three energy before combat.",
+          "Use repeatable energy sources and artifact permanents with tap abilities as high-value copy targets.",
+          "Favor copied permanents with entry triggers, attack triggers, or sacrifice/death value; Saheeli’s copy enters with the target’s copiable abilities, while her 5/5 and haste modifications remain part of the copy.",
+          "Exploit combat damage and attack triggers, recognizing that the token’s haste permits attacking immediately but its delayed sacrifice occurs at the next end step.",
+          "Use sacrifice outlets and death-trigger payoffs to convert Saheeli’s temporary copy into value before the delayed sacrifice.",
+          "Energy production may be slower than one Saheeli activation per turn; include ordinary artifact ramp, draw, and resilient engines rather than relying exclusively on energy."
+        ],
+        "searches": [
+          {
+            "purpose": "Find artifacts that produce energy when they enter or through repeatable activated abilities.",
+            "oracle_text_all": [
+              "energy"
+            ],
+            "oracle_text_any": [
+              "you get",
+              "energy counters"
+            ],
+            "type_line_any": [
+              "Artifact"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find permanents that produce energy when an artifact or creature enters, supporting repeated artifact deployment.",
+            "oracle_text_all": [
+              "energy"
+            ],
+            "oracle_text_any": [
+              "enters",
+              "enters the battlefield"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find high-impact permanents with entry abilities suitable for Saheeli copies.",
+            "oracle_text_all": [
+              "enters"
+            ],
+            "oracle_text_any": [
+              "draw",
+              "create",
+              "destroy",
+              "return",
+              "search"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 3.0,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find artifact permanents with repeatable mana, draw, or resource-producing abilities.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "Add",
+              "draw a card",
+              "draw cards",
+              "create"
+            ],
+            "type_line_any": [
+              "Artifact"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": 2.0,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find attack or combat-damage payoffs that reward Saheeli’s hasty temporary copies.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "Whenever this creature attacks",
+              "Whenever a creature you control attacks",
+              "combat damage"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find sacrifice outlets and death payoffs that can monetize Saheeli’s token before its delayed sacrifice.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "sacrifice",
+              "dies",
+              "is put into a graveyard"
+            ],
+            "type_line_any": [
+              "Artifact",
+              "Creature",
+              "Enchantment"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find permanents that copy creatures or tokens, including additional temporary bodies and copy synergies.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "copy"
+            ],
+            "type_line_any": [
+              "Artifact",
+              "Creature",
+              "Enchantment"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find artifact and Artificer spells that improve Saheeli’s energy generation and provide standalone value.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "artifact",
+              "Artificer"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          }
+        ],
+        "named_cards": [
+          "Aetherworks Marvel",
+          "Decoction Module",
+          "Fabrication Module",
+          "Era of Innovation",
+          "Whirler Virtuoso",
+          "Dynavolt Tower",
+          "Bespoke Battlewagon",
+          "The Motherlode, Excavator",
+          "Saheeli, Sublime Artificer",
+          "Panharmonicon",
+          "Mimic Vat",
+          "Reckless Fireweaver"
+        ],
+        "uncertainties": [
+          "The observed energy search is truncated, so additional legal Temur engines remain undiscovered; confirm their exact production rate and whether they require artifacts, creatures, or other spells.",
+          "The copy rules confirm that Saheeli’s exceptions become copiable values and that enters-the-battlefield choices are made anew, but the practical value of any target still depends on its exact triggered ability and costs.",
+          "A token sacrifice outlet may sacrifice the copy before the delayed trigger; verify whether each outlet is usable without spending more resources than the copy produces.",
+          "Token-copy multipliers and effects that create multiple tokens may interact with Saheeli’s explicit 5/5, artifact, haste, and sacrifice exceptions in card-specific ways; do not assume they preserve every modification."
+        ],
+        "rule_searches": [
+          {
+            "purpose": "Continue the token and copy rules search to inspect later entries on token characteristics and copy creation.",
+            "text_all": [
+              "token"
+            ],
+            "text_any": [
+              "copy"
+            ],
+            "cursor": "G:Offspring"
+          },
+          {
+            "purpose": "Continue the enters-the-battlefield and copy rules search for triggering details after the returned page.",
+            "text_all": [
+              "enters the battlefield"
+            ],
+            "text_any": [
+              "copy"
+            ],
+            "cursor": "707.4"
+          },
+          {
+            "purpose": "Continue the delayed-sacrifice timing search for the end-step rules and delayed triggered abilities.",
+            "text_all": [
+              "beginning of the next end step"
+            ],
+            "text_any": [],
+            "cursor": "702.185a"
+          },
+          {
+            "purpose": "Investigate sacrifice timing and whether sacrificing a temporary token before a delayed sacrifice changes the delayed trigger’s result.",
+            "text_all": [
+              "sacrifice"
+            ],
+            "text_any": [
+              "delayed",
+              "triggered"
+            ],
+            "cursor": null
+          }
+        ]
+      }
+    },
+    {
+      "phase": "review",
+      "case_id": "meren",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 48.10347179998644,
+      "estimated_cost_usd": 0.011135299999999999,
+      "usage": {
+        "input_tokens": 18866,
+        "input_tokens_details": {
+          "cache_write_tokens": 18863,
+          "cached_tokens": 0
+        },
+        "output_tokens": 5349,
+        "output_tokens_details": {
+          "reasoning_tokens": 129
+        },
+        "total_tokens": 24215
+      },
+      "complete": false,
+      "missing_keys": [],
+      "assessments": [
+        {
+          "card_key": "C00",
+          "fit": "weak",
+          "reason": "Untapping after deaths is incidental; it neither sacrifices creatures nor rewards recursion, while forced attacks conflict with a value-engine plan.",
+          "caveat": "Useful only with a combat-focused artifact package.",
+          "evidence": [
+            {
+              "key": "C00",
+              "quote": "Whenever another creature dies, untap this creature."
+            }
+          ],
+          "name": "Galvanic Juggernaut",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C01",
+          "fit": "support",
+          "reason": "Doubles Meren's death-triggered experience and other death triggers; its graveyard exile cost competes with recursion targets.",
+          "caveat": "Requires five mana and three expendable creature cards in the graveyard.",
+          "evidence": [
+            {
+              "key": "C01",
+              "quote": "that ability triggers an additional time."
+            }
+          ],
+          "name": "Drivnod, Carnage Dominus",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C02",
+          "fit": "weak",
+          "reason": "The cantrip is useful, but stopping all graveyard targets shuts off Meren and most recursion, including its own strategic plan.",
+          "caveat": "Consider only in a graveyard-hate side direction.",
+          "evidence": [
+            {
+              "key": "C02",
+              "quote": "Cards in graveyards can't be the targets of spells or abilities."
+            }
+          ],
+          "name": "Ground Seal",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C03",
+          "fit": "support",
+          "reason": "A creature that sacrifices itself into immediate recursion can generate experience and reuse a creature ETB; finality prevents that creature's later return after dying.",
+          "caveat": "Sorcery timing and {B} activation limit flexibility.",
+          "evidence": [
+            {
+              "key": "C03",
+              "quote": "Sacrifice this creature: Return target creature card from your graveyard to the battlefield with a finality counter on it."
+            }
+          ],
+          "name": "Soulcoil Viper",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C04",
+          "fit": "weak",
+          "reason": "Madness can place it in the graveyard, but it offers no ETB, death, sacrifice, or recursion value for Meren.",
+          "caveat": "Needs a dedicated discard package to become relevant.",
+          "evidence": [
+            {
+              "key": "C04",
+              "quote": "Madness {B}"
+            }
+          ],
+          "name": "Kitchen Imp",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C05",
+          "fit": "support",
+          "reason": "Provides a sacrifice outlet, burst mana, and Zombie production; repeated sacrifices create experience and can fund recursion turns.",
+          "caveat": "Both abilities tap, and the mana ability produces colorless only.",
+          "evidence": [
+            {
+              "key": "C05",
+              "quote": "Sacrifice a creature: Add {C}{C}{C}."
+            }
+          ],
+          "name": "Transmogrant Altar",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C06",
+          "fit": "weak",
+          "reason": "Draws from noncreature spells and supplies combat protection, but does not interact with sacrificing, dying, or creature recursion.",
+          "caveat": "Requires a noncreature-spell-heavy build.",
+          "evidence": [
+            {
+              "key": "C06",
+              "quote": "Whenever you cast a noncreature spell"
+            }
+          ],
+          "name": "The Vision",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C07",
+          "fit": "support",
+          "reason": "Its ETB converts an expendable creature or land into a larger body, creating a sacrifice event and a reasonable Meren recursion target.",
+          "caveat": "Four mana and no further ETB or death value make it modest.",
+          "evidence": [
+            {
+              "key": "C07",
+              "quote": "you may sacrifice a creature or land."
+            }
+          ],
+          "name": "Harvester Troll",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C08",
+          "fit": "core",
+          "reason": "Repeatable ETB artifact/enchantment removal is excellent with Meren; sacrificing and returning it repeatedly also builds experience.",
+          "caveat": "Targets only artifacts or enchantments and requires a legal target.",
+          "evidence": [
+            {
+              "key": "C08",
+              "quote": "When this creature enters, you may destroy target artifact or enchantment."
+            }
+          ],
+          "name": "Reclamation Sage",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C09",
+          "fit": "support",
+          "reason": "Stocks the graveyard while finding a land, and its low mana value makes it easy for Meren to recur for repeated selection and sacrifice value.",
+          "caveat": "Only four cards are milled and the land is merely put into hand.",
+          "evidence": [
+            {
+              "key": "C09",
+              "quote": "reveal the top four cards of your library"
+            }
+          ],
+          "name": "Satyr Wayfinder",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C10",
+          "fit": "weak",
+          "reason": "Self-recursion supplies a recurring body, but its high activation cost lacks an ETB, death payoff, or sacrifice outlet.",
+          "caveat": "Needs abundant mana and a Rat-focused package.",
+          "evidence": [
+            {
+              "key": "C10",
+              "quote": "Return this card from your graveyard to the battlefield tapped."
+            }
+          ],
+          "name": "Tunnel Rats",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C11",
+          "fit": "weak",
+          "reason": "Artifact-copy tokens can create temporary ETB value, but the card has no sacrifice or death interaction and costs heavily to activate.",
+          "caveat": "Needs a high-value artifact package.",
+          "evidence": [
+            {
+              "key": "C11",
+              "quote": "Create a token that's a copy of another target artifact you control."
+            }
+          ],
+          "name": "Chrome Dome",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C12",
+          "fit": "conditional",
+          "reason": "Discarding creatures enables graveyard setup while its combat trigger removes opposing creatures; ninjutsu can reuse an attacker, but it is not a sacrifice engine.",
+          "caveat": "Requires reliable unblocked attackers and a discard package.",
+          "evidence": [
+            {
+              "key": "C12",
+              "quote": "you may discard a creature card. When you do, destroy target creature or planeswalker"
+            }
+          ],
+          "name": "Dokuchi Silencer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C13",
+          "fit": "conditional",
+          "reason": "Squad supplies multiple bodies for sacrifice and deathtouch improves combat, while death recursion can rebuild copies only indirectly.",
+          "caveat": "Needs substantial extra mana and combat access.",
+          "evidence": [
+            {
+              "key": "C13",
+              "quote": "When this creature enters, create that many tokens that are copies of it."
+            }
+          ],
+          "name": "Roadkill Rodney",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C14",
+          "fit": "core",
+          "reason": "A free sacrifice outlet converts every creature into two mana and an experience counter, enabling repeated death-trigger and recursion turns.",
+          "caveat": "Produces colorless mana and requires creatures worth sacrificing.",
+          "evidence": [
+            {
+              "key": "C14",
+              "quote": "Sacrifice a creature: Add {C}{C}."
+            }
+          ],
+          "name": "Ashnod's Altar",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C15",
+          "fit": "support",
+          "reason": "A large recursive body tutors a low-cost green utility creature, then Meren can reuse both ETBs for sustained board value.",
+          "caveat": "Six mana and the tutored creature must be nonlegendary, green, and mana value three or less.",
+          "evidence": [
+            {
+              "key": "C15",
+              "quote": "search your library for a nonlegendary green creature card with mana value 3 or less"
+            }
+          ],
+          "name": "Woodland Bellower",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C16",
+          "fit": "core",
+          "reason": "One-mana creature that mills on entry and death fills the graveyard and naturally rewards sacrifice, making Meren's threshold and targets reliable.",
+          "caveat": "Mill can lose important cards and does not select among them.",
+          "evidence": [
+            {
+              "key": "C16",
+              "quote": "When this creature enters or dies, mill three cards."
+            }
+          ],
+          "name": "Stitcher's Supplier",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C17",
+          "fit": "core",
+          "reason": "A zero-mana sacrifice outlet repeatedly triggers Meren, scries away unwanted draws, and lets ETB creatures be timed for recursion.",
+          "caveat": "Scry 1 is selection rather than card advantage.",
+          "evidence": [
+            {
+              "key": "C17",
+              "quote": "Sacrifice a creature: Scry 1."
+            }
+          ],
+          "name": "Viscera Seer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C18",
+          "fit": "support",
+          "reason": "Provides a repeatable sacrifice outlet plus creature shrinkage, generating experience while functioning as low-cost interaction against small creatures.",
+          "caveat": "Requires {B} per activation and only gives -1/-1.",
+          "evidence": [
+            {
+              "key": "C18",
+              "quote": "{B}, Sacrifice a creature: Target creature gets -1/-1 until end of turn."
+            }
+          ],
+          "name": "Plagued Rusalka",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C19",
+          "fit": "weak",
+          "reason": "Its graveyard spell-casting attack ability is unrelated to creature recursion and its ten-mana value is poor for Meren's curve.",
+          "caveat": "Needs a dedicated instant-sorcery graveyard deck.",
+          "evidence": [
+            {
+              "key": "C19",
+              "quote": "Whenever The Dawning Archaic attacks, you may cast target instant or sorcery card from your graveyard"
+            }
+          ],
+          "name": "The Dawning Archaic",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C20",
+          "fit": "core",
+          "reason": "Its ETB forces each player to sacrifice or discard, creating immediate interaction; Meren can repeatedly return it for attrition and experience support.",
+          "caveat": "Symmetrical and ineffective against players with expendable boards or empty hands.",
+          "evidence": [
+            {
+              "key": "C20",
+              "quote": "each player sacrifices a creature or planeswalker of their choice."
+            }
+          ],
+          "name": "Plaguecrafter",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C21",
+          "fit": "conditional",
+          "reason": "Can double death triggers on an equipped creature, potentially multiplying value, but it is not itself a sacrifice outlet and needs combat-equipment support.",
+          "caveat": "Requires equip mana and a creature with a relevant death trigger.",
+          "evidence": [
+            {
+              "key": "C21",
+              "quote": "that ability triggers an additional time."
+            }
+          ],
+          "name": "The Masamune",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C22",
+          "fit": "core",
+          "reason": "Free sacrifice outlet grows while converting disposable creatures into experience, and its Zombie type supports tribal tutors or recursion packages.",
+          "caveat": "Cannot block and supplies no direct card or mana advantage.",
+          "evidence": [
+            {
+              "key": "C22",
+              "quote": "Sacrifice a creature: Put a +1/+1 counter on this creature."
+            }
+          ],
+          "name": "Carrion Feeder",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C23",
+          "fit": "support",
+          "reason": "Flash graveyard hate and Treasure production answer an opponent's recent creature while providing mana for recursion and sacrifice turns.",
+          "caveat": "Targets only an opposing creature card put there from the battlefield this turn.",
+          "evidence": [
+            {
+              "key": "C23",
+              "quote": "exile target creature card from an opponent's graveyard that was put there from the battlefield this turn"
+            }
+          ],
+          "name": "Lobelia Sackville-Baggins",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C24",
+          "fit": "core",
+          "reason": "Draws once each turn whenever creatures die, turning Meren's sacrifice loop into steady cards while also benefiting from opponents' deaths.",
+          "caveat": "Only triggers once per turn and excludes no creature type beyond its wording's event.",
+          "evidence": [
+            {
+              "key": "C24",
+              "quote": "Whenever one or more other creatures die, draw a card."
+            }
+          ],
+          "name": "Morbid Opportunist",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C25",
+          "fit": "weak",
+          "reason": "A small flying body that only looks at an opponent's top card has no meaningful sacrifice, death, ETB value, or recursion payoff.",
+          "caveat": "Could fit a narrow information or artifact-creature package.",
+          "evidence": [
+            {
+              "key": "C25",
+              "quote": "look at the top card of target opponent's library."
+            }
+          ],
+          "name": "Saheeli's Silverwing",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C26",
+          "fit": "support",
+          "reason": "It returns itself after dying, creating repeated death and ETB-like land-mana utility while supplying a resilient sacrifice body.",
+          "caveat": "Its return changes it into an Aura and requires a Forest you control.",
+          "evidence": [
+            {
+              "key": "C26",
+              "quote": "When Harold and Bob dies, if it was a creature, return it to the battlefield."
+            }
+          ],
+          "name": "Harold and Bob, First Numens",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C27",
+          "fit": "conditional",
+          "reason": "Turns recurring expendable creatures into a mana-denial lock, while Meren can replace the upkeep sacrifice and grow experience.",
+          "caveat": "Requires reliable creature recursion and can severely constrain your own nonblack mana.",
+          "evidence": [
+            {
+              "key": "C27",
+              "quote": "At the beginning of your upkeep, sacrifice this enchantment unless you sacrifice a creature."
+            }
+          ],
+          "name": "Contamination",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C28",
+          "fit": "support",
+          "reason": "Sacrificing this four-mana creature returns a low-cost creature, creating a compact death-to-ETB chain for Meren's experience engine.",
+          "caveat": "The returned creature must have mana value two or less.",
+          "evidence": [
+            {
+              "key": "C28",
+              "quote": "When this creature dies, return target creature card with mana value 2 or less from your graveyard to the battlefield."
+            }
+          ],
+          "name": "Driver of the Dead",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C29",
+          "fit": "core",
+          "reason": "Turns every creature death into life loss and life gain, making Meren's repeated sacrifice loops into a win condition and stabilizing races.",
+          "caveat": "Targets only one player per trigger and has zero toughness.",
+          "evidence": [
+            {
+              "key": "C29",
+              "quote": "Whenever this creature or another creature dies, target player loses 1 life and you gain 1 life."
+            }
+          ],
+          "name": "Blood Artist",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C30",
+          "fit": "support",
+          "reason": "Sacrifice protection preserves the creature while its sacrifice-triggered drain rewards every permanent sacrificed, including creatures used with Meren.",
+          "caveat": "Protection costs {1}{B}, taps the creature, and the drain is only one life.",
+          "evidence": [
+            {
+              "key": "C30",
+              "quote": "Whenever you sacrifice a permanent, target opponent loses 1 life and you gain 1 life."
+            }
+          ],
+          "name": "Popular Egotist",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C31",
+          "fit": "weak",
+          "reason": "Mana production and eventual combat pressure are useful generally, but it lacks sacrifice, death, ETB, and recursion value.",
+          "caveat": "Needs a ramp or life-drain direction to justify inclusion.",
+          "evidence": [
+            {
+              "key": "C31",
+              "quote": "{T}: Add one mana of any color."
+            }
+          ],
+          "name": "Cryptolith Fragment // Aurora of Emrakul",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C32",
+          "fit": "core",
+          "reason": "Draws for each nontoken creature death, directly converting Meren sacrifices into cards and remaining a useful low-cost recursive creature.",
+          "caveat": "Does not reward token deaths and costs three mana.",
+          "evidence": [
+            {
+              "key": "C32",
+              "quote": "Whenever another nontoken creature you control dies, draw a card."
+            }
+          ],
+          "name": "Grim Haruspex",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C33",
+          "fit": "conditional",
+          "reason": "Cheap equipment can repeatedly remove creatures on entry and gives a recursive body more power, but requires an extra payment and equip package.",
+          "caveat": "The ETB removal costs {2} and equipment is otherwise modest.",
+          "evidence": [
+            {
+              "key": "C33",
+              "quote": "for each opponent, destroy up to one target creature or planeswalker"
+            }
+          ],
+          "name": "Lich's Relic",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C34",
+          "fit": "core",
+          "reason": "A one-mana creature is a repeatable sacrifice that prevents combat damage; Meren can recur it each end step for recurring battlefield control.",
+          "caveat": "Only prevents combat damage and needs a sacrifice outlet effect timing plan.",
+          "evidence": [
+            {
+              "key": "C34",
+              "quote": "Sacrifice this creature: Prevent all combat damage that would be dealt this turn."
+            }
+          ],
+          "name": "Spore Frog",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C35",
+          "fit": "support",
+          "reason": "Draws whenever you cast recurring creature spells, replenishing cards as Meren and other recursion engines deploy creatures.",
+          "caveat": "Requires four mana and triggers on casting, not creatures returned directly without being cast.",
+          "evidence": [
+            {
+              "key": "C35",
+              "quote": "Whenever you cast a creature spell, draw a card."
+            }
+          ],
+          "name": "Beast Whisperer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C36",
+          "fit": "weak",
+          "reason": "Returns enchantments to hand, but the deck's primary recursion target is creatures and the activated ability is expensive and taps.",
+          "caveat": "Needs a meaningful enchantment package.",
+          "evidence": [
+            {
+              "key": "C36",
+              "quote": "Return target enchantment card from your graveyard to your hand."
+            }
+          ],
+          "name": "Dowsing Shaman",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C37",
+          "fit": "core",
+          "reason": "Sacrifices itself for land ramp and an experience counter, then Meren can recur it to repeat landfall-ready acceleration.",
+          "caveat": "Only finds basic lands and puts them onto the battlefield tapped.",
+          "evidence": [
+            {
+              "key": "C37",
+              "quote": "Sacrifice this creature: Search your library for a basic land card"
+            }
+          ],
+          "name": "Sakura-Tribe Elder",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C38",
+          "fit": "weak",
+          "reason": "A costly global creature transformation and token generation do not advance sacrifice recursion, and the 6/6 setting can erase useful small-body roles.",
+          "caveat": "Needs a token-heavy combat direction.",
+          "evidence": [
+            {
+              "key": "C38",
+              "quote": "Creatures you control have base power and toughness 6/6"
+            }
+          ],
+          "name": "March of the World Ooze",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C39",
+          "fit": "support",
+          "reason": "A one-mana creature sacrifices for artifact/enchantment removal or a card and land, providing flexible value that Meren can recur.",
+          "caveat": "Each mode requires {2}, and the land mode depends on having a land in hand.",
+          "evidence": [
+            {
+              "key": "C39",
+              "quote": "{2}, Sacrifice this creature: Choose one"
+            }
+          ],
+          "name": "Insidious Fungus",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C40",
+          "fit": "conditional",
+          "reason": "Milled cards and graveyard-entry triggers support recursion, while transformed Grist makes removal and creature copies; it needs a graveyard-focused package.",
+          "caveat": "Transforming requires a qualifying graveyard entry and paying {G}; planeswalker copying is delayed.",
+          "evidence": [
+            {
+              "key": "C40",
+              "quote": "Whenever Grist or another creature you control enters, if it entered from your graveyard or you cast it from your graveyard"
+            }
+          ],
+          "name": "Grist, Voracious Larva // Grist, the Plague Swarm",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C41",
+          "fit": "weak",
+          "reason": "Reach and discard-based flying removal provide narrow utility, but the card lacks sacrifice, death, ETB, and recursion value.",
+          "caveat": "Needs a discard outlet and a flying-heavy metagame.",
+          "evidence": [
+            {
+              "key": "C41",
+              "quote": "Discard this card: Destroy target creature with flying."
+            }
+          ],
+          "name": "Sureshot Sower",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C42",
+          "fit": "weak",
+          "reason": "A temporary combat trick neither advances sacrifice nor recursion and has little value from Meren's creature-focused end-step ability.",
+          "caveat": "Useful only in a combat-protection direction.",
+          "evidence": [
+            {
+              "key": "C42",
+              "quote": "Target creature gets +2/+2 and gains reach until end of turn."
+            }
+          ],
+          "name": "Tethermage's Advantage",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C43",
+          "fit": "conditional",
+          "reason": "Sacrifices a creature to tutor a same-type creature, enabling chains and death triggers, but requires carefully built tribal curves and sorcery timing.",
+          "caveat": "Requires a matching creature type at exactly one higher mana value.",
+          "evidence": [
+            {
+              "key": "C43",
+              "quote": "Sacrifice a creature: Search your library for a creature card that shares a creature type"
+            }
+          ],
+          "name": "Pyre of Heroes",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C44",
+          "fit": "weak",
+          "reason": "Self-recursion supplies a body for sacrifice, but six mana is inefficient and the opponent-land condition is unreliable; it has no ETB value.",
+          "caveat": "Becomes cheaper only against the specified nonbasic-land board state.",
+          "evidence": [
+            {
+              "key": "C44",
+              "quote": "Return this card from your graveyard to the battlefield with a +1/+1 counter on it."
+            }
+          ],
+          "name": "Razorlash Transmogrant",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C45",
+          "fit": "core",
+          "reason": "Recurs any graveyard card to hand on ETB, letting Meren repeatedly reuse key creatures, sacrifice outlets, or interaction while itself is a strong target.",
+          "caveat": "Returns cards to hand rather than directly to the battlefield.",
+          "evidence": [
+            {
+              "key": "C45",
+              "quote": "return target card from your graveyard to your hand."
+            }
+          ],
+          "name": "Eternal Witness",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C46",
+          "fit": "conditional",
+          "reason": "Surveil fills and filters the graveyard, while graveyard-entry creatures can create extra bodies for sacrifice and death triggers.",
+          "caveat": "Copy trigger is once per turn and only works with creatures entering or cast from graveyards.",
+          "evidence": [
+            {
+              "key": "C46",
+              "quote": "Whenever one or more other creatures you control enter, if they entered or were cast from a graveyard"
+            }
+          ],
+          "name": "Twilight Diviner",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C47",
+          "fit": "support",
+          "reason": "Provides a creature death trigger for a card and an ETB land, making it a reusable ramp-and-draw package when sacrificed and returned.",
+          "caveat": "Four mana and only searches basic lands.",
+          "evidence": [
+            {
+              "key": "C47",
+              "quote": "When this creature dies, you may draw a card."
+            }
+          ],
+          "name": "Solemn Simulacrum",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C48",
+          "fit": "core",
+          "reason": "A sacrifice outlet that draws cards and supplies removal counters directly advances Meren's engine; proliferate can also grow experience counters.",
+          "caveat": "Costs one life per sacrifice and cannot sacrifice itself.",
+          "evidence": [
+            {
+              "key": "C48",
+              "quote": "Pay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one target creature and draw a card."
+            }
+          ],
+          "name": "Yawgmoth, Thran Physician",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C49",
+          "fit": "support",
+          "reason": "Free sacrifice outlet protects itself while opposing deaths grow it, creating experience and a resilient secondary threat.",
+          "caveat": "Its protection sacrifices another creature and it is legendary, limiting duplicates.",
+          "evidence": [
+            {
+              "key": "C49",
+              "quote": "Sacrifice another creature: Yahenni gains indestructible until end of turn."
+            }
+          ],
+          "name": "Yahenni, Undying Partisan",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C50",
+          "fit": "support",
+          "reason": "Provides limited fixing from the battlefield and graveyard hate from exile, while its exile cost can interfere with only selected recursion targets.",
+          "caveat": "Mana ability is once per turn and graveyard activation exiles the card itself.",
+          "evidence": [
+            {
+              "key": "C50",
+              "quote": "{2}, Exile this card from your graveyard: Exile target card from a graveyard."
+            }
+          ],
+          "name": "Gravestone Strider",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C51",
+          "fit": "weak",
+          "reason": "Sacrifice untaps it only during upkeep, so it is neither a flexible outlet nor a meaningful death-value creature for Meren.",
+          "caveat": "Needs a combat-focused build and creatures available during upkeep.",
+          "evidence": [
+            {
+              "key": "C51",
+              "quote": "Sacrifice a creature: Untap this creature. Activate only during your upkeep."
+            }
+          ],
+          "name": "Black Carriage",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C52",
+          "fit": "weak",
+          "reason": "Combat damage exiles opposing cards and grants protection, but it lacks sacrifice, death, ETB, or graveyard-recursion value.",
+          "caveat": "Requires connecting in combat and an exile-casting package.",
+          "evidence": [
+            {
+              "key": "C52",
+              "quote": "Whenever Klaw deals combat damage to a player"
+            }
+          ],
+          "name": "Klaw, Master of Sound",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C53",
+          "fit": "support",
+          "reason": "A self-sacrificing four-mana creature supplies a predictable death and can be replayed by Meren, with temporary hexproof or trample as useful secondary value.",
+          "caveat": "It takes four upkeeps to sacrifice itself and offers no ETB payoff.",
+          "evidence": [
+            {
+              "key": "C53",
+              "quote": "At the beginning of your upkeep, remove an oil counter from this creature."
+            }
+          ],
+          "name": "Evolved Spinoderm",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C54",
+          "fit": "core",
+          "reason": "A free sacrifice outlet produces colored mana, enabling Meren recursions and multiplying death-trigger value without requiring a tap.",
+          "caveat": "Mana production is one mana per creature and needs creatures to fuel it.",
+          "evidence": [
+            {
+              "key": "C54",
+              "quote": "Sacrifice a creature: Add one mana of any color."
+            }
+          ],
+          "name": "Phyrexian Altar",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C55",
+          "fit": "support",
+          "reason": "A cheap recursive creature sacrifices for removal or proliferate, with proliferate able to increase Meren's experience counters and other counters.",
+          "caveat": "Each activation costs {1} and proliferate cannot create a counter where none exists.",
+          "evidence": [
+            {
+              "key": "C55",
+              "quote": "Destroy target artifact.\n• Destroy target enchantment.\n• Proliferate."
+            }
+          ],
+          "name": "Cankerbloom",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C56",
+          "fit": "conditional",
+          "reason": "Doubles token and counter production, improving sacrifice fodder and experience growth, but it has no direct engine ability and costs five mana.",
+          "caveat": "Needs token or counter-producing support to justify its cost.",
+          "evidence": [
+            {
+              "key": "C56",
+              "quote": "If an effect would put one or more counters on a permanent you control, it puts twice that many counters"
+            }
+          ],
+          "name": "Doubling Season",
+          "evidence_errors": [
+            "invalid_quote:C56"
+          ]
+        },
+        {
+          "card_key": "C57",
+          "fit": "core",
+          "reason": "Evoke supplies cheap ETB creature removal and immediate sacrifice, producing experience; Meren can repeatedly return it for removal loops.",
+          "caveat": "Only destroys nonartifact, nonblack creatures and evoke sacrifices it on entry.",
+          "evidence": [
+            {
+              "key": "C57",
+              "quote": "When this creature enters, destroy target nonartifact, nonblack creature."
+            }
+          ],
+          "name": "Shriekmaw",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C58",
+          "fit": "support",
+          "reason": "Mills on entry and, on death, places a chosen creature atop the library, setting up Meren's next recursion target and rewarding sacrifice.",
+          "caveat": "The death ability exiles this card and puts the target on top rather than directly returning it.",
+          "evidence": [
+            {
+              "key": "C58",
+              "quote": "When this creature dies, you may exile it. When you do, put target creature card from your graveyard on top of your library."
+            }
+          ],
+          "name": "Paramecia Coloniex",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C59",
+          "fit": "weak",
+          "reason": "This directly prevents creature cards from entering the battlefield, shutting off Meren and most proposed recursion while offering only hate value.",
+          "caveat": "Use only in a dedicated anti-graveyard strategy.",
+          "evidence": [
+            {
+              "key": "C59",
+              "quote": "Creature cards in graveyards and libraries can't enter the battlefield."
+            }
+          ],
+          "name": "Grafdigger's Cage",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C60",
+          "fit": "support",
+          "reason": "A recursive ETB creature that destroys an opposing creature converts Meren's end-step returns into repeatable removal and board control.",
+          "caveat": "Four mana and {B}{B}; its destruction effect targets only an opponent's creature.",
+          "evidence": [
+            {
+              "key": "C60",
+              "quote": "When this creature enters, destroy target creature an opponent controls."
+            }
+          ],
+          "name": "Ravenous Chupacabra",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C61",
+          "fit": "support",
+          "reason": "Its death creates Treasure, turning sacrifice into mana while triggering Meren experience; recursion can repeatedly rebuild the resource.",
+          "caveat": "Treasure requires a separate tap-and-sacrifice activation to produce mana.",
+          "evidence": [
+            {
+              "key": "C61",
+              "quote": "When this creature dies, create a Treasure token."
+            }
+          ],
+          "name": "Undercity Dire Rat",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C62",
+          "fit": "core",
+          "reason": "A low-cost death payoff drains every opponent and gains life, converting repeated Meren sacrifices into scalable board-control payoff and a win condition.",
+          "caveat": "Its one toughness makes it vulnerable and it requires the creature to remain on the battlefield.",
+          "evidence": [
+            {
+              "key": "C62",
+              "quote": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life."
+            }
+          ],
+          "name": "Zulaport Cutthroat",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C63",
+          "fit": "support",
+          "reason": "Landfall proliferates experience counters and any other counters, while recurring land-sacrifice and ramp creatures can provide repeated land entries.",
+          "caveat": "Needs repeated land plays and proliferate only adds existing counter types.",
+          "evidence": [
+            {
+              "key": "C63",
+              "quote": "Landfall — Whenever a land you control enters, proliferate."
+            }
+          ],
+          "name": "Evolution Sage",
+          "evidence_errors": []
+        }
+      ],
+      "recommendations": [
+        {
+          "rank": 1,
+          "key": "C17",
+          "name": "Viscera Seer",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 2,
+          "key": "C14",
+          "name": "Ashnod's Altar",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 3,
+          "key": "C54",
+          "name": "Phyrexian Altar",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 4,
+          "key": "C16",
+          "name": "Stitcher's Supplier",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 5,
+          "key": "C08",
+          "name": "Reclamation Sage",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 6,
+          "key": "C20",
+          "name": "Plaguecrafter",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 7,
+          "key": "C57",
+          "name": "Shriekmaw",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 8,
+          "key": "C45",
+          "name": "Eternal Witness",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 9,
+          "key": "C37",
+          "name": "Sakura-Tribe Elder",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 10,
+          "key": "C29",
+          "name": "Blood Artist",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 11,
+          "key": "C62",
+          "name": "Zulaport Cutthroat",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 12,
+          "key": "C32",
+          "name": "Grim Haruspex",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 13,
+          "key": "C24",
+          "name": "Morbid Opportunist",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 14,
+          "key": "C34",
+          "name": "Spore Frog",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 15,
+          "key": "C48",
+          "name": "Yawgmoth, Thran Physician",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        }
+      ],
+      "evidence_valid_count": 63,
+      "candidate_count": 64
+    },
+    {
+      "phase": "review",
+      "case_id": "saheeli",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "seconds": 58.260636700026225,
+      "estimated_cost_usd": 0.014007450000000001,
+      "usage": {
+        "input_tokens": 23841,
+        "input_tokens_details": {
+          "cache_write_tokens": 21954,
+          "cached_tokens": 1884
+        },
+        "output_tokens": 6706,
+        "output_tokens_details": {
+          "reasoning_tokens": 66
+        },
+        "total_tokens": 30547
+      },
+      "complete": false,
+      "missing_keys": [],
+      "assessments": [
+        {
+          "card_key": "C00",
+          "fit": "core",
+          "reason": "Produces substantial energy from every artifact entry and supplies an extra turn; Saheeli copies can double-trigger its entry ability before combat.",
+          "caveat": "Six mana and eight-energy activation require a developed artifact board.",
+          "evidence": [
+            {
+              "key": "C00",
+              "quote": "Whenever Gonti's Aether Heart or another artifact you control enters, you get {E}{E}"
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Gonti's Aether Heart",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C01",
+          "fit": "support",
+          "reason": "Enters with four energy and provides creature removal or reach; Saheeli can copy it for another energy burst and temporary utility.",
+          "caveat": "Removal is slow because it requires tapping and energy.",
+          "evidence": [
+            {
+              "key": "C01",
+              "quote": "When this creature enters, you get {E}{E}{E}{E}"
+            },
+            {
+              "key": "C01",
+              "quote": "{T}, Pay {E}{E}: This creature deals 1 damage to target creature."
+            }
+          ],
+          "name": "Aethertorch Renegade",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C02",
+          "fit": "weak",
+          "reason": "A 4/5 body can attack and be copied, but it supplies no artifact, Artificer, energy, entry, or combat-value engine.",
+          "caveat": "Only reasonable in a creature-heavy combat direction.",
+          "evidence": [
+            {
+              "key": "C02",
+              "quote": "Creature — Bear"
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Ordinary Bear",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C03",
+          "fit": "support",
+          "reason": "Bounces an opposing permanent or your own entry-value creature, and draws a card; targeting a tapped creature reduces its cost.",
+          "caveat": "Sorcery-speed four-mana interaction is not an energy engine.",
+          "evidence": [
+            {
+              "key": "C03",
+              "quote": "Return target nonland permanent to its owner's hand. Draw a card."
+            },
+            {
+              "key": "C03",
+              "quote": "This spell costs {2} less to cast if it targets a tapped creature."
+            }
+          ],
+          "name": "Fantastic Bounce",
+          "evidence_errors": [
+            "invalid_quote:C03"
+          ]
+        },
+        {
+          "card_key": "C04",
+          "fit": "conditional",
+          "reason": "Copies every token, potentially multiplying Thopters, Servos, and Saheeli-created bodies for combat and sacrifice value.",
+          "caveat": "Requires a substantial token board and four green mana.",
+          "evidence": [
+            {
+              "key": "C04",
+              "quote": "For each token you control, create a token that's a copy of that permanent."
+            },
+            {
+              "key": "D0",
+              "quote": "create a token that's a copy of target permanent you control"
+            }
+          ],
+          "name": "Second Harvest",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C05",
+          "fit": "core",
+          "reason": "Generates energy from every creature entry and can recycle your creatures for repeated entry triggers, including Saheeli copies before end step.",
+          "caveat": "The bounce activation costs four mana and taps the Module.",
+          "evidence": [
+            {
+              "key": "C05",
+              "quote": "Whenever a creature you control enters, you get {E}"
+            },
+            {
+              "key": "C05",
+              "quote": "{4}, {T}: Return target creature you control to its owner's hand."
+            }
+          ],
+          "name": "Decoction Module",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C06",
+          "fit": "conditional",
+          "reason": "Creates a token every combat and converts tokens into copies, giving Saheeli many artifact bodies and strong combat scaling.",
+          "caveat": "Six mana and a token package are needed; its combat trigger competes with Saheeli's timing.",
+          "evidence": [
+            {
+              "key": "C06",
+              "quote": "At the beginning of combat on your turn, create a 2/1 blue Phyrexian Myr artifact creature token."
+            },
+            {
+              "key": "C06",
+              "quote": "each other token you control becomes a copy of that token."
+            }
+          ],
+          "name": "Brudiclad, Telchor Engineer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C07",
+          "fit": "support",
+          "reason": "Attacking with equipped creatures supplies two energy and gives blocking interaction, while the Equipment is an artifact spell for Saheeli.",
+          "caveat": "Coin flip makes the removal unreliable and equip costs two.",
+          "evidence": [
+            {
+              "key": "C07",
+              "quote": "Whenever equipped creature attacks, you get {E}{E}"
+            },
+            {
+              "key": "C07",
+              "quote": "Flip a coin. If you win the flip, exile the chosen creature."
+            }
+          ],
+          "name": "Plasma Caster",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C08",
+          "fit": "core",
+          "reason": "Provides three energy on entry and converts energy into evasive artifact attackers; Saheeli can copy it for another entry burst.",
+          "caveat": "Each Thopter costs three energy, competing with Saheeli's activation.",
+          "evidence": [
+            {
+              "key": "C08",
+              "quote": "When this creature enters, you get {E}{E}{E}"
+            },
+            {
+              "key": "C08",
+              "quote": "Pay {E}{E}{E}: Create a 1/1 colorless Thopter artifact creature token with flying."
+            }
+          ],
+          "name": "Whirler Virtuoso",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C09",
+          "fit": "support",
+          "reason": "Adds three energy and can refresh hands; spending energy can enable a large redraw and temporary access to exiled cards.",
+          "caveat": "The strongest mode requires paying seven energy and benefits all players.",
+          "evidence": [
+            {
+              "key": "C09",
+              "quote": "You get {E}{E}{E} (three energy counters)"
+            },
+            {
+              "key": "C09",
+              "quote": "If seven or more {E} was paid this way, you may play cards you own exiled this way"
+            }
+          ],
+          "name": "Wheel of Potential",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C10",
+          "fit": "weak",
+          "reason": "Its death only tempts the Ring, offering no artifact, energy, copy, or combat synergy for Saheeli.",
+          "caveat": "Requires a separate Ring-tempt strategy.",
+          "evidence": [
+            {
+              "key": "C10",
+              "quote": "When this creature dies, the Ring tempts you."
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Mirrormere Guardian",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C11",
+          "fit": "core",
+          "reason": "Creates artifact Thopters from artifact casts, increasing board presence and sacrifice resources while Saheeli independently gains energy from those casts.",
+          "caveat": "Its draw ability requires sacrificing two artifacts and four total mana.",
+          "evidence": [
+            {
+              "key": "C11",
+              "quote": "Whenever you cast an artifact spell, create a 1/1 colorless Thopter artifact creature token with flying."
+            },
+            {
+              "key": "C11",
+              "quote": "Sacrifice two artifacts: Draw a card."
+            }
+          ],
+          "name": "Sai, Master Thopterist",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C12",
+          "fit": "weak",
+          "reason": "An eight-mana modular creature is expensive and lacks energy or entry value; its counters do not naturally support Saheeli's copy plan.",
+          "caveat": "Needs a dedicated modular and artifact-counter package.",
+          "evidence": [
+            {
+              "key": "C12",
+              "quote": "Modular 6 (This creature enters with six +1/+1 counters on it."
+            },
+            {
+              "key": "C12",
+              "quote": "At the beginning of your upkeep, put a +1/+1 counter"
+            }
+          ],
+          "name": "Arcbound Overseer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C13",
+          "fit": "conditional",
+          "reason": "Provides an unblockable equipped attacker and cloaks a card, offering combat pressure and an artifact target for copying.",
+          "caveat": "Cloaked-card value and face-up access depend on the top card being a creature.",
+          "evidence": [
+            {
+              "key": "C13",
+              "quote": "Equipped creature gets +1/+0 and can't be blocked."
+            },
+            {
+              "key": "C13",
+              "quote": "Turn it face up any time for its mana cost if it's a creature card."
+            }
+          ],
+          "name": "Cryptic Coat",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C14",
+          "fit": "support",
+          "reason": "A cheap Artificer advances Saheeli's energy when cast and becomes a 4/4 with three artifacts, contributing a useful combat body.",
+          "caveat": "Its payoff requires controlling at least three artifacts.",
+          "evidence": [
+            {
+              "key": "C14",
+              "quote": "Metalcraft — This creature gets +2/+2 as long as you control three or more artifacts."
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Carapace Forger",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C15",
+          "fit": "weak",
+          "reason": "Provides scry and self-reanimation as a land, but is neither artifact nor Artificer and has no copy, energy, or combat payoff.",
+          "caveat": "Its unusual death transformation may have value in a landfall shell.",
+          "evidence": [
+            {
+              "key": "C15",
+              "quote": "When Princess Yue dies, if she was a nonland creature, return this card to the battlefield tapped"
+            },
+            {
+              "key": "C15",
+              "quote": "{T}: Scry 2."
+            }
+          ],
+          "name": "Princess Yue",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C16",
+          "fit": "support",
+          "reason": "Cheap artifact entry draw improves consistency and supplies an artifact permanent for Saheeli's copy targets; sacrifice gains life and recycles it.",
+          "caveat": "Its graveyard replacement prevents normal death-recursion lines.",
+          "evidence": [
+            {
+              "key": "C16",
+              "quote": "When this artifact enters, scry 1, then draw a card."
+            },
+            {
+              "key": "C16",
+              "quote": "When this artifact is put into a graveyard from the battlefield, its owner shuffles it into their library."
+            }
+          ],
+          "name": "Lembas",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C17",
+          "fit": "support",
+          "reason": "Turns every artifact cast into an evasive artifact token, multiplying Saheeli's combat bodies and artifact count.",
+          "caveat": "Four-mana enchantment has no direct energy production.",
+          "evidence": [
+            {
+              "key": "C17",
+              "quote": "Whenever you cast an artifact spell, create a 1/1 colorless Thopter artifact creature token with flying."
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Efficient Construction",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C18",
+          "fit": "conditional",
+          "reason": "Creates green mana from each large creature, and Saheeli's 5/5 copies can increase that count for later turns.",
+          "caveat": "Requires multiple creatures with power four or greater and is not an artifact.",
+          "evidence": [
+            {
+              "key": "C18",
+              "quote": "add {G} for each creature you control with power 4 or greater."
+            },
+            {
+              "key": "D0",
+              "quote": "it's a 5/5 artifact creature in addition to its other types"
+            }
+          ],
+          "name": "Giant-Man, Gargantuan Genius",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C19",
+          "fit": "support",
+          "reason": "Creates a 4/4 copy of your creature, or steals an opposing creature copy, adding immediate combat bodies independent of energy.",
+          "caveat": "Five-mana sorcery cannot copy noncreatures or provide repeatable value.",
+          "evidence": [
+            {
+              "key": "C19",
+              "quote": "Create a token that's a copy of target creature you control"
+            },
+            {
+              "key": "C19",
+              "quote": "Create a token that's a copy of target creature an opponent controls"
+            }
+          ],
+          "name": "Ember Island Production",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C20",
+          "fit": "core",
+          "reason": "Investigates on every artifact cast for artifact card flow, while reducing artifact activation costs for energy engines and sacrifice outlets.",
+          "caveat": "The reduction cannot lower mana portions below one.",
+          "evidence": [
+            {
+              "key": "C20",
+              "quote": "Whenever you cast an artifact spell, investigate."
+            },
+            {
+              "key": "C20",
+              "quote": "Activated abilities of artifacts you control cost {1} less to activate."
+            }
+          ],
+          "name": "Forensic Gadgeteer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C21",
+          "fit": "weak",
+          "reason": "The creature is an off-plan land-recovery body and the sorcery only places a land in the graveyard; neither advances artifacts, energy, or copies.",
+          "caveat": "Needs a graveyard-land or landfall package.",
+          "evidence": [
+            {
+              "key": "C21",
+              "quote": "Search your library for a land card, put it into your graveyard"
+            },
+            {
+              "key": "C21",
+              "quote": "return target land card from your graveyard to your hand."
+            }
+          ],
+          "name": "Carnivorous Cultivator // Enroot",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C22",
+          "fit": "core",
+          "reason": "Doubles Saheeli-copy entry triggers and artifact/creature ETBs, greatly increasing energy, token, draw, and removal value from copied permanents.",
+          "caveat": "Only doubles triggered abilities caused by artifact or creature entry.",
+          "evidence": [
+            {
+              "key": "C22",
+              "quote": "that ability triggers an additional time."
+            },
+            {
+              "key": "D0",
+              "quote": "create a token that's a copy of target permanent you control"
+            }
+          ],
+          "name": "Panharmonicon",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C23",
+          "fit": "core",
+          "reason": "Converts every energy gain into creature growth and has its own energy production; Saheeli, Heart, and Generatorium can rapidly grow the board.",
+          "caveat": "Requires creatures worth growing and four mana to activate its production.",
+          "evidence": [
+            {
+              "key": "C23",
+              "quote": "Whenever you get one or more {E}, put a +1/+1 counter on target creature you control."
+            },
+            {
+              "key": "C23",
+              "quote": "{4}, {T}: You get {E}."
+            }
+          ],
+          "name": "Fabrication Module",
+          "evidence_errors": [
+            "invalid_quote:C23"
+          ]
+        },
+        {
+          "card_key": "C24",
+          "fit": "core",
+          "reason": "Makes copies of artifact creatures or nonartifact creatures, and entwine supplies two bodies for combat and ETB/death value.",
+          "caveat": "Entwine costs an additional three mana and copies lack Saheeli's temporary modifications.",
+          "evidence": [
+            {
+              "key": "C24",
+              "quote": "Create a token that's a copy of target artifact creature you control."
+            },
+            {
+              "key": "C24",
+              "quote": "Entwine {2}{U}"
+            }
+          ],
+          "name": "Mirage Mockery",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C25",
+          "fit": "support",
+          "reason": "Rewards attacking with Saheeli by creating a trampling Rhino when a qualifying large artifact is controlled, adding combat pressure.",
+          "caveat": "Requires attacking with the commander and an artifact with mana value at least four.",
+          "evidence": [
+            {
+              "key": "C25",
+              "quote": "Whenever you attack with your commander"
+            },
+            {
+              "key": "C25",
+              "quote": "create a 4/4 green Rhino creature token with trample."
+            }
+          ],
+          "name": "W'Kabi, Shield of the Nation",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C26",
+          "fit": "support",
+          "reason": "Excellent Saheeli copy target: its death creates two artifact bodies, and its lifelink/deathtouch makes the temporary 5/5 copy valuable in combat.",
+          "caveat": "Six mana and no energy production make it a top-end target.",
+          "evidence": [
+            {
+              "key": "C26",
+              "quote": "When this creature dies, create a 3/3 colorless Phyrexian Wurm artifact creature token"
+            },
+            {
+              "key": "D0",
+              "quote": "Sacrifice it at the beginning of the next end step."
+            }
+          ],
+          "name": "Wurmcoil Engine",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C27",
+          "fit": "core",
+          "reason": "Draws from every historic spell, especially the deck's artifacts, while also being an Artificer spell that supplies Saheeli energy when cast.",
+          "caveat": "Four-mana creature is vulnerable and must remain on the battlefield to draw.",
+          "evidence": [
+            {
+              "key": "C27",
+              "quote": "Whenever you cast a historic spell, draw a card."
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Jhoira, Weatherlight Captain",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C28",
+          "fit": "support",
+          "reason": "Artifact ramp searches a basic on entry and draws on death; Saheeli can copy it for additional land acceleration and later death value.",
+          "caveat": "Four mana for a 2/2 is slow without blink, sacrifice, or copy support.",
+          "evidence": [
+            {
+              "key": "C28",
+              "quote": "When this creature enters, you may search your library for a basic land card"
+            },
+            {
+              "key": "C28",
+              "quote": "When this creature dies, you may draw a card."
+            }
+          ],
+          "name": "Solemn Simulacrum",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C29",
+          "fit": "conditional",
+          "reason": "Doubles Saheeli's temporary copy and token engines and doubles +1/+1 counters from Fabrication Module.",
+          "caveat": "Five mana and nonartifact status mean it needs a token/counter-heavy build.",
+          "evidence": [
+            {
+              "key": "C29",
+              "quote": "it creates twice that many of those tokens instead."
+            },
+            {
+              "key": "C29",
+              "quote": "it puts twice that many of those counters on that permanent instead."
+            }
+          ],
+          "name": "Doubling Season",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C30",
+          "fit": "weak",
+          "reason": "Offers a tap damage ability and conditional card draw after its own damage, but lacks artifact, energy, copy, or broad combat synergy.",
+          "caveat": "Needs a dedicated ping or deathtouch-damage package.",
+          "evidence": [
+            {
+              "key": "C30",
+              "quote": "Whenever a creature an opponent controls dies, if Hawkeye dealt damage to it this turn, draw a card."
+            },
+            {
+              "key": "C30",
+              "quote": "{T}: Hawkeye deals 1 damage to any target."
+            }
+          ],
+          "name": "Hawkeye, Avenging Archer",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C31",
+          "fit": "support",
+          "reason": "Turns Clues from Gadgeteer into Clue, Food, and Treasure, multiplying artifacts, draw, life, and mana while supporting artifact-count payoffs.",
+          "caveat": "Needs a Clue, Food, or Treasure producer to function.",
+          "evidence": [
+            {
+              "key": "C31",
+              "quote": "If you would create a Clue, Food, or Treasure token, instead create one of each."
+            },
+            {
+              "key": "C20",
+              "quote": "Whenever you cast an artifact spell, investigate."
+            }
+          ],
+          "name": "Academy Manufactor",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C32",
+          "fit": "conditional",
+          "reason": "A powerful Saheeli copy target whose death leaves three artifact bodies, with evasive combat keywords on the original.",
+          "caveat": "Nine mana is a major prerequisite and it produces value only on death.",
+          "evidence": [
+            {
+              "key": "C32",
+              "quote": "When this creature dies, create a 3/3 colorless Golem artifact creature token"
+            },
+            {
+              "key": "C32",
+              "quote": "Flying, vigilance, trample"
+            }
+          ],
+          "name": "Triplicate Titan",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C33",
+          "fit": "weak",
+          "reason": "Creates one nonartifact Hero token and a counter through a costly once-only activation, without energy or artifact interaction.",
+          "caveat": "Needs a creature-token combat or power-up strategy.",
+          "evidence": [
+            {
+              "key": "C33",
+              "quote": "create a 3/2 white Hero creature token with vigilance."
+            },
+            {
+              "key": "C33",
+              "quote": "Activate each power-up ability only once."
+            }
+          ],
+          "name": "Pet Avengers",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C34",
+          "fit": "weak",
+          "reason": "A nine-mana Eldrazi has no artifact, energy, copy, or entry value; its sacrifice alternative needs an absent Spawn package.",
+          "caveat": "Requires four Eldrazi Spawn or substantial ramp.",
+          "evidence": [
+            {
+              "key": "C34",
+              "quote": "You may sacrifice four Eldrazi Spawn rather than pay this spell's mana cost."
+            },
+            {
+              "key": "C34",
+              "quote": "Annihilator 1"
+            }
+          ],
+          "name": "Hand of Emrakul",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C35",
+          "fit": "conditional",
+          "reason": "Builds +1/+1 counters through landfall and doubles them, complementing Fabrication Module and proliferate-style counter plans.",
+          "caveat": "Needs frequent land entries and substantial green mana for doubling.",
+          "evidence": [
+            {
+              "key": "C35",
+              "quote": "Landfall — Whenever a land you control enters, put a +1/+1 counter on target creature."
+            },
+            {
+              "key": "C35",
+              "quote": "Double the number of +1/+1 counters on each creature you control."
+            }
+          ],
+          "name": "Bristly Bill, Spine Sower",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C36",
+          "fit": "weak",
+          "reason": "An artifact body can be cast for Saheeli energy and attack, but draft-only text and forced attacks make it poor Commander utility.",
+          "caveat": "Its noted-player ability is not meaningful in ordinary Commander play.",
+          "evidence": [
+            {
+              "key": "C36",
+              "quote": "Reveal this card as you draft it and note the player who passed it to you."
+            },
+            {
+              "key": "C36",
+              "quote": "This creature attacks each combat if able."
+            }
+          ],
+          "name": "Cogwork Tracker",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C37",
+          "fit": "core",
+          "reason": "Generates energy when permanents die and converts six energy into a free top-six spell, while remaining an artifact copy target.",
+          "caveat": "Needs deaths and six energy; its ability taps and does not guarantee a hit.",
+          "evidence": [
+            {
+              "key": "C37",
+              "quote": "Whenever a permanent you control is put into a graveyard, you get {E}"
+            },
+            {
+              "key": "C37",
+              "quote": "Look at the top six cards of your library. You may cast a spell"
+            }
+          ],
+          "name": "Aetherworks Marvel",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C38",
+          "fit": "support",
+          "reason": "One-mana artifact gives two energy and immediate +2/+0, with energy equip enabling repeated combat use and Saheeli triggering on cast.",
+          "caveat": "Equip consumes the same energy needed for Saheeli's copy activation.",
+          "evidence": [
+            {
+              "key": "C38",
+              "quote": "When this Equipment enters, you get {E}{E}"
+            },
+            {
+              "key": "C38",
+              "quote": "Equip—Pay {E}{E}."
+            }
+          ],
+          "name": "Inventor's Axe",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C39",
+          "fit": "support",
+          "reason": "Provides two energy and can tap or untap artifacts and creatures, enabling combat manipulation or repeated tap abilities.",
+          "caveat": "Requires tapping the creature and two energy per activation.",
+          "evidence": [
+            {
+              "key": "C39",
+              "quote": "When this creature enters, you get {E}{E}"
+            },
+            {
+              "key": "C39",
+              "quote": "You may tap or untap target artifact or creature."
+            }
+          ],
+          "name": "Janjeet Sentry",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C40",
+          "fit": "conditional",
+          "reason": "Produces artifact tokens and upgrades them from Servo to Thopter to Construct, supplying Saheeli artifacts, attackers, and sacrifice material.",
+          "caveat": "Each conversion requires tapping and appropriate disposable tokens.",
+          "evidence": [
+            {
+              "key": "C40",
+              "quote": "Create a 1/1 colorless Servo artifact creature token."
+            },
+            {
+              "key": "C40",
+              "quote": "Sacrifice a Thopter: Create a 4/4 colorless Construct artifact creature token."
+            }
+          ],
+          "name": "Retrofitter Foundry",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C41",
+          "fit": "weak",
+          "reason": "Creates Blood through combat and pings opponents when noncreature artifacts are sacrificed, but is a costly nonartifact creature outside the energy plan.",
+          "caveat": "Needs a high-power attacker and many noncreature artifact sacrifices.",
+          "evidence": [
+            {
+              "key": "C41",
+              "quote": "Whenever Jaws deals combat damage to a player, create that many Blood tokens."
+            },
+            {
+              "key": "C41",
+              "quote": "Whenever a noncreature artifact is sacrificed or destroyed"
+            }
+          ],
+          "name": "Jaws, Relentless Predator",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C42",
+          "fit": "weak",
+          "reason": "Its death-triggered tapping or untapping is unpredictable and tribal-dependent, with no artifact, energy, copy, or direct combat payoff.",
+          "caveat": "Needs a concentrated shared-creature-type board and death outlets.",
+          "evidence": [
+            {
+              "key": "C42",
+              "quote": "Whenever a creature dies, tap all untapped creatures that share a creature type with it"
+            },
+            {
+              "key": "C42",
+              "quote": "or untap all tapped creatures that share a creature type with it."
+            }
+          ],
+          "name": "Faces of the Past",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C43",
+          "fit": "support",
+          "reason": "Landfall proliferates energy counters, +1/+1 counters, and other existing counters, extending Saheeli's stored energy and Fabrication growth.",
+          "caveat": "Requires landfall triggers and counters already present; proliferate does not create energy from nothing.",
+          "evidence": [
+            {
+              "key": "C43",
+              "quote": "Landfall — Whenever a land you control enters, proliferate."
+            },
+            {
+              "key": "R02",
+              "quote": "give each another counter of each kind already there."
+            }
+          ],
+          "name": "Evolution Sage",
+          "evidence_errors": [
+            "invalid_quote:R02"
+          ]
+        },
+        {
+          "card_key": "C44",
+          "fit": "support",
+          "reason": "Untaps a creature whenever an artifact is cast, enabling repeated tap abilities and attack preparation while also being an evasive body.",
+          "caveat": "It does not untap artifacts and provides no energy itself.",
+          "evidence": [
+            {
+              "key": "C44",
+              "quote": "Whenever you cast an artifact spell, you may untap target creature."
+            },
+            {
+              "key": "C44",
+              "quote": "Flying\nWhenever you cast an artifact spell"
+            }
+          ],
+          "name": "Mirran Spy",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C45",
+          "fit": "conditional",
+          "reason": "Scales as an artifact creature and leaves flying artifact Thopters on death; counters from Fabrication Module make both halves stronger.",
+          "caveat": "Requires mana to cast and grow, plus a sacrifice or death-value plan.",
+          "evidence": [
+            {
+              "key": "C45",
+              "quote": "When this creature dies, create a 1/1 colorless Thopter artifact creature token with flying for each +1/+1 counter"
+            },
+            {
+              "key": "C45",
+              "quote": "{1}, {T}: Put a +1/+1 counter on this creature."
+            }
+          ],
+          "name": "Hangarback Walker",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C46",
+          "fit": "conditional",
+          "reason": "Can end your turn after Saheeli's delayed sacrifice is put on the stack, potentially preserving a temporary copy for later turns.",
+          "caveat": "Requires exact stack timing and sacrifices ending the turn's remaining actions.",
+          "evidence": [
+            {
+              "key": "C46",
+              "quote": "End the turn."
+            },
+            {
+              "key": "D0",
+              "quote": "Sacrifice it at the beginning of the next end step."
+            }
+          ],
+          "name": "Sundial of the Infinite",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C47",
+          "fit": "weak",
+          "reason": "Cheap creature bounce is useful interaction, but it neither advances artifacts, energy, copying, nor card advantage.",
+          "caveat": "Could be playable only if unusually high creature-bounce density is desired.",
+          "evidence": [
+            {
+              "key": "C47",
+              "quote": "Return target creature to its owner's hand."
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Drown in Shapelessness",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C48",
+          "fit": "core",
+          "reason": "Cheap Artificer artifact that reduces artifact spell costs, increasing Saheeli energy generation, artifact density, and ability to deploy copy targets.",
+          "caveat": "Reduction applies only to artifact spells and the 2/2 is fragile.",
+          "evidence": [
+            {
+              "key": "C48",
+              "quote": "Artifact spells you cast cost {1} less to cast."
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Enthusiastic Mechanaut",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C49",
+          "fit": "support",
+          "reason": "Affinity makes this artifact creature affordable in a developed board and its entry draws two cards, making it an attractive Saheeli copy target.",
+          "caveat": "Seven-mana base cost is poor before artifact density is established.",
+          "evidence": [
+            {
+              "key": "C49",
+              "quote": "This spell costs {1} less to cast for each artifact you control."
+            },
+            {
+              "key": "C49",
+              "quote": "When this creature enters, draw two cards."
+            }
+          ],
+          "name": "Thought Monitor",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C50",
+          "fit": "weak",
+          "reason": "Has no rules text and therefore supplies no artifact, energy, copy, draw, or combat interaction beyond its basic body.",
+          "caveat": "Only relevant if its text is supplied elsewhere.",
+          "evidence": [
+            {
+              "key": "C50",
+              "quote": "oracle_text\": \"\""
+            },
+            {
+              "key": "D0",
+              "quote": "Whenever you cast an Artificer or artifact spell, you get {E}"
+            }
+          ],
+          "name": "Black Widow, Natasha Romanoff",
+          "evidence_errors": [
+            "invalid_quote:C50"
+          ]
+        },
+        {
+          "card_key": "C51",
+          "fit": "conditional",
+          "reason": "Produces Servo or scalable Construct artifact tokens, supplying artifact count and combat bodies for Saheeli and sacrifice engines.",
+          "caveat": "Token production is mana- and tap-intensive and needs Oviya to survive.",
+          "evidence": [
+            {
+              "key": "C51",
+              "quote": "Create a 1/1 colorless Servo artifact creature token."
+            },
+            {
+              "key": "C51",
+              "quote": "Create an X/X colorless Construct artifact creature token"
+            }
+          ],
+          "name": "Oviya Pashiri, Sage Lifecrafter",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C52",
+          "fit": "weak",
+          "reason": "Provides haste to itself and one large creature, but offers no artifact, energy, copy, entry, or meaningful board-wide combat support.",
+          "caveat": "Needs multiple power-five creatures to justify the tap ability.",
+          "evidence": [
+            {
+              "key": "C52",
+              "quote": "Target creature with power 5 or greater gains haste until end of turn."
+            },
+            {
+              "key": "C52",
+              "quote": "Haste\n{T}:"
+            }
+          ],
+          "name": "Bloodthorn Taunter",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C53",
+          "fit": "support",
+          "reason": "Loots unwanted cards and exchanges an artifact for a graveyard artifact, enabling death triggers and recurring high-value copy targets.",
+          "caveat": "The recursion ability requires an artifact in the graveyard and sacrifices another artifact.",
+          "evidence": [
+            {
+              "key": "C53",
+              "quote": "Sacrifice an artifact. If you do, return target artifact card from your graveyard to the battlefield."
+            },
+            {
+              "key": "C53",
+              "quote": "+2: Discard up to two cards, then draw that many cards."
+            }
+          ],
+          "name": "Daretti, Scrap Savant",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C54",
+          "fit": "conditional",
+          "reason": "Entry creates four artifact tokens and attack converts Myr into extra damage and power, making it a premium Saheeli copy target.",
+          "caveat": "Seven mana and a sizable Myr board are required for maximum combat value.",
+          "evidence": [
+            {
+              "key": "C54",
+              "quote": "When this creature enters, create four 1/1 colorless Myr artifact creature tokens."
+            },
+            {
+              "key": "C54",
+              "quote": "Whenever this creature attacks, you may tap X untapped Myr you control."
+            }
+          ],
+          "name": "Myr Battlesphere",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C55",
+          "fit": "core",
+          "reason": "Cheap Artificer artifact-cost reducer also turns one artifact into a copy of another, enabling repeatable utility copying and Saheeli's artifact density.",
+          "caveat": "Copy activation is sorcery-speed and requires two artifacts plus one mana.",
+          "evidence": [
+            {
+              "key": "C55",
+              "quote": "Artifact spells you cast cost {1} less to cast."
+            },
+            {
+              "key": "C55",
+              "quote": "Target artifact you control becomes a copy of a second target artifact you control"
+            }
+          ],
+          "name": "Shuri, Wakandan Inventor",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C56",
+          "fit": "conditional",
+          "reason": "A Saheeli copy can enter as a 5/5 artifact version of Meteor Golem and trigger destruction of an opposing nonland permanent.",
+          "caveat": "Seven mana is expensive and the copy's delayed sacrifice limits repeat use.",
+          "evidence": [
+            {
+              "key": "C56",
+              "quote": "When this creature enters, destroy target nonland permanent an opponent controls."
+            },
+            {
+              "key": "D0",
+              "quote": "create a token that's a copy of target permanent you control"
+            }
+          ],
+          "name": "Meteor Golem",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C57",
+          "fit": "core",
+          "reason": "Deals damage whenever an artifact enters, including Saheeli copies, Thopters, Clues, and other token artifacts, converting deployment into reach.",
+          "caveat": "Its one-damage trigger is incremental and it is vulnerable as a 1/3.",
+          "evidence": [
+            {
+              "key": "C57",
+              "quote": "Whenever an artifact you control enters, this creature deals 1 damage to each opponent."
+            },
+            {
+              "key": "D0",
+              "quote": "it's a 5/5 artifact creature in addition to its other types"
+            }
+          ],
+          "name": "Reckless Fireweaver",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C58",
+          "fit": "support",
+          "reason": "Cheap artifact attacker becomes a 3/3 on attack, benefiting from Saheeli's haste and providing a simple combat payoff and copy target.",
+          "caveat": "It has no energy or entry value and only improves during attacks.",
+          "evidence": [
+            {
+              "key": "C58",
+              "quote": "Whenever this creature attacks, it gets +3/+0 until end of turn."
+            },
+            {
+              "key": "C58",
+              "quote": "Artifact Creature — Phyrexian Construct"
+            }
+          ],
+          "name": "Kiln Walker",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C59",
+          "fit": "support",
+          "reason": "Creates an attackable combat target for an opponent and can transform after combat damage into a three-mana land, improving ramp and combat pressure.",
+          "caveat": "Needs an equipped creature to connect and gives the opponent two Plant blockers.",
+          "evidence": [
+            {
+              "key": "C59",
+              "quote": "Whenever equipped creature deals combat damage to a player, you may transform this Equipment."
+            },
+            {
+              "key": "C59",
+              "quote": "{T}: Add three mana of any one color."
+            }
+          ],
+          "name": "Dowsing Dagger // Lost Vale",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C60",
+          "fit": "core",
+          "reason": "Adds an extra energy whenever Saheeli, artifacts, or energy engines produce energy and later converts substantial energy expenditure into card draw.",
+          "caveat": "Its draw ability requires four energy paid or lost that turn and tapping it.",
+          "evidence": [
+            {
+              "key": "C60",
+              "quote": "If you would get one or more {E}, you get that many plus one {E} instead."
+            },
+            {
+              "key": "C60",
+              "quote": "Draw a card. Activate only if you've paid or lost four or more {E} this turn."
+            }
+          ],
+          "name": "Izzet Generatorium",
+          "evidence_errors": [
+            "invalid_quote:C60"
+          ]
+        },
+        {
+          "card_key": "C61",
+          "fit": "weak",
+          "reason": "An eight-mana nonartifact creature creates two nonartifact Insects but supplies no energy, artifact, copy, or relevant entry payoff.",
+          "caveat": "Requires a dedicated emerge or Eldrazi-Spawn package.",
+          "evidence": [
+            {
+              "key": "C61",
+              "quote": "When you cast this spell, create two 1/1 green Insect creature tokens."
+            },
+            {
+              "key": "C61",
+              "quote": "Emerge {6}{G}"
+            }
+          ],
+          "name": "It of the Horrid Swarm",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C62",
+          "fit": "conditional",
+          "reason": "Can grow a creature then return creatures of a chosen parity, offering mass interaction and possible self-bounce of valuable entry creatures.",
+          "caveat": "Five mana and parity selection can also return your own board or miss key targets.",
+          "evidence": [
+            {
+              "key": "C62",
+              "quote": "You may put a +1/+1 counter on a creature."
+            },
+            {
+              "key": "C62",
+              "quote": "Return each creature with power of the chosen quality to its owner's hand."
+            }
+          ],
+          "name": "Zimone's Hypothesis",
+          "evidence_errors": []
+        },
+        {
+          "card_key": "C63",
+          "fit": "weak",
+          "reason": "Suppresses all creature-entry triggers, directly disabling Saheeli copy targets, energy creatures, Thopter engines, and many candidate payoffs.",
+          "caveat": "Only suitable as a metagame hate piece despite severe self-conflict.",
+          "evidence": [
+            {
+              "key": "C63",
+              "quote": "Creatures entering don't cause abilities to trigger."
+            },
+            {
+              "key": "D0",
+              "quote": "At the beginning of combat on your turn, you may pay {E}{E}{E}"
+            }
+          ],
+          "name": "Torpor Orb",
+          "evidence_errors": []
+        }
+      ],
+      "recommendations": [
+        {
+          "rank": 1,
+          "key": "C00",
+          "name": "Gonti's Aether Heart",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 2,
+          "key": "C60",
+          "name": "Izzet Generatorium",
+          "evidence_valid": false,
+          "recommendation_valid": false
+        },
+        {
+          "rank": 3,
+          "key": "C37",
+          "name": "Aetherworks Marvel",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 4,
+          "key": "C05",
+          "name": "Decoction Module",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 5,
+          "key": "C08",
+          "name": "Whirler Virtuoso",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 6,
+          "key": "C11",
+          "name": "Sai, Master Thopterist",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 7,
+          "key": "C20",
+          "name": "Forensic Gadgeteer",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 8,
+          "key": "C22",
+          "name": "Panharmonicon",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 9,
+          "key": "C23",
+          "name": "Fabrication Module",
+          "evidence_valid": false,
+          "recommendation_valid": false
+        },
+        {
+          "rank": 10,
+          "key": "C24",
+          "name": "Mirage Mockery",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 11,
+          "key": "C27",
+          "name": "Jhoira, Weatherlight Captain",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 12,
+          "key": "C31",
+          "name": "Academy Manufactor",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 13,
+          "key": "C48",
+          "name": "Enthusiastic Mechanaut",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 14,
+          "key": "C57",
+          "name": "Reckless Fireweaver",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        },
+        {
+          "rank": 15,
+          "key": "C55",
+          "name": "Shuri, Wakandan Inventor",
+          "evidence_valid": true,
+          "recommendation_valid": true
+        }
+      ],
+      "evidence_valid_count": 59,
+      "candidate_count": 64
+    }
+  ],
+  "scope": "known regressions; quotation coverage is not semantic accuracy"
+}

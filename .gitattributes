@@ -2,3 +2,9 @@
 # Keep frozen experiment evidence byte-for-byte across platforms.
 docs/research/new-cards-spike-2026-10-05/*.json -text
 docs/research/new-cards-spike-2026-10-05/*.txt -text
+docs/research/commander-discovery*/**/*.json -text whitespace=cr-at-eol
+docs/research/deck-recovery-smoke/*.json -text whitespace=cr-at-eol
+backend/evals/commander_discovery/*.json -text whitespace=cr-at-eol
+backend/evals/deck_recovery/*.txt -text whitespace=cr-at-eol
+# The official rules resource is verified against its original byte hash.
+backend/src/mtg_helper/services/recommendations/data/*.txt -text whitespace=cr-at-eol

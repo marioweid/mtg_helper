@@ -1,0 +1,58 @@
+{
+  "card_searches": {
+    "nomination_errors": [],
+    "queries": []
+  },
+  "rule_searches": [],
+  "source_prefixes": [
+    {
+      "text": "Flying",
+      "count": 534
+    },
+    {
+      "text": "Trample",
+      "count": 342
+    },
+    {
+      "text": "Enchant creature",
+      "count": 262
+    },
+    {
+      "text": "Deathtouch",
+      "count": 160
+    },
+    {
+      "text": "Flash",
+      "count": 150
+    },
+    {
+      "text": "Reach",
+      "count": 144
+    },
+    {
+      "text": "{T}: Add one mana of any color.",
+      "count": 109
+    },
+    {
+      "text": "Choose one —",
+      "count": 107
+    },
+    {
+      "text": "Menace",
+      "count": 102
+    },
+    {
+      "text": "Equip {2}",
+      "count": 98
+    },
+    {
+      "text": "Vigilance",
+      "count": 73
+    },
+    {
+      "text": "Reach (This creature can block creatures with flying.)",
+      "count": 72
+    }
+  ],
+  "note": "Matches are hypotheses, not fit; broad/zero/error results need explicit revision."
+}

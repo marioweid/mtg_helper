@@ -1,0 +1,51 @@
+{
+  "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt",
+  "sha256": "8d860e451f20f38865b725b42d82feb714c725373dd8f3b32b8652b3eeb070ca",
+  "rules": [
+    {
+      "key": "R00",
+      "text": "109.5. The words “you” and “your” on an object refer to the object’s controller, its would-be controller (if a player is attempting to play, cast, or activate it), or its owner (if it has no controller). For a static ability, this is the current controller of the object it’s on. For an activated ability, this is the player who activated the ability. For a triggered ability, this is the controller of the object when the ability triggered, unless it’s a delayed triggered ability. To determine the controller of a delayed triggered ability, see rules 603.7d–f.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R01",
+      "text": "122.1. A counter is a marker placed on an object or player that modifies its characteristics and/or interacts with a rule, ability, or effect. Counters are not objects and have no characteristics. Notably, a counter is not a token, and a token is not a counter. Counters with the same name or description are interchangeable.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R02",
+      "text": "701.34a To proliferate means to choose any number of permanents and/or players that have a counter, then give each one additional counter of each kind that permanent or player already has.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R03",
+      "text": "707.2. When copying an object, the copy acquires the copiable values of the original object’s characteristics and, for an object on the stack, choices made when casting or activating it (mode, targets, the value of X, whether it was kicked, how it will affect multiple targets, and so on). The copiable values are the values derived from the text printed on the object (that text being name, mana cost, color indicator, card type, subtype, supertype, rules text, power, toughness, and/or loyalty), as modified by other copy effects, by its face-down status, and by “as . . . enters” and “as . . . is turned face up” abilities that set power and toughness (and may also set additional characteristics). Other effects (including type-changing and text-changing effects), status, counters, and stickers are not copied.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R04",
+      "text": "707.9a Some copy effects cause the copy to gain an ability as part of the copying process. This ability becomes part of the copiable values for the copy, along with any other abilities that were copied.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R05",
+      "text": "707.9b Some copy effects modify a characteristic as part of the copying process. The final set of values for that characteristic becomes part of the copiable values of the copy.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R06",
+      "text": "603.7b A delayed triggered ability will trigger only once—the next time its trigger event occurs—unless it has a stated duration, such as “this turn.” If its trigger event occurs more than once simultaneously and the ability doesn’t have a stated duration, the controller of the delayed triggered ability chooses which event causes the ability to trigger.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R07",
+      "text": "701.7a To create one or more tokens with certain characteristics, put the specified number of tokens with the specified characteristics onto the battlefield.",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    },
+    {
+      "key": "R08",
+      "text": "724.1b Exile every object on the stack, including the object that’s resolving. All objects not on the battlefield or in the command zone that aren’t represented by cards will cease to exist the next time state-based actions are checked (see rule 704, “State-Based Actions”).",
+      "source": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt"
+    }
+  ]
+}
