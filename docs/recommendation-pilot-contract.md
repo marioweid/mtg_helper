@@ -116,8 +116,17 @@ and obtain an explicitly reviewed reconciliation; there is no safe “clear hold
 
 ## API and feature gate
 
-All endpoints require authenticated deck ownership and the `recommendations` capability, default
-false, under `/api/v1/decks/{deck_id}/recommendations`:
+The Admin page has a **Discover · Experimental** access panel near the top. It loads the signed-in
+account and effective capability, then offers **Enable for my account** or **Disable for my account**.
+These explicit actions use the existing authenticated admin feature-flag endpoint with that account's
+ID; the panel never changes the global default or other accounts. Loading/refreshing status is
+read-only, and toggling access never generates recommendations. After enabling, reload an open deck
+to see the Discover tab. An uncertain save requires **Refresh status** before another change.
+This convenience control does not approve spending or establish source readiness/provider prices.
+Disabling stops future run stages; a request already in flight may still bill.
+
+All deck recommendation endpoints require authenticated deck ownership and the `recommendations`
+capability, default false, under `/api/v1/decks/{deck_id}/recommendations`:
 
 - `GET /status`, `POST /preview-query` (literal cards and native rules, no provider request).
 - `POST /runs` (explicit request key/input; 202) and `GET /runs/{run_id}`.
@@ -144,7 +153,9 @@ Completed checks:
   Covers source-generation changes, single-use claims, unknown holds/UTC rollover, deleted-deck
   spending, late receipts, ownership, isolated feedback, current completion legality and origins
   through manual merge, Oracle repair, partial and batch completion.
-- All 60 frontend tests, frontend typecheck/lint/format, backend Ruff lint/format and `ty` passed.
+- All 78 frontend tests (including 18 admin-access checks) and frontend typecheck/lint/format passed.
+  Backend Ruff lint/format and `ty` passed during the pilot implementation; no backend code changed
+  for the admin-access panel.
 - Five offline historical replays preserved all 37 archived research JSON files byte for byte.
 - Wheel packaging verified the complete official rules text/hash. Clean schemas were initialized
   by database tests; reapplying the schema preserved all 22 immutable test source snapshots.
