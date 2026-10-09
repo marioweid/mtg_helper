@@ -56,9 +56,10 @@ export function AdminDiscoverControls({ state, onRefresh, onToggle }: ControlsPr
         {state.loading ? "Loading status…" : state.saving ? "Saving…" : status}
       </p>
       <p className="text-sm text-amber-300">
-        Enabling and browsing do not call AI. Generate makes paid requests (up to $0.10/run,
-        $1/account/day estimate guards). Verify provider pricing and source readiness before
-        generating. Disabling stops future stages; an in-flight request may still bill.
+        Enabling and browsing do not call AI. Draft strategy (up to $0.01/run) and Generate cards
+        (up to $0.10/run) make paid requests, sharing the $1/account/day estimate guard. Verify
+        provider pricing and source readiness before generating. Disabling stops future stages; an
+        in-flight request may still bill.
       </p>
       <div className="flex flex-wrap gap-2">
         <button

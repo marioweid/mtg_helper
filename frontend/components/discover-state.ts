@@ -10,6 +10,7 @@ import type {
 type Client = Pick<
   typeof apiClient,
   | "getDiscoverStatus"
+  | "draftCommanderStrategy"
   | "generateDiscover"
   | "previewDiscover"
   | "planDiscover"
@@ -25,6 +26,7 @@ export interface DiscoverState {
   error: string | null;
   loading: boolean;
   generating: boolean;
+  drafting: boolean;
   browsing: boolean;
   planning: string | null;
   goal: string;
@@ -39,6 +41,7 @@ export class DiscoverController {
     error: null,
     loading: false,
     generating: false,
+    drafting: false,
     browsing: false,
     planning: null,
     goal: "",
@@ -48,6 +51,8 @@ export class DiscoverController {
   private epoch = 0;
   private live = false;
   private pending: DiscoverGenerate | null = null;
+  private pendingDraftKey: string | null = null;
+  private goalInitialized = false;
   private preview: DiscoverPreview = {};
   private rulesPreview: DiscoverPreview = {};
 
@@ -77,6 +82,7 @@ export class DiscoverController {
   }
 
   setGoal(goal: string): void {
+    this.goalInitialized = true;
     this.update({ goal });
   }
 
@@ -106,25 +112,70 @@ export class DiscoverController {
     if (this.timer) clearTimeout(this.timer);
     this.update({ loading: true, error: null });
     const epoch = this.epoch;
-    await this.perform(
+    const status = await this.perform(
       () => this.api.getDiscoverStatus(this.deckId),
       (status) => ({
         status,
-        goal: this.state.goal || status.run?.goal || status.goal_seed,
+        goal: this.goalInitialized ? this.state.goal : status.run?.goal || status.goal_seed,
       }),
     );
     if (!this.live || epoch !== this.epoch) return;
+    if (status) this.goalInitialized = true;
     this.update({ loading: false });
-    if (this.state.status?.run?.status === "running") {
+    if (this.running()) {
       this.timer = setTimeout(() => void this.refresh(), 3000);
     }
   }
 
+  private running(): boolean {
+    return (
+      this.state.status?.run?.status === "running" ||
+      this.state.status?.strategy_run?.status === "running"
+    );
+  }
+
+  private paidActionBlocked(): boolean {
+    return (
+      !this.live ||
+      this.state.drafting ||
+      this.state.generating ||
+      !this.state.status?.ready ||
+      this.running()
+    );
+  }
+
+  async draftStrategy(): Promise<void> {
+    if (this.paidActionBlocked()) return;
+    const epoch = this.epoch;
+    this.pendingDraftKey ??= crypto.randomUUID();
+    const body = { request_key: this.pendingDraftKey };
+    this.update({ drafting: true, error: null });
+    const result = await this.perform(
+      () => this.api.draftCommanderStrategy(this.deckId, body),
+      (strategy_run) => ({
+        status: this.state.status ? { ...this.state.status, strategy_run } : null,
+      }),
+    );
+    if (!this.live || epoch !== this.epoch) return;
+    this.update({ drafting: false });
+    if (result) {
+      this.pendingDraftKey = null;
+      await this.refresh();
+    }
+  }
+
+  useStrategy(): void {
+    const run = this.state.status?.strategy_run;
+    if (run?.status === "completed" && !run.stale && run.strategy) {
+      this.setGoal(run.strategy.goal);
+    }
+  }
+
   async generate(constraint: DiscoverQuery | null): Promise<void> {
-    if (this.state.generating || !this.state.status?.ready) return;
+    if (this.paidActionBlocked()) return;
     const goal = this.state.goal.trim();
     if (!goal) {
-      this.update({ error: "Enter a commander-only goal" });
+      this.update({ error: "Enter a commander-only goal or draft a strategy first" });
       return;
     }
     if (
@@ -216,8 +267,8 @@ export class DiscoverController {
     this.update({ planning: null });
   }
 
-  async inspect(): Promise<void> {
-    const run = this.state.status?.run;
+  async inspect(strategy = false): Promise<void> {
+    const run = strategy ? this.state.status?.strategy_run : this.state.status?.run;
     if (!run) return;
     await this.perform(
       () => this.api.getDiscoverTrace(this.deckId, run.id),

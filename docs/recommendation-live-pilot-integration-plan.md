@@ -7,6 +7,10 @@ The first commander-only adapter, shared core and isolated UI are implemented. I
 review found a rules-snapshot pagination issue, repaired and confirmed by a focused recheck. See the
 [implemented contract](recommendation-pilot-contract.md) for actual boundaries and operating notes.
 Live account enablement and spending authorization remain separate gates.
+The user also chose **draft strategy first**: an explicit one-call, source-only commander goal draft,
+then review/**Use as goal**/edit, then a separate explicit card Generate. `app-strategy-v1` reuses the
+same durable spending ledger and daily allowance without replacing card-run history or changing
+`app-pilot-v1`'s three-call bounds; see the contract for its $0.01 estimate ceiling.
 The user wants to live-test the new pipeline alongside the existing recommendations and keep the
 research/evaluation workflow active. They explicitly chose **commander-only first**: physical cards
 and planned additions are exclusions, not model support or a deck-aware balance analysis.
@@ -42,7 +46,9 @@ be supported with both complete facts/combined identity and a dedicated test or 
 unavailable; do not silently use one commander. Initial release can gate unsupported partner decks.
 
 Opening a tab, refreshing/polling, or changing a display filter performs **no model request**.
-A visible Generate button previews call/spend bounds and explicitly starts a run. Local source
+A visible Generate button previews card-run call/spend bounds and explicitly starts a run. An
+optional, separately priced Draft commander strategy button starts only the source-only goal draft;
+reviewing/copying/editing its result performs no model request or saved-deck edit. Local source
 browsing, card details, filtering and manual planning remain available while AI is slow or absent.
 No optimistic "no matches" result when sources are absent or work is pending/failed.
 

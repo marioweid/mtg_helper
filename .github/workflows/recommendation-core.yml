@@ -45,6 +45,7 @@ jobs:
         run: |
           uv run --no-sync pytest -q -W error \
             tests/test_recommendation_core.py \
+            tests/test_recommendation_strategy.py \
             tests/test_commander_discovery_luna_refined.py \
             tests/test_commander_discovery_refinement.py \
             tests/test_commander_discovery_sol_assessment.py \

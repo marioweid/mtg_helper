@@ -2,7 +2,7 @@
 
 ## Now
 
-**Status: commander-only Discover implementation requested; default off, not a proven recommender.**
+**Status: commander-only Discover implemented; default off, not a proven recommender.**
 
 The user now wants to live-test the source-backed pipeline alongside the old Top Picks logic, kept
 as Community Picks, while retaining the evaluation tools. They chose commander-only first, with
@@ -14,6 +14,10 @@ incorporated. The shared core and isolated adapter are implemented and independe
 [implemented contract](recommendation-pilot-contract.md). No deployment, account enablement or paid
 application calls occurred. Model defaults and experiment receipts remain unchanged; old paid
 budgets stay consumed. Semantic accuracy and real application latency remain unproven.
+The user selected a visible **draft strategy first** workflow: one separately bounded, explicit AI
+commander-goal draft, followed by review/copy/edit and a separate card Generate. It uses printed
+commander facts only, shares the durable spending/unknown-hold boundary, preserves card-run results
+and never automatically changes the saved deck description. The implemented contract describes it.
 
 The user wants interactive visual building and goal-driven agent advice without depending on
 Moxfield, EDHREC, or embeddings. Evaluation decks are Zaxara, Camellia, Yuna Grand Summoner, and

@@ -24,6 +24,7 @@ class Work:
     source_hash: str
     rules_hash: str
     context: Card
+    profile: str = budget.VERSION
 
 
 @dataclass(kw_only=True)
@@ -35,6 +36,7 @@ class NewRun:
     source_hash: str
     rules_hash: str
     context: Card
+    profile: str = budget.VERSION
 
 
 async def account_lock(conn: asyncpg.Connection, account_id: UUID) -> None:
@@ -87,6 +89,7 @@ class RunRepository:
             await expire_locked(conn, owner.account_id)
 
     async def create(self, new: NewRun) -> tuple[UUID, Work | None]:
+        reserved = budget.reservation(new.profile)
         async with self.pool.acquire() as conn, conn.transaction():
             await owned_deck(conn, new.owner, new.deck_id)
             await account_lock(conn, new.owner.account_id)
@@ -100,6 +103,7 @@ class RunRepository:
                 if (
                     existing["request_hash"] != new.request_hash
                     or existing["deck_id"] != new.deck_id
+                    or existing["profile"] != new.profile
                 ):
                     raise DiscoveryError("Request key already used for different inputs", 409)
                 return existing["id"], None
@@ -116,10 +120,10 @@ class RunRepository:
                 new.request_hash,
                 new.source_hash,
                 new.rules_hash,
-                budget.VERSION,
+                new.profile,
                 json.dumps(new.context),
                 token,
-                budget.reservation(),
+                reserved,
             )
             return run_id, Work(
                 id=run_id,
@@ -129,6 +133,7 @@ class RunRepository:
                 source_hash=new.source_hash,
                 rules_hash=new.rules_hash,
                 context=new.context,
+                profile=new.profile,
             )
 
     async def _can_create(self, conn: asyncpg.Connection, new: NewRun) -> None:
@@ -145,7 +150,10 @@ class RunRepository:
         )
         if unknown:
             raise DiscoveryError("Unknown billing hold; admin reconciliation required", 409)
-        if await spending(conn, new.owner.account_id) + budget.reservation() > budget.DAILY_CAP:
+        if (
+            await spending(conn, new.owner.account_id) + budget.reservation(new.profile)
+            > budget.DAILY_CAP
+        ):
             raise DiscoveryError("Discover daily estimated spending limit reached", 429)
 
     async def checkpoint(self, work: Work, phase: str, request: Card) -> bool:
@@ -159,9 +167,9 @@ class RunRepository:
                 work.token,
                 phase,
             )
-            if row is None:
+            if row is None or row["profile"] != work.profile:
                 return False
-            reserved = budget.cost(*budget.BOUNDS[phase])
+            reserved = budget.cost(*budget.bounds(row["profile"])[phase])
             if row["held_microusd"] < reserved:
                 raise DiscoveryError("Insufficient reservation; no request sent", 409)
             inserted = await conn.fetchval(
@@ -213,7 +221,11 @@ class RunRepository:
                 )
 
     async def publish(self, work: Work, phase: str, data: Card) -> bool:
-        next_phase = {"plan": "revise", "revise": "review", "review": "done"}[phase]
+        next_phase = (
+            "done"
+            if work.profile == budget.STRATEGY_VERSION
+            else {"plan": "revise", "revise": "review", "review": "done"}[phase]
+        )
         if phase == "revise" and not data["candidates"]:
             next_phase = "done"
         result = await self.pool.execute(
@@ -222,12 +234,13 @@ class RunRepository:
             "held_microusd = CASE WHEN $4 = 'done' THEN 0 ELSE held_microusd END, "
             "finished_at = CASE WHEN $4 = 'done' THEN now() ELSE NULL END "
             "WHERE id = $1 AND token = $2 AND status = 'running' AND phase = $5 "
-            "AND lease_until > now()",
+            "AND lease_until > now() AND profile = $6",
             work.id,
             work.token,
             json.dumps(data),
             next_phase,
             phase,
+            work.profile,
         )
         return result == "UPDATE 1" and next_phase != "done"
 

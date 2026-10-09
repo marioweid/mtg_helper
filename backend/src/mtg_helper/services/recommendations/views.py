@@ -57,11 +57,12 @@ def run_view(
         profile=row["profile"],
         error=row["error"],
         candidates=candidates,
+        strategy=data.get("strategy_draft") if row["profile"] == budget.STRATEGY_VERSION else None,
         known_cost_microusd=row["known_cost_microusd"],
         held_microusd=row["held_microusd"],
         stale=(
             source_hash != row["source_hash"]
-            or row["profile"] != budget.VERSION
+            or row["profile"] not in {budget.VERSION, budget.STRATEGY_VERSION}
             or context["commander"]["oracle_id"] != commander_id
         ),
     )

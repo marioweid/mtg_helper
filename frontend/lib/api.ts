@@ -139,6 +139,12 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
+  draftCommanderStrategy: (deckId: string, body: { request_key: string }) =>
+    request<DiscoverRun>(`/decks/${deckId}/recommendations/strategy-drafts`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   getDiscoverStatus: (deckId: string) =>
     request<DiscoverStatus>(`/decks/${deckId}/recommendations/status`),
   previewDiscover: (deckId: string, body: DiscoverPreview) =>

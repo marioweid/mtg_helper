@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import Field, ValidationError
 
-from mtg_helper.services.recommendations import budget, profiles, refinement
+from mtg_helper.services.recommendations import budget, profiles, refinement, strategy
 from mtg_helper.services.recommendations.discovery import (
     Assessment,
     Query,
@@ -177,8 +177,11 @@ class Workflow:
         return updated
 
 
-def stage(phase: str, payload: Card) -> profiles.Stage:
-    """Bind review IDs to real discoveries and preserve historical prompts in their own profile."""
+def stage(phase: str, payload: Card, *, profile: str = budget.VERSION) -> profiles.Stage:
+    """Bind a known paid profile without changing historical evaluation prompts."""
+    bound = budget.bounds(profile)[phase]
+    if profile == budget.STRATEGY_VERSION:
+        return profiles.Stage(strategy.PROMPT, strategy.StrategyDraft, *bound)
     plan = profiles.PLAN_PROMPT.replace(
         "Do not invent budget/bracket/combo constraints.", "Respect declared typed constraints."
     )
@@ -192,12 +195,12 @@ def stage(phase: str, payload: Card) -> profiles.Stage:
         "review": review + profiles.CLOSED_REVIEW_PROMPT,
     }
     schema = refinement.review_type(payload) if phase == "review" else AppPlan
-    return profiles.Stage(prompts[phase] + APP_CONTEXT, schema, *budget.BOUNDS[phase])
+    return profiles.Stage(prompts[phase] + APP_CONTEXT, schema, *bound)
 
 
-def check_request(phase: str, payload: Card) -> profiles.Stage:
+def check_request(phase: str, payload: Card, *, profile: str = budget.VERSION) -> profiles.Stage:
     """Bound framing, schema, instructions and payload together; never truncate facts."""
-    fixed = stage(phase, payload)
+    fixed = stage(phase, payload, profile=profile)
     size = (
         len(
             (
