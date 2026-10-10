@@ -18,7 +18,7 @@ from mtg_helper.models.recommendations import (
     StrategyDraftRequest,
 )
 from mtg_helper.services import feature_flag_service
-from mtg_helper.services.recommendations import budget, pipeline, strategy, views
+from mtg_helper.services.recommendations import artwork, budget, pipeline, strategy, views
 from mtg_helper.services.recommendations.planning import Planner
 from mtg_helper.services.recommendations.provider import Provider
 from mtg_helper.services.recommendations.repository import (
@@ -94,12 +94,12 @@ class DiscoveryService:
                 "SELECT published_at FROM new_card_catalog_state"
             )
             rows = await conn.fetch(
-                "SELECT DISTINCT ON (profile = $3) * FROM recommendation_runs "
+                "SELECT DISTINCT ON (profile LIKE $3) * FROM recommendation_runs "
                 "WHERE account_id = $1 AND deck_id = $2 "
-                "ORDER BY (profile = $3), created_at DESC",
+                "ORDER BY (profile LIKE $3), created_at DESC",
                 owner.account_id,
                 deck_id,
-                budget.STRATEGY_VERSION,
+                "app-strategy-%",
             )
             for row in rows:
                 view = views.run_view(
@@ -108,7 +108,8 @@ class DiscoveryService:
                     commander_id=str(deck["commander_oracle_id"]),
                     source_hash=status.source_hash,
                 )
-                if row["profile"] == budget.STRATEGY_VERSION:
+                await artwork.attach(conn, view.candidates)
+                if row["profile"].startswith("app-strategy-"):
                     status.strategy_run = view
                 else:
                     status.run = view
@@ -129,9 +130,12 @@ class DiscoveryService:
                 "Pinned sources unavailable; restart or ask Admin to sync", status
             ) from exc
         try:
-            return await asyncio.to_thread(
+            page = await asyncio.to_thread(
                 views.browse, sources, leader_for_deck(deck, sources.cards), hidden, request
             )
+            async with self.pool.acquire() as conn:
+                await artwork.attach(conn, page.cards)
+            return page
         except ValueError as exc:
             raise DiscoveryError(str(exc), 422) from exc
 
@@ -265,12 +269,14 @@ class DiscoveryService:
             row = await owned_run(conn, owner, deck_id, run_id)
             deck = await owned_deck(conn, owner, deck_id)
             current = await conn.fetchval("SELECT source_sha256 FROM new_card_catalog_state")
-            return views.run_view(
+            view = views.run_view(
                 dict(row),
                 await exclusions(conn, owner, deck_id),
                 commander_id=str(deck["commander_oracle_id"]),
                 source_hash=current,
             )
+            await artwork.attach(conn, view.candidates)
+            return view
 
     async def trace(self, owner: Owner, deck_id: UUID, run_id: UUID) -> Card:
         async with self.pool.acquire() as conn:

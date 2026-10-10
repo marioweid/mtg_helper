@@ -4,8 +4,8 @@ from typing import Any
 
 MODEL = "gpt-5.6-luna"
 VERSION = "app-pilot-v1"
-STRATEGY_VERSION = "app-strategy-v1"
-STRATEGY_BOUNDS = {"plan": (20_000, 2_000)}
+STRATEGY_VERSION = "app-strategy-v2"
+STRATEGY_BOUNDS = {"plan": (20_000, 4_000)}
 STRATEGY_CAP = 10_000
 BOUNDS = {"plan": (20_000, 5_000), "revise": (60_000, 5_000), "review": (95_000, 10_000)}
 RUN_CAP = 100_000

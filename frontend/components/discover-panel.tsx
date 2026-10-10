@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DiscoverController, type DiscoverState } from "@/components/discover-state";
 import { CommanderStrategyPanel } from "@/components/commander-strategy-panel";
 import { ManaCost } from "@/components/mana-cost";
+import { VisualCardGrid, VisualCardTile } from "@/components/visual-card-grid";
 import type {
   DiscoverCandidate,
   DiscoverFace,
@@ -246,7 +247,7 @@ function DiscoverProgress({ state }: { state: DiscoverState }) {
   );
 }
 
-function DiscoverResults({ state, controller }: StateProps) {
+export function DiscoverResults({ state, controller }: StateProps) {
   const run = state.status?.run;
   return (
     <div className="space-y-4">
@@ -259,15 +260,17 @@ function DiscoverResults({ state, controller }: StateProps) {
         {!run?.candidates.length && (
           <p>No shortlist available. Browse source cards independently.</p>
         )}
-        {run?.candidates.map((card) => (
-          <Candidate
-            key={card.oracle_id}
-            card={card}
-            run={run}
-            state={state}
-            controller={controller}
-          />
-        ))}
+        <VisualCardGrid>
+          {run?.candidates.map((card) => (
+            <Candidate
+              key={card.oracle_id}
+              card={card}
+              run={run}
+              state={state}
+              controller={controller}
+            />
+          ))}
+        </VisualCardGrid>
       </div>
       <div className={BOX}>
         <h3 className="font-medium">Local matches · not fit recommendations</h3>
@@ -277,15 +280,17 @@ function DiscoverResults({ state, controller }: StateProps) {
             {state.page.snapshot_hash.slice(0, 12)}
           </p>
         )}
-        {state.page?.cards.map((card) => (
-          <Candidate
-            key={card.oracle_id}
-            card={card}
-            run={null}
-            state={state}
-            controller={controller}
-          />
-        ))}
+        <VisualCardGrid>
+          {state.page?.cards.map((card) => (
+            <Candidate
+              key={card.oracle_id}
+              card={card}
+              run={null}
+              state={state}
+              controller={controller}
+            />
+          ))}
+        </VisualCardGrid>
         {state.page?.next_cursor && (
           <button
             className={BUTTON}
@@ -300,21 +305,32 @@ function DiscoverResults({ state, controller }: StateProps) {
   );
 }
 
-function Candidate({
-  card,
-  run,
-  state,
-  controller,
-}: StateProps & {
+interface CandidateProps extends StateProps {
   card: DiscoverCandidate;
   run: DiscoverRun | null;
-}) {
+}
+
+function Candidate(props: CandidateProps) {
+  return (
+    <VisualCardTile
+      name={props.card.facts.name}
+      imageUri={props.card.image_uri ?? null}
+      footer={<CandidateDetails {...props} />}
+    />
+  );
+}
+
+function CandidateDetails({ card, run, state, controller }: CandidateProps) {
   const canRecommend = !!run && card.recommended && !run.stale && !card.excluded;
   return (
-    <article className="rounded border border-white/10 p-3 space-y-2">
+    <article className="space-y-2">
       <h4 className="font-semibold">
         {card.facts.name} <ManaCost cost={card.facts.mana_cost} />
       </h4>
+      <p className="text-xs text-gray-400">
+        Artwork: current catalog printing. Source facts and advice below retain their pinned
+        snapshot.
+      </p>
       <details>
         <summary className="cursor-pointer text-sm">Authoritative source facts</summary>
         <SourceFacts face={card.facts} />
@@ -451,8 +467,9 @@ function RulesBrowser({ state, controller }: StateProps) {
   );
 }
 
-function DiscoverTrace({ state, controller }: StateProps) {
-  const strategy = state.trace?.["profile"] === "app-strategy-v1";
+export function DiscoverTrace({ state, controller }: StateProps) {
+  const profile = state.trace?.["profile"];
+  const strategy = typeof profile === "string" && profile.startsWith("app-strategy-");
   return (
     <div className={BOX}>
       <RulesBrowser state={state} controller={controller} />

@@ -31,6 +31,7 @@ export interface DiscoverFacts extends DiscoverFace {
 export interface DiscoverCandidate {
   oracle_id: string;
   facts: DiscoverFacts;
+  image_uri?: string | null;
   state: "unassessed" | "assessed" | "failed";
   assessment: {
     fit: "core" | "support" | "conditional" | "weak" | "uncertain";
@@ -43,7 +44,14 @@ export interface DiscoverCandidate {
   excluded: boolean;
 }
 
-export interface CommanderStrategyDraft {
+export const STRATEGY_PROFILE = "app-strategy-v2";
+
+export interface CommanderStrategyChoice {
+  title: string;
+  pace: string;
+  early_game: string;
+  engine: string;
+  payoff: string;
   goal: string;
   explanation: string;
   uncertainties: string[];
@@ -63,7 +71,7 @@ export interface DiscoverRun {
   candidates: DiscoverCandidate[];
   known_cost_microusd: number;
   held_microusd: number;
-  strategy?: CommanderStrategyDraft | null;
+  strategies?: CommanderStrategyChoice[];
 }
 
 export interface DiscoverStatus {

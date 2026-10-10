@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api";
+import { STRATEGY_PROFILE } from "@/lib/discovery-types";
 import type {
   DiscoverGenerate,
   DiscoverPage,
@@ -164,10 +165,11 @@ export class DiscoverController {
     }
   }
 
-  useStrategy(): void {
+  useStrategy(index: number): void {
     const run = this.state.status?.strategy_run;
-    if (run?.status === "completed" && !run.stale && run.strategy) {
-      this.setGoal(run.strategy.goal);
+    const choice = Number.isInteger(index) && index >= 0 ? run?.strategies?.[index] : null;
+    if (run?.status === "completed" && !run.stale && run.profile === STRATEGY_PROFILE && choice) {
+      this.setGoal(choice.goal);
     }
   }
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from mtg_helper.services.recommendations.discovery import StrictModel
 from mtg_helper.services.recommendations.pipeline import LiteralQuery
 from mtg_helper.services.recommendations.refinement import KeyedAssessment, RuleQuery
-from mtg_helper.services.recommendations.strategy import StrategyDraft
+from mtg_helper.services.recommendations.strategy import StrategyChoice
 
 
 class StrategyDraftRequest(StrictModel):
@@ -47,6 +47,7 @@ class QueryPreview(StrictModel):
 class CandidateView(BaseModel):
     oracle_id: UUID
     facts: dict[str, Any]
+    image_uri: str | None = None
     state: Literal["unassessed", "assessed", "failed"] = "unassessed"
     assessment: KeyedAssessment | None = None
     evidence_errors: list[str] = Field(default_factory=list)
@@ -66,7 +67,7 @@ class RunView(BaseModel):
     error: str | None = None
     stale: bool = False
     candidates: list[CandidateView] = Field(default_factory=list)
-    strategy: StrategyDraft | None = None
+    strategies: list[StrategyChoice] = Field(default_factory=list)
     known_cost_microusd: int = 0
     held_microusd: int = 0
 
@@ -81,7 +82,7 @@ class DiscoveryStatus(BaseModel):
     run: RunView | None = None
     strategy_run: RunView | None = None
     strategy_cap_microusd: int = 10_000
-    strategy_reserved_microusd: int = 7_400
+    strategy_reserved_microusd: int = 9_800
     strategy_maximum_calls: int = 1
     run_cap_microusd: int = 100_000
     daily_cap_microusd: int = 1_000_000

@@ -14,9 +14,11 @@ incorporated. The shared core and isolated adapter are implemented and independe
 [implemented contract](recommendation-pilot-contract.md). No deployment, account enablement or paid
 application calls occurred. Model defaults and experiment receipts remain unchanged; old paid
 budgets stay consumed. Semantic accuracy and real application latency remain unproven.
-The user selected a visible **draft strategy first** workflow: one separately bounded, explicit AI
-commander-goal draft, followed by review/copy/edit and a separate card Generate. It uses printed
-commander facts only, shares the durable spending/unknown-hold boundary, preserves card-run results
+The user selected a visible **draft strategy first** workflow: one separately bounded AI call now
+proposes three selectable directions with pace, early setup/ramp, engine and possible payoff; no
+complete win condition is required. Selection copies all phases/uncertainties into the editable
+goal before a separate card Generate. Image tiles reuse current-catalog art outside source evidence.
+It uses printed commander facts only, shares durable spending/unknown holds, preserves card results
 and never automatically changes the saved deck description. The implemented contract describes it.
 
 The user wants interactive visual building and goal-driven agent advice without depending on
