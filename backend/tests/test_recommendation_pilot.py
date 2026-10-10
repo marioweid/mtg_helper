@@ -18,6 +18,7 @@ from mtg_helper.services.recommendations.repository import Owner
 from mtg_helper.services.recommendations.service import DiscoveryService
 from mtg_helper.services.recommendations.source_repository import SourceRepository
 from tests.conftest import create_test_account, create_test_deck
+from tests.test_recommendation_strategy import drafts
 
 pytestmark = pytest.mark.asyncio
 
@@ -28,7 +29,7 @@ class Transport:
         self.calls = []
         self.status = 200
         self.bad_quote = False
-        self.strategy_goal = "Build around the commander's printed abilities."
+        self.strategy_title = "Quick setup"
 
     async def handle(self, request):
         body = json.loads(request.content)
@@ -39,12 +40,9 @@ class Transport:
         assert json.loads(saved["request"]) == body
         self.calls.append(body)
         payload = json.loads(body["input"])
-        if "goal" in body["text"]["format"]["schema"]["properties"]:
-            output = {
-                "goal": self.strategy_goal,
-                "explanation": "A commander-only proposed direction, not existing-deck analysis.",
-                "uncertainties": ["Unverified advice"],
-            }
+        if "strategies" in body["text"]["format"]["schema"]["properties"]:
+            output = drafts()
+            output["strategies"][0]["title"] = self.strategy_title
         elif "candidates" in payload:
             rows = {}
             for index, card in enumerate(payload["candidates"]):
@@ -211,7 +209,7 @@ async def test_quote_failure_keeps_neighbor_and_feedback_does_not_touch_legacy(
     assert await db_pool.fetchval("SELECT count(*) FROM deck_feedback") == 0
 
 
-@pytest.mark.parametrize(("endpoint", "held"), [("runs", 11_000), ("strategy-drafts", 7_400)])
+@pytest.mark.parametrize(("endpoint", "held"), [("runs", 11_000), ("strategy-drafts", 9_800)])
 async def test_unknown_billing_blocks_new_runs_and_is_never_retried(
     pilot, client, db_pool, endpoint, held
 ):

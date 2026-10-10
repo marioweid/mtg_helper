@@ -57,7 +57,7 @@ def run_view(
         profile=row["profile"],
         error=row["error"],
         candidates=candidates,
-        strategy=data.get("strategy_draft") if row["profile"] == budget.STRATEGY_VERSION else None,
+        strategies=data.get("strategies", []) if row["profile"] == budget.STRATEGY_VERSION else [],
         known_cost_microusd=row["known_cost_microusd"],
         held_microusd=row["held_microusd"],
         stale=(

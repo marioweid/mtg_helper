@@ -9,8 +9,11 @@ Top Picks is labeled Community Picks with the same backend, source selection and
 The [integration plan](recommendation-live-pilot-integration-plan.md) remains the design reference.
 This document describes the actual first pilot and its limitations, not a recommendation-accuracy
 claim. Account enablement and the proposed spending ceilings require separate confirmation.
-An optional **Draft commander strategy** action now proposes a source-only, editable goal before
-card generation. It does not automatically replace a goal, save a deck or generate cards.
+**Draft 3 commander strategies** offers selectable source-only directions before card generation.
+Each has pace, early setup/ramp, main engine, possible payoff, explanation and uncertainties; a
+complete win condition is not required. Choosing one copies all phases and uncertainties into the
+editable discovery goal, without automatic saving or card generation. Suggestions and free source
+matches use the shared artwork-first card grid.
 
 ## Behavior
 
@@ -19,10 +22,11 @@ card generation. It does not automatically replace a goal, save a deck or genera
 - Explicit goals and literal Oracle/type/keyword/mana-value constraints. Narrative preferences are
   unverified; no bracket, price, collection-ownership or combo guarantee is implemented.
 - Source browsing, inspection, rules lookup, refresh and pending additions need no model calls.
-- Explicit **Draft commander strategy** makes one separately bounded call using only complete
-  commander facts. Review the unverified goal/explanation/uncertainties, select **Use as goal**, edit
-  the goal if needed, then explicitly Generate cards. Blank or existing edited goals survive refresh;
-  drafting never writes the saved deck description or discards previous card recommendations.
+- Explicit **Draft 3 commander strategies** makes one separately bounded call using only complete
+  commander facts. Compare the unverified directions, select one **Use as goal**, edit its complete
+  phase/uncertainty goal if needed, then explicitly Generate cards. Pace is a preference, not a speed
+  guarantee. Blank or existing edited goals survive refresh; drafting never writes the saved deck
+  description or discards previous card recommendations.
 - Only explicit **Generate** starts the card run: plan, one complete replacement revision, then
   assessment of at most 32 independently admitted cards. No eligible shortlist means no review call.
 - Invalid global identities/JSON fail the review. Independently valid assessment rows survive bad
@@ -43,9 +47,12 @@ Pure catalog/search/admission/evidence/rules operations and historical prompt pr
 `backend/src/mtg_helper/services/recommendations/`. Application modules never import `scripts.*`.
 Evaluation CLIs retain their file/provider adapters, frozen pools, protocols and exclusive ledgers.
 The separate `app-pilot-v1` contract uses real independent discoveries, not diagnostic fixtures.
-`app-strategy-v1` is a one-call draft, not a discovery/assessment pool or a card recommendation.
+`app-strategy-v2` is a one-call, three-choice draft, not a discovery/assessment pool or card advice.
 It reuses the same run/attempt ledger, account lock and unknown holds; no schema migration or new
-spending account is needed. A draft cannot authorize recommendation-origin additions.
+spending account is needed. A draft cannot authorize recommendation-origin additions. Archived
+`app-strategy-v1` records remain strategy history, never replace card results and retain their
+original private trace/accounting. They are stale/nonselectable, not adapted into invented choices
+or resumed with new bounds. Unknown holds from any profile still block spending.
 
 Preserved offline suite:
 
@@ -54,6 +61,7 @@ cd backend
 uv run --no-sync pytest -q -W error \
   tests/test_recommendation_core.py \
   tests/test_recommendation_strategy.py \
+  tests/test_recommendation_artwork.py \
   tests/test_commander_discovery_luna_refined.py \
   tests/test_commander_discovery_refinement.py \
   tests/test_commander_discovery_sol_assessment.py \
@@ -75,6 +83,12 @@ Existing spent/stopped authorizations are never reusable, including the unknown 
 Normal Admin card sync publishes complete normalized root/face facts alongside unchanged legacy
 New Cards facts, in the same catalog transaction. Immutable compressed card/rules snapshots are
 hash checked, bounded and retained in PostgreSQL. Read-only indexes cache two snapshot pairs.
+
+Artwork is optional current-catalog printing metadata, batched by Oracle identity after authorizing
+source/status/run reads. Only HTTPS URLs on `cards.scryfall.io` are exposed; missing/unsafe images
+fall back to readable name tiles. Images never enter provider payloads, gameplay snapshots, cursor
+hashes, evidence or spending fingerprints. Source facts/AI advice remain pinned even if artwork
+changes. The UI labels this distinction; artwork is not a guarantee of an owned/exact printing.
 
 The complete official rules text is packaged under
 `backend/src/mtg_helper/services/recommendations/data/rules-20260925.txt`, not an ignored cache.
@@ -108,8 +122,8 @@ The following are implemented **estimate guards**, not approved live spending or
 | Account/day ceiling | 1,000,000 microdollars ($1), UTC |
 | Phase input bytes/output tokens | 20,000/5,000; 60,000/5,000; 95,000/10,000 |
 
-The optional `app-strategy-v1` draft has one `plan` attempt, a 20,000-byte framed input bound and
-2,000-output-token bound. It reserves 7,400 microdollars ($0.0074), under its 10,000-microdollar
+The optional `app-strategy-v2` draft has one `plan` attempt, a 20,000-byte framed input bound and
+4,000-output-token bound. It reserves 9,800 microdollars ($0.0098), under its 10,000-microdollar
 ($0.01) estimate ceiling. It shares the same $1/account/UTC-day allowance, one-active-run lock and
 unknown holds as card runs. Using/editing a completed draft costs nothing; a later explicit card
 Generate retains its independent three-call bounds above. Neither action starts the other.
@@ -147,9 +161,11 @@ capability, default false, under `/api/v1/decks/{deck_id}/recommendations`:
 - `GET /status`, `POST /preview-query` (literal cards and native rules, no provider request).
 - `POST /runs` (explicit card-run request key/input; 202) and `GET /runs/{run_id}`.
 - `POST /strategy-drafts` (explicit request key only; 202). Status returns the latest draft in
-  `strategy_run` independently of the latest card `run`. The completed run's `strategy` contains
-  `goal`, `explanation` and `uncertainties`; card runs do not acquire it. Lost-response retries
-  retain the same request key, and keys cannot be reused across paid profiles.
+  `strategy_run` independently of the latest card `run`, including archived strategy versions.
+  A current completed draft's `strategies` contains exactly three choices: `title`, `pace`,
+  `early_game`, `engine`, `payoff`, `explanation`, `uncertainties` and a deterministic `goal` of at
+  most 1000 characters containing every phase/uncertainty without truncation. Card runs have no
+  choices. Lost-response retries retain the same key; keys cannot be reused across paid profiles.
 - `GET /runs/{run_id}/trace` (private diagnostics).
 - `POST /runs/{run_id}/candidates/{oracle_id}/plan` (validated recommendation).
 - `POST /candidates/{oracle_id}/plan` (explicit manual, unassessed source addition).
@@ -168,14 +184,14 @@ exercise paid model behavior.
 
 Completed checks:
 
-- 149 offline backend checks: all 135 preserved evaluation checks, 10 application-core checks and
-  4 strategy-draft checks.
-- 42 real isolated PostgreSQL checks: 15 Discover, 7 strategy-draft, 17 legacy New Cards and
-  3 card-identity checks.
+- 164 offline backend checks: all 135 preserved evaluation checks, 10 application-core checks,
+  6 strategy-choice checks and 13 artwork checks.
+- 44 real isolated PostgreSQL checks: 15 Discover, 8 strategy-choice, 1 artwork, 17 legacy New Cards
+  and 3 card-identity checks.
   Covers source-generation changes, single-use claims, unknown holds/UTC rollover, deleted-deck
   spending, late receipts, ownership, isolated feedback, current completion legality and origins
   through manual merge, Oracle repair, partial and batch completion.
-- All 90 frontend tests (including 18 admin-access and 12 strategy-draft checks), frontend
+- All 98 frontend tests (including 18 admin-access, 18 strategy and 2 image checks), frontend
   typecheck/lint/format, full backend Ruff lint/format and `ty check src/` passed.
   Draft checks cover separate reservations/profile fencing, duplicate workers, expiry/late settlement,
   shared daily allowance, cross-profile/UTC unknown holds, explicit goal use and no automatic deck edit.
@@ -185,10 +201,17 @@ Completed checks:
 - Independent boundary review found one P2: card pagination dropped its pinned rules hash. The
   repaired response/controller and fingerprint behavior passed a focused independent recheck and
   a real rules-publication regression.
-- Independent read-only review of the strategy-draft paid/action boundary found no supported
-  blockers. It inspected profile-specific bounds/fencing, shared holds/settlement, request-key
+- Earlier independent read-only review of the single-draft `app-strategy-v1` paid/action boundary
+  found no supported blockers. It inspected profile-specific bounds/fencing, shared holds/settlement, request-key
   identity, status separation and explicit goal use; it did not independently rerun the suites or
   establish paid-model behavior/semantic correctness.
+- The image/three-choice independent boundary review found a P2: trace refresh still recognized only
+  v1 and would switch v2 strategy traces to card traces (or disable refresh without card results).
+  The family-aware heading/refresh repair failed the two v2 regressions before the fix, then passed
+  all four current/archived-with/without-card cases. A focused independent recheck reran all 11
+  strategy controller tests and found no remaining supported blocker. No browser/paid-model proof.
+- Mutation checks detected unsafe artwork passthrough and missing selected-phase goal context;
+  the unchanged-on-disk implementation then passed all 19 targeted backend tests.
 
 The broader existing planned-change suite is **not a pass**:
 `test_planned_addition_is_excluded_from_physical_deck` expects two planned Sol Rings, but singleton
