@@ -9,6 +9,9 @@ run**: owner checks and actual-data rehearsal passed; independent review found n
 verification are still required. Owner checks include 207 Linux backend tests, 138 additional scoped
 offline checks, 12 frontend tests, lint/types/format, warning-free homeserver image builds, and a
 clean offline zizmor workflow audit. Database/build/live-sync evidence was not independently rerun.
+The focused rollout review found an admission/drain race. The owner repaired it by closing admission
+before waiting, then rechecking leases after backend stop and before candidate startup. Runnable
+failure-path checks verify drain timeout and post-stop active leases prevent backup/migration.
 
 This ships the canonical publication foundation only. Old label consumers, maintenance streams,
 legacy columns and prompts remain. No sole-source cutover or recommendation-accuracy claim is made.
@@ -48,8 +51,10 @@ No paid model requests are part of rehearsal or deployment verification.
    replacement images before the maintenance interval; do not recreate PostgreSQL, Qdrant, Portainer
    or other homeserver applications. Retain the existing runtime environment, data directory,
    frontend port/binding, public OAuth URL, credentials, admin allowlist and tracing configuration.
-3. Pause only the MTG Helper sync worker and frontend/backend during the final write freeze. Let
-   in-flight work drain. Take another restricted production backup and capture fresh personal-table
+3. Close admission by stopping only the MTG Helper sync worker and frontend. Keep the backend alive
+   while waiting for admin jobs and model leases to drain; fail closed if this cannot be established.
+   Then stop the backend and recheck no active leases before backup or candidate startup.
+   Take another restricted production backup and capture fresh personal-table
    fingerprints and historical-source fingerprints. Rehearsal counts are not the final baseline if
    users have changed data since the first backup.
 4. Deploy the reviewed commit with passing PR checks via the documented SSH/Compose fallback.
