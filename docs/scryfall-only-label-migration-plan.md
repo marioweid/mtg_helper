@@ -12,7 +12,8 @@ sync. It publishes facts, history and tags in the same transaction; keeps direct
 from descendant searches; and retains source metadata, weights, annotations, receipts and hashes.
 Admin status/UI now expose exact publication and upstream update times and a mismatched-generation
 warning. **Existing label consumers, legacy sources, prompts and global label columns still remain.**
-They have not been cut over or removed. No paid calls or application-database DDL were performed.
+They have not been cut over or removed. No paid calls were performed. The publication schema and
+sync have now been deployed to the approved homeserver production database after actual-data rehearsal.
 
 Acceptance evidence for this slice:
 
@@ -30,7 +31,7 @@ Acceptance evidence for this slice:
   identical card/tag snapshots. Normalized card hash:
   `6aae3dd11d54589517423aeb56e0399f458d9d2deb8f765da517a887475fac34`; tag snapshot hash:
   `a6d8a5540e824e91836b27a29eeebe5864dabaeb8c7ba173a189fbdc7d89129a`.
-- The application database still has 31,692 cards and no `scryfall_tag_state` or `new_card_catalog`
+- The original local application database still has 31,692 cards and no `scryfall_tag_state` or `new_card_catalog`
   relation. It was inspected, not upgraded or synced. The disposable verification database is retained.
 
 Independent review identified two resource blockers: implicit HTTP decompression before the transfer
@@ -51,13 +52,15 @@ stopped and untouched. Authentication redirects/provider routing passed; interac
 and authenticated browser verification remain for the user. This is not production deployment or
 label-consumer cutover.
 
-The user has authorized homeserver/Portainer deployment of the publication foundation.
-The [production release procedure](scryfall-publication-production.md) records the actual-data
-rehearsal: 25 personal tables preserved exactly through schema, full startup and live sync; zero
-identity repairs; historical source snapshots preserved. The inherited startup schema separately
-backfills 1,514 legacy `mtgjson_tags` rows. Production itself is still unchanged pending readiness
-review, the final write freeze/backup and deployment verification. Unrelated research experiments
-are excluded from the release worktree.
+**Homeserver production publication is deployed and verified**; see the
+[production release record](scryfall-publication-production.md). Both rehearsal and actual rollout
+preserved all 25 personal tables and historical source snapshots through schema/startup/live sync.
+The final maintenance backup is retained, and production reports matching generations: 4,577 tags,
+236,717 direct memberships. Backend/frontend are running; the original sync worker has resumed.
+The inherited startup schema separately backfills legacy `mtgjson_tags` rows, not personal state.
+No paid model calls were made, and unrelated research experiments are excluded from release PR #18.
+Public ingress requires the user's normal browser access; the unauthenticated automation probe was
+403. This deployment is publication only, not the unfinished global-label consumer cutover.
 
 Next: canonical UUID/printed-keyword API, filters, source
 snapshots and planner queries; then remove the old labeling paths together. Do not treat ingestion
@@ -132,5 +135,6 @@ use that behavior as a preservation operation: compare saved state before/after 
 identity repair separately. The sync preservation regression uses a valid multi-copy basic land;
 the schema-upgrade regression preserves all stored quantities and intent without repair.
 
-Independent review is required before merging schema/API and global label replacements. This document
-is the migration boundary, not permission to deploy, destroy existing data or claim better accuracy.
+Independent review is required before merging schema/API and global label replacements. The recorded
+production approval covers the publication foundation only; it does not authorize destructive
+consumer-cutover DDL, data deletion, paid evaluation or claims of better recommendation accuracy.

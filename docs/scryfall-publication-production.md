@@ -2,11 +2,11 @@
 
 ## Now
 
-Production deployment is authorized for the homeserver/Portainer stack. A release worktree based on
-`origin/main` excludes the separate admission/review experiments. Production migration has **not yet
-run**: owner checks and actual-data rehearsal passed; independent review found no blockers and ran
-33 offline tag tests plus scoped lint/format checks. The final maintenance backup and post-deployment
-verification are still required. Owner checks include 207 Linux backend tests, 138 additional scoped
+**Production publication deployed and verified on October 13, 2026**, via the documented
+SSH/Compose fallback for the existing homeserver/Portainer stack. [Release PR #18](https://github.com/marioweid/mtg_helper/pull/18)
+is based on `origin/main` and excludes the separate admission/review experiments. Owner checks and
+actual-data rehearsal passed; independent publication review found no blockers and ran 33 offline
+tag tests plus scoped lint/format checks. Owner checks include 207 Linux backend tests, 138 additional scoped
 offline checks, 12 frontend tests, lint/types/format, warning-free homeserver image builds, and a
 clean offline zizmor workflow audit. Database/build/live-sync evidence was not independently rerun.
 The focused rollout review found an admission/drain race. The owner repaired it by closing admission
@@ -42,6 +42,27 @@ byte-unchanged or hide this exception by dropping personal fields from the prese
 Raw backups, runtime environments, row fingerprints and operational scripts remain private, ignored
 and excluded from Docker build contexts. Public documentation contains no personal row content.
 No paid model requests are part of rehearsal or deployment verification.
+
+## Production verification
+
+- Admission closed first; admin work/model leases drained before backend stop and final backup.
+- Final restricted backup: homeserver `backups/scryfall-publication/`
+  `before-production-20261013T184810Z.dump`; runtime data and fingerprints remain private.
+- Actual startup and live sync preserved all 25 personal tables, including 14 decks and 948 card rows,
+  plus all six pre-existing historical source snapshots. PostgreSQL's image and data mount unchanged.
+- Authenticated maintenance sync succeeded: matching generation, 4,577 tags and 236,717 memberships;
+  persisted row counts match. Publication timestamp `2026-10-13T18:49:33.012439+00:00`.
+- Backend unauthenticated Admin request returned `401`. Frontend sign-in returned `200` locally;
+  Google provider URLs retain `https://mtg.marioweid.com` and the original credentials/session secret.
+- Frontend reopened only after preservation checks; the original sync worker resumed afterwards.
+  Qdrant, PostgreSQL, Portainer and unrelated applications were not recreated.
+- An unauthenticated public `/signin` probe returned `403`; automated checks do not bypass that ingress
+  access layer. Interactive public access/Google sign-in remains the user's browser confirmation.
+- Old backend/frontend images retain `before-scryfall-publication` rollback tags. No paid model endpoint
+  was invoked, no database volume removed, and no personal categories or saved intent remapped.
+
+The reviewed PR is merged only after this verification so subsequent Portainer Git polling receives
+this same release without reopening writers during the write freeze. Check status after GitOps restarts.
 
 ## Deployment sequence and rollback boundary
 
