@@ -4,11 +4,11 @@ import asyncio
 import gzip
 import json
 import tempfile
+import zlib
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any, BinaryIO
-from urllib.parse import urlparse
 from uuid import uuid4
 
 import asyncpg
@@ -21,38 +21,44 @@ from mtg_helper.services.new_cards.discovery import (
     release_history,
 )
 from mtg_helper.services.recommendations import source_repository
+from mtg_helper.services.scryfall_exports import BulkExport, stream_export
 
 _MAX_BYTES = 130 * 1024 * 1024
+_MAX_HISTORY_BYTES = 2 * 1024 * 1024 * 1024
+_MAX_HISTORY_LINE_BYTES = 2 * 1024 * 1024
+_MAX_HISTORY_RECORDS = 1_000_000
 
 
 def _records(stream: BinaryIO) -> Iterator[dict[str, Any]]:
-    with gzip.GzipFile(fileobj=stream, mode="rb") as archive:
-        for line in archive:
-            if not line.strip():
-                continue
-            card = json.loads(line)
-            if not isinstance(card, dict) or card.get("object") != "card":
-                raise ValueError("Invalid Scryfall card record; previous catalog retained")
-            yield card
+    size = count = 0
+    try:
+        with gzip.GzipFile(fileobj=stream, mode="rb") as archive:
+            while line := archive.readline(_MAX_HISTORY_LINE_BYTES + 1):
+                size += len(line)
+                if len(line) > _MAX_HISTORY_LINE_BYTES or size > _MAX_HISTORY_BYTES:
+                    raise ValueError("Scryfall printing history exceeds decompression limits")
+                if not line.strip():
+                    continue
+                count += 1
+                if count > _MAX_HISTORY_RECORDS:
+                    raise ValueError("Scryfall printing history exceeds record limit")
+                card = json.loads(line)
+                if not isinstance(card, dict) or card.get("object") != "card":
+                    raise ValueError("Invalid Scryfall card record; previous catalog retained")
+                yield card
+    except (OSError, EOFError, zlib.error, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid Scryfall printing-history gzip JSONL; retain sources") from exc
 
 
 async def download_history(client: httpx.AsyncClient, url: str) -> dict[str, ReleaseHistory]:
     """Stream compressed history to temporary disk, then reduce it without a full object list."""
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or not (parsed.hostname or "").endswith(".scryfall.io"):
-        raise ValueError("Scryfall returned an untrusted bulk download host")
+    BulkExport.trusted_download(url)
     with (
         tempfile.TemporaryDirectory() as directory,
         (Path(directory) / "history.gz").open("w+b") as target,
     ):
-        size = 0
-        async with client.stream("GET", url) as response:
-            response.raise_for_status()
-            async for chunk in response.aiter_bytes():
-                size += len(chunk)
-                if size > _MAX_BYTES:
-                    raise ValueError("Scryfall history exceeded 130 MiB; previous catalog retained")
-                target.write(chunk)
+        async for chunk in stream_export(client, url, _MAX_BYTES):
+            target.write(chunk)
         target.seek(0)
         history = await asyncio.to_thread(release_history, _records(target))
     if len(history) < 1000:

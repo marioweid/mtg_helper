@@ -1,0 +1,530 @@
+{
+  "version": "scryfall-tag-coverage-v1",
+  "sources": [
+    {
+      "type": "oracle_cards",
+      "updated_at": "2026-10-12T21:02:30.790+00:00",
+      "bytes": 24647418,
+      "sha256": "cedbddbfae1aa60a4cae2b09aae7a0280d2cc4e08fb0bb989b4daa4ad0cdf65f",
+      "download_seconds": 0.961,
+      "uri": "https://data.scryfall.io/oracle-cards/oracle-cards-20261012210230.jsonl.gz"
+    },
+    {
+      "type": "oracle_tags",
+      "updated_at": "2026-10-12T21:00:35.495+00:00",
+      "bytes": 6020688,
+      "sha256": "0f16fe2bb4c9df8a33996f60830510210c9bf473dc10f4bad23c403a01f7826f",
+      "download_seconds": 0.215,
+      "uri": "https://data.scryfall.io/oracle-tags/oracle-tags-20261012210035.jsonl.gz"
+    }
+  ],
+  "repetitions": 10,
+  "limits": {
+    "queries": 8,
+    "replaced_final_queries": 2,
+    "query_sample": 8,
+    "query_admission": 20,
+    "shortlist": 32
+  },
+  "cases": {
+    "yuna": {
+      "plan": {
+        "intents": [
+          "Exploit Yuna’s one-shot mana ability by prioritizing cheap creature spells and creatures that enter with counters.",
+          "Multiply, proliferate, and redistribute +1/+1 counters while preserving value from countered permanents leaving the battlefield.",
+          "Use modular, undying, and sacrifice interactions carefully: Yuna checks counters immediately before the permanent leaves, while undying requires no +1/+1 counters."
+        ],
+        "searches": [
+          {
+            "purpose": "Find creatures that both tap for mana and can accumulate +1/+1 counters.",
+            "oracle_text_all": [
+              "Add one mana",
+              "+1/+1 counter"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find explicit effects that double or add additional +1/+1 counters.",
+            "oracle_text_all": [
+              "+1/+1 counters"
+            ],
+            "oracle_text_any": [
+              "double",
+              "twice",
+              "additional"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find creatures with reliable counter entry or counter-growth text, narrowed to practical curve cards.",
+            "oracle_text_all": [
+              "+1/+1 counter"
+            ],
+            "oracle_text_any": [
+              "enters with",
+              "enters the battlefield",
+              "put"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 5.0
+          },
+          {
+            "purpose": "Find repeatable proliferate creatures that can turn Yuna’s counters into broader growth.",
+            "oracle_text_all": [
+              "proliferate"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 5.0
+          },
+          {
+            "purpose": "Find modular creatures whose death directly transfers +1/+1 counters.",
+            "oracle_text_all": [
+              "+1/+1 counters",
+              "put a +1/+1 counter"
+            ],
+            "oracle_text_any": [
+              "Modular",
+              "when this permanent is put into a graveyard from the battlefield"
+            ],
+            "type_line_any": [
+              "Artifact Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 6.0
+          },
+          {
+            "purpose": "Find creatures with undying that can repeatedly die and return, noting that existing +1/+1 counters suppress undying.",
+            "oracle_text_all": [
+              "Undying"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 4.0
+          },
+          {
+            "purpose": "Find sacrifice outlets that specifically sacrifice creatures and can repeatedly expose Yuna’s redistribution trigger.",
+            "oracle_text_all": [
+              "Sacrifice a creature"
+            ],
+            "oracle_text_any": [],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 4.0
+          },
+          {
+            "purpose": "Find payoff creatures granting evasion to creatures already carrying +1/+1 counters.",
+            "oracle_text_all": [
+              "+1/+1 counter"
+            ],
+            "oracle_text_any": [
+              "flying",
+              "trample",
+              "can't be blocked"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 7.0
+          }
+        ],
+        "named_cards": [
+          "Hardened Scales",
+          "Branching Evolution",
+          "Conclave Mentor",
+          "Kami of Whispered Hopes",
+          "Incubation Druid",
+          "Gyre Sage",
+          "Evolution Sage",
+          "Deepglow Skate",
+          "The Ozolith",
+          "Resourceful Defense",
+          "Champion of Lambholt",
+          "Tanazir Quandrix"
+        ],
+        "uncertainties": [
+          "The mana-plus-counter search returned only 12 cards and was sampled narrowly; Tender Wildguide is a strong direct fit, but additional candidates require full-result review.",
+          "The counter search was extremely broad at 530–599 matches, so individual cards need curve, color, and wording verification.",
+          "Yuna’s trigger uses the permanent’s pre-leave information; the retrieved rules page confirmed the concept of last known information but did not directly establish this exact trigger’s application.",
+          "Modular is especially complementary because its death trigger independently transfers counters, but its recipient is restricted to artifact creatures."
+        ]
+      },
+      "tag_queries": [
+        {
+          "purpose": "Creature mana production with +1/+1 counter abilities",
+          "kind": "scryfall_tags_or_printed_keywords",
+          "tag_groups": [
+            [
+              "bb6c0ff7-302d-48ff-aee9-5cfefd44e351"
+            ],
+            [
+              "eb4a8d84-9daa-4aee-8491-2566673a5749",
+              "c1100c9e-08bf-4845-9263-1a5f86b9005f"
+            ]
+          ],
+          "keywords_any": [],
+          "creature": true
+        },
+        {
+          "purpose": "Counter modification including player counters",
+          "kind": "scryfall_tags_or_printed_keywords",
+          "tag_groups": [
+            [
+              "b7cfc923-3a15-4168-876b-525ce37850c5"
+            ]
+          ],
+          "keywords_any": [
+            "Proliferate"
+          ],
+          "creature": false
+        }
+      ]
+    },
+    "meren": {
+      "plan": {
+        "intents": [
+          "Build a repeatable sacrifice engine that reliably generates Meren experience counters.",
+          "Exploit reusable creature enter/death triggers for removal, hand disruption, cards, mana, and life swings.",
+          "Use low-mana creatures and token makers to sustain sacrifice loops while reserving larger creatures for threshold-based recursion.",
+          "Account for dies requiring a creature to reach the graveyard; exile, bounce, and replacement effects do not automatically trigger death abilities."
+        ],
+        "searches": [
+          {
+            "purpose": "Find creature sacrifice outlets, emphasizing activated or repeatable outlets rather than spells with sacrifice as an additional cost.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "sacrifice a creature",
+              "sacrifice another creature"
+            ],
+            "type_line_any": [
+              "Creature",
+              "Artifact"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find creatures that reward repeated creature deaths with damage, life loss, life gain, or cards.",
+            "oracle_text_all": [
+              "dies"
+            ],
+            "oracle_text_any": [
+              "each opponent loses life",
+              "target opponent loses life",
+              "damage",
+              "draw a card",
+              "you gain life"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find reusable creature enter-the-battlefield effects for removal, disruption, card advantage, or sacrifice pressure.",
+            "oracle_text_all": [
+              "enters"
+            ],
+            "oracle_text_any": [
+              "destroy",
+              "exile",
+              "sacrifices",
+              "discard",
+              "draw a card"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find inexpensive creatures that convert tapping or sacrificing into mana or land ramp and can be recovered by Meren.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "add one mana",
+              "search your library for a basic land",
+              "put it onto the battlefield"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 2.0
+          },
+          {
+            "purpose": "Find additional creature recursion that returns cards directly from the graveyard to the battlefield.",
+            "oracle_text_all": [
+              "return"
+            ],
+            "oracle_text_any": [
+              "creature card from your graveyard to the battlefield",
+              "target creature card in your graveyard"
+            ],
+            "type_line_any": [],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find creatures that create expendable bodies when entering or dying, sustaining sacrifice outlets and Meren triggers.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "create a token",
+              "create a 1/1",
+              "dies"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": 4.0
+          },
+          {
+            "purpose": "Find creatures with persist, undying, or other wording that preserves sacrifice value through repeated deaths.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "undying",
+              "persist",
+              "return it to the battlefield",
+              "return that card to the battlefield"
+            ],
+            "type_line_any": [
+              "Creature"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          },
+          {
+            "purpose": "Find effects that modify or replace graveyard-bound creature value, including death prevention and counters relevant to recurring bodies.",
+            "oracle_text_all": [],
+            "oracle_text_any": [
+              "counter",
+              "graveyard",
+              "dies"
+            ],
+            "type_line_any": [
+              "Creature",
+              "Artifact",
+              "Enchantment"
+            ],
+            "keywords_any": [],
+            "mana_cost_all": [],
+            "mana_value_min": null,
+            "mana_value_max": null
+          }
+        ],
+        "named_cards": [
+          "Viscera Seer",
+          "Carrion Feeder",
+          "Yawgmoth, Thran Physician",
+          "Ashnod's Altar",
+          "Altar of Dementia",
+          "Spore Frog",
+          "Sakura-Tribe Elder",
+          "Doomed Dissenter",
+          "Reassembling Skeleton",
+          "Solemn Simulacrum",
+          "Fleshbag Marauder",
+          "Plaguecrafter"
+        ],
+        "uncertainties": [
+          "The revised enter-the-battlefield search uses the observed source prefix “enters”; matching cards still require manual evaluation because some effects are unrelated to entering the battlefield.",
+          "The sacrifice-outlet query remains intentionally broad because literal text can match one-shot costs, casualty, or conditional abilities; artifact matches may include non-outlets.",
+          "Meren's experience counters are not independently defined by the returned rules page; their operational meaning comes from Meren's own oracle text.",
+          "A creature only dies when it is put into a graveyard from the battlefield, so exile, bounce, and replacement effects can interrupt death-trigger plans."
+        ]
+      },
+      "tag_queries": [
+        {
+          "purpose": "Creature sacrifice and repeated draw engine",
+          "kind": "scryfall_tags_or_printed_keywords",
+          "tag_groups": [
+            [
+              "d5dcbcc6-d49b-4d76-9272-35a062bcb656"
+            ],
+            [
+              "0e87cf9c-591e-4f2a-b4fd-675021f120ae"
+            ]
+          ],
+          "keywords_any": [],
+          "creature": true
+        },
+        {
+          "purpose": "Counter modification including player counters",
+          "kind": "scryfall_tags_or_printed_keywords",
+          "tag_groups": [
+            [
+              "b7cfc923-3a15-4168-876b-525ce37850c5"
+            ]
+          ],
+          "keywords_any": [
+            "Proliferate"
+          ],
+          "creature": false
+        }
+      ]
+    }
+  },
+  "tag_definitions": {
+    "mana-dork": {
+      "object": "tag",
+      "id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+      "label": "mana dork",
+      "slug": "mana-dork",
+      "type": "oracle",
+      "uri": "https://tagger.scryfall.com/tags/card/mana-dork",
+      "description": "Creatures which can repeatedly generate mana",
+      "parent_ids": [
+        "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd"
+      ],
+      "child_ids": [],
+      "aliases": []
+    },
+    "gains-pp-counters": {
+      "object": "tag",
+      "id": "eb4a8d84-9daa-4aee-8491-2566673a5749",
+      "label": "gains pp counters",
+      "slug": "gains-pp-counters",
+      "type": "oracle",
+      "uri": "https://tagger.scryfall.com/tags/card/gains-pp-counters",
+      "description": null,
+      "parent_ids": [],
+      "child_ids": [
+        "d8ab12ff-4810-4d46-af62-bba5b9144028",
+        "e55b60f9-39a0-4357-858c-a8fcb2662d72",
+        "de7f69b3-b217-4e34-bc50-bc163b53d488",
+        "dd649a09-3b27-4ee2-a400-74a6b33bc638",
+        "b4efa2f1-c578-41ea-a43f-2e29648b2bce",
+        "3078b84a-00bd-4a0a-9cd1-d40614038c5a"
+      ],
+      "aliases": []
+    },
+    "gives-pp-counters": {
+      "object": "tag",
+      "id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+      "label": "gives pp counters",
+      "slug": "gives-pp-counters",
+      "type": "oracle",
+      "uri": "https://tagger.scryfall.com/tags/card/gives-pp-counters",
+      "description": "Cards that give +1/+1 counters. For permanents that only give +1/+1 counters to themselves, see [gains pp counters](gains-pp-counters) (which may overlap for cards that can give counters to themselves as well as others).",
+      "parent_ids": [],
+      "child_ids": [
+        "68264ee3-cc65-471a-a9e7-8fe85ee3aa97",
+        "f3cdad26-6def-42eb-80c7-1f15f130b111",
+        "b504c445-169d-4145-abc4-65270686c208",
+        "8b8a6f8f-4e74-4336-9e79-b85ae26c01d0",
+        "849ba467-4aa3-4d08-bebc-71e4a1a60138",
+        "4866375e-92a4-4636-9c46-7a9a75f8950e",
+        "bc88735f-12f7-4cdb-9106-7b1565d617e0",
+        "8edac4f8-76cf-4355-9ad9-57a36258af03",
+        "dff7cd67-1f16-44c5-a01a-75fd27c00f68",
+        "caca1f77-0206-4660-b62c-18b3e57916fb",
+        "74ce1d70-73ef-49f3-8ad3-b5d35c5ea1a0",
+        "12a19a8d-fef9-462e-b071-001dcf096235",
+        "d87fab2b-0dd0-4163-8e80-86b14cf3fab3",
+        "5d854eb0-8676-4ac7-be87-8a219695bd22"
+      ],
+      "aliases": []
+    },
+    "sacrifice-outlet-creature": {
+      "object": "tag",
+      "id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+      "label": "sacrifice outlet-creature",
+      "slug": "sacrifice-outlet-creature",
+      "type": "oracle",
+      "uri": "https://tagger.scryfall.com/tags/card/sacrifice-outlet-creature",
+      "description": null,
+      "parent_ids": [
+        "c7bd55a7-1ea0-49da-b25e-0be470fbe8ec"
+      ],
+      "child_ids": [
+        "77164ab5-9faf-413b-a1b5-9f3470f04864",
+        "d69c4838-05b0-4681-b5f6-8ed1d7843175",
+        "84557fe1-7df7-4d0b-8dec-dd2bb46f07ee",
+        "0989ab40-0a51-4378-9490-1403af1ac754",
+        "1f30d2f1-ebb9-4870-8c82-0547d48680f1"
+      ],
+      "aliases": [
+        "sac outlet-creature"
+      ]
+    },
+    "draw-engine": {
+      "object": "tag",
+      "id": "0e87cf9c-591e-4f2a-b4fd-675021f120ae",
+      "label": "draw engine",
+      "slug": "draw-engine",
+      "type": "oracle",
+      "uri": "https://tagger.scryfall.com/tags/card/draw-engine",
+      "description": "Card draw effects that can net you additional cards repeatedly over time. Contrast [Burst Draw](burst-draw), which nets you multiple cards right away.",
+      "parent_ids": [
+        "544b4fd6-abf7-4ae3-846f-d8d1e134054c"
+      ],
+      "child_ids": [
+        "77f8c103-b6fb-4f74-9048-51ca6f6ccfc0"
+      ],
+      "aliases": []
+    },
+    "repeatable-proliferate": {
+      "object": "tag",
+      "id": "b7cfc923-3a15-4168-876b-525ce37850c5",
+      "label": "repeatable-proliferate",
+      "slug": "repeatable-proliferate",
+      "type": "oracle",
+      "uri": "https://tagger.scryfall.com/tags/card/repeatable-proliferate",
+      "description": null,
+      "parent_ids": [],
+      "child_ids": [],
+      "aliases": []
+    }
+  },
+  "scope": "Fixed parent-selected search hypotheses on regression decks, not model outputs",
+  "metric": "Reference overlap and label coverage, not relevance or accuracy"
+}

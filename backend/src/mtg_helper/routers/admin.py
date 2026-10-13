@@ -23,6 +23,7 @@ from mtg_helper.services import (
     moxfield_hub_service,
     mtgjson,
     scryfall,
+    scryfall_tag_repository,
     theme_service,
     theme_suggestion_service,
 )
@@ -192,6 +193,9 @@ async def status(request: Request) -> dict[str, Any]:
         "tag": asdict(registry.tag),
         "refresh_all": asdict(registry.refresh_all),
         "theme_suggest": asdict(registry.theme_suggest),
+        "scryfall_sources": await scryfall_tag_repository.publication_status(
+            request.app.state.db_pool
+        ),
     }
 
 

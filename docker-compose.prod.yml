@@ -45,6 +45,7 @@ services:
       [
         "uv",
         "run",
+        "--no-sync",
         "uvicorn",
         "mtg_helper.main:app",
         "--host",

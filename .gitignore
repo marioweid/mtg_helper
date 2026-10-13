@@ -237,6 +237,9 @@ __marimo__/
 !docs/research/commander-discovery-luna-refined/requests/*.json
 !docs/research/commander-discovery-luna-refined/observations/*.json
 
+# Public Scryfall-only coverage receipts; full archives and operational backups stay ignored.
+!docs/research/scryfall-tag-coverage/*.json
+
 # Terraform
 infra/terraform/.terraform/
 infra/terraform/*.tfstate

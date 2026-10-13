@@ -196,6 +196,8 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
         await conn.execute(
             """
             TRUNCATE new_card_catalog, new_card_catalog_state,
+                scryfall_tag_state, scryfall_tag_memberships,
+                scryfall_tag_descendants, scryfall_tags,
                 feature_flags, moxfield_commander_recs, moxfield_hub_card_stats,
                 moxfield_hubs,
                 collection_cards, collections, account_ranking_weights,

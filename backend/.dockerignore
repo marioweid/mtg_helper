@@ -1,4 +1,6 @@
 .venv
+# Cached exports, runtime secrets and production backup/rehearsal data stay off build hosts.
+.cache
 .pytest_cache
 .ruff_cache
 __pycache__

@@ -1,0 +1,449 @@
+{
+  "yuna": [
+    {
+      "seed_number": 0,
+      "gained": [
+        "62e7e7b1-9887-4d15-b0e5-a8ddc711bd88",
+        "795b903b-5260-4c06-b26f-a89cecdfa1f8",
+        "9d6ab594-aea9-4f13-8802-f3794ee45425",
+        "e70ac420-8540-4a69-820f-ae3e0274ca1a"
+      ],
+      "lost": [
+        "00187de2-bc48-4137-97d8-a9a0fafc76c1",
+        "3a38d2d1-c4ff-4088-b1df-5feb9602ee2e",
+        "4aae7102-301a-429d-b169-4f462384d55d",
+        "a217f386-11b5-48f0-b173-3b0700ba295f"
+      ],
+      "new_discoveries": [
+        "795b903b-5260-4c06-b26f-a89cecdfa1f8"
+      ],
+      "previous_matches_now_admitted": [
+        "62e7e7b1-9887-4d15-b0e5-a8ddc711bd88",
+        "9d6ab594-aea9-4f13-8802-f3794ee45425",
+        "e70ac420-8540-4a69-820f-ae3e0274ca1a"
+      ]
+    },
+    {
+      "seed_number": 1,
+      "gained": [
+        "0ad44727-41c3-471c-b038-1bf43c5f296a",
+        "48e6d3d8-2f27-4017-acdd-40bce8cdbc02",
+        "5d2ccaa4-4815-4987-889f-d08c4d1e7a8e",
+        "5f5fe039-4be4-42ae-9fa4-4392328aa665"
+      ],
+      "lost": [
+        "44cf5ef4-2b0f-4d9d-bf87-8835424721d0",
+        "799664fc-279c-40c1-8e40-44a68c38801b",
+        "9c46adaa-ab39-4c0a-99bd-935b6c4f732f",
+        "f8b9dd54-0837-47f4-ad14-7a0322d46d5f"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "0ad44727-41c3-471c-b038-1bf43c5f296a",
+        "48e6d3d8-2f27-4017-acdd-40bce8cdbc02",
+        "5d2ccaa4-4815-4987-889f-d08c4d1e7a8e",
+        "5f5fe039-4be4-42ae-9fa4-4392328aa665"
+      ]
+    },
+    {
+      "seed_number": 2,
+      "gained": [
+        "05d1e797-bda2-4411-a546-919493768650",
+        "0a0d25a8-4f28-453b-9270-4d449fe0ca65",
+        "667cffdd-8951-4223-8895-fa46e9f14b96",
+        "ee496b34-d8e0-482a-a2c2-3122ea376da0"
+      ],
+      "lost": [
+        "4aae7102-301a-429d-b169-4f462384d55d",
+        "5607bc18-f3b7-40b0-b97d-2e06affa99ac",
+        "7140d726-0136-43af-84b5-85005a66a186",
+        "77dd6ce0-91fc-4e71-99ff-47cdf3359067"
+      ],
+      "new_discoveries": [
+        "05d1e797-bda2-4411-a546-919493768650",
+        "667cffdd-8951-4223-8895-fa46e9f14b96"
+      ],
+      "previous_matches_now_admitted": [
+        "0a0d25a8-4f28-453b-9270-4d449fe0ca65",
+        "ee496b34-d8e0-482a-a2c2-3122ea376da0"
+      ]
+    },
+    {
+      "seed_number": 3,
+      "gained": [
+        "4716ab91-30e6-4c63-8389-a9db8f9414d8",
+        "62e7e7b1-9887-4d15-b0e5-a8ddc711bd88",
+        "6c728edd-ab67-44ce-b19d-aa98dfce68bb"
+      ],
+      "lost": [
+        "2f920bf2-6a49-47c2-be3c-9787c377673b",
+        "4469ff35-54ec-4ff5-bc19-3808ae0f711b",
+        "7661484b-1faa-4ed7-b77b-fc1e625d23e3",
+        "ae63fd5c-46ff-41fb-a1f6-6259336525c1"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "4716ab91-30e6-4c63-8389-a9db8f9414d8",
+        "62e7e7b1-9887-4d15-b0e5-a8ddc711bd88",
+        "6c728edd-ab67-44ce-b19d-aa98dfce68bb"
+      ]
+    },
+    {
+      "seed_number": 4,
+      "gained": [
+        "482bd55a-ba73-4722-8643-94fa12818515",
+        "787e6cc6-d97a-4229-97d1-ec2377d138d3",
+        "e70ac420-8540-4a69-820f-ae3e0274ca1a",
+        "f6311b7a-7482-4b13-9f8f-13e80c98e98e"
+      ],
+      "lost": [
+        "34e56412-4649-481d-be51-357b331d0b75",
+        "45de1caf-46c2-4acc-8be2-08e1840a3b98",
+        "ba48a1a6-a53f-4e7e-881a-472637a3a007",
+        "d4c4ad11-7e71-4ad0-aee7-58ac7b1b38f8"
+      ],
+      "new_discoveries": [
+        "482bd55a-ba73-4722-8643-94fa12818515"
+      ],
+      "previous_matches_now_admitted": [
+        "787e6cc6-d97a-4229-97d1-ec2377d138d3",
+        "e70ac420-8540-4a69-820f-ae3e0274ca1a",
+        "f6311b7a-7482-4b13-9f8f-13e80c98e98e"
+      ]
+    },
+    {
+      "seed_number": 5,
+      "gained": [
+        "2ee08dcd-5558-45be-b619-8a550f3865ad",
+        "62e7e7b1-9887-4d15-b0e5-a8ddc711bd88",
+        "d6239ada-c72a-49b2-882c-6dae1dd366e3"
+      ],
+      "lost": [
+        "13ec2390-e08a-4645-99e9-bac7e41917bb",
+        "77dd6ce0-91fc-4e71-99ff-47cdf3359067",
+        "9da9248d-1201-447f-b6c2-2b64af4f71c4",
+        "dac85722-d741-4584-8b98-8ac220958a38"
+      ],
+      "new_discoveries": [
+        "2ee08dcd-5558-45be-b619-8a550f3865ad",
+        "d6239ada-c72a-49b2-882c-6dae1dd366e3"
+      ],
+      "previous_matches_now_admitted": [
+        "62e7e7b1-9887-4d15-b0e5-a8ddc711bd88"
+      ]
+    },
+    {
+      "seed_number": 6,
+      "gained": [
+        "292cd535-916e-486e-b0cc-ecdb9477287d",
+        "95dc1f55-9dad-4a35-ac5e-abc53d442ffb",
+        "ba922414-878f-4261-9bce-500c5c9e9506"
+      ],
+      "lost": [
+        "1d6d0348-46ad-46ed-ae7b-d7510f0ebe70",
+        "44cf5ef4-2b0f-4d9d-bf87-8835424721d0",
+        "d4838305-5392-42b2-81d1-9b9da71b20b1",
+        "e9c756a5-f4d4-4b84-be60-ad4bc0d1acf9"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "292cd535-916e-486e-b0cc-ecdb9477287d",
+        "95dc1f55-9dad-4a35-ac5e-abc53d442ffb",
+        "ba922414-878f-4261-9bce-500c5c9e9506"
+      ]
+    },
+    {
+      "seed_number": 7,
+      "gained": [
+        "5dd54b2a-7d6a-44f5-8827-ff3660a4b12b",
+        "7a8baaf9-e21f-41a0-9f15-80764f6e5e68",
+        "e3e255e0-ab04-4488-bdc1-bb1542f51e16",
+        "ee496b34-d8e0-482a-a2c2-3122ea376da0"
+      ],
+      "lost": [
+        "14bf3049-faa3-4c1f-a613-603e977a50a4",
+        "7747e94c-35a7-4e3b-956b-339a16634502",
+        "7e86d4a6-e4cd-418a-8bbc-72cdad753e3a",
+        "e3191093-1aaa-4002-a603-7c8d132b6a31"
+      ],
+      "new_discoveries": [
+        "7a8baaf9-e21f-41a0-9f15-80764f6e5e68"
+      ],
+      "previous_matches_now_admitted": [
+        "5dd54b2a-7d6a-44f5-8827-ff3660a4b12b",
+        "e3e255e0-ab04-4488-bdc1-bb1542f51e16",
+        "ee496b34-d8e0-482a-a2c2-3122ea376da0"
+      ]
+    },
+    {
+      "seed_number": 8,
+      "gained": [
+        "25781dc5-d6ea-4273-9fe3-06a8808b3718",
+        "2ee08dcd-5558-45be-b619-8a550f3865ad",
+        "6c728edd-ab67-44ce-b19d-aa98dfce68bb"
+      ],
+      "lost": [
+        "0c97aea7-c997-45b4-a044-84fb5c07a021",
+        "1167fe30-32b8-4381-8067-a05cd345977b",
+        "28c44f88-1d47-4894-86ce-4089bd761360",
+        "cca03b76-dd3c-4228-b97a-f7fa20819b2e"
+      ],
+      "new_discoveries": [
+        "25781dc5-d6ea-4273-9fe3-06a8808b3718",
+        "2ee08dcd-5558-45be-b619-8a550f3865ad"
+      ],
+      "previous_matches_now_admitted": [
+        "6c728edd-ab67-44ce-b19d-aa98dfce68bb"
+      ]
+    },
+    {
+      "seed_number": 9,
+      "gained": [
+        "7d95e72a-461e-4993-a190-847466a4b17c",
+        "8952a7e6-4ede-42bb-b90c-00ea4f24f8f8",
+        "cf6ff089-63d7-4a98-b95d-2837c017a866",
+        "d6239ada-c72a-49b2-882c-6dae1dd366e3"
+      ],
+      "lost": [
+        "6a5ce1b0-ac78-4a74-9eb7-4064e1687bf1",
+        "cea79fa0-2a76-41f3-846f-4d1a6ff5f629",
+        "ec3031ff-93db-48e9-9e09-335786cb85c2",
+        "f557697a-4c1b-44f6-a989-4879bbe26eb5"
+      ],
+      "new_discoveries": [
+        "cf6ff089-63d7-4a98-b95d-2837c017a866",
+        "d6239ada-c72a-49b2-882c-6dae1dd366e3"
+      ],
+      "previous_matches_now_admitted": [
+        "7d95e72a-461e-4993-a190-847466a4b17c",
+        "8952a7e6-4ede-42bb-b90c-00ea4f24f8f8"
+      ]
+    }
+  ],
+  "meren": [
+    {
+      "seed_number": 0,
+      "gained": [
+        "37d1d507-25dc-4cd0-b51e-2f1e9b24832c",
+        "4b457bc2-2d8c-42cb-9a63-bb4c459d14e3",
+        "894176e3-af9c-41ef-9f35-59dfdda3c17f",
+        "cf4a3b1a-4b87-473e-be1f-3aa3da45c28e"
+      ],
+      "lost": [
+        "11173ad3-c007-478f-bce0-d756eac07ccb",
+        "5ea0c608-2c56-4889-a5d3-d435df515950",
+        "9ae376d5-c68f-4a4b-851c-ebfd385b86dd",
+        "e70ac420-8540-4a69-820f-ae3e0274ca1a"
+      ],
+      "new_discoveries": [
+        "4b457bc2-2d8c-42cb-9a63-bb4c459d14e3",
+        "cf4a3b1a-4b87-473e-be1f-3aa3da45c28e"
+      ],
+      "previous_matches_now_admitted": [
+        "37d1d507-25dc-4cd0-b51e-2f1e9b24832c",
+        "894176e3-af9c-41ef-9f35-59dfdda3c17f"
+      ]
+    },
+    {
+      "seed_number": 1,
+      "gained": [
+        "03e59169-d8f8-40da-b5f7-645d16365e7b",
+        "043ded41-2506-4dab-91c4-142d9287e7d7",
+        "828fe0c0-e280-4a8b-9e49-68cb34c2da97",
+        "f72558f5-ac5c-4efa-b01b-439bc0bbf18d"
+      ],
+      "lost": [
+        "034264da-a404-4037-b215-b095bba77490",
+        "adf9aed9-dd63-48da-b799-ea94839fc22a",
+        "d0ecea04-9768-4b09-8718-dd59135251e3",
+        "fcb2a95b-cef0-4b29-8b2b-538f380aff2b"
+      ],
+      "new_discoveries": [
+        "03e59169-d8f8-40da-b5f7-645d16365e7b"
+      ],
+      "previous_matches_now_admitted": [
+        "043ded41-2506-4dab-91c4-142d9287e7d7",
+        "828fe0c0-e280-4a8b-9e49-68cb34c2da97",
+        "f72558f5-ac5c-4efa-b01b-439bc0bbf18d"
+      ]
+    },
+    {
+      "seed_number": 2,
+      "gained": [
+        "0ea58cfe-b37c-49a6-a3be-7e60065b8238",
+        "a6c28bde-10d9-471b-acd0-32a1c6195805",
+        "c99896a8-8b58-4946-8f2d-b4e2562f278a",
+        "cc545c68-829f-4c57-94d2-cd1edf2667a7"
+      ],
+      "lost": [
+        "03259490-a789-4f96-8c5b-b410425bdd02",
+        "740f9740-aaa7-4061-86f5-85be79742541",
+        "899387c5-6781-485b-b8bc-aa89d3b97413",
+        "f9672b63-415a-448b-a3da-140df63a0f0c"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "0ea58cfe-b37c-49a6-a3be-7e60065b8238",
+        "a6c28bde-10d9-471b-acd0-32a1c6195805",
+        "c99896a8-8b58-4946-8f2d-b4e2562f278a",
+        "cc545c68-829f-4c57-94d2-cd1edf2667a7"
+      ]
+    },
+    {
+      "seed_number": 3,
+      "gained": [
+        "0287d541-3f73-4c8b-9a77-87f99898758d",
+        "411ba1a2-30bb-4618-b874-6be0d996f07d",
+        "508ce3a9-9050-4494-9adf-7f9cd6cc2f9f",
+        "ba922414-878f-4261-9bce-500c5c9e9506"
+      ],
+      "lost": [
+        "58afb897-4d57-4b53-a5c3-b532cb3d5180",
+        "7b5c3d28-6d8b-488b-b088-567b24faadc7",
+        "cd17bd00-90b1-4b89-9368-2d8735159e47",
+        "e97f9c2b-b41e-4f36-9245-77c0ac125647"
+      ],
+      "new_discoveries": [
+        "411ba1a2-30bb-4618-b874-6be0d996f07d"
+      ],
+      "previous_matches_now_admitted": [
+        "0287d541-3f73-4c8b-9a77-87f99898758d",
+        "508ce3a9-9050-4494-9adf-7f9cd6cc2f9f",
+        "ba922414-878f-4261-9bce-500c5c9e9506"
+      ]
+    },
+    {
+      "seed_number": 4,
+      "gained": [
+        "0ad44727-41c3-471c-b038-1bf43c5f296a",
+        "2ad8ff62-d090-4835-9274-3b755ba0f8e6",
+        "f088817a-570d-4480-bc59-f2ad6675a71b",
+        "f61c1dc4-2f09-4b50-957f-ee656c659072"
+      ],
+      "lost": [
+        "172b94a0-2801-4623-aed8-902591c2d591",
+        "78780f37-f215-4ae1-adce-6255b0146873",
+        "a6a257bd-ee19-4246-b997-5288e6fa41e1",
+        "adf9aed9-dd63-48da-b799-ea94839fc22a"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "0ad44727-41c3-471c-b038-1bf43c5f296a",
+        "2ad8ff62-d090-4835-9274-3b755ba0f8e6",
+        "f088817a-570d-4480-bc59-f2ad6675a71b",
+        "f61c1dc4-2f09-4b50-957f-ee656c659072"
+      ]
+    },
+    {
+      "seed_number": 5,
+      "gained": [
+        "142af8f1-6d6b-4043-8cc4-6632481972c1",
+        "70113003-be5e-406a-9aec-cb480468c36d",
+        "a217f386-11b5-48f0-b173-3b0700ba295f",
+        "ba922414-878f-4261-9bce-500c5c9e9506"
+      ],
+      "lost": [
+        "5049da27-f38b-4fe6-a387-51510bd1f44e",
+        "e43c31ee-1bac-4f96-8b74-334b3238ab73",
+        "e7c0052e-6dda-4fcf-9368-7749aa9b9c5c",
+        "f1feac23-8ba3-440c-828c-590f88008c31"
+      ],
+      "new_discoveries": [
+        "142af8f1-6d6b-4043-8cc4-6632481972c1"
+      ],
+      "previous_matches_now_admitted": [
+        "70113003-be5e-406a-9aec-cb480468c36d",
+        "a217f386-11b5-48f0-b173-3b0700ba295f",
+        "ba922414-878f-4261-9bce-500c5c9e9506"
+      ]
+    },
+    {
+      "seed_number": 6,
+      "gained": [
+        "0ad44727-41c3-471c-b038-1bf43c5f296a",
+        "1779869a-5e54-4ab5-86b8-d4d20e2e1ba4",
+        "482bd55a-ba73-4722-8643-94fa12818515",
+        "6de27cba-5500-4448-abef-68e69fe519dc"
+      ],
+      "lost": [
+        "aa64f830-b9b6-4d5e-9a5d-f9e120089335",
+        "de8d7cad-02c7-43f1-896e-eaa73f016ada",
+        "e7c5a568-3855-4a20-9edf-01a8a6a4ba97",
+        "fcdfe9d5-2743-4d3e-ab57-bf0f96beaa15"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "0ad44727-41c3-471c-b038-1bf43c5f296a",
+        "1779869a-5e54-4ab5-86b8-d4d20e2e1ba4",
+        "482bd55a-ba73-4722-8643-94fa12818515",
+        "6de27cba-5500-4448-abef-68e69fe519dc"
+      ]
+    },
+    {
+      "seed_number": 7,
+      "gained": [
+        "0dc158ba-7ec8-4558-91f5-0a87ef8380d4",
+        "13ca49a2-8a78-4be4-976a-b684086864bb",
+        "142af8f1-6d6b-4043-8cc4-6632481972c1",
+        "41b929ad-0c44-4e50-84d3-13b318035543"
+      ],
+      "lost": [
+        "276b1bd8-8918-4226-bab3-100cf5aa3c24",
+        "2b0afb89-0944-4861-b9c3-e909e2ac215e",
+        "6698b059-f1ed-4023-9d44-fbdf39fb159a",
+        "f7493bcf-5c17-4562-a759-37082ec49ff8"
+      ],
+      "new_discoveries": [
+        "13ca49a2-8a78-4be4-976a-b684086864bb",
+        "142af8f1-6d6b-4043-8cc4-6632481972c1",
+        "41b929ad-0c44-4e50-84d3-13b318035543"
+      ],
+      "previous_matches_now_admitted": [
+        "0dc158ba-7ec8-4558-91f5-0a87ef8380d4"
+      ]
+    },
+    {
+      "seed_number": 8,
+      "gained": [
+        "0dc158ba-7ec8-4558-91f5-0a87ef8380d4",
+        "11c7662f-e688-40a6-98fd-6ae89d231b44",
+        "23c2cdc9-2b16-423a-b932-2daadeb1021b",
+        "f61c1dc4-2f09-4b50-957f-ee656c659072"
+      ],
+      "lost": [
+        "493acba2-92b0-43a4-9f4b-d49a91ca77f5",
+        "97652492-7906-4d79-983c-fa1dc1239eba",
+        "e41e8754-028c-4399-b530-de9e134d04b0",
+        "e5762815-5fc3-4ae7-abee-69f27c5e4e90"
+      ],
+      "new_discoveries": [
+        "11c7662f-e688-40a6-98fd-6ae89d231b44",
+        "23c2cdc9-2b16-423a-b932-2daadeb1021b"
+      ],
+      "previous_matches_now_admitted": [
+        "0dc158ba-7ec8-4558-91f5-0a87ef8380d4",
+        "f61c1dc4-2f09-4b50-957f-ee656c659072"
+      ]
+    },
+    {
+      "seed_number": 9,
+      "gained": [
+        "7c98626b-ba97-4d1e-9be7-291480ae8d22",
+        "864fc52a-e9f4-4254-901e-b949d96b34eb",
+        "c99896a8-8b58-4946-8f2d-b4e2562f278a"
+      ],
+      "lost": [
+        "166e5680-b8cf-47da-bcae-3591367c5fb4",
+        "27faa94b-c7a7-45e7-8630-80126fab74ba",
+        "a79d2fc8-467f-464d-9e73-2dae4b059628",
+        "b92b4894-0786-49a7-8003-d99393f080d4"
+      ],
+      "new_discoveries": [],
+      "previous_matches_now_admitted": [
+        "7c98626b-ba97-4d1e-9be7-291480ae8d22",
+        "864fc52a-e9f4-4254-901e-b949d96b34eb",
+        "c99896a8-8b58-4946-8f2d-b4e2562f278a"
+      ]
+    }
+  ]
+}

@@ -834,9 +834,44 @@ ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS recommendation_origin BOOLE
 
 CREATE TABLE IF NOT EXISTS recommendation_sources (
     sha256 TEXT PRIMARY KEY CHECK (sha256 ~ '^[0-9a-f]{64}$'),
-    kind TEXT NOT NULL CHECK (kind IN ('cards', 'rules')),
+    kind TEXT NOT NULL CHECK (kind IN ('cards', 'rules', 'oracle_tags')),
     payload BYTEA NOT NULL CHECK (octet_length(payload) <= 136314880),
     published_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE recommendation_sources DROP CONSTRAINT IF EXISTS recommendation_sources_kind_check;
+ALTER TABLE recommendation_sources ADD CONSTRAINT recommendation_sources_kind_check
+    CHECK (kind IN ('cards', 'rules', 'oracle_tags'));
+
+-- Direct source memberships stay separate from descendant-aware query expansions.
+CREATE TABLE IF NOT EXISTS scryfall_tags (
+    id UUID PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    metadata JSONB NOT NULL
+);
+CREATE TABLE IF NOT EXISTS scryfall_tag_memberships (
+    tag_id UUID NOT NULL REFERENCES scryfall_tags(id),
+    oracle_id UUID NOT NULL,
+    details JSONB NOT NULL,
+    PRIMARY KEY (tag_id, oracle_id)
+);
+CREATE INDEX IF NOT EXISTS idx_scryfall_tag_memberships_oracle
+    ON scryfall_tag_memberships (oracle_id);
+CREATE TABLE IF NOT EXISTS scryfall_tag_descendants (
+    ancestor_id UUID NOT NULL REFERENCES scryfall_tags(id),
+    descendant_id UUID NOT NULL REFERENCES scryfall_tags(id),
+    PRIMARY KEY (ancestor_id, descendant_id)
+);
+CREATE TABLE IF NOT EXISTS scryfall_tag_state (
+    singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+    source_sha256 TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    tag_sha256 TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    archive_sha256 TEXT NOT NULL CHECK (archive_sha256 ~ '^[0-9a-f]{64}$'),
+    manifest JSONB NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL,
+    published_at TIMESTAMPTZ NOT NULL,
+    tag_count INTEGER NOT NULL CHECK (tag_count >= 1000),
+    membership_count INTEGER NOT NULL CHECK (membership_count >= 1000)
 );
 
 CREATE TABLE IF NOT EXISTS recommendation_accounts (
