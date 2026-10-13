@@ -4,12 +4,11 @@ import gzip
 import json
 from typing import Any
 
-import httpx
 import pytest
 
+from mtg_helper.services import scryfall
 from mtg_helper.services.scryfall import (
     _extract_image_uri,
-    _fetch_bulk_data_url,
     _is_commander_relevant,
     _map_card,
     _parse_bulk_cards,
@@ -42,31 +41,6 @@ def _make_card(**kwargs: Any) -> dict[str, Any]:
     return {**defaults, **kwargs}
 
 
-async def test_fetch_bulk_data_url_uses_jsonl_download_uri() -> None:
-    download_uri = "https://data.scryfall.example/oracle-cards.jsonl.gz"
-    metadata = {
-        "data": [
-            {
-                "type": "oracle_cards",
-                "jsonl_download_uri": download_uri,
-            }
-        ]
-    }
-    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=metadata))
-
-    async with httpx.AsyncClient(transport=transport) as client:
-        assert await _fetch_bulk_data_url(client) == download_uri
-
-
-async def test_fetch_bulk_data_url_rejects_missing_jsonl_uri() -> None:
-    metadata = {"data": [{"type": "oracle_cards"}]}
-    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=metadata))
-
-    async with httpx.AsyncClient(transport=transport) as client:
-        with pytest.raises(ValueError, match="missing jsonl_download_uri"):
-            await _fetch_bulk_data_url(client)
-
-
 def test_parse_bulk_cards_reads_gzip_jsonl() -> None:
     cards = [_make_card(id="first"), _make_card(id="second")]
     jsonl = b"\n".join(json.dumps(card).encode() for card in cards)
@@ -89,6 +63,13 @@ def test_parse_bulk_cards_rejects_invalid_download(content: bytes) -> None:
 def test_parse_bulk_cards_rejects_non_object_line() -> None:
     with pytest.raises(ValueError, match="line 1 is not a card object"):
         _parse_bulk_cards(gzip.compress(b"[]"))
+
+
+@pytest.mark.parametrize("limit", ["_MAX_RAW_CARD_BYTES", "_MAX_CARD_LINE_BYTES"])
+def test_parse_bulk_cards_bounds_decompression(monkeypatch: pytest.MonkeyPatch, limit: str) -> None:
+    monkeypatch.setattr(scryfall, limit, 10)
+    with pytest.raises(ValueError, match="JSONL exceeds size limits"):
+        _parse_bulk_cards(gzip.compress(json.dumps(_make_card()).encode()))
 
 
 def test_map_card_basic_fields() -> None:

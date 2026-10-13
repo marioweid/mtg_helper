@@ -4,10 +4,11 @@ Copy-paste commands for the things you do more than once a year. For project con
 
 ## Compose layout
 
-Two files. The base file is local-dev only; the prod file is a standalone Portainer stack.
+The base file is local-dev only; production and publication staging are standalone stacks.
 
 | File | Purpose |
 |---|---|
+| `docker-compose.staging.yml` | Isolated local Scryfall publication testing. Dedicated database volume, loopback-only ports, no working AI key. See [staging instructions](docs/scryfall-label-staging.md). |
 | `docker-compose.yml` | Local dev. Postgres + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in a Docker-managed named volume. |
 | `docker-compose.prod.yml` | Standalone production/Portainer stack. Uses host data under `${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}`, production frontend build, and daily `scryfall-sync` (weekly tag/embedding refresh). |
 
@@ -171,6 +172,10 @@ docker compose down -v && docker compose up -d
 ```
 
 ### Production schema apply
+
+For the Scryfall publication release, follow the
+[actual-data rehearsal, backup and verification procedure](docs/scryfall-publication-production.md).
+Do not restart the production backend as a substitute for preservation checks and a final backup.
 
 Schema runs on container start. For a one-off forced re-apply in Portainer, restart the `backend` service. CLI fallback:
 

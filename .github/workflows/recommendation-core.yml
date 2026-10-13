@@ -55,4 +55,7 @@ jobs:
             tests/test_commander_discovery_check.py \
             tests/test_deck_recovery_check.py \
             tests/test_assistant_quality_eval.py \
-            tests/test_new_cards_evidence.py
+            tests/test_new_cards_evidence.py \
+            tests/test_scryfall_exports.py \
+            tests/test_scryfall_tags.py \
+            tests/test_scryfall_history_bounds.py

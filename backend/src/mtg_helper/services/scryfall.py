@@ -6,14 +6,21 @@ import io
 import json
 import logging
 import time
+import zlib
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import asyncpg
 import httpx
 
-from mtg_helper.config import settings
+from mtg_helper.services import scryfall_exports, scryfall_tag_repository
 from mtg_helper.services.new_cards import catalog
+from mtg_helper.services.new_cards.discovery import ReleaseHistory
+from mtg_helper.services.recommendations import source_repository
+from mtg_helper.services.recommendations.snapshots import MAX_BYTES
+from mtg_helper.services.scryfall_tags import MAX_TAG_BYTES
 
 if TYPE_CHECKING:
     from mtg_helper.services.admin_jobs import ProgressCb
@@ -22,6 +29,8 @@ _log = logging.getLogger(__name__)
 
 # Batch size for upsert operations
 _BATCH_SIZE = 500
+_MAX_RAW_CARD_BYTES = 512 * 1024 * 1024
+_MAX_CARD_LINE_BYTES = 2 * 1024 * 1024
 
 _CARD_TYPES = frozenset(
     {
@@ -194,41 +203,17 @@ def _is_commander_playable(card: dict[str, Any]) -> bool:
     return True
 
 
-async def _fetch_bulk_data_url(
-    client: httpx.AsyncClient,
-    kind: str = "oracle_cards",
-) -> str:
-    """Fetch the JSONL download URL for the oracle_cards bulk data file.
-
-    Args:
-        client: httpx async client.
-
-    Returns:
-        Download URL string.
-
-    Raises:
-        ValueError: If the oracle_cards entry or its download URL is missing.
-    """
-    response = await client.get(settings.scryfall_bulk_data_url)
-    response.raise_for_status()
-    entries = response.json().get("data", [])
-    for entry in entries:
-        if entry.get("type") == kind:
-            download_uri = entry.get("jsonl_download_uri")
-            if isinstance(download_uri, str) and download_uri:
-                return download_uri
-            msg = f"{kind} bulk data entry is missing jsonl_download_uri"
-            raise ValueError(msg)
-    msg = f"{kind} bulk data entry not found in Scryfall response"
-    raise ValueError(msg)
-
-
 def _parse_bulk_cards(content: bytes) -> list[dict[str, Any]]:
     """Parse a gzip-compressed Scryfall JSONL payload."""
     cards: list[dict[str, Any]] = []
+    size = line_number = 0
     try:
         with gzip.GzipFile(fileobj=io.BytesIO(content), mode="rb") as archive:
-            for line_number, line in enumerate(archive, start=1):
+            while line := archive.readline(_MAX_CARD_LINE_BYTES + 1):
+                line_number += 1
+                size += len(line)
+                if len(line) > _MAX_CARD_LINE_BYTES or size > _MAX_RAW_CARD_BYTES:
+                    raise ValueError("Scryfall oracle_cards JSONL exceeds size limits")
                 if not line.strip():
                     continue
                 card = json.loads(line)
@@ -236,7 +221,7 @@ def _parse_bulk_cards(content: bytes) -> list[dict[str, Any]]:
                     msg = f"Scryfall JSONL line {line_number} is not a card object"
                     raise ValueError(msg)
                 cards.append(card)
-    except (gzip.BadGzipFile, EOFError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except (OSError, EOFError, zlib.error, json.JSONDecodeError, UnicodeDecodeError) as exc:
         msg = "Scryfall oracle_cards download is not valid gzip-compressed JSONL"
         raise ValueError(msg) from exc
     return cards
@@ -337,11 +322,39 @@ async def _switch_canonical_rows(
         )
 
 
+@dataclass(kw_only=True)
+class _DownloadedSources:
+    cards: list[dict[str, Any]]
+    history: dict[str, ReleaseHistory]
+    publication: source_repository.Publication
+    tags: scryfall_tag_repository.TagPublication
+
+
+async def _download_sources(client: httpx.AsyncClient) -> _DownloadedSources:
+    exports = await scryfall_exports.fetch_exports(client)
+    card_bytes = await scryfall_exports.download_export(client, exports["oracle_cards"], MAX_BYTES)
+    all_cards = await asyncio.to_thread(_parse_bulk_cards, card_bytes)
+    tag_bytes = await scryfall_exports.download_export(
+        client, exports["oracle_tags"], MAX_TAG_BYTES
+    )
+    history = await catalog.download_history(client, exports["default_cards"].jsonl_download_uri)
+    source = await asyncio.to_thread(source_repository.prepare, all_cards)
+    tags = await asyncio.to_thread(
+        scryfall_tag_repository.prepare,
+        tag_bytes,
+        source.digest,
+        {UUID(identity) for identity in source.cards},
+        card_export=exports["oracle_cards"],
+        tag_export=exports["oracle_tags"],
+    )
+    return _DownloadedSources(cards=all_cards, history=history, publication=source, tags=tags)
+
+
 async def run_sync(
     pool: asyncpg.Pool,
     progress: "ProgressCb | None" = None,
 ) -> dict[str, Any]:
-    """Download Scryfall oracle_cards JSONL data and upsert into the cards table.
+    """Atomically sync card facts, history, and Oracle tags from one Scryfall manifest.
 
     Args:
         pool: asyncpg connection pool.
@@ -366,33 +379,33 @@ async def run_sync(
             "Accept": "application/json",
         },
     ) as client:
-        download_url = await _fetch_bulk_data_url(client)
-        response = await client.get(download_url)
-        response.raise_for_status()
-        all_cards = _parse_bulk_cards(response.content)
-        history_url = await _fetch_bulk_data_url(client, "default_cards")
-        history = await catalog.download_history(client, history_url)
+        sources = await _download_sources(client)
 
-    from mtg_helper.services.recommendations import source_repository
-
-    source = await asyncio.to_thread(source_repository.prepare, all_cards)
-    cb("filtering", 0, len(all_cards))
+    cb("filtering", 0, len(sources.cards))
     relevant = [
-        _map_card(c) for c in all_cards if _is_commander_relevant(c) and _is_commander_playable(c)
+        _map_card(c)
+        for c in sources.cards
+        if _is_commander_relevant(c) and _is_commander_playable(c)
     ]
 
     total = len(relevant)
     _log.info("Upserting %d Commander-relevant cards", total)
     async with pool.acquire() as conn, conn.transaction():
-        if not await catalog.lock_generation(conn, started_at, len(all_cards)):
+        if not await catalog.lock_generation(conn, started_at, len(sources.cards)):
             return {"cards_processed": 0, "superseded": True}
+        await scryfall_tag_repository.validate_generation(conn, sources.tags)
         for i in range(0, total, _BATCH_SIZE):
             await _upsert_batch(conn, relevant[i : i + _BATCH_SIZE])
             done = min(i + _BATCH_SIZE, total)
             cb("upserting", done, total)
             _log.info("Upserted %d / %d cards", done, total)
         await _switch_canonical_rows(conn, relevant)
-        await catalog.publish(conn, all_cards, history, started_at, source=source)
+        await catalog.publish(
+            conn, sources.cards, sources.history, started_at, source=sources.publication
+        )
+        cb("publishing Oracle tags", 0, len(sources.tags.catalog.tags))
+        await scryfall_tag_repository.publish(conn, sources.tags, started_at)
+        cb("publishing Oracle tags", len(sources.tags.catalog.tags), len(sources.tags.catalog.tags))
 
     from mtg_helper.services import oracle_duplicate_repair_service
 
@@ -403,5 +416,10 @@ async def run_sync(
 
     return {
         "cards_processed": total,
+        "oracle_tags_processed": len(sources.tags.catalog.tags),
+        "oracle_memberships_processed": sources.tags.membership_count,
+        "card_source_sha256": sources.publication.digest,
+        "tag_source_sha256": sources.tags.digest,
+        "source_manifest": sources.tags.manifest,
         "duration_seconds": round(time.monotonic() - start, 2),
     }

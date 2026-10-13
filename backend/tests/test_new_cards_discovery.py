@@ -187,7 +187,7 @@ async def test_history_download_failure_bounds(mode, monkeypatch):
     if mode == "large":
         monkeypatch.setattr(catalog, "_MAX_BYTES", 1)
     status = 503 if mode == "network" else 200
-    transport = httpx.MockTransport(lambda _: httpx.Response(status, content=body))
+    transport = httpx.MockTransport(lambda _: httpx.Response(status, stream=httpx.ByteStream(body)))
     url = "https://untrusted.example/file" if mode == "host" else "https://data.scryfall.io/file"
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises((ValueError, httpx.HTTPStatusError)):

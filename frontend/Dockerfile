@@ -3,7 +3,7 @@ WORKDIR /app
 RUN corepack enable
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM base AS dev
@@ -13,6 +13,7 @@ EXPOSE 3000
 CMD ["pnpm", "dev"]
 
 FROM deps AS build
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN pnpm build
 

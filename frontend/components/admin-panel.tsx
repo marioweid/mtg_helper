@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminDiscoverPanel } from "@/components/admin-discover-panel";
+import { ScryfallPublication, type ScryfallSourceStatus } from "@/components/scryfall-publication";
 import { ThemeManager } from "@/components/theme-manager";
 
 type Job = "sync" | "tag" | "refresh-all";
@@ -18,9 +19,9 @@ const JOBS: { id: Job; label: string; path: string; description: string }[] = [
   },
   {
     id: "sync",
-    label: "Sync cards",
+    label: "Sync Scryfall",
     path: "/api/v1/admin/sync-cards",
-    description: "Pull fresh Scryfall bulk data and upsert the cards table.",
+    description: "Publish card facts, printing history, and Oracle tags together.",
   },
   {
     id: "tag",
@@ -49,6 +50,7 @@ type StatusResponse = {
   mtgjson: JobSnapshot;
   tag: JobSnapshot;
   refresh_all: JobSnapshot;
+  scryfall_sources: ScryfallSourceStatus;
 };
 
 type MoxfieldHub = {
@@ -67,7 +69,7 @@ type MoxfieldHub = {
 const STATUS_PATH = "/api/v1/admin/status";
 const POLL_INTERVAL_MS = 2000;
 
-const SLOT_BY_ID: Record<Job, keyof StatusResponse> = {
+const SLOT_BY_ID: Record<Job, "sync" | "tag" | "refresh_all"> = {
   sync: "sync",
   tag: "tag",
   "refresh-all": "refresh_all",
@@ -101,6 +103,7 @@ export function AdminPanel() {
     mtgjson: emptySnapshot("mtgjson"),
     tag: emptySnapshot("tag"),
     refresh_all: emptySnapshot("refresh-all"),
+    scryfall_sources: { status: "unavailable" },
   }));
   const [kickoffError, setKickoffError] = useState<Partial<Record<Job, string>>>({});
   const [manualError, setManualError] = useState<string | null>(null);
@@ -258,6 +261,7 @@ export function AdminPanel() {
   return (
     <div className="space-y-4">
       <AdminDiscoverPanel />
+      <ScryfallPublication source={status.scryfall_sources} />
       {JOBS.map(({ id, label, path, description }) => {
         const snapshot = status[SLOT_BY_ID[id]];
         const running = snapshot.status === "running";

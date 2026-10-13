@@ -1,0 +1,68 @@
+# Local-only staging for the incomplete Scryfall label replacement.
+# Uses its own project/network/database volume; never mounts application data.
+# Secrets are supplied at runtime, never copied into images.
+name: mtg-helper-label-staging
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mtg_helper_label_staging
+      POSTGRES_USER: staging
+      POSTGRES_PASSWORD: ${STAGING_DATABASE_PASSWORD:?Generate the staging runtime env first}
+    volumes:
+      - staging-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U staging -d mtg_helper_label_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    command:
+      - uv
+      - run
+      - --no-sync
+      - uvicorn
+      - mtg_helper.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      DATABASE_URL: ${STAGING_DATABASE_URL:?Generate the staging runtime env first}
+      OPENAI_API_KEY: staging-disabled-no-provider-key
+      GOOGLE_OAUTH_CLIENT_ID: ${AUTH_GOOGLE_ID:?Local Google OAuth credentials are required}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:?Use the same admin allowlist as the frontend}
+      INTERNAL_API_TOKEN: ${STAGING_INTERNAL_API_TOKEN:?Generate the staging runtime env first}
+      ASSAY_ENDPOINT: ""
+      ASSAY_API_KEY: ""
+      ASSAY_APPLICATION: ""
+      ENABLE_OPTIMIZER: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runner
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      BACKEND_ORIGIN: http://backend:8000
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:?Local Google OAuth credentials are required}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:?Local Google OAuth credentials are required}
+      AUTH_SECRET: ${STAGING_AUTH_SECRET:?Generate the staging runtime env first}
+      AUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
+      ADMIN_EMAILS: ${ADMIN_EMAILS:?Use the same admin allowlist as the backend}
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      - backend
+
+volumes:
+  staging-pgdata:

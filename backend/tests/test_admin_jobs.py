@@ -74,7 +74,15 @@ async def test_status_endpoint_returns_all_job_slots(client: AsyncClient) -> Non
     resp = await client.get("/api/v1/admin/status")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"sync", "mtgjson", "tag", "refresh_all", "theme_suggest"}
+    assert set(body.keys()) == {
+        "sync",
+        "mtgjson",
+        "tag",
+        "refresh_all",
+        "theme_suggest",
+        "scryfall_sources",
+    }
+    assert body.pop("scryfall_sources") == {"status": "unavailable"}
     for key, slot in body.items():
         assert slot["status"] == "idle"
         assert slot["key"] in {"sync", "mtgjson", "tag", "refresh-all", "theme-suggest"}
