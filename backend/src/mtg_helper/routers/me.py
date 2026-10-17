@@ -1,7 +1,6 @@
-"""Authenticated `/me` endpoints: account profile, preferences, ranking weights, collections."""
+"""Authenticated `/me` endpoints for account and collection operations."""
 
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
@@ -14,14 +13,10 @@ from mtg_helper.models.collections import (
     CollectionResponse,
 )
 from mtg_helper.models.common import DataResponse
-from mtg_helper.models.preferences import PreferenceCreate, PreferenceResponse
-from mtg_helper.models.ranking_weights import RankingWeightsResponse, RankingWeightsUpdate
 from mtg_helper.services import (
     account_service,
     collection_service,
     collection_url_import_service,
-    preference_service,
-    ranking_weight_service,
 )
 from mtg_helper.services.collection_service import (
     AccountNotFoundError as CollectionAccountNotFoundError,
@@ -51,71 +46,6 @@ async def update_me(
     result = await account_service.update_account(request.app.state.db_pool, account.id, body)
     if result is None:
         raise HTTPException(status_code=404, detail="account not found")
-    return DataResponse(data=result)
-
-
-@router.post(
-    "/preferences",
-    response_model=DataResponse[PreferenceResponse],
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_preference(
-    body: PreferenceCreate, account: CurrentAccount, request: Request
-) -> DataResponse[PreferenceResponse]:
-    """Create a preference for the authenticated account."""
-    try:
-        result = await preference_service.create_preference(
-            request.app.state.db_pool, account.id, body
-        )
-    except preference_service.CardNotFoundError as e:
-        raise HTTPException(
-            status_code=422, detail={"code": "CARD_NOT_FOUND", "message": str(e)}
-        ) from e
-    return DataResponse(data=result)
-
-
-@router.get("/preferences", response_model=DataResponse[list[PreferenceResponse]])
-async def list_preferences(
-    account: CurrentAccount, request: Request
-) -> DataResponse[list[PreferenceResponse]]:
-    """List all preferences for the authenticated account."""
-    results = await preference_service.list_preferences(request.app.state.db_pool, account.id)
-    return DataResponse(data=results)
-
-
-@router.delete("/preferences/{preference_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_preference(preference_id: UUID, account: CurrentAccount, request: Request) -> None:
-    """Delete one of the authenticated account's preferences."""
-    deleted = await preference_service.delete_preference(
-        request.app.state.db_pool, account.id, preference_id
-    )
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "code": "PREFERENCE_NOT_FOUND",
-                "message": f"Preference {preference_id} not found",
-            },
-        )
-
-
-@router.get("/ranking-weights", response_model=DataResponse[RankingWeightsResponse])
-async def get_ranking_weights(
-    account: CurrentAccount, request: Request
-) -> DataResponse[RankingWeightsResponse]:
-    """Get ranking weights for the authenticated account."""
-    result = await ranking_weight_service.get_weights(request.app.state.db_pool, account.id)
-    return DataResponse(data=result)
-
-
-@router.put("/ranking-weights", response_model=DataResponse[RankingWeightsResponse])
-async def update_ranking_weights(
-    body: RankingWeightsUpdate, account: CurrentAccount, request: Request
-) -> DataResponse[RankingWeightsResponse]:
-    """Update ranking weights for the authenticated account."""
-    result = await ranking_weight_service.update_weights(
-        request.app.state.db_pool, account.id, body
-    )
     return DataResponse(data=result)
 
 

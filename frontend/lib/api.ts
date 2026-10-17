@@ -6,8 +6,6 @@ import type {
   Capabilities,
   CardResponse,
   CardSuggestion,
-  CoachMemoryResponse,
-  CoachMemoryUpdate,
   ComboListResponse,
   CollectionCardAdd,
   CollectionCardItem,
@@ -37,8 +35,6 @@ import type {
   DeckUpdate,
   DescribeRequest,
   DescribeResponse,
-  FeedbackCreate,
-  FeedbackResponse,
   CommanderCoachRequest,
   CommanderCoachResponse,
   CommanderCoachStartResponse,
@@ -60,12 +56,8 @@ import type {
   PlannedDeckChangeUpdate,
   PlannedShoppingListRequest,
   SimulationAnalysisResponse,
-  PreferenceCreate,
-  PreferenceResponse,
   QuickstartRequest,
   QuickstartResponse,
-  RankingWeightsResponse,
-  RankingWeightsUpdate,
   SnapshotDetailResponse,
   SnapshotResponse,
   SnapshotSummary,
@@ -500,14 +492,6 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  getCoachMemory: (deckId: string) => request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`),
-
-  updateCoachMemory: (deckId: string, body: CoachMemoryUpdate) =>
-    request<CoachMemoryResponse>(`/decks/${deckId}/coach/memory`, {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
-
   suggestCards: (
     deckId: string,
     prompt: string,
@@ -564,40 +548,6 @@ export const apiClient = {
     fetch(`${CLIENT_BASE}/decks/${deckId}/export/buylist`).then((res) => {
       if (!res.ok) throw new ApiError("EXPORT_FAILED", "Buy list export failed");
       return res.text();
-    }),
-
-  // Feedback
-  addFeedback: (deckId: string, body: FeedbackCreate) =>
-    request<FeedbackResponse>(`/decks/${deckId}/feedback`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
-  listFeedback: (deckId: string) => request<FeedbackResponse[]>(`/decks/${deckId}/feedback`),
-
-  deleteFeedback: (deckId: string, feedbackId: string) =>
-    fetch(`${CLIENT_BASE}/decks/${deckId}/feedback/${feedbackId}`, {
-      method: "DELETE",
-    }).then((res) => {
-      if (!res.ok && res.status !== 204)
-        throw new ApiError("DELETE_FAILED", "Failed to delete feedback");
-    }),
-
-  // Preferences
-  createPreference: (body: PreferenceCreate) =>
-    request<PreferenceResponse>(`/me/preferences`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
-  listPreferences: () => request<PreferenceResponse[]>(`/me/preferences`),
-
-  deletePreference: (preferenceId: string) =>
-    fetch(`${CLIENT_BASE}/me/preferences/${preferenceId}`, {
-      method: "DELETE",
-    }).then((res) => {
-      if (!res.ok && res.status !== 204)
-        throw new ApiError("DELETE_FAILED", "Failed to delete preference");
     }),
 
   // Collections
@@ -696,14 +646,6 @@ export const apiClient = {
       return res.text();
     }),
 
-  // Ranking Weights
-  getRankingWeights: () => request<RankingWeightsResponse>(`/me/ranking-weights`),
-
-  updateRankingWeights: (body: RankingWeightsUpdate) =>
-    request<RankingWeightsResponse>(`/me/ranking-weights`, {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
 };
 
 // Re-export for convenience

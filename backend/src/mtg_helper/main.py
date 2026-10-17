@@ -19,7 +19,6 @@ from mtg_helper.routers import (
     cards,
     collections,
     decks,
-    feedback,
     health,
     me,
     new_cards,
@@ -163,7 +162,6 @@ app.include_router(new_cards.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(recommendations.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(ai.router, prefix="/api/v1", dependencies=_authed)
-app.include_router(feedback.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(collections.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(tags.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(admin.router, prefix="/api/v1", dependencies=_admin)

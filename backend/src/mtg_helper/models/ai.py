@@ -1,6 +1,5 @@
 """Pydantic models for AI deck building endpoints."""
 
-from datetime import datetime
 from typing import Literal, Self
 from uuid import UUID, uuid4
 
@@ -362,7 +361,7 @@ class CoachSignalLane(BaseModel):
     name: str
     role: Literal["engine", "payoff", "support", "interaction", "mana", "risk"]
     strength: Literal["core", "present", "thin"]
-    source: Literal["commander", "tags", "cards", "memory", "role_budget", "synergy"]
+    source: Literal["commander", "tags", "cards", "role_budget", "synergy"]
     terms: list[str] = Field(default_factory=list)
     examples: list[str] = Field(default_factory=list)
     protect: bool = False
@@ -439,7 +438,6 @@ CoachResolvedMode = Literal[
     "builder",
     "mana",
     "meta",
-    "memory",
     "chat",
     "replacement",
 ]
@@ -474,23 +472,6 @@ class CommanderCoachRequest(BaseModel):
     message: str = Field(default="Doctor this deck", min_length=1, max_length=4000)
     history: list[CoachHistoryTurn] = Field(default_factory=list, max_length=12)
     mode: CoachMode = "auto"
-    coach_memory_notes: str | None = Field(default=None, max_length=8000)
-
-
-class CoachMemoryUpdate(BaseModel):
-    """User-editable persistent notes for one deck's Coach context."""
-
-    notes: str = Field(default="", max_length=8000)
-
-
-class CoachMemoryResponse(BaseModel):
-    """Persistent Commander Coach memory for a deck/account pair."""
-
-    deck_id: UUID
-    account_id: UUID
-    notes: str
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
 
 
 class CommanderCoachResponse(BaseModel):
@@ -501,8 +482,6 @@ class CommanderCoachResponse(BaseModel):
     recommendations: list[ReplacementOption] = Field(default_factory=list, max_length=8)
     doctor: DeckDoctorResponse | None = None
     replacement: TargetedReplacementResponse | None = None
-    coach_memory: CoachMemoryResponse | None = None
-    memory_updated: bool = False
 
 
 class CommanderCoachStartResponse(BaseModel):

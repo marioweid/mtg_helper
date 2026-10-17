@@ -20,7 +20,6 @@ interface Props {
   onSetCategories?: (scryfallId: string, categories: string[]) => void | Promise<void>;
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
   onSwapped?: () => void | Promise<void>;
-  petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
 }
 
@@ -90,7 +89,6 @@ export function DeckCategoryGroup({
   onSetCategories,
   onSetQuantity,
   onSwapped,
-  petCardNames,
   comboCardIds,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
@@ -152,11 +150,6 @@ export function DeckCategoryGroup({
                       <CardHover name={card.name} imageUri={card.image_uri}>
                         {card.name}
                       </CardHover>
-                      {petCardNames?.has(card.name) && (
-                        <span className="text-red-400 flex-shrink-0" title="Pet card">
-                          ♥
-                        </span>
-                      )}
                       {comboCardIds?.has(card.scryfall_id) && (
                         <span
                           className="flex-shrink-0 text-yellow-300"

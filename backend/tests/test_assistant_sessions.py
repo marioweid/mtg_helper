@@ -21,11 +21,11 @@ from mtg_helper import observability
 from mtg_helper.auth import get_current_account
 from mtg_helper.config import Settings
 from mtg_helper.models.accounts import AccountResponse
-from mtg_helper.models.ai import CoachMemoryResponse, CommanderCoachRequest
+from mtg_helper.models.ai import CommanderCoachRequest
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.observability import assistant_turn
 from mtg_helper.routers import ai
-from mtg_helper.services import coach_memory_service, deck_service, mtg_assistant
+from mtg_helper.services import deck_service, mtg_assistant
 
 pytestmark = pytest.mark.no_db
 
@@ -125,8 +125,6 @@ async def session_app(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[SessionA
     )
     app.dependency_overrides[get_current_account] = lambda: account
     monkeypatch.setattr(deck_service, "get_deck", AsyncMock(return_value=deck))
-    memory = CoachMemoryResponse(deck_id=deck.id, account_id=account.id, notes="Keep Sol Ring")
-    monkeypatch.setattr(coach_memory_service, "get_memory", AsyncMock(return_value=memory))
     settings = Settings(
         _env_file=None,
         database_url="unused",
@@ -195,60 +193,6 @@ async def test_sync_assistant_turns_share_session_and_capture_only_current_conte
     ]
     assert http_roots
     assert all("session.id" not in (s.attributes or {}) for s in http_roots)
-
-
-@pytest.mark.parametrize("message", ["Hello", "What do you have in memory?"])
-async def test_background_turn_completes_after_start_response(
-    session_app: SessionApp,
-    monkeypatch: pytest.MonkeyPatch,
-    message: str,
-) -> None:
-    chat = session_app
-    started_work, release = asyncio.Event(), asyncio.Event()
-    memory = CoachMemoryResponse(deck_id=chat.deck_id, account_id=chat.account.id, notes="Sol Ring")
-
-    async def delayed_memory(*args: object) -> CoachMemoryResponse:
-        started_work.set()
-        await release.wait()
-        return memory
-
-    monkeypatch.setattr(coach_memory_service, "get_memory", delayed_memory)
-    path = f"/api/v1/decks/{chat.deck_id}/coach"
-    response = await chat.client.post(path + "/start", json={"message": message})
-    assert response.status_code == 200
-    await asyncio.wait_for(started_work.wait(), timeout=2)
-    assert await chat.turns() == []
-    release.set()
-    job_id = response.json()["data"]["job_id"]
-    stream = await asyncio.wait_for(chat.client.get(f"{path}/{job_id}/stream"), timeout=3)
-    assert "event: done" in stream.text
-    turns = await chat.turns()
-    assert len(turns) == 1
-    assert turns[0].parent is None
-    assert message in _text(turns[0], "gen_ai.input.messages")
-    assert _text(turns[0], "gen_ai.output.messages")
-    if message.startswith("What"):
-        assert "Sol Ring" in _text(turns[0], "gen_ai.output.messages")
-    assert "event: progress" in stream.text
-
-
-async def test_background_failure_records_failed_turn(
-    session_app: SessionApp,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    chat = session_app
-    monkeypatch.setattr(
-        coach_memory_service, "get_memory", AsyncMock(side_effect=RuntimeError("offline"))
-    )
-    path = f"/api/v1/decks/{chat.deck_id}/coach"
-    response = await chat.client.post(path + "/start", json={"message": "Hello"})
-    job_id = response.json()["data"]["job_id"]
-    stream = await asyncio.wait_for(chat.client.get(f"{path}/{job_id}/stream"), timeout=3)
-    assert "event: failed" in stream.text
-    turns = await chat.turns()
-    assert len(turns) == 1
-    assert turns[0].status.is_ok is False
-    assert "gen_ai.output.messages" not in (turns[0].attributes or {})
 
 
 async def test_unauthorized_deck_and_invalid_conversation_never_create_turn(

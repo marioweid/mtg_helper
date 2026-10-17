@@ -350,7 +350,6 @@ export default function BuildPage() {
   const params = useParams();
   const deckId = params["id"] as string;
 
-  const [petCardNames, setPetCardNames] = useState<Set<string>>(new Set());
   const [state, dispatch] = useReducer(wizardReducer, undefined, initWizardState);
   const [deckCategoryCounts, setDeckCategoryCounts] = useState<Record<string, number>>({});
   const [deckCards, setDeckCards] = useState<DeckCardItem[]>([]);
@@ -411,21 +410,6 @@ export default function BuildPage() {
     [deckCards, plannedChanges],
   );
 
-  useEffect(() => {
-    apiClient
-      .listPreferences()
-      .then((prefs) => {
-        const names = new Set(
-          prefs
-            .filter((p) => p.preference_type === "pet_card" && p.card_name)
-            .map((p) => p.card_name as string),
-        );
-        setPetCardNames(names);
-      })
-      .catch(() => {
-        /* non-critical */
-      });
-  }, []);
 
   const refreshDeck = useCallback(async () => {
     try {
@@ -771,14 +755,6 @@ export default function BuildPage() {
     setGlobalRejectedNames((prev) =>
       prev.includes(suggestion.name) ? prev : [...prev, suggestion.name],
     );
-    try {
-      await apiClient.addFeedback(deckId, {
-        card_scryfall_id: suggestion.scryfall_id,
-        feedback: "reject",
-      });
-    } catch {
-      /* non-critical */
-    }
   }
 
   async function handleRemoveAccepted(stage: string, suggestion: CardSuggestion) {
@@ -1192,7 +1168,6 @@ export default function BuildPage() {
                     onReject={() => void handleReject(activeStageKey, s)}
                     onRemove={() => void handleRemoveAccepted(activeStageKey, s)}
                     onAddBack={() => void handleAddRejected(activeStageKey, s)}
-                    isPetCard={petCardNames.has(s.name)}
                     isBasicLand={isBasicLand(s)}
                     inCombo={comboCardNames.has(s.name.toLowerCase())}
                     quantity={activeStageState.quantities[cardIdentity(s)] ?? 1}
@@ -1283,7 +1258,6 @@ export default function BuildPage() {
         onUndoCut={handleUndoCut}
         onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
         onSetQuantity={handleSetQuantity}
-        petCardNames={petCardNames}
         commander={deckCommander}
         bracket={deckBracket}
         deckId={deckId}

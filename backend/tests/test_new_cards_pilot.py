@@ -219,7 +219,7 @@ async def test_dismiss_undo_and_planning_are_explicit_idempotent(pilot, client, 
     assert next_work.request.context["planned_changes"][0]["name"] == "New 1"
 
 
-@pytest.mark.parametrize("change", ["quantity", "notes", "preference", "goal", "rules"])
+@pytest.mark.parametrize("change", ["quantity", "goal", "rules"])
 async def test_context_changes_hide_cache_without_relying_on_updated_at(pilot, db_pool, change):
     deck, owner, service, cards = pilot
     await service.run(await service.claim(owner, deck))
@@ -229,19 +229,6 @@ async def test_context_changes_hide_cache_without_relying_on_updated_at(pilot, d
                 "INSERT INTO deck_cards (deck_id, card_id, quantity) "
                 "SELECT $1, id, 2 FROM cards WHERE name = 'Sol Ring'",
                 deck,
-            )
-        elif change == "notes":
-            await conn.execute(
-                "INSERT INTO deck_coach_memory (deck_id, account_id, notes) "
-                "VALUES ($1, $2, 'No infinite combos')",
-                deck,
-                owner.account_id,
-            )
-        elif change == "preference":
-            await conn.execute(
-                "INSERT INTO preferences (account_id, preference_type, description) "
-                "VALUES ($1, 'general', 'No infinite combos')",
-                owner.account_id,
             )
         elif change == "goal":
             await conn.execute("UPDATE decks SET description = 'New goal' WHERE id = $1", deck)
@@ -258,7 +245,31 @@ async def test_context_changes_hide_cache_without_relying_on_updated_at(pilot, d
     assert all(p.name != "New 1" for p in response.picks)
 
 
-async def test_live_filters_expiry_legality_avoid_and_physical_identity(pilot, db_pool):
+async def test_legacy_personalization_rows_do_not_stale_new_cards_cache(pilot, db_pool):
+    deck, owner, service, _ = pilot
+    await service.run(await service.claim(owner, deck))
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO deck_coach_memory (deck_id, account_id, notes) VALUES ($1, $2, $3)",
+            deck,
+            owner.account_id,
+            "No infinite combos",
+        )
+        await conn.execute(
+            "INSERT INTO preferences (account_id, preference_type, description) "
+            "VALUES ($1, $2, $3)",
+            owner.account_id,
+            "general",
+            "No infinite combos",
+        )
+
+    response = await service.view(owner, deck)
+
+    assert not response.stale
+    assert response.assessed_count == 8
+
+
+async def test_live_filters_expiry_legality_and_physical_identity(pilot, db_pool):
     deck, owner, service, cards = pilot
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -276,12 +287,6 @@ async def test_live_filters_expiry_legality_avoid_and_physical_identity(pilot, d
             UUID(cards[2]["oracle_id"]),
         )
         await conn.execute(
-            "INSERT INTO preferences (account_id, preference_type, card_id) "
-            "SELECT $1, 'avoid_card', id FROM cards WHERE oracle_id = $2",
-            owner.account_id,
-            UUID(cards[3]["oracle_id"]),
-        )
-        await conn.execute(
             "INSERT INTO deck_cards (deck_id, card_id) "
             "SELECT $1, id FROM cards WHERE oracle_id = $2",
             deck,
@@ -291,7 +296,7 @@ async def test_live_filters_expiry_legality_avoid_and_physical_identity(pilot, d
             "UPDATE cards SET color_identity = ARRAY['R'] WHERE oracle_id = $1",
             UUID(cards[5]["oracle_id"]),
         )
-    assert (await service.view(owner, deck)).eligible_count == 3
+    assert (await service.view(owner, deck)).eligible_count == 4
 
 
 async def test_durable_account_lease_blocks_duplicates_and_other_decks(pilot, db_pool, client):

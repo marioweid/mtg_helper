@@ -780,19 +780,6 @@ export interface CommanderCoachRequest {
   message: string;
   history?: CoachHistoryTurn[];
   mode?: CommanderCoachMode;
-  coach_memory_notes?: string | null;
-}
-
-export interface CoachMemoryResponse {
-  deck_id: string;
-  account_id: string;
-  notes: string;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-export interface CoachMemoryUpdate {
-  notes: string;
 }
 
 export interface CommanderCoachResponse {
@@ -801,8 +788,6 @@ export interface CommanderCoachResponse {
   recommendations: ReplacementOption[];
   doctor: DeckDoctorResponse | null;
   replacement: TargetedReplacementResponse | null;
-  coach_memory: CoachMemoryResponse | null;
-  memory_updated: boolean;
 }
 
 export interface CommanderCoachStartResponse {
@@ -901,49 +886,6 @@ export interface QuickstartStageResult {
 export interface QuickstartResponse {
   deck: DeckResponse;
   stages: QuickstartStageResult[];
-}
-
-// Feedback
-export interface FeedbackCreate {
-  card_scryfall_id: string;
-  feedback: "up" | "down" | "reject";
-  reason?: string | null;
-}
-
-export interface FeedbackResponse {
-  id: string;
-  deck_id: string;
-  card_id: string;
-  card_name: string;
-  feedback: string;
-  reason: string | null;
-  created_at: string;
-}
-
-// Ranking Weights
-export interface RankingWeights {
-  semantic: number;
-  synergy: number;
-  popularity: number;
-  personal: number;
-  deck_inclusion: number;
-  moxfield_inclusion: number;
-  trusted_quota: number;
-}
-
-export interface RankingWeightsResponse extends RankingWeights {
-  account_id: string;
-  updated_at: string;
-}
-
-export interface RankingWeightsUpdate {
-  semantic: number;
-  synergy: number;
-  popularity: number;
-  personal: number;
-  deck_inclusion: number;
-  moxfield_inclusion: number;
-  trusted_quota: number;
 }
 
 // Collections
@@ -1214,29 +1156,4 @@ export interface DeckCompareResponse {
   left: ComparisonSideMeta;
   right: ComparisonSideMeta;
   diff: DeckDiff;
-}
-
-// Preferences
-export type PreferenceType =
-  | "pet_card"
-  | "avoid_card"
-  | "avoid_archetype"
-  | "general"
-  | "feedback_boosting"
-  | "user_profile_boosting";
-
-export interface PreferenceCreate {
-  preference_type: PreferenceType;
-  card_scryfall_id?: string | null;
-  description?: string | null;
-}
-
-export interface PreferenceResponse {
-  id: string;
-  account_id: string;
-  preference_type: string;
-  card_id: string | null;
-  card_name: string | null;
-  description: string | null;
-  created_at: string;
 }

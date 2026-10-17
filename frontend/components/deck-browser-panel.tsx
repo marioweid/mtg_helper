@@ -36,7 +36,6 @@ interface Props {
   onUndoCut?: (card: DeckCardItem) => void | Promise<void>;
   onCardClick?: (card: DeckCardItem) => void;
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
-  petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
   /** When set, the filter input also searches the card pool and lets the user add matches. */
   onAddCard?: (card: CardResponse) => void | Promise<void>;
@@ -47,12 +46,10 @@ interface Props {
 function CardRow({
   card,
   onCut,
-  isPet,
   inCombo,
 }: {
   card: DeckCardItem;
   onCut: () => void;
-  isPet: boolean;
   inCombo: boolean;
 }) {
   const tags = bucketsFor(card).filter((t) => t !== "untagged");
@@ -67,11 +64,6 @@ function CardRow({
           <CardHover name={card.name} imageUri={card.image_uri}>
             <span className="truncate text-gray-100">{card.name}</span>
           </CardHover>
-          {isPet && (
-            <span className="shrink-0 text-red-400" title="Pet card">
-              ♥
-            </span>
-          )}
           {inCombo && (
             <span className="shrink-0 text-yellow-300" title="In a combo">
               ⚡
@@ -112,7 +104,6 @@ export function DeckBrowserPanel({
   onUndoCut,
   onCardClick,
   onSetQuantity,
-  petCardNames,
   comboCardIds,
   onAddCard,
   commanderLegal,
@@ -274,7 +265,6 @@ export function DeckBrowserPanel({
                 key={card.deck_card_id}
                 card={card}
                 onCut={() => handleCut(card)}
-                isPet={petCardNames?.has(card.name) ?? false}
                 inCombo={comboCardIds?.has(card.scryfall_id) ?? false}
               />
             ))}
@@ -289,7 +279,6 @@ export function DeckBrowserPanel({
             }}
             {...(onCardClick ? { onCardClick } : {})}
             {...(onSetQuantity ? { onSetQuantity } : {})}
-            {...(petCardNames ? { petCardNames } : {})}
             {...(comboCardIds ? { comboCardIds } : {})}
           />
         )}

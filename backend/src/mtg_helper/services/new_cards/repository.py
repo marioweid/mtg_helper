@@ -187,17 +187,6 @@ async def _context(
         "JOIN cards c ON c.id = p.card_id WHERE p.deck_id = $1 ORDER BY c.name, p.direction",
         deck["id"],
     )
-    preferences = await conn.fetch(
-        "SELECT p.preference_type, p.description, c.name FROM preferences p "
-        "LEFT JOIN cards c ON c.id = p.card_id WHERE p.account_id = $1 "
-        "ORDER BY p.preference_type, c.name, p.description",
-        owner.account_id,
-    )
-    notes = await conn.fetchval(
-        "SELECT notes FROM deck_coach_memory WHERE deck_id = $1 AND account_id = $2",
-        deck["id"],
-        owner.account_id,
-    )
     context = {
         "physical": physical,
         "name": deck["name"],
@@ -205,8 +194,6 @@ async def _context(
         "bracket": deck["bracket"],
         "themes": list(deck["archetype_tags"]),
         "role_targets": json_value(deck["stage_targets"]),
-        "notes": notes or "",
-        "preferences": [dict(p) for p in preferences],
         "planned_changes": [dict(p) for p in plans],
     }
     return context, len(physical) == len(rows) and len(rows) >= len(commanders)
@@ -243,10 +230,6 @@ async def _candidates(
           AND NOT EXISTS (
               SELECT 1 FROM new_card_dismissals x
               WHERE x.deck_id = $1 AND x.account_id = $2 AND x.oracle_id = n.oracle_id)
-          AND NOT EXISTS (
-              SELECT 1 FROM preferences p JOIN cards pc ON pc.id = p.card_id
-              WHERE p.account_id = $2 AND p.preference_type = 'avoid_card'
-                AND pc.oracle_id = n.oracle_id)
         ORDER BY n.released_at DESC, c.name, n.oracle_id
         """,
             deck_id,

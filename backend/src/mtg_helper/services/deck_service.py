@@ -26,7 +26,6 @@ from mtg_helper.services import (
     deck_fit_service,
     mana_curve_service,
     planned_change_service,
-    preference_service,
 )
 from mtg_helper.services.builder_roles import derive_builder_roles
 
@@ -401,15 +400,12 @@ async def get_deck(
             partner_card = await _fetch_commander_summary(conn, deck_row["partner_id"])
 
     cards = [_row_to_deck_card_item(r) for r in card_rows]
-    protected_names: set[str] = set()
     if account_id is not None and cards:
         ownership_map = await collection_service.build_ownership_map(
             pool, account_id, [c.scryfall_id for c in cards]
         )
         for card in cards:
             card.owned_in = ownership_map.get(card.scryfall_id, [])
-        preferences = await preference_service.get_preferences_for_prompt(pool, account_id)
-        protected_names.update(preferences["pet_cards"])
 
     mana_curve = await mana_curve_service.deck_curve(pool, deck_row["commander_id"], cards)
     planned_changes, physical_card_count, planned_card_count = await _planned_state(
@@ -445,11 +441,7 @@ async def get_deck(
         planned_changes=planned_changes,
     )
     try:
-        await deck_fit_service.enrich_deck_fit(
-            pool,
-            deck,
-            protected_names=protected_names,
-        )
+        await deck_fit_service.enrich_deck_fit(pool, deck)
     except Exception:  # noqa: BLE001 - scoring must not make deck detail unavailable
         _log.exception("Deck fit scoring failed for deck %s", deck_id)
     return deck

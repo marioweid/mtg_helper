@@ -217,9 +217,6 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
         await conn.execute("UPDATE cards SET tags = ARRAY[]::text[], hub_tags = ARRAY[]::text[]")
     finally:
         await conn.close()
-    from mtg_helper.services import profile_service
-
-    profile_service._cache.clear()
 
 
 @pytest.fixture(autouse=True)

@@ -1,7 +1,7 @@
 """Deterministic, deck-relative card fit scoring."""
 
 import re
-from collections.abc import Mapping, Set
+from collections.abc import Mapping
 from typing import Literal
 from uuid import UUID
 
@@ -38,19 +38,15 @@ class WeakCardEvidence(BaseModel):
 async def enrich_deck_fit(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
-    *,
-    protected_names: Set[str] | None = None,
 ) -> None:
     """Attach current source-backed fit evidence to every card in a loaded deck."""
     scores = await score_themes(pool, deck.archetype_tags, deck.commander_color_identity)
-    score_deck_cards(deck, scores, protected_names=protected_names)
+    score_deck_cards(deck, scores)
 
 
 def score_deck_cards(
     deck: DeckDetailResponse,
     source_scores: Mapping[UUID, float],
-    *,
-    protected_names: Set[str] | None = None,
 ) -> None:
     """Compute normalized card fit from source synergy and current deck context."""
     role_counts = _role_counts(deck.cards)
@@ -58,7 +54,6 @@ def score_deck_cards(
     commander_words = _commander_words(deck)
     commander_ids = {card_id for card_id in (deck.commander_id, deck.partner_id) if card_id}
     deck_tags = {_normalize_tag(tag) for tag in deck.archetype_tags}
-    protected = {name.casefold() for name in (protected_names or set())}
 
     for card in deck.cards:
         reasons: list[str] = []
@@ -76,7 +71,7 @@ def score_deck_cards(
             score += 10
             reasons.append(f"Fills low role: {', '.join(needed_roles[:2])}")
 
-        protections = _protection_reasons(card, protected, needed_roles, commander_ids)
+        protections = _protection_reasons(card, needed_roles, commander_ids)
         card.deck_fit_score = min(100, round(score))
         card.deck_fit_band = _band(card.deck_fit_score)
         card.deck_fit_reasons = reasons[:3]
@@ -144,7 +139,6 @@ def _needed_roles(
 
 def _protection_reasons(
     card: DeckCardItem,
-    protected_names: set[str],
     needed_roles: list[str],
     commander_ids: set[UUID],
 ) -> list[str]:
@@ -153,8 +147,6 @@ def _protection_reasons(
         reasons.append("Protected as a commander")
     if "Land" in (card.type_line or ""):
         reasons.append("Protected from ordinary cuts: land")
-    if card.name.casefold() in protected_names:
-        reasons.append("Protected by your pet-card preference")
     normalized_tags = {_normalize_tag(tag) for tag in [*card.tags, *card.mtgjson_tags]}
     if normalized_tags & {"combo", "combo_piece", "combo_pieces"}:
         reasons.append("Protected as a known combo piece")

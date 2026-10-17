@@ -161,68 +161,6 @@ function SwapCard({
   );
 }
 
-function CoachMemoryModal({
-  open,
-  notes,
-  savedAt,
-  saving,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  notes: string;
-  savedAt: string | null;
-  saving: boolean;
-  onChange: (value: string) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Edit Assistant memory</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              These persistent notes guide future MTG Assistant recommendations.
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
-            ✕
-          </button>
-        </div>
-        <textarea
-          value={notes}
-          onChange={(event) => onChange(event.target.value)}
-          rows={10}
-          maxLength={8000}
-          className="mt-4 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-          placeholder="Ask the Assistant what it remembers, or write memory notes here manually."
-        />
-        <div className="mt-2 flex justify-between text-xs text-gray-500">
-          <span>{savedAt ? `Saved ${new Date(savedAt).toLocaleString()}` : "Not saved yet"}</span>
-          <span>{notes.length}/8000</span>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save memory"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ReplacementMessage({
   result,
   busy,
@@ -419,20 +357,11 @@ function CoachConversation({ deckId }: { deckId: string }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("Looking over the deck…");
   const [busy, setBusy] = useState<string | null>(null);
-  const [memoryNotes, setMemoryNotes] = useState("");
-  const [memorySavedAt, setMemorySavedAt] = useState<string | null>(null);
-  const [memorySaving, setMemorySaving] = useState(false);
-  const [memoryOpen, setMemoryOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [deckResult, memory] = await Promise.all([
-        apiClient.getDeck(deckId),
-        apiClient.getCoachMemory(deckId),
-      ]);
+      const deckResult = await apiClient.getDeck(deckId);
       setDeck(deckResult);
-      setMemoryNotes(memory.notes);
-      setMemorySavedAt(memory.updated_at);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load deck");
     }
@@ -487,10 +416,6 @@ function CoachConversation({ deckId }: { deckId: string }) {
       });
       events.addEventListener("done", (event) => {
         const response = JSON.parse((event as MessageEvent).data) as CommanderCoachResponse;
-        if (response.coach_memory) {
-          setMemoryNotes(response.coach_memory.notes);
-          setMemorySavedAt(response.coach_memory.updated_at);
-        }
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: response.reply, result: response },
@@ -513,24 +438,6 @@ function CoachConversation({ deckId }: { deckId: string }) {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "MTG Assistant failed");
       setLoading(false);
-    }
-  }
-
-  async function saveMemory() {
-    setMemorySaving(true);
-    try {
-      const memory = await apiClient.updateCoachMemory(deckId, { notes: memoryNotes });
-      setMemoryNotes(memory.notes);
-      setMemorySavedAt(memory.updated_at);
-      setMemoryOpen(false);
-      toast.push("Assistant memory saved", "success");
-    } catch (err) {
-      toast.push(
-        err instanceof ApiError ? err.message : "Failed to save Assistant memory",
-        "error",
-      );
-    } finally {
-      setMemorySaving(false);
     }
   }
 
@@ -623,16 +530,6 @@ function CoachConversation({ deckId }: { deckId: string }) {
 
   return (
     <div className="fixed inset-x-0 bottom-0 top-[53px] z-30 flex flex-col overflow-hidden bg-zinc-950">
-      <CoachMemoryModal
-        open={memoryOpen}
-        notes={memoryNotes}
-        savedAt={memorySavedAt}
-        saving={memorySaving}
-        onChange={setMemoryNotes}
-        onClose={() => setMemoryOpen(false)}
-        onSave={() => void saveMemory()}
-      />
-
       <div className="shrink-0 px-2 py-2 sm:px-3 lg:px-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-bold text-white">MTG Assistant</h1>
@@ -642,13 +539,6 @@ function CoachConversation({ deckId }: { deckId: string }) {
           >
             {deck.name}
           </Link>
-          <button
-            type="button"
-            onClick={() => setMemoryOpen(true)}
-            className="ml-auto text-xs text-indigo-300 hover:text-indigo-100"
-          >
-            Edit memory
-          </button>
         </div>
         <div className="mt-2">
           <PlannedChangesPanel

@@ -20,7 +20,7 @@ from mtg_helper.models.ai import CommanderCoachRequest, DeckIdentityReport
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.services import moxfield_recs_service
 from mtg_helper.services.commander_coach import synergy_scoring
-from mtg_helper.services.commander_coach.orchestrator import run_coach
+from mtg_helper.services.mtg_assistant import run_assistant as run_coach
 
 _DEFAULT_DB = "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper"
 _COMMANDERS = {

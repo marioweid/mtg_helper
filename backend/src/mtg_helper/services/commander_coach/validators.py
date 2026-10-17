@@ -106,31 +106,8 @@ def _commander_words(deck: DeckDetailResponse) -> set[str]:
     return words & _ENGINE_WORDS
 
 
-def _memory_terms(coach_memory_notes: str | None) -> set[str]:
-    words = _words(coach_memory_notes)
-    terms: set[str] = set()
-    if {"food", "squirrel", "token", "tokens", "sacrifice"} & words:
-        terms.update(words & {"food", "squirrel", "token", "tokens", "sacrifice"})
-    if {"counter", "counters", "proliferate"} & words:
-        terms.update({"counter", "counters", "proliferate"} & words)
-    return terms
-
-
-def _memory_protected_names(
-    deck: DeckDetailResponse,
-    coach_memory_notes: str | None,
-) -> set[str]:
-    if not coach_memory_notes:
-        return set()
-    text = coach_memory_notes.lower()
-    protect_words = ("protect", "preserve", "keep", "core", "engine", "don't cut", "do not cut")
-    if not any(word in text for word in protect_words):
-        return set()
-    return {card.name for card in deck.cards if card.name.lower() in text}
-
-
-def _theme_tags(deck: DeckDetailResponse, coach_memory_notes: str | None = None) -> set[str]:
-    tags = set(deck.archetype_tags or []) | _memory_terms(coach_memory_notes)
+def _theme_tags(deck: DeckDetailResponse) -> set[str]:
+    tags = set(deck.archetype_tags or [])
     if "food_matters" in tags:
         tags.update({"food_matters", "food", "token", "sacrifice"})
     if "squirrel_tribal" in tags:
@@ -160,19 +137,12 @@ def _validate_cut(
     deck_cards: dict[str, DeckCardItem],
     theme: set[str],
     commander_words: set[str],
-    protected_names: set[str],
 ) -> ValidationIssue | None:
     card = deck_cards.get(cut.card_name)
     if card is None:
         return ValidationIssue("cut", (cut.card_name,), "cut card is not in the deck")
     overlap = _card_tags(card) & theme
     commander_overlap = _card_engine_words(card) & commander_words
-    if cut.card_name in protected_names and cut.confidence != "high":
-        return ValidationIssue(
-            "cut",
-            (cut.card_name,),
-            "cuts a card protected by persistent Coach memory without high confidence",
-        )
     if commander_overlap and cut.confidence != "high":
         return ValidationIssue(
             "cut",
@@ -230,7 +200,6 @@ def _validate_swap(
     deck_cards: dict[str, DeckCardItem],
     theme: set[str],
     commander_words: set[str],
-    protected_names: set[str],
 ) -> ValidationIssue | None:
     missing = [name for name in swap.remove if name not in deck_cards]
     if missing:
@@ -257,12 +226,6 @@ def _validate_swap(
     )
     for name in swap.remove:
         removed = deck_cards[name]
-        if name in protected_names:
-            return ValidationIssue(
-                "swap",
-                tuple(swap.remove),
-                f"removes {name}, which is protected by persistent Coach memory",
-            )
         if issue := _validate_theme_removal(swap, removed, theme, commander_words, addition):
             return issue
     return None
@@ -271,16 +234,14 @@ def _validate_swap(
 def validate_doctor_output(
     deck: DeckDetailResponse,
     output: DeckDoctorResponse,
-    coach_memory_notes: str | None = None,
 ) -> list[ValidationIssue]:
     """Return theme/legality issues found in a doctor response."""
     deck_cards = _deck_cards_by_name(deck)
-    theme = _theme_tags(deck, coach_memory_notes)
-    commander_words = _commander_words(deck) | _memory_terms(coach_memory_notes)
-    protected_names = _memory_protected_names(deck, coach_memory_notes)
+    theme = _theme_tags(deck)
+    commander_words = _commander_words(deck)
     issues: list[ValidationIssue] = []
     for cut in output.cuts:
-        if issue := _validate_cut(cut, deck_cards, theme, commander_words, protected_names):
+        if issue := _validate_cut(cut, deck_cards, theme, commander_words):
             issues.append(issue)
     for swap in output.swaps:
         if issue := _validate_swap(
@@ -288,7 +249,6 @@ def validate_doctor_output(
             deck_cards,
             theme,
             commander_words,
-            protected_names,
         ):
             issues.append(issue)
     return issues
@@ -297,10 +257,9 @@ def validate_doctor_output(
 def filter_invalid_doctor_output(
     deck: DeckDetailResponse,
     output: DeckDoctorResponse,
-    coach_memory_notes: str | None = None,
 ) -> list[ValidationIssue]:
     """Remove invalid cuts/swaps in-place and return the removed issues."""
-    issues = validate_doctor_output(deck, output, coach_memory_notes)
+    issues = validate_doctor_output(deck, output)
     if not issues:
         return []
     invalid_cuts = {name for issue in issues if issue.item_type == "cut" for name in issue.names}
@@ -310,14 +269,9 @@ def filter_invalid_doctor_output(
     return issues
 
 
-def feedback_for_doctor(
-    issues: list[ValidationIssue],
-    coach_memory_notes: str | None = None,
-) -> str:
+def feedback_for_doctor(issues: list[ValidationIssue]) -> str:
     """Convert validation issues into concise revision instructions."""
-    lines = ["Revise the recommendations to preserve core theme engines and Coach memory."]
-    if coach_memory_notes:
-        lines.extend(["Persistent Coach memory:", coach_memory_notes.strip()])
+    lines = ["Revise the recommendations to preserve core theme engines."]
     lines.append("Rejected recommendations:")
     for issue in issues[:8]:
         lines.append(f"- {issue.item_type} {', '.join(issue.names)}: {issue.reason}")

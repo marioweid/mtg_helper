@@ -19,7 +19,6 @@ from mtg_helper.services.deck_service import STAGES
 from mtg_helper.services.retrieval_service import RetrievedCard, TypeFilter
 from tests.conftest import (
     HAZEL_SCRYFALL_ID,
-    SOL_RING_SCRYFALL_ID,
     create_test_account,
     create_test_deck,
 )
@@ -242,18 +241,10 @@ async def test_suggest_cards_returns_200(client: AsyncClient) -> None:
     assert isinstance(data["unresolved"], list)
 
 
-# ── feedback boosting ─────────────────────────────────────────────────────────
-
-
-async def test_feedback_boosting_disabled_build_still_works(client: AsyncClient) -> None:
-    """Build works normally even when feedback boosting is off."""
+async def test_build_works_without_personalization_endpoints(client: AsyncClient) -> None:
+    """Build retrieval remains available without account-taste writes."""
     account_id = await create_test_account(client, "No Boost User")
     deck_id = await create_test_deck(client, owner_id=account_id)
-
-    await client.post(
-        f"/api/v1/decks/{deck_id}/feedback",
-        json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "feedback": "down"},
-    )
 
     resp = await client.post(f"/api/v1/decks/{deck_id}/build", json={})
     assert resp.status_code == 200

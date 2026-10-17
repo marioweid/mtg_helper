@@ -1,4 +1,4 @@
-"""Run a complete assistant turn, including memory commands and session tracing."""
+"""Run a complete authorized and traced assistant turn."""
 
 from uuid import UUID
 
@@ -8,8 +8,7 @@ from opentelemetry.trace import Tracer
 from mtg_helper.models.ai import CommanderCoachRequest, CommanderCoachResponse
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.observability import assistant_turn
-from mtg_helper.services import coach_memory_service, commander_coach
-from mtg_helper.services.commander_coach import ProgressCb
+from mtg_helper.services.mtg_assistant import ProgressCb, run_assistant
 
 
 class AssistantService:
@@ -36,7 +35,7 @@ class AssistantService:
             progress: Optional SSE progress publisher.
 
         Returns:
-            The assistant's visible reply and structured recommendations or memory.
+            The assistant's visible reply and structured recommendations.
         """
         with assistant_turn(
             self.tracer,
@@ -57,34 +56,11 @@ class AssistantService:
         *,
         progress: ProgressCb | None,
     ) -> CommanderCoachResponse:
-        await _emit(progress, "memory_check", "Checking Assistant memory")
-        memory = await coach_memory_service.get_memory(self.pool, deck.id, account_id)
-        body = body.model_copy(update={"coach_memory_notes": memory.notes.strip() or None})
-        await _emit(progress, "memory_loaded", "Loaded deck memory into Assistant context")
         await _emit(progress, "assistant_routing", "MTG Assistant is reading the request")
-        routed = await coach_memory_service.handle_memory_message(
-            self.pool, deck.id, account_id, body
-        )
-        if routed is not None:
-            await _emit(progress, "assistant_routed", "Handled by deterministic memory tools")
-            await _report_routed(progress, routed)
-            return routed
         await _emit(progress, "assistant_routed", "MTG Assistant is selecting deck tools")
-        return await commander_coach.run_coach(
-            self.pool, deck, body, progress=progress, account_id=account_id
-        )
+        return await run_assistant(self.pool, deck, body, progress=progress, account_id=account_id)
 
 
 async def _emit(progress: ProgressCb | None, event: str, message: str) -> None:
     if progress is not None:
         await progress(event, message)
-
-
-async def _report_routed(progress: ProgressCb | None, result: CommanderCoachResponse) -> None:
-    if result.mode == "memory" and result.memory_updated:
-        await _emit(progress, "memory_writing", "Writing updated Assistant memory")
-        await _emit(progress, "memory_written", "Assistant memory updated")
-    elif result.mode == "memory":
-        await _emit(progress, "memory_read", "Reading Assistant memory")
-    else:
-        await _emit(progress, "chat_reply", "MTG Assistant answered without deck tools")

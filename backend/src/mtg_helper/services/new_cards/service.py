@@ -94,9 +94,7 @@ class NewCardsService:
             state = await repository.load(conn, work.owner, deck)
             current = {candidate.oracle_id: candidate.input_hash for candidate in state.candidates}
             if any(current.get(c.oracle_id) != c.input_hash for c in work.candidates):
-                raise NewCardsError(
-                    "Deck, plans, preferences or source changed. Analyze again.", 409
-                )
+                raise NewCardsError("Deck, plans, or source changed. Analyze again.", 409)
             pairs = list(zip(work.candidates, assessments, strict=True))
             await conn.executemany(
                 """

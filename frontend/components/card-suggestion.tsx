@@ -12,7 +12,6 @@ interface Props {
   onReject: () => void;
   onRemove?: () => void;
   onAddBack?: () => void;
-  isPetCard?: boolean;
   isBasicLand?: boolean;
   inCombo?: boolean;
   quantity?: number;
@@ -39,7 +38,6 @@ export function CardSuggestionCard({
   onReject,
   onRemove,
   onAddBack,
-  isPetCard,
   isBasicLand,
   inCombo,
   quantity = 1,
@@ -86,14 +84,6 @@ export function CardSuggestionCard({
                 ⚡
               </span>
             )}
-            {isPetCard && (
-              <span
-                className="rounded-full bg-black/70 px-1.5 py-0.5 text-sm text-red-400 backdrop-blur"
-                title="Pet card"
-              >
-                ♥
-              </span>
-            )}
           </div>
           {/* Bottom-right: price (kept clear of the card's printed mana cost) */}
           <span
@@ -113,11 +103,6 @@ export function CardSuggestionCard({
             {isGameChanger && (
               <span className="text-[10px] font-semibold text-amber-300" title="Game changer">
                 Game Changer
-              </span>
-            )}
-            {isPetCard && (
-              <span className="text-red-400 text-xs" title="Pet card">
-                ♥
               </span>
             )}
             {isHot && <span title={hotTitle}>🔥</span>}

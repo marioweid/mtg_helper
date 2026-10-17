@@ -27,7 +27,7 @@ def compact_card_rows(deck: DeckDetailResponse) -> list[dict[str, Any]]:
     return [_card_row(card) for card in cards]
 
 
-def deck_profile(deck: DeckDetailResponse, memory: str | None, message: str) -> dict[str, Any]:
+def deck_profile(deck: DeckDetailResponse, message: str) -> dict[str, Any]:
     """Build the shared prompt payload used by Coach specialists."""
     commander = deck.commander_card
     partner = deck.partner_card
@@ -38,7 +38,6 @@ def deck_profile(deck: DeckDetailResponse, memory: str | None, message: str) -> 
         "bracket": deck.bracket,
         "archetype_tags": list(deck.archetype_tags or []),
         "stage_targets": dict(deck.stage_targets or {}),
-        "coach_memory_notes": memory or "",
         "user_goal": message,
         "card_count": sum(max(1, card.quantity) for card in deck.cards),
         "cards": compact_card_rows(deck),

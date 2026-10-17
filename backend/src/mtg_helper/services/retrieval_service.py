@@ -9,8 +9,7 @@ from uuid import UUID
 
 import asyncpg
 
-from mtg_helper.models.ranking_weights import RankingWeights
-from mtg_helper.services import moxfield_recs_service, profile_service, theme_service
+from mtg_helper.services import moxfield_recs_service, theme_service
 
 _log = logging.getLogger(__name__)
 
@@ -899,25 +898,6 @@ def _curve_fit_score(cmc: Decimal | None, deck_cmc_counts: dict[int, int] | None
     return max(0.0, 0.5 - (actual - target) / target * 0.5)
 
 
-def _personal_rating(card_id: UUID, feedback_weights: dict[UUID, float] | None) -> float:
-    """Map a feedback weight to a [0, 1] personal rating score.
-
-    Args:
-        card_id: Card UUID.
-        feedback_weights: Per-card weight multipliers (range [0.05, 2.0]).
-
-    Returns:
-        Personal rating in [0.0, 1.0]; 0.5 if no feedback.
-    """
-    if feedback_weights is None:
-        return 0.5
-    weight = feedback_weights.get(card_id)
-    if weight is None:
-        return 0.5
-    # Linear map: 0.05 → 0.0, 2.0 → 1.0
-    return (weight - 0.05) / 1.95
-
-
 def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
     """Score a card based on how many requested types/subtypes/keywords/traits it matches.
 
@@ -1044,15 +1024,14 @@ def _color_affinity_score(
     return overlap / len(card_colors)
 
 
-# Default signal weights (no type filter)
-_W_SYNERGY: float = 0.22
-_W_POPULARITY: float = 0.20
-_W_PERSONAL: float = 0.15
-# Fixed weights (never user-tunable)
+# Fixed source-evidence weights (never user-tunable).
+_W_SYNERGY: float = 0.47
+_W_POPULARITY: float = 0.10
 _W_CURVE: float = 0.10
 _W_COLOR: float = 0.05
-_W_PROFILE: float = 0.03
 _W_REPRESENTATION: float = 0.08
+_W_DECK_INCLUSION: float = 0.20
+_W_MOXFIELD_INCLUSION: float = 0.20
 
 _MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
 _MULTI_TAG_SYNERGY_THRESHOLD = 3
@@ -1065,11 +1044,8 @@ class _ScoreContext:
     fts_set: set[UUID]
     commander_colors: set[str]
     deck_cmc_counts: dict[int, int] | None
-    feedback_weights: dict[UUID, float] | None
-    user_profile: "profile_service.UserProfile | None"
     type_filter: TypeFilter | None
     stage: str | None
-    weights: RankingWeights
     hub_inclusion: dict[UUID, float]
     moxfield_inclusion: dict[UUID, float]
     representation_query: RepresentationQuery | None
@@ -1083,9 +1059,7 @@ class _ScoreComponents:
     synergy: float
     popularity: float
     curve: float
-    personal: float
     color: float
-    profile: float
     inclusion: float
     moxfield_inclusion: float
     representation: float
@@ -1099,18 +1073,14 @@ def _build_score_context(
     cards_by_id: dict[UUID, "asyncpg.Record"],
     commander_color_identity: list[str],
     deck_cmc_counts: dict[int, int] | None,
-    feedback_weights: dict[UUID, float] | None,
-    user_profile: "profile_service.UserProfile | None",
     type_filter: TypeFilter | None,
     stage: str | None,
-    ranking_weights: RankingWeights | None,
     hub_inclusion: dict[UUID, float] | None,
     moxfield_inclusion: dict[UUID, float] | None,
     prefer_keywords: bool,
     representation_query: RepresentationQuery | None,
 ) -> _ScoreContext:
-    weights = ranking_weights if ranking_weights is not None else RankingWeights()
-    synergy_base_weight = weights.synergy + weights.semantic
+    synergy_base_weight = _W_SYNERGY
     if prefer_keywords:
         synergy_base_weight += 0.05
     ranks = [
@@ -1123,11 +1093,8 @@ def _build_score_context(
         fts_set=fts_set,
         commander_colors=set(commander_color_identity),
         deck_cmc_counts=deck_cmc_counts,
-        feedback_weights=feedback_weights,
-        user_profile=user_profile,
         type_filter=type_filter,
         stage=stage,
-        weights=weights,
         hub_inclusion=hub_inclusion or {},
         moxfield_inclusion=moxfield_inclusion or {},
         representation_query=representation_query,
@@ -1150,9 +1117,6 @@ def _score_components(uid: UUID, row: "asyncpg.Record", context: _ScoreContext) 
     popularity = 0.0
     if rank is not None:
         popularity = max(0.0, 1.0 - math.log1p(rank) / math.log1p(context.max_rank))
-    profile = 0.5
-    if context.user_profile is not None:
-        profile = profile_service.score_card(context.user_profile, uid, list(row["tags"]))
     representation = 0.0
     if context.representation_query is not None:
         representation = _representation_match_score(row, context.representation_query)
@@ -1160,9 +1124,7 @@ def _score_components(uid: UUID, row: "asyncpg.Record", context: _ScoreContext) 
         synergy=synergy,
         popularity=popularity,
         curve=_curve_fit_score(row["cmc"], context.deck_cmc_counts),
-        personal=_personal_rating(uid, context.feedback_weights),
         color=_color_affinity_score(list(row["color_identity"]), context.commander_colors),
-        profile=profile,
         inclusion=context.hub_inclusion.get(uid, 0.0),
         moxfield_inclusion=context.moxfield_inclusion.get(uid, 0.0),
         representation=representation,
@@ -1181,18 +1143,15 @@ def _combine_score(
             return 0.0
         type_weight = 0.15
     synergy_weight = max(0.0, context.synergy_base_weight - type_weight - representation_weight)
-    weights = context.weights
     return (
         synergy_weight * components.synergy
         + type_weight * type_score
         + representation_weight * components.representation
         + _W_COLOR * components.color
-        + weights.popularity * components.popularity
+        + _W_POPULARITY * components.popularity
         + _W_CURVE * components.curve
-        + weights.personal * components.personal
-        + _W_PROFILE * components.profile
-        + weights.deck_inclusion * components.inclusion
-        + weights.moxfield_inclusion * components.moxfield_inclusion
+        + _W_DECK_INCLUSION * components.inclusion
+        + _W_MOXFIELD_INCLUSION * components.moxfield_inclusion
     )
 
 
@@ -1204,11 +1163,8 @@ def _compute_weighted_scores(
     cards_by_id: dict[UUID, "asyncpg.Record"],
     commander_color_identity: list[str],
     deck_cmc_counts: dict[int, int] | None,
-    feedback_weights: dict[UUID, float] | None,
-    user_profile: "profile_service.UserProfile | None" = None,
     type_filter: TypeFilter | None = None,
     stage: str | None = None,
-    ranking_weights: RankingWeights | None = None,
     hub_inclusion: dict[UUID, float] | None = None,
     moxfield_inclusion: dict[UUID, float] | None = None,
     prefer_keywords: bool = False,
@@ -1219,16 +1175,11 @@ def _compute_weighted_scores(
     Default weights (no type_filter):
         score = w_synergy   * synergy_score
               + w_popularity* popularity
-              + w_personal  * personal_card_rating
               + 0.10        * curve_fit
               + 0.05        * color_affinity
-              + 0.03        * user_profile_score
+              + w_source    * source_inclusion
 
-    The legacy keyword-match weight is folded into synergy so saved ranking
-    settings remain compatible after removing vector search. With type_filter, 0.15 is
-    reallocated from synergy to a type_score signal.
-
-    Weights come from ``ranking_weights`` when provided; otherwise module defaults apply.
+    With a type filter, 0.15 is reallocated from synergy to a type-score signal.
     Multi-modal cards (3+ tag matches) outside theme/bangers stages have synergy dampened 0.7x.
 
     Args:
@@ -1238,11 +1189,8 @@ def _compute_weighted_scores(
         cards_by_id: Raw DB rows indexed by card UUID.
         commander_color_identity: Commander's color identity letters.
         deck_cmc_counts: Current deck CMC distribution.
-        feedback_weights: Per-card feedback weight multipliers.
-        user_profile: Optional cross-deck user preference profile.
         type_filter: Optional parsed type/subtype preferences; activates type boost.
         stage: Current build stage (used to determine synergy damping).
-        ranking_weights: Optional per-user weight overrides.
         representation_query: Deterministic feature terms to score against card representation.
 
     Returns:
@@ -1255,11 +1203,8 @@ def _compute_weighted_scores(
         cards_by_id=cards_by_id,
         commander_color_identity=commander_color_identity,
         deck_cmc_counts=deck_cmc_counts,
-        feedback_weights=feedback_weights,
-        user_profile=user_profile,
         type_filter=type_filter,
         stage=stage,
-        ranking_weights=ranking_weights,
         hub_inclusion=hub_inclusion,
         moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=prefer_keywords,
@@ -1604,10 +1549,7 @@ class _RetrievalRequest:
     offset: int
     stage: str | None
     deck_cmc_counts: dict[int, int] | None
-    feedback_weights: dict[UUID, float] | None
-    user_profile: "profile_service.UserProfile | None"
     type_filter: TypeFilter | None
-    ranking_weights: RankingWeights | None
     collection_filter: CollectionFilter | None
     price_filter: PriceFilter | None
     commander_id: UUID | None
@@ -1748,11 +1690,8 @@ def _rank_candidates(
         cards_by_id=cards_by_id,
         commander_color_identity=request.commander_color_identity,
         deck_cmc_counts=request.deck_cmc_counts,
-        feedback_weights=request.feedback_weights,
-        user_profile=request.user_profile,
         type_filter=request.type_filter,
         stage=request.stage,
-        ranking_weights=request.ranking_weights,
         hub_inclusion=hub_inclusion,
         moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=request.prefer_keywords,
@@ -1762,7 +1701,6 @@ def _rank_candidates(
     _annotate_representation_signals(search.signal_map, cards_by_id, representation_query)
     _annotate_hub_signals(search.signal_map, hub_inclusion, cards_by_id)
     _annotate_moxfield_signals(search.signal_map, moxfield_inclusion, cards_by_id)
-    quota = request.ranking_weights.trusted_quota if request.ranking_weights else 1.0
     page_end = request.offset + request.limit
     ranked = _apply_trusted_quota(
         scores,
@@ -1771,7 +1709,7 @@ def _rank_candidates(
         cards_by_id,
         page_end,
         stage=request.stage,
-        quota=quota,
+        quota=1.0,
     )
     return _RankingResult(
         top_ids=ranked[request.offset : page_end],
@@ -1847,10 +1785,7 @@ async def retrieve_candidates(
     offset: int = 0,
     stage: str | None = None,
     deck_cmc_counts: dict[int, int] | None = None,
-    feedback_weights: dict[UUID, float] | None = None,
-    user_profile: "profile_service.UserProfile | None" = None,
     type_filter: TypeFilter | None = None,
-    ranking_weights: RankingWeights | None = None,
     collection_filter: CollectionFilter | None = None,
     price_filter: PriceFilter | None = None,
     commander_id: UUID | None = None,
@@ -1873,10 +1808,7 @@ async def retrieve_candidates(
         limit: Number of top candidates to return.
         stage: Current build stage; land cards are excluded when stage != "lands".
         deck_cmc_counts: Deck's current CMC distribution for curve fit scoring.
-        feedback_weights: Optional per-card score multipliers (range [0.05, 2.0]).
-        user_profile: Optional cross-deck user preference profile.
         type_filter: Optional type/subtype preferences for soft score boosting.
-        ranking_weights: Optional per-user signal weight overrides.
         collection_filter: When set, restricts candidates to owned cards.
         price_filter: When set, excludes cards above the EUR cap (nonfoil).
         commander_id: When set, fetches top Moxfield commander-deck picks and
@@ -1901,10 +1833,7 @@ async def retrieve_candidates(
         offset=offset,
         stage=stage,
         deck_cmc_counts=deck_cmc_counts,
-        feedback_weights=feedback_weights,
-        user_profile=user_profile,
         type_filter=type_filter,
-        ranking_weights=ranking_weights,
         collection_filter=collection_filter,
         price_filter=price_filter,
         commander_id=commander_id,

@@ -14,7 +14,7 @@ from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 
 LaneRole = Literal["engine", "payoff", "support", "interaction", "mana", "risk"]
 LaneStrength = Literal["core", "present", "thin"]
-LaneSource = Literal["commander", "tags", "cards", "memory", "role_budget", "synergy"]
+LaneSource = Literal["commander", "tags", "cards", "role_budget", "synergy"]
 
 
 @dataclass(frozen=True)
@@ -68,18 +68,16 @@ _TAG_TO_LANES: dict[str, tuple[str, ...]] = {
 def analyze_signals(
     deck: DeckDetailResponse,
     *,
-    memory: str | None = None,
     roles: CoachRoleBudgetReport | None = None,
     synergy: CoachSynergyReport | None = None,
 ) -> CoachSignalReport:
-    """Build a compact lane map from commander text, tags, cards, memory, and reports."""
+    """Build a compact lane map from commander text, tags, cards, and reports."""
     lanes: dict[str, CoachSignalLane] = {}
     commander_blob = _commander_blob(deck)
     tag_lanes = _lanes_from_tags(deck)
-    memory_blob = (memory or "").lower()
     for spec in _LANE_SPECS:
         examples = _matching_cards(deck.cards, spec.terms)
-        source = _source_for_lane(spec, commander_blob, tag_lanes, memory_blob, examples)
+        source = _source_for_lane(spec, commander_blob, tag_lanes, examples)
         if source is None:
             continue
         strength = _strength(spec.name, source, examples, synergy)
@@ -94,7 +92,7 @@ def analyze_signals(
         )
     _merge_report_lanes(lanes, roles, synergy)
     lane_list = sorted(lanes.values(), key=_lane_sort_key)
-    protected = _protected_cards(deck.cards, lane_list, memory_blob)
+    protected = _protected_cards(deck.cards, lane_list)
     core = [lane.name for lane in lane_list if lane.strength == "core"]
     weak = [lane.name for lane in lane_list if lane.strength == "thin"]
     return CoachSignalReport(
@@ -128,15 +126,12 @@ def _source_for_lane(
     spec: LaneSpec,
     commander_blob: str,
     tag_lanes: set[str],
-    memory_blob: str,
     examples: list[str],
 ) -> LaneSource | None:
     if _has_any(commander_blob, spec.terms):
         return "commander"
     if spec.name in tag_lanes:
         return "tags"
-    if _has_any(memory_blob, spec.terms):
-        return "memory"
     if examples:
         return "cards"
     return None
@@ -148,7 +143,7 @@ def _strength(
     examples: list[str],
     synergy: CoachSynergyReport | None,
 ) -> LaneStrength:
-    if source in {"commander", "memory"}:
+    if source == "commander":
         return "core"
     if synergy and lane_name in synergy.weak_packages:
         return "thin"
@@ -199,15 +194,9 @@ def _upsert_lane(
     )
 
 
-def _protected_cards(
-    cards: list[DeckCardItem],
-    lanes: list[CoachSignalLane],
-    memory: str,
-) -> list[str]:
+def _protected_cards(cards: list[DeckCardItem], lanes: list[CoachSignalLane]) -> list[str]:
     protected_terms = tuple(term for lane in lanes if lane.protect for term in lane.terms)
     names = [card.name for card in cards if _has_any(_card_blob(card), protected_terms)]
-    if any(word in memory for word in ("protect", "keep", "preserve", "do not cut", "don't cut")):
-        names.extend(card.name for card in cards if card.name.lower() in memory)
     return sorted(set(names))[:16]
 
 

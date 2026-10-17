@@ -17,8 +17,6 @@ from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.ai import (
     BuildRequest,
     BuildResponse,
-    CoachMemoryResponse,
-    CoachMemoryUpdate,
     CommanderCoachRequest,
     CommanderCoachResponse,
     CommanderCoachStartResponse,
@@ -46,7 +44,6 @@ from mtg_helper.models.swaps import SwapRequest, SwapResponse
 from mtg_helper.services import (
     agents,
     ai_service,
-    coach_memory_service,
     commander_suggestor_service,
     deck_optimizer_service,
     deck_service,
@@ -296,36 +293,6 @@ async def coach_deck_start(
     return DataResponse(data=CommanderCoachStartResponse(job_id=job.job_id))
 
 
-@router.get("/{deck_id}/coach/memory", response_model=DataResponse[CoachMemoryResponse])
-async def get_coach_memory(
-    deck_id: UUID,
-    request: Request,
-    account: CurrentAccount,
-) -> DataResponse[CoachMemoryResponse]:
-    """Return editable persistent memory notes for this deck's Assistant."""
-    await _require_deck(request, deck_id, account)
-    memory = await coach_memory_service.get_memory(request.app.state.db_pool, deck_id, account.id)
-    return DataResponse(data=memory)
-
-
-@router.put("/{deck_id}/coach/memory", response_model=DataResponse[CoachMemoryResponse])
-async def update_coach_memory(
-    deck_id: UUID,
-    body: CoachMemoryUpdate,
-    request: Request,
-    account: CurrentAccount,
-) -> DataResponse[CoachMemoryResponse]:
-    """Replace editable persistent memory notes for this deck's Assistant."""
-    await _require_deck(request, deck_id, account)
-    memory = await coach_memory_service.upsert_memory(
-        request.app.state.db_pool,
-        deck_id,
-        account.id,
-        body.notes,
-    )
-    return DataResponse(data=memory)
-
-
 def _sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
@@ -372,12 +339,7 @@ async def doctor_deck(
     """Run the Commander deck doctor agent for an existing deck."""
     _enforce_rate_limit(account, "doctor_deck", _ANALYZE_LIMIT)
     deck = await _require_deck(request, deck_id, account)
-    memory = await coach_memory_service.get_memory(request.app.state.db_pool, deck_id, account.id)
-    result = await agents.doctor_deck(
-        request.app.state.db_pool,
-        deck,
-        coach_memory_notes=memory.notes.strip() or None,
-    )
+    result = await agents.doctor_deck(request.app.state.db_pool, deck)
     return DataResponse(data=result)
 
 
