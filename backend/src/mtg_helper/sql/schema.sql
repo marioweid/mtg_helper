@@ -814,6 +814,20 @@ CREATE TABLE IF NOT EXISTS new_card_assessments (
     PRIMARY KEY (deck_id, account_id, oracle_id)
 );
 
+-- A changed input hash must never destroy the advice that was produced for the
+-- prior deck context. The current table remains the fast cache; this table is
+-- the immutable historical record for superseded assessments.
+CREATE TABLE IF NOT EXISTS new_card_assessment_history (
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    input_hash TEXT NOT NULL,
+    assessment JSONB NOT NULL,
+    assessed_at TIMESTAMPTZ NOT NULL,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (deck_id, account_id, oracle_id, input_hash)
+);
+
 -- One durable lease/quota row per account, not an in-process task registry.
 CREATE TABLE IF NOT EXISTS new_card_jobs (
     account_id UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,

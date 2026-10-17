@@ -96,6 +96,7 @@ class NewCardsService:
             if any(current.get(c.oracle_id) != c.input_hash for c in work.candidates):
                 raise NewCardsError("Deck, plans, or source changed. Analyze again.", 409)
             pairs = list(zip(work.candidates, assessments, strict=True))
+            await _archive_superseded_assessments(conn, work, pairs)
             await conn.executemany(
                 """
                 INSERT INTO new_card_assessments
@@ -200,6 +201,41 @@ class NewCardsService:
                 candidate.row["id"],
                 "Experimental New Cards suggestion (unverified): " + assessment.reason,
             )
+
+
+async def _archive_superseded_assessments(
+    conn: asyncpg.Connection,
+    work: Work,
+    pairs: list[tuple[Candidate, Assessment]],
+) -> None:
+    """Retain cache entries when a fresh context replaces their current value."""
+    existing = await conn.fetch(
+        "SELECT oracle_id, input_hash, assessment, assessed_at FROM new_card_assessments "
+        "WHERE deck_id = $1 AND account_id = $2 AND oracle_id = ANY($3::uuid[])",
+        work.deck_id,
+        work.owner.account_id,
+        [candidate.oracle_id for candidate, _ in pairs],
+    )
+    incoming = {candidate.oracle_id: candidate.input_hash for candidate, _ in pairs}
+    archived = [row for row in existing if row["input_hash"] != incoming[row["oracle_id"]]]
+    if not archived:
+        return
+    await conn.executemany(
+        "INSERT INTO new_card_assessment_history "
+        "(deck_id, account_id, oracle_id, input_hash, assessment, assessed_at) "
+        "VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+        [
+            (
+                work.deck_id,
+                work.owner.account_id,
+                row["oracle_id"],
+                row["input_hash"],
+                row["assessment"],
+                row["assessed_at"],
+            )
+            for row in archived
+        ],
+    )
 
 
 async def _claim_lease(conn: asyncpg.Connection, owner: Owner, deck_id: UUID) -> UUID | None:
