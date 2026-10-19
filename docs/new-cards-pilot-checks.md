@@ -59,9 +59,9 @@ identity normalization enforces singleton limits. They were not weakened or sile
 - `test_immediate_add_consumes_matching_plan`
 - `test_shopping_list_uses_only_selected_collections`
 
-Adjacent pre-existing dead code: `planned_change_service.complete_plan` has no callers; actual
-single and batch endpoints use `revision_service.apply_revision`. The pilot guards the real path.
-Removing that legacy function is separate cleanup, not part of this feature.
+At that checkpoint, `planned_change_service.complete_plan` was unused. It has since been removed;
+single and batch endpoints still use `revision_service.apply_revision`. Shared physical-completion
+and inventory helpers remain in use by revisions.
 
 ## Reproduce focused checks
 

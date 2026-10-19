@@ -18,7 +18,7 @@ Paths in this table are relative to `/api/v1`:
 
 | Prefix/path | Main operations | Router source |
 |---|---|---|
-| `/cards` | Filtered local search, Scryfall-ID lookup, card sync | `routers/cards.py` |
+| `/cards` | Filtered local search and Scryfall-ID lookup | `routers/cards.py` |
 | `/decks` | CRUD, text/URL import, cards/quantities/categories, plans, Community Picks and combos | `routers/decks.py` |
 | `/decks/{deck_id}/build`, `/decks/{deck_id}/suggest` | Deterministic stage and prompt-based retrieval | `routers/ai.py` |
 | `/decks/{deck_id}/coach`, `/decks/{deck_id}/coach/start` | Direct/background assistant turns; background progress via SSE | `routers/ai.py` |
@@ -35,6 +35,8 @@ Router paths are relative to `backend/src/mtg_helper/`. No `/preferences`, `/me/
 `/me/ranking-weights`, `/decks/{deck_id}/coach/memory`, `/decks/{deck_id}/feedback`,
 or `/decks/{deck_id}/chat` routes are registered.
 Coach is the current chat interface.
+Global card sync is available only through `/admin/sync-cards`; the duplicate
+`POST /cards/sync` route has been removed.
 
 ## Examples
 

@@ -1007,10 +1007,6 @@ async def import_csv(
     return await import_rows(pool, collection_id, parsed, mode, source=f"{csv_format}-csv")
 
 
-def _format_bool(value: bool) -> str:
-    return "True" if value else "False"
-
-
 def _format_datetime(value: datetime | None) -> str:
     if value is None:
         return ""

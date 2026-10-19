@@ -36,7 +36,6 @@ import type {
   DescribeRequest,
   DescribeResponse,
   CommanderCoachRequest,
-  CommanderCoachResponse,
   CommanderCoachStartResponse,
   CommanderSuggestRequest,
   CommanderSuggestResponse,
@@ -478,12 +477,6 @@ export const apiClient = {
         subtypes: opts?.subtypes && opts.subtypes.length > 0 ? opts.subtypes : null,
         theme_tag: opts?.theme_tag ?? null,
       }),
-    }),
-
-  coachDeck: (deckId: string, body: CommanderCoachRequest) =>
-    request<CommanderCoachResponse>(`/decks/${deckId}/coach`, {
-      method: "POST",
-      body: JSON.stringify(body),
     }),
 
   startCoachDeck: (deckId: string, body: CommanderCoachRequest) =>

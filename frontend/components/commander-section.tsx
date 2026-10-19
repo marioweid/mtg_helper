@@ -12,9 +12,8 @@ interface Props {
 }
 
 /**
- * Collapsible "Commander" group rendered above the regular deck category
- * groups. Mirrors ``DeckCategoryGroup``'s chrome so it reads as part of the
- * same list. Each row expands to show the full card image + oracle text.
+ * Collapsible command-zone group kept separate from ordinary deck categories.
+ * Each row expands to show the full card image and Oracle text.
  */
 export function CommanderSection({ commander, partner }: Props) {
   const [expanded, setExpanded] = useState(true);

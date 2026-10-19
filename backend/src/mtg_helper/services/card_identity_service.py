@@ -2,7 +2,6 @@
 
 import logging
 import re
-from typing import Any
 from uuid import UUID
 
 import asyncpg
@@ -48,13 +47,6 @@ _TENS = {
     "eighty": 80,
     "ninety": 90,
 }
-
-
-def oracle_key(row: Any) -> UUID:
-    """Return the stable oracle key for a card-like record or model."""
-    oracle_id = row["oracle_id"] if isinstance(row, asyncpg.Record) else row.oracle_id
-    card_id = row["id"] if isinstance(row, asyncpg.Record) else row.id
-    return oracle_id or card_id
 
 
 async def canonical_card_by_scryfall(

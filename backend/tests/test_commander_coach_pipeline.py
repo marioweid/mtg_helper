@@ -1,4 +1,4 @@
-"""Tests for the Commander Coach specialist pipeline."""
+"""Tests for the current tool-using Commander Coach and its response contracts."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -28,7 +28,6 @@ from mtg_helper.models.ai import (
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.routers import ai
 from mtg_helper.services import mtg_assistant
-from mtg_helper.services.commander_coach import signal_lanes
 from mtg_helper.services.mtg_assistant import (
     AssistantAnswer,
     AssistantCut,
@@ -398,14 +397,6 @@ def test_find_cards_input_treats_natural_theme_tags_as_hints() -> None:
 
     assert filters.theme_tags == ["aristocrats"]
     assert filters.theme_hints == ["Food sacrifice"]
-
-
-async def test_signal_lanes_detect_core_commander_packages() -> None:
-    report = signal_lanes.analyze_signals(_deck())
-
-    assert "food_generation" in report.core_lanes
-    assert "squirrel_generation" in signal_lanes.lane_names(report)
-    assert "Food Engine" in report.protected_cards
 
 
 def test_assistant_drops_ungrounded_cards_and_unknown_cuts() -> None:

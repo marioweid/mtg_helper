@@ -576,57 +576,6 @@ async def _complete_cut(conn: asyncpg.Connection, plan: asyncpg.Record, quantity
         )
 
 
-async def complete_plan(
-    pool: asyncpg.Pool,
-    deck_id: UUID,
-    plan_id: UUID,
-    quantity: int,
-    *,
-    email: str,
-    account_id: UUID,
-) -> PlannedDeckChange | None:
-    """Atomically complete copies and optionally move collection inventory."""
-    async with pool.acquire() as conn, conn.transaction():
-        await _owned_deck(conn, deck_id, email, lock=True)
-        plan = await conn.fetchrow(
-            """
-            SELECT * FROM deck_card_plans
-            WHERE deck_id = $1 AND id = $2
-            FOR UPDATE
-            """,
-            deck_id,
-            plan_id,
-        )
-        if plan is None:
-            raise PlanNotFoundError(f"Planned change {plan_id} not found")
-        if quantity > int(plan["quantity"]):
-            raise InsufficientQuantityError("Completion exceeds the pending quantity")
-        if plan["collection_id"] is not None:
-            await _validate_collection(
-                conn,
-                plan["collection_id"],
-                account_id,
-                plan["card_id"],
-                plan["direction"],
-            )
-        if plan["direction"] == "addition":
-            await _complete_addition(conn, plan, quantity)
-        else:
-            await _complete_cut(conn, plan, quantity)
-        remaining = int(plan["quantity"]) - quantity
-        if remaining == 0:
-            await conn.execute("DELETE FROM deck_card_plans WHERE id = $1", plan_id)
-        else:
-            await conn.execute(
-                "UPDATE deck_card_plans SET quantity = $2, updated_at = now() WHERE id = $1",
-                plan_id,
-                remaining,
-            )
-    if remaining == 0:
-        return None
-    return await get_plan(pool, deck_id, plan_id, email, account_id)
-
-
 async def consume_immediate_plan(
     pool: asyncpg.Pool,
     deck_id: UUID,

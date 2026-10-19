@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "oxlint src app lib components",
+    "lint": "oxlint app lib components",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "format:check": "oxfmt --check ."

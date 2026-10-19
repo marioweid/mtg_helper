@@ -34,10 +34,6 @@ class Settings(BaseSettings):
     assay_api_key: SecretStr = SecretStr("")
     assay_application: str = ""
 
-    # Pagination defaults
-    default_limit: int = 20
-    max_limit: int = 100
-
     # Google Sign-In. Empty client id disables auth (dev/test only).
     google_oauth_client_id: str = ""
     admin_emails: Annotated[list[str], NoDecode] = []

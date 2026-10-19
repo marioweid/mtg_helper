@@ -697,11 +697,6 @@ async def _excluded_nonbasic_names(pool: asyncpg.Pool, ids: list[UUID]) -> set[s
     return {_normalize_card_name(r["name"]) for r in rows}
 
 
-def _is_land_card(type_line: str | None) -> bool:
-    """Return True if the card's type line indicates it is a land."""
-    return "Land" in (type_line or "")
-
-
 async def _search_tags(
     pool: asyncpg.Pool,
     query_tags: list[str],
@@ -1251,17 +1246,6 @@ def _annotate_representation_signals(
         entry = signal_map.setdefault(uid, [])
         if "representation" not in entry:
             entry.append("representation")
-
-
-def _merge_inclusion_scores(
-    primary: dict[UUID, float], secondary: dict[UUID, float]
-) -> dict[UUID, float]:
-    """Merge trusted inclusion maps by keeping each card's strongest score."""
-    merged = dict(primary)
-    for uid, score in secondary.items():
-        if score > merged.get(uid, 0.0):
-            merged[uid] = score
-    return merged
 
 
 def _annotate_hub_signals(
