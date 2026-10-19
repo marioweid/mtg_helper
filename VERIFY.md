@@ -1,14 +1,77 @@
 # Development verification
 
 Run Compose commands from the repository root. Production Portainer configuration is
-separate; these commands operate on the local project only. Requirements: Docker Desktop
-with Linux containers, Compose, and `uv` for host-side Python checks.
+separate; these commands operate on the local project only. Host checks need `uv` and Node 22.
+Container workflows need Docker Desktop with Linux containers and Compose; SQL tests can also
+use a separate local PostgreSQL 16 instance.
+
+## Routine verification: no Google login
+
+**Do not require an interactive Google sign-in for ordinary code verification.** Backend
+API tests use the real application with disposable accounts and test-only authentication
+overrides from `backend/tests/conftest.py`. Auth tests supply synthetic provider claims;
+frontend tests use synthetic sessions. None of this changes running-app authentication.
+Do not add a production auth bypass or copy Google tokens into tests to avoid signing in.
+
+Start with the offline checks from `backend/`:
+
+```sh
+uv run pytest -q -W error -m no_db
+uv run ruff check .
+uv run ruff format --check .
+uv run ty check src/
+```
+
+`-m no_db` matters: an unmarked test can initialize the database for the entire session,
+even when other selected tests do not need it. Offline checks need neither Docker nor OAuth.
+For SQL/API behavior, use the isolated database checks below, also without a Google login.
+Run affected suites, not just offline tests, when changing database-backed behavior.
+
+Frontend checks from `frontend/` (Node 22, dependencies already installed):
+
+```sh
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm build
+```
+
+If `pnpm` is not on PATH, use the installed tools directly rather than skipping checks:
+
+```sh
+node node_modules/vitest/vitest.mjs run
+node node_modules/typescript/bin/tsc --noEmit
+node_modules/.bin/oxlint app lib components
+node_modules/.bin/oxfmt --check .
+node node_modules/next/dist/bin/next build
+```
+
+On PowerShell, invoke oxlint and oxfmt as `& .\node_modules\.bin\oxlint.cmd` and
+`& .\node_modules\.bin\oxfmt.cmd`, with the same arguments.
+
+### Browser checks: reuse the session
+
+- Keep using the same browser profile, `http://localhost:3000` origin, and existing root
+  `AUTH_SECRET`. Do not regenerate the secret, clear cookies, or sign out between checks.
+- Reuse a signed-in tab/profile before requesting another login. The existing Auth.js
+  implementation refreshes Google ID tokens using the stored refresh token; restarting the
+  backend does not itself require Google consent again.
+- Session cookies or browser storage snapshots are credentials. If retained by browser tooling,
+  keep them outside version control (for example, ignored `.local/browser/`) and never print them.
+- A first login, expired/revoked session, or failed refresh may still need human interaction.
+  For unrelated cleanup/refactoring, finish automated verification and record authenticated
+  browser smoke as pending instead of repeatedly asking the user to sign in.
+- Test real OAuth/consent only when explicitly verifying authentication, or when a changed
+  authenticated UI flow genuinely requires browser acceptance. Fixture tests are not OAuth E2E.
 
 ## Configuration
 
 Preserve existing environment files. On a new checkout copy `backend/.env.example` to
 `backend/.env`, and `.env.example` to root `.env` (PowerShell: `Copy-Item`). Set the
-backend OpenAI key and root Google credentials plus a unique local Auth.js secret.
+backend OpenAI key and root Google credentials plus a unique local Auth.js secret for the
+interactive application. Automated tests use synthetic credentials and do not need real Google
+credentials or a working model key. Create the local Auth.js secret once, then preserve it.
 Live mode additionally requires `LIVE_DATABASE_URL` with a LAN-resolvable database host.
 Reuse the existing production Google client only with approval. Its authorized redirect
 must include `http://localhost:3000/api/auth/callback/google`. The backend client ID
@@ -49,10 +112,12 @@ docker compose -f docker-compose.yml -f docker-compose.live.yml up -d --no-build
 curl http://localhost:8000/health
 ```
 
-Expect `{"status":"ok"}`. Open `http://localhost:3000` and sign in with the same Google
-account as the hosted application. Compare an existing deck and collection without editing
-them. An OAuth redirect mismatch requires adding the localhost callback in Google Cloud;
-do not bypass authentication. If sign-in needs human interaction, record that validation as pending.
+Expect `{"status":"ok"}`. If a signed-in browser session is already available at
+`http://localhost:3000`, compare an existing deck and collection without editing them.
+Reuse the session for the same Google account as the hosted application; do not request fresh
+consent for every restart. If unavailable, record authenticated browser verification as pending
+and continue with automated checks. OAuth redirect problems require the localhost callback in
+Google Cloud; do not bypass running-app authentication.
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.live.yml restart backend
@@ -89,15 +154,21 @@ docker compose run --rm --no-deps -e OPENAI_API_KEY=test backend uv run --extra 
 Test setup drops/recreates the test schema. It rejects remote hosts, non-test names,
 query-parameter routing overrides, and the application's database before connecting.
 Tests never call paid models or require the homeserver when using this local target.
+The `client` fixture creates its own test account, so API/deck/collection/ownership checks do
+not require a real browser, Google credentials, or the production account. The test override
+is not enabled in Compose or production.
 
-Focused safety checks need no database (run from `backend/`):
+For host-side integration tests against that same disposable database, run from `backend/`:
 
 ```sh
-uv run pytest -q tests/test_live_development.py tests/test_observability.py
-uv run ruff check .
-uv run ruff format --check .
-uv run ty check src/
+uv run pytest -q -W error tests/test_accounts.py tests/test_deck_crud.py
 ```
+
+The host default is `127.0.0.1`/`localhost:5432`, database `mtg_helper_test`. If using a
+different local PostgreSQL 16 instance, explicitly set `TEST_DATABASE_URL` to its disposable
+`_test` database. Bind any temporary test server to loopback and use an empty, dedicated cluster;
+do not repurpose existing application clusters. Docker being unavailable blocks container checks,
+not offline tests or a separately available isolated PostgreSQL instance.
 
 If testing inside live-mode containers, use the same Compose override on `run`/`exec`;
 `TEST_DATABASE_URL` still selects the isolated local `_test` database, never the live application.
