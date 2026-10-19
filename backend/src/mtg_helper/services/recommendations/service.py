@@ -104,7 +104,7 @@ class DiscoveryService:
             for row in rows:
                 view = views.run_view(
                     dict(row),
-                    await exclusions(conn, owner, deck_id),
+                    await exclusions(conn, deck_id),
                     commander_id=str(deck["commander_oracle_id"]),
                     source_hash=status.source_hash,
                 )
@@ -118,7 +118,7 @@ class DiscoveryService:
     async def preview(self, owner: Owner, deck_id: UUID, request: QueryPreview) -> QueryPage:
         async with self.pool.acquire() as conn:
             deck = await owned_deck(conn, owner, deck_id)
-            hidden = await exclusions(conn, owner, deck_id)
+            hidden = await exclusions(conn, deck_id)
         try:
             cards_hash, rules_hash = await self.sources.current()
             sources = await self.sources.load(
@@ -173,7 +173,7 @@ class DiscoveryService:
                     "clear that scope explicitly or use Community Picks",
                     409,
                 )
-            hidden = await exclusions(conn, owner, deck_id)
+            hidden = await exclusions(conn, deck_id)
             leader = leader_for_deck(deck, sources.cards)
         if request.constraint:
             try:
@@ -271,7 +271,7 @@ class DiscoveryService:
             current = await conn.fetchval("SELECT source_sha256 FROM new_card_catalog_state")
             view = views.run_view(
                 dict(row),
-                await exclusions(conn, owner, deck_id),
+                await exclusions(conn, deck_id),
                 commander_id=str(deck["commander_oracle_id"]),
                 source_hash=current,
             )

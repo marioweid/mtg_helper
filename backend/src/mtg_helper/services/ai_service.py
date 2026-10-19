@@ -402,7 +402,6 @@ def _resolve_stage_query(
 async def _stage_excluded_ids(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
-    account_id: UUID,
     exclude: list[str] | None,
 ) -> list[UUID]:
     deck_card_ids = [card.card_id for card in deck.cards]
@@ -519,7 +518,7 @@ async def build_stage(
     if commander is None:
         raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
 
-    all_excluded = await _stage_excluded_ids(pool, deck, account_id, exclude)
+    all_excluded = await _stage_excluded_ids(pool, deck, exclude)
 
     deck_archetype_tags = list(deck.archetype_tags or [])
     stage_query = _resolve_stage_query(

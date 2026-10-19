@@ -8,11 +8,8 @@ import pytest
 from mtg_helper.services import oracle_duplicate_repair_service
 from mtg_helper.services.new_cards import catalog
 from mtg_helper.services.new_cards.discovery import release_history
-from tests import test_new_cards_pilot as fixtures
 from tests.conftest import SCHEMA_PATH
 
-model = fixtures.model
-pilot = fixtures.pilot
 pytestmark = pytest.mark.asyncio
 
 

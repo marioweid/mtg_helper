@@ -188,7 +188,6 @@ export default function DeckDetailPage() {
     };
   }, [deckId]);
 
-
   async function handleSaveDescription() {
     if (!deck) return;
     setSavingDescription(true);

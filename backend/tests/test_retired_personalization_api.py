@@ -29,7 +29,7 @@ async def test_memory_routes_are_absent_for_an_authenticated_owned_deck(client) 
     deck_id = await create_test_deck(client)
 
     for method in ("get", "put"):
-        response = await getattr(client, method)(f"/api/v1/decks/{deck_id}/coach/memory", json={})
+        response = await client.request(method, f"/api/v1/decks/{deck_id}/coach/memory", json={})
         assert response.status_code == 404
 
     model = TestModel(call_tools=[], custom_output_args={"mode": "chat", "reply": "Answer"})

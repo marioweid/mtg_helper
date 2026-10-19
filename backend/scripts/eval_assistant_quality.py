@@ -21,7 +21,6 @@ class AssistantEvalCase(BaseModel):
     deck_fixture: str = Field(min_length=1)
     history: list[EvalHistoryTurn]
     message: str = Field(min_length=1)
-    memory: str
     expected_tools: list[str]
     required_phrases: list[str]
     forbidden_phrases: list[str]

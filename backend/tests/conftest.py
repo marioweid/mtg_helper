@@ -20,6 +20,8 @@ from httpx import ASGITransport, AsyncClient
 
 from mtg_helper.main import app
 
+pytest_plugins = ("tests.new_cards_fixtures",)
+
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test"
 )

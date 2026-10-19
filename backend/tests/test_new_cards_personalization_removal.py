@@ -2,8 +2,6 @@
 
 from mtg_helper.services.new_cards import repository
 
-pytest_plugins = ("tests.test_new_cards_pilot",)
-
 
 async def test_legacy_rows_do_not_change_context_or_reuse_old_assessments(
     pilot, db_pool, model

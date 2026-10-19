@@ -45,7 +45,7 @@ async def owned_deck(
     return row
 
 
-async def exclusions(conn: asyncpg.Connection, owner: Owner, deck_id: UUID) -> set[str]:
+async def exclusions(conn: asyncpg.Connection, deck_id: UUID) -> set[str]:
     rows = await conn.fetch(
         "SELECT c.oracle_id FROM cards c JOIN deck_cards d ON d.card_id = c.id "
         "WHERE d.deck_id = $1 UNION SELECT c.oracle_id FROM cards c "

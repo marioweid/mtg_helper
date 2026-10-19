@@ -715,7 +715,6 @@ export type CommanderCoachResolvedMode =
   | "builder"
   | "mana"
   | "meta"
-  | "memory"
   | "chat"
   | "replacement";
 

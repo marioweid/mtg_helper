@@ -142,8 +142,8 @@ backend and frontend for the request wiring.
   conversation UUID. Reusing a client UUID for another account or deck cannot merge sessions.
   This identifier is correlation metadata, never authentication or permission to read a transcript.
 - Each turn gets one independent `assistant.turn` root trace with the current question and visible
-  reply. Model/tool child spans retain detailed evidence and provider history. Memory-only commands
-  are included too. Background turns remain open until completion; failed turns record their error.
+  reply. Model/tool child spans retain detailed evidence and provider history. Background turns
+  remain open until completion; failed turns record their error.
 - HTTP start requests and SSE connections remain ordinary traces, not duplicate session turns.
   Each assistant turn links back to its initiating HTTP request.
 - API callers can send `conversation_id` (a UUID) in both `POST /api/v1/decks/{deck_id}/coach` and
@@ -152,9 +152,10 @@ backend and frontend for the request wiring.
 
 Session grouping uses Assay's documented OpenTelemetry `session.id` root attribute and
 `gen_ai.conversation.id` on GenAI spans, on the same provider as the rest of our tracing.
-It does not load conversation history from Assay: the assistant still receives its bounded history
-from the chat page, and deck memory remains in the application's database. Existing traces are not
-retroactively grouped. Without Assay configuration, chat behavior is unchanged and nothing exports.
+It does not load conversation history from Assay: the assistant receives bounded history from the
+current chat page, not saved cross-chat memory. Old memory rows remain stored but are unused.
+Existing traces are not retroactively grouped. Without Assay configuration, chat behavior is
+unchanged and nothing exports.
 
 ## Database
 
@@ -234,8 +235,9 @@ unresolved special products. Original regular-product releases use the 60-day UT
 promos or later representative printings. Coverage is conservative, not a complete spoiler feed.
 
 **Plan addition** is explicit and idempotent; it never edits physical cards or plans supporting swaps.
-Current physical cards, partners, goals, preferences, notes and pending plans invalidate affected
-cached advice. Pending additions are not support. Dismissals persist per account/deck; the UI can undo
+Current physical cards, partners, goals and pending plans invalidate affected cached advice.
+Retired account preferences and memory notes no longer affect advice or its cache identity.
+Pending additions are not support. Dismissals persist per account/deck; the UI can undo
 the latest dismissal. Saved plans survive age expiry. Pilot-origin plans recheck current local
 legality, color identity and copy limits during single/batch completion; failures roll back the whole
 revision. Manual/Rule 0 plans retain existing policy. A stale catalog is visibly flagged after two

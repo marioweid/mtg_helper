@@ -410,7 +410,6 @@ export default function BuildPage() {
     [deckCards, plannedChanges],
   );
 
-
   const refreshDeck = useCallback(async () => {
     try {
       const deck = await apiClient.getDeck(deckId);
