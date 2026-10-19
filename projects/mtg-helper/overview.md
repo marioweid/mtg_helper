@@ -1,29 +1,25 @@
-# MTG Helper — Project Overview
+# Project overview
 
-## What It Is
+MTG Helper is a Commander deck workspace with local card search, staged building,
+AI-assisted strategy and card advice, collections, planned changes, and goldfishing.
+See the [README](../../README.md) for features, screenshots, and development entry points.
 
-An AI-powered Commander deck-building assistant. You set a commander, describe your strategy in natural language, and the AI builds a deck in stages — giving you control at every step.
+## Current scope
 
-## Problem It Solves
+- Google sign-in with account-scoped decks and collections.
+- Commander/partner selection, deck imports, and Moxfield-compatible exports.
+- A deterministic stage builder plus a separate tool-using AI coach.
+- Physical deck cards kept separate from pending additions/cuts and revision history.
+- Collection ownership, price filters, Cardmarket shopping lists, and mana/playtest tools.
+- Experimental released-card advice and an independently gated source-backed Discover pilot.
 
-Building Commander decks is fun but time-consuming. You need to balance mana curves, find synergies across 27,000+ legal cards, and match a target power level. MTG Helper automates the research and card selection while keeping the human in the loop for creative decisions.
+Account preference learning, cross-deck feedback ranking, and persistent Coach memory
+are retired. Their stored data is retained, not used to personalize current advice.
+The Preferences page is a placeholder, not a preference editor.
 
-## Target User
+## Limits
 
-Commander players who want help building decks that match a specific strategy, tone, and power level — without losing creative control.
-
-## Core Value Proposition
-
-- **Natural language deck building** — Describe what you want ("Hazel of the Rootbloom with token copies and big X spells as finishers") and get a structured deck
-- **Interactive refinement** — Start with a partial list, ask for targeted suggestions, and iterate
-- **Preference learning** — The AI remembers what you like and dislike, both per-deck and globally
-- **Power level awareness** — Build for bracket 2 (casual) or bracket 3 (strong) intentionally
-- **Full card accuracy** — Local Scryfall database ensures every suggestion is a real, legal card
-
-## Non-Goals (For Now)
-
-- Multi-user / authentication
-- Cloud deployment (Docker Compose local first)
-- Deck playtesting or goldfish simulation
-- Price optimization
-- Collection tracking (delegate to Moxfield)
+AI advice is unverified; local identity and eligibility checks do not prove Magic rules
+interpretations or strategic fit. Discover is default off and does not assess physical-deck
+interactions. New Cards assesses the physical list but excludes previews and unresolved releases.
+See the [remaining work](roadmap.md) and individual pilot contracts before extending either.

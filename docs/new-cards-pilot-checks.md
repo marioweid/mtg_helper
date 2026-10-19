@@ -1,12 +1,12 @@
 # Experimental New Cards pilot — verification
 
-## Now
+## Historical implementation checks
 
-Implementation is published in [PR #13](https://github.com/marioweid/mtg_helper/pull/13) on
-`feat/new-cards-pilot`. Independent read-only review passed with no blockers. It is not merged or
-deployed; operator/browser/provider acceptance remains outstanding.
-No production deployment, production database write, or additional paid model call was performed.
-The existing research budgets remain exhausted. See [contract](new-cards-pilot-contract.md) and
+The checks below were recorded for [PR #13](https://github.com/marioweid/mtg_helper/pull/13)
+on October 7, 2026. They are not current branch/deployment status or a rerun of the tests.
+Independent read-only review reported no blockers; browser/provider acceptance was not performed.
+Retired preference/memory invalidation below describes that historical version, not the current
+personalization-free contract. Research budgets remain exhausted. See [contract](new-cards-pilot-contract.md) and
 [operating instructions](../OPERATIONS.md#experimental-new-cards-pilot).
 
 ## Local evidence (2026-10-07)
@@ -65,14 +65,15 @@ Removing that legacy function is separate cleanup, not part of this feature.
 
 ## Reproduce focused checks
 
-Use a disposable PostgreSQL database owned by role `mtg`; the fixture drops/recreates its public
-schema. Never set `TEST_DATABASE_URL` to a development or production database containing user data.
+First follow [VERIFY.md](../VERIFY.md#isolated-database-mode-and-tests) to start the isolated
+database. The fixture drops/recreates its test schema; never use shared data. The historical
+port 15439 above is not a prerequisite for the current local setup.
 
 ```bash
 cd backend
 uv run ruff check .
 uv run ty check src/
-TEST_DATABASE_URL=postgresql://mtg@127.0.0.1:15439/mtg_helper_test uv run pytest -q -W error \
+uv run pytest -q -W error \
   tests/test_new_cards*.py tests/test_scryfall_pipeline.py tests/test_card_identity_service.py \
   tests/test_deck_crud.py tests/test_assistant_deck_context.py
 

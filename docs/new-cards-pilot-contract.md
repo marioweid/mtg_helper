@@ -2,7 +2,7 @@
 
 User approved implementation and explicitly chose **released, Commander-legal cards first**.
 Previews, unknown-release products, and promo-only originals are excluded and disclosed, not
-asserted future-legal. This supersedes the broader draft's preview scope for the pilot only.
+asserted future-legal. The pilot does not implement preview discovery.
 No automatic physical deck changes. Model output is advisory and labeled unverified.
 
 ## HTTP contract
@@ -66,10 +66,11 @@ interface NewCardPick {
 }
 ```
 
-GET filters expired, in-deck, pending-addition, dismissed, avoided and illegal cards on every read.
+GET filters expired, in-deck, pending-addition, dismissed and illegal cards on every read.
 Coverage refers to the currently eligible pool; rejects count as assessed. No minimum suggestion
 count. Incomplete coverage must not look like a completed empty result. Old-context assessments are
 not displayed as current. Support facts use physical cards only; pending cuts are included as warnings.
+Retired account preferences, feedback ranking and Coach memory do not affect advice or cache identity.
 
 ## Pilot boundaries
 

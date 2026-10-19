@@ -1,50 +1,27 @@
-# Tech Stack
+# Tech stack
 
-## Backend
+Installed versions are pinned in [backend/pyproject.toml](../../backend/pyproject.toml),
+[frontend/package.json](../../frontend/package.json), and their lockfiles.
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Framework | FastAPI | Async REST API |
-| Python | 3.13 | Runtime |
-| DB Driver | asyncpg | Async PostgreSQL access, plain SQL |
-| AI | Claude API (Anthropic SDK) | Deck building, card suggestions |
-| HTTP Client | httpx | Scryfall bulk data downloads |
-| Validation | Pydantic V2 | Request/response models |
-| Package Manager | uv | Dependencies, virtualenv |
-| Linting | ruff | Lint + format |
-| Type Checking | ty | Static analysis |
-| Testing | pytest | Unit + integration tests |
+| Area | Current technology |
+|---|---|
+| Backend | Python 3.13, FastAPI, Pydantic V2, pydantic-settings |
+| Database | PostgreSQL 16, asyncpg, parameterized plain SQL (no ORM) |
+| AI | OpenAI Responses through Pydantic AI; bounded workflows and structured output |
+| HTTP | HTTPX, curl_cffi for supporting source integrations |
+| Tracing | Optional Assay SDK / OpenTelemetry integration |
+| Frontend | Next.js 15 App Router, React 19, TypeScript |
+| Authentication | Auth.js / next-auth with Google; backend Google ID-token verification |
+| UI | Tailwind CSS 4, React state/hooks, dnd-kit |
+| Python tooling | uv, Ruff, ty, pytest / pytest-asyncio |
+| Frontend tooling | pnpm, oxlint, oxfmt, Vitest, TypeScript |
+| Development | Docker Compose with hot reload; isolated default or explicit live-data override |
+| Production | Portainer Compose, external shared PostgreSQL, existing proxy/Cloudflare ingress |
 
-## Frontend
+Scryfall provides card facts/images and canonical tag publication. Legacy consumers still
+use MTGJSON, Moxfield, and Archidekt metadata/evidence; Commander Spellbook supplies combo
+data. The [Scryfall-only label migration](../../docs/scryfall-only-label-migration-plan.md)
+is not complete. There is no vector database service or Anthropic/Gemini runtime integration.
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Framework | Next.js 14+ (App Router) | UI |
-| Language | TypeScript | Type safety |
-| Styling | TBD (Tailwind CSS recommended) | Styling |
-| State | TBD | Client state management |
-| Linting | oxlint | Lint |
-| Formatting | oxfmt | Format |
-
-## Database
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Primary DB | PostgreSQL 16 | Cards, decks, preferences, conversations |
-| Query Style | Plain SQL via asyncpg | No ORM |
-| Future | Qdrant | Vector search for card similarity (if needed) |
-
-## Infrastructure
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Local | Docker Compose | Run all services locally |
-| Future Deploy | GCP (Cloud Run + Cloud SQL) | Production hosting |
-
-## External APIs
-
-| Service | Usage | Rate Limiting |
-|---------|-------|---------------|
-| Scryfall Bulk Data | Card database import | None (bulk download) |
-| Scryfall CDN | Card images (URLs stored in DB) | None (public CDN) |
-| Claude API | AI deck building + suggestions | Per API plan |
+Use [VERIFY.md](../../VERIFY.md) for development commands and database safety, and
+[OPERATIONS.md](../../OPERATIONS.md) for deployment and sync operations.

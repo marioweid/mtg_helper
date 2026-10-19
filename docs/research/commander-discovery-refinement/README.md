@@ -2,6 +2,11 @@
 
 ## Scope and authority
 
+This records the offline-refinement checkpoint. The shared core was subsequently integrated
+behind the default-off Discover capability; see the
+[current contract](../../recommendation-pilot-contract.md). The historical separation policy
+below is not a claim that application integration is still absent.
+
 The user approved refining the experimental pipeline **outside the application** until testing
 establishes a grounded base. After clarification, the user chose **Luna**, the cheapest measured
 model, to drive refinement. Compare Sol/Terra later using the same frozen improved pipeline.
