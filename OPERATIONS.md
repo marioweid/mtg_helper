@@ -1,6 +1,7 @@
 # Operations Runbook
 
-Copy-paste commands for the things you do more than once a year. For project conventions see `CLAUDE.md`.
+Production deployment, source sync, and tracing. For project conventions see [AGENTS.md](AGENTS.md).
+For local boot/tests and database safety, start with [VERIFY.md](VERIFY.md).
 
 ## Compose layout
 
@@ -10,7 +11,8 @@ The base file is local-dev only; production and publication staging are standalo
 |---|---|
 | `docker-compose.staging.yml` | Isolated local Scryfall publication testing. Dedicated database volume, loopback-only ports, no working AI key. See [staging instructions](docs/scryfall-label-staging.md). |
 | `docker-compose.yml` | Local dev. Postgres + backend (`--reload`) + frontend (`pnpm dev`). Source dirs bind-mounted for hot reload. Data in a Docker-managed named volume. |
-| `docker-compose.prod.yml` | Standalone production/Portainer stack. Uses host data under `${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}`, production frontend build, and daily `scryfall-sync` (weekly tag/embedding refresh). |
+| `docker-compose.live.yml` | Explicit override for local hot reload against shared live data; disables startup maintenance, not ordinary writes. Use with the base file. |
+| `docker-compose.prod.yml` | Standalone production/Portainer stack. Connects to existing shared PostgreSQL, builds the production frontend, and runs daily `scryfall-sync` (weekly full source refresh/tagging). |
 
 The production file intentionally does **not** use Compose merge tags (`!reset`, `!override`) so it
 works with current Portainer Git stacks. It publishes only the frontend to
@@ -20,11 +22,8 @@ the Admin page when you want fresh data.
 
 ## Portainer setup summary
 
-1. Create persistent data directories on the homeserver:
-
-```bash
-sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
-```
+1. Ensure the existing PostgreSQL service is reachable on the external `shared_database` Docker
+   network. Set `MTG_DATABASE_URL` to its DSN; this stack creates no database or data directories.
 
 2. In Portainer, create a Git stack using:
    - Repository URL: this repo
@@ -36,35 +35,19 @@ sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
 
 ## Local boot
 
-```bash
-# Required once: copy env template and fill in keys
-cp backend/.env.example backend/.env
-$EDITOR backend/.env   # set OPENAI_API_KEY; INTERNAL_API_TOKEN if you'll hit admin endpoints
+Follow [VERIFY.md](VERIFY.md) for configuration, isolated/live mode switching, and safe tests.
+Both `backend/.env` and root `.env` are needed for the documented signed-in local setup.
+Root `.env` supplies Google credentials and a unique local session secret. Backend configuration
+is runtime-only and is not copied into images. All published local ports bind to loopback.
 
-# bring everything up (postgres, backend, frontend)
-docker compose up -d --build
-
-# tail logs
-docker compose logs -f backend frontend
-
-# stop
-docker compose down
-```
-
-Ports: backend `:8000`, frontend `:3000`, postgres `:5432`.
-
-> Local Compose loads `backend/.env` into the backend service and overrides `DATABASE_URL` with the
-> `postgres` service hostname. The file is runtime-only and is not copied into images. No root
-> `.env` is needed locally. `INTERNAL_API_TOKEN` only matters for `/api/v1/admin/*` endpoints.
+Live-data mode is for schema-compatible development only: **normal edits affect production**.
+Do not run schema experiments, repairs, global source refreshes, or destructive tests there.
 
 ## Prod boot with Portainer
 
 1. On the homeserver, install Portainer Agent/CE and make sure the Docker host can build images.
-2. Create the data directories once:
-
-```bash
-sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
-```
+2. Ensure the external `shared_database` Docker network and existing PostgreSQL service are
+   available. Set `MTG_DATABASE_URL`; database storage is managed outside this stack.
 
 3. In Portainer: **Stacks → Add stack → Git repository**.
    - Repository URL: this repo
@@ -75,9 +58,13 @@ sudo mkdir -p /srv/mtg-helper/data/postgres /srv/mtg-helper/data/qdrant
 4. Deploy the stack.
 5. Point the existing homeserver tunnel/proxy at `http://127.0.0.1:${FRONTEND_PORT}`.
 
+After updating an existing stack, remove its obsolete vector-search container in Portainer
+if it remains as an orphan. Preserve its old bind-mounted storage until a separate data cleanup
+is approved; do not remove unrelated containers or database volumes.
+
 Compose uses the stack environment only for interpolation and forwards each variable to the service
-that needs it. In particular, `OPENAI_API_KEY` is available only to `backend`; PostgreSQL receives
-only its database settings, `frontend` receives only URL/auth settings, and `scryfall-sync` receives
+that needs it. In particular, `OPENAI_API_KEY` and the database DSN are available only to `backend`;
+`frontend` receives only URL/auth settings, and `scryfall-sync` receives
 only `INTERNAL_API_TOKEN`.
 
 CLI equivalent for testing on the server:
@@ -142,8 +129,8 @@ backend and frontend for the request wiring.
   conversation UUID. Reusing a client UUID for another account or deck cannot merge sessions.
   This identifier is correlation metadata, never authentication or permission to read a transcript.
 - Each turn gets one independent `assistant.turn` root trace with the current question and visible
-  reply. Model/tool child spans retain detailed evidence and provider history. Memory-only commands
-  are included too. Background turns remain open until completion; failed turns record their error.
+  reply. Model/tool child spans retain detailed evidence and provider history. Background turns
+  remain open until completion; failed turns record their error.
 - HTTP start requests and SSE connections remain ordinary traces, not duplicate session turns.
   Each assistant turn links back to its initiating HTTP request.
 - API callers can send `conversation_id` (a UUID) in both `POST /api/v1/decks/{deck_id}/coach` and
@@ -152,70 +139,75 @@ backend and frontend for the request wiring.
 
 Session grouping uses Assay's documented OpenTelemetry `session.id` root attribute and
 `gen_ai.conversation.id` on GenAI spans, on the same provider as the rest of our tracing.
-It does not load conversation history from Assay: the assistant still receives its bounded history
-from the chat page, and deck memory remains in the application's database. Existing traces are not
-retroactively grouped. Without Assay configuration, chat behavior is unchanged and nothing exports.
+It does not load conversation history from Assay: the assistant receives bounded history from the
+current chat page, not saved cross-chat memory. Old memory rows remain stored but are unused.
+Existing traces are not retroactively grouped. Without Assay configuration, chat behavior is
+unchanged and nothing exports.
 
 ## Database
 
-Schema is `backend/src/mtg_helper/sql/schema.sql` — idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE`). Auto-applied on backend startup via `apply_schema()` and on first compose up via `docker-entrypoint-initdb.d`. There is no separate migration tool — edit `schema.sql`, restart the backend.
+Schema is `backend/src/mtg_helper/sql/schema.sql`, including idempotent upgrade statements.
+The base local PostgreSQL container initializes it on first startup. Backend startup also calls
+`apply_schema()` when `RUN_STARTUP_MAINTENANCE=true` (the default), along with catalog initialization
+and deck identity repair. The live-data override disables that maintenance entirely.
+
+There is no separate migration framework. Validate edits/upgrades against an isolated database
+first; idempotence does not mean a schema edit is non-destructive or safe for live data.
 
 ```bash
-# re-apply schema after editing schema.sql (local)
+# Isolated local mode only, after following VERIFY.md; never use the live override here.
 docker compose restart backend
 
 # psql shell
 docker compose exec postgres psql -U mtg -d mtg_helper
-
-# wipe local DB (DESTRUCTIVE — drops the volume)
-docker compose down -v && docker compose up -d
 ```
 
 ### Production schema apply
 
-For the Scryfall publication release, follow the
-[actual-data rehearsal, backup and verification procedure](docs/scryfall-publication-production.md).
-Do not restart the production backend as a substitute for preservation checks and a final backup.
-
-Schema runs on container start. For a one-off forced re-apply in Portainer, restart the `backend` service. CLI fallback:
-
-```bash
-cd /opt/mtg-helper
-docker compose -f docker-compose.prod.yml --env-file .env.prod restart backend
-```
+Follow the [actual-data rehearsal, backup and verification procedure](docs/scryfall-publication-production.md)
+before deploying schema changes. Do not restart production as a substitute for preservation checks
+and a final backup. That release record describes the October 13 deployment, not current approval.
 
 ## Card data sync
 
 Easiest: sign in as an admin user, click **Admin** in the nav (only visible to addresses listed in `ADMIN_EMAILS`), use the buttons. The page calls the same endpoints below.
 
-Required env (frontend, in `.env.local` for dev / Portainer stack env for prod):
+Set the admin allowlist on the backend (`backend/.env` for local Compose, stack env for production):
 
 ```
 ADMIN_EMAILS="you@example.com,other@example.com"
 ```
 
-Backend's `ADMIN_EMAILS` (in `backend/.env` / Portainer stack env) must contain the same set — frontend just hides the button, backend enforces.
+The frontend obtains `is_admin` from the current account; the backend enforces access.
+Standalone staging uses root `ADMIN_EMAILS` as described in its own runbook.
 
-Three admin endpoints, in order, do a full refresh: pull Scryfall → tag → embed into Qdrant.
+Use **Refresh All** for the complete source-sync and rule-based tagging pipeline. It includes
+Scryfall, MTGJSON, Moxfield and Archidekt; no separate indexing service is required.
 
 ```bash
-TOKEN="<INTERNAL_API_TOKEN from .env>"
-BASE="http://localhost:8000"   # local; use https://<your-host> for prod
+TOKEN="<configured INTERNAL_API_TOKEN>"
+BASE="http://localhost:8000"   # isolated local backend; never live-data development
 
-curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/sync-cards"
-curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/tag-cards"
-curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/embed-cards"
+curl -X POST -H "X-Internal-Token: $TOKEN" "$BASE/api/v1/admin/refresh-all"
 ```
 
+For production internal jobs use `http://backend:8000` from the stack network, as the sync worker
+does. The public frontend proxy requires a Google session; an internal token alone does not
+authenticate through it. Do not expose the backend publicly to run maintenance.
+
+For a Scryfall-only refresh, use `/api/v1/admin/sync-cards`; for rule-based tagging only,
+use `/api/v1/admin/tag-cards`. Jobs run in the background; inspect `/api/v1/admin/status`
+or the Admin UI for completion before starting dependent work.
+
 Daily card auto-sync runs **only in prod** via `scryfall-sync` in `docker-compose.prod.yml`.
-It runs full refresh (sync + tag + embed) on startup and every seventh day; intervening daily runs
+It runs full source sync and tagging on startup and every seventh day; intervening daily runs
 only sync shared Scryfall facts/history. This does not run deck AI analysis. Locally, sync manually
 from Admin. Backend startup also syncs when `cards` is empty.
 
 ### Experimental New Cards pilot
 
-After deploying the reviewed branch, restart the backend to apply the additive, idempotent schema.
-An existing populated database still needs **one Admin card sync**: startup does not silently redownload
+After a reviewed schema deployment, an existing populated database needs **one Admin card sync**
+to bootstrap source data: startup does not silently redownload
 its catalog. Discovery then publishes Oracle facts plus full Default Cards printing history in the
 same transaction as canonical cards. Failed/truncated refreshes retain the previous catalog. Allow
 additional temporary disk/network space for the compressed history (130 MiB download cap) and memory
@@ -234,8 +226,9 @@ unresolved special products. Original regular-product releases use the 60-day UT
 promos or later representative printings. Coverage is conservative, not a complete spoiler feed.
 
 **Plan addition** is explicit and idempotent; it never edits physical cards or plans supporting swaps.
-Current physical cards, partners, goals, preferences, notes and pending plans invalidate affected
-cached advice. Pending additions are not support. Dismissals persist per account/deck; the UI can undo
+Current physical cards, partners, goals and pending plans invalidate affected cached advice.
+Retired account preferences and memory notes no longer affect advice or its cache identity.
+Pending additions are not support. Dismissals persist per account/deck; the UI can undo
 the latest dismissal. Saved plans survive age expiry. Pilot-origin plans recheck current local
 legality, color identity and copy limits during single/batch completion; failures roll back the whole
 revision. Manual/Rule 0 plans retain existing policy. A stale catalog is visibly flagged after two
@@ -262,28 +255,6 @@ Recommended setup:
 
 If your Portainer install offers a “force rebuild/redeploy” option for Git updates, enable it so local images are rebuilt from the new commit.
 
-## VM lifecycle
-
-VM is a GCP spot instance. It can get preempted (= STOPPED). A Cloud Scheduler job (`mtg-helper-auto-restart`) starts it on a schedule.
-
-```bash
-# status
-gcloud compute instances describe mtg-helper \
-  --zone=europe-west1-b --format='value(status)'
-
-# manual start (after preemption)
-gcloud compute instances start mtg-helper --zone=europe-west1-b
-
-# manual stop
-gcloud compute instances stop mtg-helper --zone=europe-west1-b
-
-# SSH (interactive)
-gcloud compute ssh mtg-helper --zone=europe-west1-b --tunnel-through-iap
-
-# trigger the auto-restart job once
-gcloud scheduler jobs run mtg-helper-auto-restart --location=europe-west1
-```
-
 ## Production stack CLI fallback
 
 Prefer Portainer for normal deploys. If you need to manage the stack by SSH:
@@ -296,47 +267,26 @@ $COMPOSE ps
 $COMPOSE logs -f backend
 $COMPOSE restart backend
 $COMPOSE up -d --build --force-recreate backend frontend
-$COMPOSE down            # stops everything; data persists under MTG_HELPER_DATA_DIR
+$COMPOSE down            # stops this stack; shared PostgreSQL and its storage are unaffected
 ```
 
-## Snapshots & restore
+## Database backups
 
-Daily disk snapshots managed by Terraform (`google_compute_resource_policy`).
-
-```bash
-# list snapshots for the data disk
-gcloud compute snapshots list --filter='sourceDisk~mtg-helper-data' \
-  --sort-by='~creationTimestamp'
-
-# restore: detach data disk, create a new disk from snapshot, attach it
-# (manual — do this only for disaster recovery)
-```
-
-## Infrastructure (Terraform)
-
-```bash
-cd infra/terraform
-
-terraform plan
-terraform apply
-
-# specific target (e.g. just IAM)
-terraform apply -target=google_project_iam_member.deployer_os_login
-```
-
-Required vars in `infra/terraform/terraform.tfvars` (gitignored). See `terraform.tfvars.example`.
+Shared PostgreSQL storage and backups are managed outside this application stack. Verify its
+backup/restore procedure before schema deployments; follow the
+[preservation procedure](docs/scryfall-publication-production.md) for application data checks.
 
 ## Common deploy failures
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `Permission denied (publickey)` for `sa_<digits>` | `google-guest-agent` disabled on VM (regression after image refresh / spot recreate) | SSH in, `sudo systemctl enable --now google-guest-agent`. Startup script also handles this on next boot. |
-| `iam.serviceAccounts.actAs` denied | Deployer SA missing `roles/iam.serviceAccountUser` on the VM SA | `terraform apply` (binding lives in `deployer.tf`) |
-| `No such file or directory: ~/mtg-helper` | Deployer SA's home is `/home/sa_<numeric>/`, not personal user's | Always use absolute `/opt/mtg-helper` + `sudo` in workflow |
-| Backend container restart-loops after deploy | Schema apply error or missing env var | `$COMPOSE logs --tail=100 backend` on the VM |
-| Sync endpoint returns 401 with `X-Internal-Token` | Backend `.env` missing `INTERNAL_API_TOKEN`, or value mismatched between caller and server | Compare `cat .env` on VM/local with `$INTERNAL_API_TOKEN` env in cron container |
+| Backend container restart-loops after deploy | Schema apply error or missing env var | `$COMPOSE logs --tail=100 backend` on the homeserver |
+| Sync endpoint returns 401 with `X-Internal-Token` | Missing/mismatched token between backend and caller | Compare configured secrets privately; never print environment files or full container configuration into logs/transcripts. |
 
-## Quick checks (CI commands)
+## Development checks
+
+Prepare the isolated test database using [VERIFY.md](VERIFY.md). These are development checks,
+not a claim that CI runs every suite; the checked-in workflow targets the offline recommendation core.
 
 ```bash
 # backend
@@ -345,8 +295,11 @@ uv run ruff check . && uv run ruff format --check .
 uv run ty check src/
 uv run pytest -q
 
-# frontend (needs node 22)
-cd frontend
-PATH="/usr/local/Cellar/node@22/22.22.2_1/bin:$PATH" pnpm exec tsc --noEmit
-PATH="/usr/local/Cellar/node@22/22.22.2_1/bin:$PATH" pnpm build
+# frontend (Node 22; from backend/)
+cd ../frontend
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm build
 ```

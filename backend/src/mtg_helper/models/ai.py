@@ -1,6 +1,5 @@
 """Pydantic models for AI deck building endpoints."""
 
-from datetime import datetime
 from typing import Literal, Self
 from uuid import UUID, uuid4
 
@@ -303,22 +302,6 @@ class CoachCurveReport(BaseModel):
     tempo_issues: list[str] = Field(default_factory=list)
 
 
-class CoachCutCandidate(BaseModel):
-    """Ranked cut candidate from the cut specialist."""
-
-    card_name: str
-    cut_score: float = Field(ge=0.0, le=10.0)
-    reason: str
-    tags: list[str] = Field(default_factory=list)
-
-
-class CoachCutReport(BaseModel):
-    """Structured output from the cut specialist."""
-
-    summary: str
-    candidates: list[CoachCutCandidate] = Field(default_factory=list)
-
-
 class CoachRoleStatus(BaseModel):
     """One deck-construction role budget status."""
 
@@ -356,63 +339,6 @@ class CoachSynergyReport(BaseModel):
     weak_packages: list[str] = Field(default_factory=list)
 
 
-class CoachSignalLane(BaseModel):
-    """One commander/deck signal lane that recommendations should respect."""
-
-    name: str
-    role: Literal["engine", "payoff", "support", "interaction", "mana", "risk"]
-    strength: Literal["core", "present", "thin"]
-    source: Literal["commander", "tags", "cards", "memory", "role_budget", "synergy"]
-    terms: list[str] = Field(default_factory=list)
-    examples: list[str] = Field(default_factory=list)
-    protect: bool = False
-
-
-class CoachSignalReport(BaseModel):
-    """Deterministic signal-lane map for Commander Coach specialists."""
-
-    summary: str
-    lanes: list[CoachSignalLane] = Field(default_factory=list)
-    core_lanes: list[str] = Field(default_factory=list)
-    weak_lanes: list[str] = Field(default_factory=list)
-    protected_cards: list[str] = Field(default_factory=list)
-
-
-class CoachUpgradeCandidate(BaseModel):
-    """Grounded upgrade candidate returned by the upgrade specialist."""
-
-    card: CardSearchHit
-    reason: str
-    role: str
-    replaces: list[str] = Field(default_factory=list)
-
-
-class CoachUpgradeReport(BaseModel):
-    """Structured output from the upgrade specialist."""
-
-    summary: str
-    candidates: list[CoachUpgradeCandidate] = Field(default_factory=list)
-    tool_call_count: int = 0
-
-
-class CoachReviewIssue(BaseModel):
-    """One challenger objection to a proposed Coach recommendation."""
-
-    severity: Literal["info", "warn", "block"]
-    item_type: Literal["cut", "upgrade", "swap", "package"]
-    names: list[str] = Field(default_factory=list)
-    reason: str
-    suggested_fix: str | None = None
-
-
-class CoachReviewReport(BaseModel):
-    """Challenger pass over cuts, upgrades, and final swap fit."""
-
-    summary: str
-    issues: list[CoachReviewIssue] = Field(default_factory=list)
-    approved: bool = True
-
-
 class ReplacementOption(BaseModel):
     """One candidate for replacing a specific card."""
 
@@ -439,7 +365,6 @@ CoachResolvedMode = Literal[
     "builder",
     "mana",
     "meta",
-    "memory",
     "chat",
     "replacement",
 ]
@@ -474,23 +399,6 @@ class CommanderCoachRequest(BaseModel):
     message: str = Field(default="Doctor this deck", min_length=1, max_length=4000)
     history: list[CoachHistoryTurn] = Field(default_factory=list, max_length=12)
     mode: CoachMode = "auto"
-    coach_memory_notes: str | None = Field(default=None, max_length=8000)
-
-
-class CoachMemoryUpdate(BaseModel):
-    """User-editable persistent notes for one deck's Coach context."""
-
-    notes: str = Field(default="", max_length=8000)
-
-
-class CoachMemoryResponse(BaseModel):
-    """Persistent Commander Coach memory for a deck/account pair."""
-
-    deck_id: UUID
-    account_id: UUID
-    notes: str
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
 
 
 class CommanderCoachResponse(BaseModel):
@@ -501,8 +409,6 @@ class CommanderCoachResponse(BaseModel):
     recommendations: list[ReplacementOption] = Field(default_factory=list, max_length=8)
     doctor: DeckDoctorResponse | None = None
     replacement: TargetedReplacementResponse | None = None
-    coach_memory: CoachMemoryResponse | None = None
-    memory_updated: bool = False
 
 
 class CommanderCoachStartResponse(BaseModel):

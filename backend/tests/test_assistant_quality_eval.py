@@ -20,6 +20,23 @@ def test_quality_corpus_contains_thirteen_unique_complete_cases() -> None:
     assert all(case.required_phrases or case.forbidden_phrases for case in cases)
 
 
+@pytest.mark.parametrize(
+    ("case_id", "instruction"),
+    [
+        ("camellia-food-win-conditions", "rather than generic Squirrel tribal"),
+        ("current-request-budget-limit", "under EUR 5"),
+        ("no-infinite-combos", "Do not recommend infinite combos"),
+    ],
+)
+def test_constraints_are_in_current_request_not_saved_memory(
+    case_id: str, instruction: str
+) -> None:
+    case = next(case for case in load_cases(_CASES) if case.id == case_id)
+
+    assert instruction in case.message
+    assert "memory" not in case.model_dump()
+
+
 def test_quality_corpus_covers_required_behaviors() -> None:
     case_ids = {case.id for case in load_cases(_CASES)}
 
@@ -29,7 +46,7 @@ def test_quality_corpus_covers_required_behaviors() -> None:
         "avoid-existing-card",
         "targeted-replacement",
         "mana-base-diagnosis",
-        "memory-budget-limit",
+        "current-request-budget-limit",
         "no-infinite-combos",
         "camellia-altar-invalid-two-card-loop",
         "broad-value-theme",

@@ -1,9 +1,8 @@
-"""Shared helpers for the Commander Coach specialist pipeline."""
+"""Deterministic deck diagnostics shared by the assistant and evaluation tools."""
 
 from typing import Any
 
 from mtg_helper.models.ai import (
-    AnalysisFinding,
     CoachCurveReport,
     CoachManaReport,
     CoachRoleBudgetReport,
@@ -13,36 +12,11 @@ from mtg_helper.models.ai import (
 )
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services import mana_base_service, mana_curve_service
-from mtg_helper.services.agents.deck_doctor_agent import _weak_card_rows
 
 
 def deck_colors(deck: DeckDetailResponse) -> list[str]:
     """Return legal commander color identity letters for search filters."""
     return [c for c in (deck.commander_color_identity or []) if c in {"W", "U", "B", "R", "G"}]
-
-
-def compact_card_rows(deck: DeckDetailResponse) -> list[dict[str, Any]]:
-    """Return compact, deterministic card rows for specialist prompts."""
-    cards = sorted(deck.cards, key=lambda c: (float(c.cmc or 0), c.name))
-    return [_card_row(card) for card in cards]
-
-
-def deck_profile(deck: DeckDetailResponse, memory: str | None, message: str) -> dict[str, Any]:
-    """Build the shared prompt payload used by Coach specialists."""
-    commander = deck.commander_card
-    partner = deck.partner_card
-    return {
-        "deck_name": deck.name,
-        "commander": commander.model_dump() if commander else None,
-        "partner": partner.model_dump() if partner else None,
-        "bracket": deck.bracket,
-        "archetype_tags": list(deck.archetype_tags or []),
-        "stage_targets": dict(deck.stage_targets or {}),
-        "coach_memory_notes": memory or "",
-        "user_goal": message,
-        "card_count": sum(max(1, card.quantity) for card in deck.cards),
-        "cards": compact_card_rows(deck),
-    }
 
 
 def analyze_mana(deck: DeckDetailResponse) -> CoachManaReport:
@@ -122,42 +96,6 @@ def analyze_synergy(deck: DeckDetailResponse) -> CoachSynergyReport:
     weak = [item.package for item in reports if item.status == "low"]
     summary = "; ".join(f"{item.package}={item.count}" for item in reports)
     return CoachSynergyReport(summary=summary, packages=reports, weak_packages=weak)
-
-
-def mana_findings(report: CoachManaReport) -> list[AnalysisFinding]:
-    """Map mana report issues into existing Deck Doctor finding shape."""
-    findings: list[AnalysisFinding] = []
-    if report.land_delta != 0 or report.color_issues:
-        findings.append(
-            AnalysisFinding(
-                category="mana_base",
-                severity="warn",
-                title="Mana base pressure",
-                detail=report.summary,
-                evidence=_evidence(report.color_issues + report.risky_cards),
-            )
-        )
-    return findings
-
-
-def curve_findings(report: CoachCurveReport) -> list[AnalysisFinding]:
-    """Map curve report issues into existing Deck Doctor finding shape."""
-    if not report.overloaded_buckets and not report.tempo_issues:
-        return []
-    return [
-        AnalysisFinding(
-            category="curve",
-            severity="warn",
-            title="Curve and tempo pressure",
-            detail=report.summary,
-            evidence=_evidence(report.overloaded_buckets + report.tempo_issues),
-        )
-    ]
-
-
-def weak_cards(deck: DeckDetailResponse, limit: int = 16) -> list[dict[str, Any]]:
-    """Return heuristic cut rows from the existing Deck Doctor helper."""
-    return _weak_card_rows(deck, limit)
 
 
 def _role_budget_counts(deck: DeckDetailResponse) -> dict[str, int]:
@@ -262,20 +200,6 @@ def _has_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(term and term.lower() in text for term in terms)
 
 
-def _card_row(card: DeckCardItem) -> dict[str, Any]:
-    return {
-        "name": card.name,
-        "mana_cost": card.mana_cost,
-        "cmc": float(card.cmc) if card.cmc is not None else None,
-        "type_line": card.type_line,
-        "oracle_text": _snippet(card.oracle_text),
-        "quantity": card.quantity,
-        "categories": list(card.categories or []),
-        "tags": list(card.tags or [])[:10],
-        "price_eur_cents": card.price_eur_cents,
-    }
-
-
 def _color_issue(color: Any) -> str:
     return f"{color.color}: {color.source_count}/{color.target} sources"
 
@@ -317,14 +241,3 @@ def _early_ramp_count(deck: DeckDetailResponse) -> int:
         if "ramp" in tags or "add one mana" in text or finds_land:
             count += max(1, card.quantity)
     return count
-
-
-def _snippet(text: str | None, limit: int = 320) -> str | None:
-    if not text:
-        return None
-    compact = " ".join(text.split())
-    return compact if len(compact) <= limit else compact[: limit - 1] + "…"
-
-
-def _evidence(items: list[str]) -> str:
-    return "; ".join(items[:6]) if items else "No detailed evidence available."

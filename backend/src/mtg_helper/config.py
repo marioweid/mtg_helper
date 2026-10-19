@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    run_startup_maintenance: bool = True
     openai_api_key: Annotated[SecretStr, Field(min_length=1)]
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
     mtgjson_all_printings_url: str = "https://mtgjson.com/api/v5/AllPrintings.json.zip"
@@ -32,10 +33,6 @@ class Settings(BaseSettings):
     assay_endpoint: str = ""
     assay_api_key: SecretStr = SecretStr("")
     assay_application: str = ""
-
-    # Pagination defaults
-    default_limit: int = 20
-    max_limit: int = 100
 
     # Google Sign-In. Empty client id disables auth (dev/test only).
     google_oauth_client_id: str = ""

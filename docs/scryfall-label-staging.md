@@ -4,7 +4,7 @@ This is an isolated, local-only deployment of the **publication foundation**, no
 Scryfall-only label migration. Existing label consumers and legacy maintenance jobs still remain.
 Do not deploy this over the application database or interpret its recommendations as migration proof.
 
-## Verified deployment
+## Historical verification: October 13, 2026
 
 On October 13, 2026, both production container builds and staging startup succeeded. The staging-only
 Admin Sync Scryfall request returned `202`, completed with status `ok` in 29.32 seconds, and reported
@@ -18,7 +18,7 @@ Twelve focused frontend tests, project lint/typecheck, explicit config lint, and
 Both final container builds completed without warnings; the narrowly documented JOSE Edge warning
 ignore does not change authentication runtime or suppress unrelated warnings.
 
-The original `mtg_helper-postgres-1` remains stopped, on its existing `mtg_helper_pgdata` volume.
+At that checkpoint, the original `mtg_helper-postgres-1` was stopped on its `mtg_helper_pgdata` volume.
 Staging uses `mtg-helper-label-staging_staging-pgdata`; it has no application-data mounts or host
 PostgreSQL port. No existing application database was started, migrated, synced or copied here.
 
@@ -39,7 +39,7 @@ The root ignored `.env` must contain `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and 
 Google's allowed redirect URI `http://localhost:3000/api/auth/callback/google`. Keep port `3000` free;
 do not stop another deployment or change its OAuth configuration blindly.
 
-Runtime secrets are already generated locally in ignored `backend/.cache/staging/runtime.env`.
+Reuse existing runtime secrets in ignored `backend/.cache/staging/runtime.env` if present.
 For a new checkout, generate them **once**, before creating the staging database volume:
 
 ```bash

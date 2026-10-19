@@ -1,144 +1,58 @@
-# Core Workflows
+# Core workflows
 
-## 1. Deck Creation (Staged Building)
+## Create or import a deck
 
-```
-User: "Build me a Hazel of the Rootbloom deck focused on token copies
-       and big X spells as finishers. Bracket 3."
-                        │
-                        ▼
-              ┌─────────────────┐
-              │ Validate commander│
-              │ (Scryfall local) │
-              └────────┬────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │ AI analyzes      │
-              │ commander +      │
-              │ strategy + bracket│
-              └────────┬────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │ Stage 1: Core Theme (20-25)  │◀── User reviews, thumbs up/down
-        │ Token copy synergies, X spells│
-        ├──────────────────────────────┤
-        │ Stage 2: Ramp (10-12)        │◀── User reviews, thumbs up/down
-        │ Mana acceleration            │
-        ├──────────────────────────────┤
-        │ Stage 3: Draw/Card Advantage │◀── User reviews, thumbs up/down
-        │ (8-10 cards)                 │
-        ├──────────────────────────────┤
-        │ Stage 4: Removal/Interaction │◀── User reviews, thumbs up/down
-        │ (8-10 cards)                 │
-        ├──────────────────────────────┤
-        │ Stage 5: Utility/Flex (5-8)  │◀── User reviews, thumbs up/down
-        │ Protection, recursion, etc.  │
-        ├──────────────────────────────┤
-        │ Stage 6: Mana Base (35-38)   │◀── User reviews
-        │ Lands                        │
-        └──────────────────────────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │ Deck complete    │
-              │ Save + export    │
-              └─────────────────┘
-```
+Sign in with Google, then choose a commander and optional partner, name, strategy, and
+target bracket. Description/keyword agents can help articulate a goal; text/URL import
+can bring an existing list into the workspace.
 
-At each stage, the AI provides:
-- A recommended number of cards for that category
-- A ranked list of suggestions with explanations
-- Synergy callouts (e.g., "works with Doubling Season already in your list")
-- Curve considerations
+## Build and refine
 
-The user can accept, reject, swap, or ask for alternatives at each stage.
+The builder stages are **Theme → Ramp → Draw → Interaction → Lands → Complete**.
+Users can navigate stages, adjust targets and filters, load more candidates, inspect
+source/ownership information, and add cards with appropriate quantities for basics.
+Stage suggestions are deterministic retrieval results, not a fresh model-generated list.
 
-## 2. Card Suggestion (Interactive Refinement)
+The separate Coach accepts a question and bounded visible chat history, inspects the
+current deck through tools, and returns unverified advice. Background turns publish
+progress over SSE. Account preference learning, saved Coach memory, and thumbs-based
+personalized ranking are no longer part of this workflow.
 
-```
-User has 80 cards in a deck, wants to fill remaining slots.
+## Plan changes, buy cards, and record history
 
-User: "I need 2-color cards that care about +1/+1 counters"
-                        │
-                        ▼
-              ┌─────────────────────┐
-              │ Build AI context:    │
-              │ - Current deck list  │
-              │ - Commander identity │
-              │ - Deck-level feedback│
-              │ - Account preferences│
-              │ - Conversation history│
-              │ - Bracket target     │
-              └────────┬────────────┘
-                       │
-                       ▼
-              ┌─────────────────────┐
-              │ AI suggests 10-15   │
-              │ cards, ranked, with:│
-              │ - Card image        │
-              │ - Why it fits       │
-              │ - Synergy callouts  │
-              │ - Curve impact      │
-              └────────┬────────────┘
-                       │
-                       ▼
-              ┌─────────────────────┐
-              │ User reviews:       │
-              │ 👍 Add to deck      │
-              │ 👎 Reject (stored)  │
-              │ Ask for more        │
-              └─────────────────────┘
-```
+Keep physical cards separate from planned additions and cuts. Review plans and generate
+Cardmarket shopping lists; complete selected plans through an atomic revision when the
+physical changes are made. Experimental-origin additions recheck legality, color identity,
+and copy limits during completion. Deck snapshots and revisions support history/comparison.
+Export Moxfield-compatible text for use elsewhere.
 
-## 3. Preference Management
+Collections record owned printings/quantities and support ownership displays and scoped
+building. Owning a card does not mean it is already in the physical deck.
 
-### Per-Deck Preferences (via feedback)
+## Playtest
 
-- Thumbs up/down on individual card suggestions
-- Natural language constraints ("no counterspells in this deck")
-- Stored in `deck_feedback` and conversation history
-- Only affect the current deck
+Goldfish opening hands and early turns; inspect mana curve/composition and simulation
+statistics. AI analysis and the separately gated optimizer are distinct from ordinary
+manual playtesting. Simulations and generated advice are not competitive win-rate guarantees.
 
-### Account-Level Preferences
+## Experimental discovery
 
-- **Pet cards** — Cards to proactively include when on-color and relevant
-  - e.g., "Monologue Tax" — always consider in white decks
-- **Avoid cards** — Cards to never suggest
-  - e.g., "Rhystic Study" — never suggest this card
-- **Avoid archetypes** — Strategies to avoid
-  - e.g., "No stax", "No mass land destruction"
-- **General preferences** — Broader taste signals
-  - e.g., "I prefer creatures over enchantments"
+- **Community Picks:** cached Moxfield/Archidekt commander evidence (the API still uses
+  `top-picks`). This is separate from source-backed Discover.
+- **New Cards:** explicitly analyze up to eight eligible released cards against the physical
+  deck, inspect source rules, dismiss/undo, or plan one addition. No automatic analysis from
+  reading the tab, preview support, or direct physical edits. See the
+  [contract](../../docs/new-cards-pilot-contract.md).
+- **Discover:** default-off, commander-only source-backed search and unverified advice.
+  Optionally draft three strategies, choose/edit a goal, then explicitly generate cards.
+  Reading/polling/filtering does not start a paid model request. See the
+  [contract](../../docs/recommendation-pilot-contract.md).
 
-Both tiers are injected into every AI prompt as system context.
+## Refresh shared source data
 
-## 4. Moxfield Export
-
-Generate a Moxfield-compatible deck list for import:
-
-```
-1 Hazel of the Rootbloom *CMDR*
-1 Doubling Season
-1 Parallel Lives
-1 Green Sun's Zenith
-...
-```
-
-Supports Moxfield's category tags and commander designation.
-
-## 5. Scryfall Data Pipeline
-
-```
-┌──────────────────┐     ┌─────────────────┐     ┌──────────────┐
-│ Scryfall Bulk    │     │ Download +       │     │ PostgreSQL   │
-│ Data Endpoint    │────▶│ Parse JSON       │────▶│ Upsert cards │
-│ (daily update)   │     │ (~80k cards)     │     │              │
-└──────────────────┘     └─────────────────┘     └──────────────┘
-```
-
-- **Initial load:** Download full bulk data, parse, insert into `cards` table
-- **Refresh:** Weekly (or on-demand) — download, diff, upsert changed cards
-- **Filtering:** Only import Commander-legal cards to reduce noise
-- **Runtime:** Triggered via CLI command or API endpoint
+Admin sync publishes Scryfall cards, printing history, and canonical tags atomically;
+failed publication retains the last good generation. Production's daily worker refreshes
+Scryfall and runs the full legacy enrichment/tagging pipeline every seventh day.
+Local development uses manual Admin sync, with empty-catalog initialization when startup
+maintenance is enabled. See [OPERATIONS.md](../../OPERATIONS.md#card-data-sync).
+Canonical tag publication does not yet replace all legacy label consumers.

@@ -5,10 +5,11 @@ import json
 import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 from uuid import UUID
 
 # Set required env vars before importing any app module that reads config at import time.
-os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test")
+os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper")
 os.environ.setdefault("OPENAI_API_KEY", "test")
 # Never send test traffic to a developer's configured Assay instance.
 os.environ.update(ASSAY_ENDPOINT="", ASSAY_API_KEY="", ASSAY_APPLICATION="")
@@ -19,6 +20,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from mtg_helper.main import app
+
+pytest_plugins = ("tests.new_cards_fixtures",)
 
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper_test"
@@ -139,8 +142,38 @@ _TEST_CARDS = [
 ]
 
 
+def _validate_test_database() -> None:
+    """Reject remote, ambiguous, or application targets before destructive test IO."""
+    error = (
+        "Unsafe TEST_DATABASE_URL: use a separate local database ending in _test, "
+        "with host localhost, 127.0.0.1, ::1, or postgres and no query parameters."
+    )
+    try:
+        target = urlsplit(TEST_DB_URL)
+        application = urlsplit(os.environ["DATABASE_URL"])
+        target_port = target.port or 5432
+        application_port = application.port or 5432
+    except ValueError:
+        raise ValueError(error) from None
+    local_hosts = {"localhost", "127.0.0.1", "::1", "postgres"}
+    valid = (
+        target.scheme in {"postgres", "postgresql"}
+        and target.hostname in local_hosts
+        and unquote(target.path).endswith("_test")
+        and not target.query
+        and not target.fragment
+    )
+    if not valid:
+        raise ValueError(error)
+    application_is_local = application.hostname in local_hosts
+    same_database = unquote(target.path) == unquote(application.path)
+    if application_is_local and same_database and target_port == application_port:
+        raise ValueError(error)
+
+
 async def _setup_schema() -> None:
     """Drop, recreate, and seed the test database schema."""
+    _validate_test_database()
     conn = await asyncpg.connect(dsn=TEST_DB_URL)
     try:
         await conn.execute(
@@ -191,11 +224,12 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
     """Reset mutable database state before every test."""
     if request.node.get_closest_marker("no_db") is not None:
         return
+    _validate_test_database()
     conn = await asyncpg.connect(dsn=TEST_DB_URL)
     try:
         await conn.execute(
             """
-            TRUNCATE new_card_catalog, new_card_catalog_state,
+            TRUNCATE new_card_catalog, new_card_catalog_state, new_card_assessment_history,
                 scryfall_tag_state, scryfall_tag_memberships,
                 scryfall_tag_descendants, scryfall_tags,
                 feature_flags, moxfield_commander_recs, moxfield_hub_card_stats,
@@ -217,9 +251,6 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
         await conn.execute("UPDATE cards SET tags = ARRAY[]::text[], hub_tags = ARRAY[]::text[]")
     finally:
         await conn.close()
-    from mtg_helper.services import profile_service
-
-    profile_service._cache.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -233,6 +264,7 @@ def _reset_rate_limits() -> None:
 @pytest_asyncio.fixture
 async def db_pool(_init_db: None) -> AsyncGenerator[asyncpg.Pool]:
     """Create a fresh asyncpg pool for each test (avoids cross-loop issues)."""
+    _validate_test_database()
     pool = await asyncpg.create_pool(dsn=TEST_DB_URL)
     yield pool
     await pool.close()

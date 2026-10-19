@@ -1,4 +1,4 @@
-"""Tests for the Commander Coach specialist pipeline."""
+"""Tests for the current tool-using Commander Coach and its response contracts."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -28,7 +28,6 @@ from mtg_helper.models.ai import (
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.routers import ai
 from mtg_helper.services import mtg_assistant
-from mtg_helper.services.commander_coach import orchestrator, signal_lanes
 from mtg_helper.services.mtg_assistant import (
     AssistantAnswer,
     AssistantCut,
@@ -37,6 +36,7 @@ from mtg_helper.services.mtg_assistant import (
     _bounded_history,
     _prompt_payload,
     _to_response,
+    run_assistant,
 )
 from mtg_helper.services.mtg_assistant_tools import AssistantManaBaseAnalysis, ManaBaseSwap
 from mtg_helper.services.mtg_card_search import (
@@ -181,19 +181,16 @@ def test_bounded_history_handles_irregular_roles_without_dropping_newest_user() 
     assert "newest-user" in str(history[-1])
 
 
-def test_prompt_payload_contains_complete_deck_and_preferences() -> None:
+def test_prompt_payload_contains_complete_deck_without_saved_preferences() -> None:
     deck = _deck()
     deck.cards[0].deck_fit_score = 25
     deck.stage_targets = {"draw": 10}
-    request = CommanderCoachRequest(
-        message="What should I add for draw?",
-        coach_memory_notes="Keep this Food-first.",
-    )
+    request = CommanderCoachRequest(message="What should I add for draw?")
 
     payload = _prompt_payload(deck, request)
 
     assert payload["current_request"] == request.message
-    assert payload["preferences"] == "Keep this Food-first."
+    assert "preferences" not in payload
     assert payload["deck"]["role_targets"] == {"draw": 10}
     assert {card["name"] for card in payload["deck"]["cards"]} == {
         "Medium Value Card",
@@ -242,9 +239,7 @@ async def test_run_coach_uses_one_tool_selecting_assistant() -> None:
         },
     )
     with mtg_assistant.get_agent().override(model=model):
-        result = await orchestrator.run_coach(
-            cast(asyncpg.Pool, None), _deck(), CommanderCoachRequest()
-        )
+        result = await run_assistant(cast(asyncpg.Pool, None), _deck(), CommanderCoachRequest())
 
     assert result.mode == "doctor"
     assert result.doctor is not None
@@ -267,7 +262,7 @@ async def test_assistant_can_inspect_exact_current_deck_cards() -> None:
         },
     )
     with mtg_assistant.get_agent().override(model=model):
-        result = await orchestrator.run_coach(
+        result = await run_assistant(
             cast(asyncpg.Pool, None),
             _deck(),
             CommanderCoachRequest(message="What does Food Engine do?"),
@@ -321,7 +316,7 @@ async def test_landbase_request_uses_grounded_mana_analysis_tool() -> None:
         patch.object(mtg_assistant, "analyze_mana_base_service", AsyncMock(return_value=analysis)),
         mtg_assistant.get_agent().override(model=model),
     ):
-        result = await orchestrator.run_coach(
+        result = await run_assistant(
             cast(asyncpg.Pool, None),
             _deck(),
             CommanderCoachRequest(message="Can we improve my landbase?"),
@@ -364,7 +359,7 @@ async def test_run_coach_returns_grounded_replacement() -> None:
         patch.object(mtg_assistant, "search_cards_service", AsyncMock(return_value=search_result)),
         mtg_assistant.get_agent().override(model=model),
     ):
-        result = await orchestrator.run_coach(
+        result = await run_assistant(
             cast(asyncpg.Pool, None),
             _deck(),
             CommanderCoachRequest(message="Replace Medium Value Card."),
@@ -402,14 +397,6 @@ def test_find_cards_input_treats_natural_theme_tags_as_hints() -> None:
 
     assert filters.theme_tags == ["aristocrats"]
     assert filters.theme_hints == ["Food sacrifice"]
-
-
-async def test_signal_lanes_detect_core_commander_packages() -> None:
-    report = signal_lanes.analyze_signals(_deck())
-
-    assert "food_generation" in report.core_lanes
-    assert "squirrel_generation" in signal_lanes.lane_names(report)
-    assert "Food Engine" in report.protected_cards
 
 
 def test_assistant_drops_ungrounded_cards_and_unknown_cuts() -> None:
@@ -562,22 +549,13 @@ async def test_coach_endpoint_serializes_targeted_replacement(
     async def return_deck(*_args: object, **_kwargs: object) -> DeckDetailResponse:
         return deck
 
-    from mtg_helper.models.ai import CoachMemoryResponse
     from mtg_helper.services import assistant_service
-
-    async def return_memory(*_args: object, **_kwargs: object) -> CoachMemoryResponse:
-        return CoachMemoryResponse(deck_id=deck.id, account_id=uuid4(), notes="")
-
-    async def no_memory(*_args: object, **_kwargs: object) -> None:
-        return None
 
     async def return_response(*_args: object, **_kwargs: object) -> CommanderCoachResponse:
         return response
 
     monkeypatch.setattr(ai, "_require_deck", return_deck)
-    monkeypatch.setattr(assistant_service.coach_memory_service, "get_memory", return_memory)
-    monkeypatch.setattr(assistant_service.coach_memory_service, "handle_memory_message", no_memory)
-    monkeypatch.setattr(assistant_service.commander_coach, "run_coach", return_response)
+    monkeypatch.setattr(assistant_service, "run_assistant", return_response)
     request = Request({"type": "http", "app": SimpleNamespace(state=SimpleNamespace(db_pool=None))})
     account = AccountResponse(
         id=uuid4(),

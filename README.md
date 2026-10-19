@@ -44,13 +44,13 @@ The application combines a local Scryfall-backed card database, deck management 
 - **Moxfield-oriented workflows** — Import, export, and work with deck lists from existing Magic deck-building tools.
 - **Fresh card data** — Scryfall bulk data is imported into PostgreSQL so card search and validation work locally.
 - **Experimental New Cards** — Explicitly analyze recent, released Commander-legal cards for your physical deck. Review unverified advice alongside source rules, then plan an addition or dismiss it. No previews or automatic deck edits. See [setup and limits](OPERATIONS.md#experimental-new-cards-pilot).
+- **Experimental Discover (default off)** — Source-backed, commander-only discovery with an optional strategy draft and explicit, bounded card generation. It does not assess physical-deck interactions. See [access and limits](docs/recommendation-pilot-contract.md).
 
 ## Tech stack
 
 - **Frontend:** Next.js, React, TypeScript
 - **Backend:** Python 3.13, FastAPI, Pydantic, asyncpg
 - **Database:** PostgreSQL 16
-- **Vector search:** Qdrant
 - **AI:** OpenAI Responses API / Pydantic AI integration
 - **Tracing:** Optional self-hosted Assay (FastAPI, HTTPX, and AI content traces)
 - **Local development:** Docker Compose
@@ -58,12 +58,23 @@ The application combines a local Scryfall-backed card database, deck management 
 
 ## Local development
 
-The easiest way to run the full stack is Docker Compose.
+Use Docker Compose with hot reload in either mode. See [`VERIFY.md`](VERIFY.md) for
+configuration, safe database checks, tests, and switching modes.
+
+- **Isolated (default):** `docker compose up -d --build` uses a local database. Use this
+  for tests, schema changes, and migration experiments before committing or deploying.
+- **Live data:** `docker compose -f docker-compose.yml -f docker-compose.live.yml up -d --build`
+  uses the homeserver database and existing Google accounts, decks, and collections.
+  **Edits/deletes immediately affect production.** Startup schema changes, catalog
+  initialization, and global deck repairs are skipped, not ordinary application writes.
+  The local PostgreSQL container remains separate for tests.
 
 ```bash
 # Copy the backend environment file used by local Compose (it remains outside images).
 cp backend/.env.example backend/.env
 $EDITOR backend/.env  # set OPENAI_API_KEY
+cp .env.example .env
+$EDITOR .env  # set Google credentials, a unique local AUTH_SECRET, and optional live DSN
 
 # start Postgres, backend, and frontend
 docker compose up -d --build
@@ -78,7 +89,11 @@ Default local services:
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
-| PostgreSQL | localhost:5432 |
+| Isolated PostgreSQL | localhost:5432 |
+
+All published development ports bind to `127.0.0.1`. Google must allow the redirect
+`http://localhost:3000/api/auth/callback/google`; the same Google client ID is supplied
+to both local frontend and backend. Real `.env` files stay outside version control.
 
 Stop the stack with:
 
@@ -102,6 +117,7 @@ cd backend
 uv run ruff check .
 uv run ruff format --check .
 uv run ty check src/
+# Prepare the isolated test database first; see VERIFY.md.
 uv run pytest -q
 ```
 
@@ -110,20 +126,24 @@ Frontend:
 ```bash
 cd frontend
 pnpm install
+pnpm test
 pnpm typecheck
+pnpm lint
+pnpm format:check
 pnpm build
 ```
 
 ## Project documentation
 
-More detailed design notes live in [`projects/mtg-helper`](projects/mtg-helper):
+Start with the [documentation guide](docs/README.md) for current runbooks, pilot contracts,
+unfinished work, and clearly separated historical evidence. Implementation guides:
 
 - [Overview](projects/mtg-helper/overview.md)
 - [Architecture](projects/mtg-helper/architecture.md)
 - [API design](projects/mtg-helper/api-design.md)
 - [Data model](projects/mtg-helper/data-model.md)
 - [Workflows](projects/mtg-helper/workflows.md)
-- [Roadmap](projects/mtg-helper/roadmap.md)
+- [Remaining work](projects/mtg-helper/roadmap.md)
 - [Tech stack](projects/mtg-helper/tech-stack.md)
 
 ## Status

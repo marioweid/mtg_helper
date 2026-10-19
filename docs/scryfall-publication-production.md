@@ -1,6 +1,10 @@
 # Scryfall publication production release
 
-## Now
+## Release record: October 13, 2026
+
+The results below describe that release, not the current container state. Reuse the
+preservation procedure for future reviewed changes; verify resource names and backup availability
+at execution time. No production action is authorized by this historical record alone.
 
 **Production publication deployed and verified on October 13, 2026**, via the documented
 SSH/Compose fallback for the existing homeserver/Portainer stack. [Release PR #18](https://github.com/marioweid/mtg_helper/pull/18)
@@ -55,7 +59,7 @@ No paid model requests are part of rehearsal or deployment verification.
 - Backend unauthenticated Admin request returned `401`. Frontend sign-in returned `200` locally;
   Google provider URLs retain `https://mtg.marioweid.com` and the original credentials/session secret.
 - Frontend reopened only after preservation checks; the original sync worker resumed afterwards.
-  Qdrant, PostgreSQL, Portainer and unrelated applications were not recreated.
+  Other database services, Portainer and unrelated applications were not recreated.
 - An unauthenticated public `/signin` probe returned `403`; automated checks do not bypass that ingress
   access layer. Interactive public access/Google sign-in remains the user's browser confirmation.
 - Old backend/frontend images retain `before-scryfall-publication` rollback tags. No paid model endpoint
@@ -69,7 +73,7 @@ this same release without reopening writers during the write freeze. Check statu
 1. Finish scoped checks and independent review. Build/test the exact release; open a branch/PR,
    never push directly to `main`. Existing research work remains preserved in its own worktree.
 2. Preserve the currently running backend/frontend image IDs under explicit rollback tags. Build
-   replacement images before the maintenance interval; do not recreate PostgreSQL, Qdrant, Portainer
+   replacement images before the maintenance interval; do not recreate PostgreSQL, Portainer
    or other homeserver applications. Retain the existing runtime environment, data directory,
    frontend port/binding, public OAuth URL, credentials, admin allowlist and tracing configuration.
 3. Close admission by stopping only the MTG Helper sync worker and frontend. Keep the backend alive

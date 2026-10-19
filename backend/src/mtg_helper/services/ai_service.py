@@ -1,6 +1,5 @@
 """Deterministic deck-building retrieval service."""
 
-import asyncio
 import logging
 from decimal import Decimal
 from uuid import UUID
@@ -14,14 +13,10 @@ from mtg_helper.models.ai import (
     SuggestResponse,
 )
 from mtg_helper.models.decks import DeckDetailResponse
-from mtg_helper.models.ranking_weights import RankingWeights
 from mtg_helper.services import (
     card_service,
     collection_service,
     deck_service,
-    preference_service,
-    profile_service,
-    ranking_weight_service,
 )
 from mtg_helper.services.deck_service import STAGES, next_stage, stage_number
 from mtg_helper.services.retrieval_service import (
@@ -39,9 +34,6 @@ from mtg_helper.services.retrieval_service import (
 _log = logging.getLogger(__name__)
 _TOTAL_STAGES = len(STAGES) - 1  # exclude "complete"
 _THEME_ETC_TAG = "__etc"
-_FEEDBACK_WEIGHTS: dict[str, float] = {"up": 1.3, "down": 0.3}
-_REJECT_BASE: float = 0.3  # weight = _REJECT_BASE ** reject_count
-_REJECT_FLOOR: float = 0.02
 
 _SIGNAL_LABELS: dict[str, str] = {
     "tag": "High tag relevance",
@@ -179,124 +171,6 @@ def card_from_retrieved(
         sources=_sources_for(card),
         game_changer=card.game_changer,
     )
-
-
-async def _compute_feedback_weights(
-    pool: asyncpg.Pool,
-    deck_id: UUID,
-    account_id: UUID | None,
-) -> dict[UUID, float] | None:
-    """Compute per-card score multipliers from feedback and preferences.
-
-    Returns None if feedback boosting is disabled or no account is provided.
-    Weights are clamped to [0.05, 2.0].
-
-    Args:
-        pool: asyncpg connection pool.
-        deck_id: The deck's UUID (for per-deck thumbs up/down).
-        account_id: The account UUID (for account-level pet/avoid weights).
-
-    Returns:
-        Dict mapping card UUID to combined weight, or None to skip weighting.
-    """
-    if account_id is None:
-        return None
-    if not await preference_service.is_feedback_boosting_enabled(pool, account_id):
-        return None
-
-    async with pool.acquire() as conn:
-        feedback_rows = await conn.fetch(
-            """
-            SELECT canonical.id AS card_id,
-                   CASE
-                       WHEN bool_or(df.feedback = 'reject') THEN 'reject'
-                       WHEN bool_or(df.feedback = 'up') THEN 'up'
-                       ELSE 'down'
-                   END AS feedback,
-                   SUM(CASE WHEN df.feedback = 'reject'
-                            THEN greatest(df.reject_count, 1) ELSE 0 END)::int AS reject_count
-            FROM deck_feedback df
-            JOIN cards source ON source.id = df.card_id
-            JOIN cards canonical
-              ON COALESCE(canonical.oracle_id, canonical.id)
-               = COALESCE(source.oracle_id, source.id)
-             AND canonical.is_canonical
-            WHERE df.deck_id = $1
-            GROUP BY canonical.id
-            """,
-            deck_id,
-        )
-
-    weights: dict[UUID, float] = {}
-    for row in feedback_rows:
-        if row["feedback"] == "reject":
-            count = max(1, row["reject_count"])
-            weights[row["card_id"]] = max(_REJECT_FLOOR, _REJECT_BASE**count)
-        else:
-            weights[row["card_id"]] = _FEEDBACK_WEIGHTS.get(row["feedback"], 0.3)
-
-    pref_weights = await preference_service.get_card_preference_weights(pool, account_id)
-    for card_id, pref_mult in pref_weights.items():
-        weights[card_id] = weights.get(card_id, 1.0) * pref_mult
-
-    for card_id in weights:
-        weights[card_id] = max(0.05, min(2.0, weights[card_id]))
-
-    return weights if weights else None
-
-
-async def _load_user_profile(
-    pool: asyncpg.Pool,
-    deck_id: UUID,
-    account_id: UUID | None,
-    email: str | None,
-) -> "profile_service.UserProfile | None":
-    """Load the cross-deck user profile if the feature is enabled.
-
-    Args:
-        pool: asyncpg connection pool.
-        deck_id: The deck being built (excluded from profile).
-        account_id: The account UUID (for preference flag).
-        email: The owner's email (canonical deck-ownership key).
-
-    Returns:
-        UserProfile if enabled and sufficient deck history exists, else None.
-    """
-    if account_id is None or email is None:
-        return None
-    if not await preference_service.is_user_profile_enabled(pool, account_id):
-        return None
-    return await profile_service.get_user_profile(pool, email, deck_id)
-
-
-async def _load_ranking_weights(
-    pool: asyncpg.Pool,
-    account_id: UUID | None,
-) -> RankingWeights | None:
-    """Load per-user ranking weights, returning None if no account.
-
-    Args:
-        pool: asyncpg connection pool.
-        account_id: The account UUID, or None for anonymous decks.
-
-    Returns:
-        RankingWeights if account exists, else None (uses defaults in retrieval).
-    """
-    if account_id is None:
-        return None
-    try:
-        result = await ranking_weight_service.get_weights(pool, account_id)
-        return RankingWeights(
-            semantic=result.semantic,
-            synergy=result.synergy,
-            popularity=result.popularity,
-            personal=result.personal,
-            deck_inclusion=result.deck_inclusion,
-            moxfield_inclusion=result.moxfield_inclusion,
-            trusted_quota=result.trusted_quota,
-        )
-    except ranking_weight_service.AccountNotFoundError:
-        return None
 
 
 def _resolve_stage(
@@ -528,21 +402,18 @@ def _resolve_stage_query(
 async def _stage_excluded_ids(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
-    account_id: UUID,
     exclude: list[str] | None,
 ) -> list[UUID]:
     deck_card_ids = [card.card_id for card in deck.cards]
     exclude_ids = await _resolve_exclude_ids(pool, exclude)
     commander_ids = [deck.commander_id] + ([deck.partner_id] if deck.partner_id else [])
-    avoid_ids = await preference_service.get_avoid_card_ids(pool, account_id)
-    return list({*deck_card_ids, *exclude_ids, *commander_ids, *avoid_ids})
+    return list({*deck_card_ids, *exclude_ids, *commander_ids})
 
 
 async def _build_stage_suggestions(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
     account_id: UUID,
-    email: str,
     *,
     stage_query: tuple[str, list[str], bool, str | None, frozenset[str] | None],
     resolved_stage: str,
@@ -557,10 +428,6 @@ async def _build_stage_suggestions(
     subtypes: list[str] | None,
 ) -> list[CardSuggestion]:
     query_text, query_tags, prefer_keywords, required_hub_tag, excluded_hub_tags = stage_query
-    feedback_weights, user_profile = await asyncio.gather(
-        _compute_feedback_weights(pool, deck.id, account_id),
-        _load_user_profile(pool, deck.id, account_id, email),
-    )
     candidates = await retrieve_candidates(
         pool,
         query_text,
@@ -571,9 +438,6 @@ async def _build_stage_suggestions(
         offset=offset,
         stage=resolved_stage,
         deck_cmc_counts=_compute_deck_cmc_counts(deck),
-        feedback_weights=feedback_weights,
-        user_profile=user_profile,
-        ranking_weights=await _load_ranking_weights(pool, account_id),
         collection_filter=await _resolve_collection_filter(pool, deck, collection_ids),
         price_filter=_resolve_price_filter(max_price_cents, min_price_cents),
         commander_id=deck.commander_id,
@@ -623,8 +487,8 @@ async def build_stage(
         target: Override target card count (determines how many candidates to return).
         offset: Pagination offset into the ranked candidate list. Used by
             Load More to fetch the next page without re-sending shown names.
-        exclude: Persistent rejections (thumbs-down / per-session rejects). Not
-            used for pagination — that's handled via ``offset``.
+        exclude: Session-local card names to exclude. Not used for pagination —
+            that's handled via ``offset``.
         collection_ids: Per-request override. When provided, replaces the deck's
             stored ``suggestion_collection_ids`` for this call only.
         theme_tag: Active theme keyword when building the theme stage.
@@ -654,7 +518,7 @@ async def build_stage(
     if commander is None:
         raise DeckNotFoundError(f"Commander card not found for deck {deck_id}")
 
-    all_excluded = await _stage_excluded_ids(pool, deck, account_id, exclude)
+    all_excluded = await _stage_excluded_ids(pool, deck, exclude)
 
     deck_archetype_tags = list(deck.archetype_tags or [])
     stage_query = _resolve_stage_query(
@@ -672,7 +536,6 @@ async def build_stage(
         pool,
         deck,
         account_id,
-        email,
         stage_query=stage_query,
         resolved_stage=resolved_stage,
         commander_color_identity=commander.color_identity,
@@ -746,10 +609,6 @@ async def suggest_cards(
     parsed_filter = parse_query_types(prompt)
     structured_filter = _resolve_structured_type_filter(card_types, subtypes)
     type_filter = _merge_type_filters(structured_filter, parsed_filter)
-    feedback_weights, user_profile = await asyncio.gather(
-        _compute_feedback_weights(pool, deck.id, account_id),
-        _load_user_profile(pool, deck.id, account_id, email),
-    )
     deck_cmc_counts = _compute_deck_cmc_counts(deck)
     collection_filter = await _resolve_collection_filter(pool, deck, collection_ids)
     price_filter = _resolve_price_filter(max_price_cents, min_price_cents)
@@ -762,8 +621,6 @@ async def suggest_cards(
         deck_card_ids,
         limit=count,
         deck_cmc_counts=deck_cmc_counts,
-        feedback_weights=feedback_weights,
-        user_profile=user_profile,
         type_filter=type_filter,
         collection_filter=collection_filter,
         price_filter=price_filter,

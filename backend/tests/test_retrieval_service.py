@@ -20,7 +20,6 @@ from mtg_helper.services.retrieval_service import (
     _filter_inclusion_by_stage,
     _filter_rows_by_stage,
     _filter_theme_rows,
-    _personal_rating,
     _representation_match_score,
     _search_tags,
     _type_match_score,
@@ -103,35 +102,6 @@ def test_curve_fit_cmc_capped_at_6() -> None:
     score_6 = _curve_fit_score(Decimal("6"), {})
     score_8 = _curve_fit_score(Decimal("8"), {})
     assert abs(score_6 - score_8) < 1e-9
-
-
-# ── _personal_rating ──────────────────────────────────────────────────────────
-
-
-def test_personal_rating_no_feedback_returns_neutral() -> None:
-    assert _personal_rating(_A, None) == 0.5
-
-
-def test_personal_rating_card_not_in_weights_returns_neutral() -> None:
-    assert _personal_rating(_A, {_B: 1.5}) == 0.5
-
-
-def test_personal_rating_max_weight_maps_to_one() -> None:
-    assert abs(_personal_rating(_A, {_A: 2.0}) - 1.0) < 1e-6
-
-
-def test_personal_rating_min_weight_maps_to_zero() -> None:
-    assert abs(_personal_rating(_A, {_A: 0.05}) - 0.0) < 1e-6
-
-
-def test_personal_rating_pet_card_weight_high() -> None:
-    # Pet card weight is 1.5 → should be above 0.5
-    assert _personal_rating(_A, {_A: 1.5}) > 0.5
-
-
-def test_personal_rating_avoid_card_weight_low() -> None:
-    # Avoid card weight is 0.1 → should be below 0.5
-    assert _personal_rating(_A, {_A: 0.1}) < 0.5
 
 
 # ── _compute_weighted_scores ──────────────────────────────────────────────────
@@ -392,7 +362,6 @@ def test_weighted_score_higher_composite_wins() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
     )
     assert scores[_A] > scores[_B]
 
@@ -407,22 +376,6 @@ def test_weighted_score_fts_boosts_synergy() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
-    )
-    assert scores[_A] > scores[_B]
-
-
-def test_weighted_score_feedback_boosts_card() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
-    # Same base; _A has pet card feedback
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        feedback_weights={_A: 1.5},
     )
     assert scores[_A] > scores[_B]
 
@@ -439,7 +392,6 @@ def test_weighted_score_representation_boosts_matching_card() -> None:
         cards_by_id=rows,  # type: ignore[arg-type]
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         representation_query=RepresentationQuery(tags=["ramp"]),
     )
 
@@ -455,7 +407,6 @@ def test_weighted_score_skips_missing_rows() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
     )
     assert _A in scores
     assert _B not in scores
@@ -470,7 +421,6 @@ def test_weighted_score_hub_inclusion_boosts_card() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         hub_inclusion={_A: 1.0},
     )
     assert scores[_A] > scores[_B]
@@ -485,7 +435,6 @@ def test_weighted_score_moxfield_inclusion_boosts_card() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         moxfield_inclusion={_A: 1.0},
     )
     assert scores[_A] > scores[_B]
@@ -500,7 +449,6 @@ def test_weighted_score_hub_inclusion_none_is_noop() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
     )
     explicit_none = _compute_weighted_scores(
         [_A, _B],
@@ -509,7 +457,6 @@ def test_weighted_score_hub_inclusion_none_is_noop() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         hub_inclusion=None,
     )
     assert base == explicit_none
@@ -531,7 +478,6 @@ def test_weighted_scoring_does_not_mutate_caller_inputs() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         hub_inclusion=hub_inclusion,
         moxfield_inclusion=moxfield_inclusion,
     )
@@ -743,7 +689,6 @@ def test_weighted_score_range_zero_to_one() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts={2: 5},
-        feedback_weights={_A: 2.0, _B: 0.05},
     )
     for score in scores.values():
         assert 0.0 <= score <= 1.0
@@ -1009,7 +954,6 @@ def test_weighted_score_type_filter_boosts_matching_card() -> None:
         cards_by_id=rows,  # type: ignore[arg-type]
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         type_filter=tf,
     )
     assert scores[_A] > scores[_B]
@@ -1024,7 +968,6 @@ def test_weighted_score_no_type_filter_unchanged_weights() -> None:
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         type_filter=None,
     )
     assert scores_no_filter[_A] > scores_no_filter[_B]
@@ -1140,7 +1083,6 @@ def test_strict_mode_zeroes_out_zero_match_cards() -> None:
         cards_by_id=rows,  # type: ignore[arg-type]
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         type_filter=tf,
     )
     assert scores[_B] == 0.0
@@ -1160,7 +1102,6 @@ def test_strict_mode_partial_match_not_zeroed() -> None:
         cards_by_id=rows,  # type: ignore[arg-type]
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         type_filter=tf,
     )
     assert scores[_A] > 0.0
@@ -1178,7 +1119,6 @@ def test_non_strict_mode_zero_match_not_zeroed() -> None:
         cards_by_id=rows,  # type: ignore[arg-type]
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        feedback_weights=None,
         type_filter=tf,
     )
     assert scores[_A] > 0.0

@@ -22,7 +22,6 @@ interface Props {
   onUndoCut?: (card: DeckCardItem) => void | Promise<void>;
   onCardClick?: (card: DeckCardItem) => void;
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
-  petCardNames?: Set<string>;
   commander?: {
     type_line: string | null;
     name?: string | null;
@@ -282,7 +281,6 @@ function DeckDrawer({ panelRef, onClose, onAddCard, ...props }: DrawerProps) {
             {...(props.onUndoCut ? { onUndoCut: props.onUndoCut } : {})}
             {...(props.onCardClick ? { onCardClick: props.onCardClick } : {})}
             {...(props.onSetQuantity ? { onSetQuantity: props.onSetQuantity } : {})}
-            {...(props.petCardNames ? { petCardNames: props.petCardNames } : {})}
             {...(props.deckId ? { onAddCard, commanderLegal: true } : {})}
             workspaceScope={`builder:${props.deckId ?? "shared"}`}
           />

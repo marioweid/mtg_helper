@@ -4,8 +4,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import pytest
+
 from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDetailResponse
 from mtg_helper.services.deck_fit_service import score_deck_cards, weak_card_evidence
+
+pytestmark = pytest.mark.no_db
 
 
 def _card(
@@ -87,19 +91,19 @@ def test_local_fallback_is_labeled_when_source_statistics_are_missing() -> None:
     assert any("Local" in reason for reason in card.deck_fit_reasons)
 
 
-def test_underfilled_role_and_pet_cards_are_protected_from_weak_list() -> None:
+def test_underfilled_roles_remain_protected_without_pet_card_protection() -> None:
     role_card = _card("Needed Draw", tags=["draw"], stages=["draw"])
     pet_card = _card("Favorite Card", tags=["vanilla"])
     ordinary = _card("Ordinary Weak Card", tags=["vanilla"])
     land = _card("Forest", type_line="Basic Land — Forest")
     deck = _deck([role_card, pet_card, ordinary, land])
 
-    score_deck_cards(deck, {}, protected_names={"Favorite Card"})
+    score_deck_cards(deck, {})
     weak = weak_card_evidence(deck, limit=8)
 
-    assert [item.name for item in weak] == ["Ordinary Weak Card"]
+    assert [item.name for item in weak] == ["Favorite Card", "Ordinary Weak Card"]
     assert role_card.deck_fit_protected
-    assert pet_card.deck_fit_protected
+    assert not pet_card.deck_fit_protected
     assert land.deck_fit_protected
 
 

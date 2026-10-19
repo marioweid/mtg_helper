@@ -17,7 +17,7 @@ services:
       POSTGRES_USER: mtg
       POSTGRES_PASSWORD: mtg_dev
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/src/mtg_helper/sql/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
@@ -30,7 +30,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - ./backend/.env
     environment:
@@ -39,27 +39,37 @@ services:
       DATABASE_URL: postgresql://mtg:mtg_dev@postgres:5432/mtg_helper
       # Test suite (docker compose exec backend uv run --extra dev pytest -q).
       TEST_DATABASE_URL: postgresql://mtg:mtg_dev@postgres:5432/mtg_helper_test
+      RUN_STARTUP_MAINTENANCE: "true"
+      GOOGLE_OAUTH_CLIENT_ID: ${AUTH_GOOGLE_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
+      - ./backend/scripts:/app/scripts:ro
 
   frontend:
     build:
       context: ./frontend
       target: dev
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       BACKEND_ORIGIN: http://backend:8000
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
     depends_on:
       - backend
     volumes:
       - ./frontend/app:/app/app
       - ./frontend/lib:/app/lib
       - ./frontend/components:/app/components
+      - ./frontend/auth.ts:/app/auth.ts
+      - ./frontend/middleware.ts:/app/middleware.ts
 
 volumes:
   pgdata:

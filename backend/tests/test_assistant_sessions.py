@@ -15,17 +15,20 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic import ValidationError
+from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.models import ModelRequestParameters, ModelSettings
 from pydantic_ai.models.test import TestModel
 
 from mtg_helper import observability
 from mtg_helper.auth import get_current_account
 from mtg_helper.config import Settings
 from mtg_helper.models.accounts import AccountResponse
-from mtg_helper.models.ai import CoachMemoryResponse, CommanderCoachRequest
+from mtg_helper.models.ai import CommanderCoachRequest
 from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.observability import assistant_turn
 from mtg_helper.routers import ai
-from mtg_helper.services import coach_memory_service, deck_service, mtg_assistant
+from mtg_helper.services import deck_service, mtg_assistant
+from mtg_helper.services.commander_coach.jobs import CoachEvent, CoachJob
 
 pytestmark = pytest.mark.no_db
 
@@ -98,6 +101,56 @@ class SessionApp:
         return [s for s in self.exporter.get_finished_spans() if s.name == "assistant.turn"]
 
 
+class FailingModel(TestModel):
+    """Deterministic external-model seam that fails before a response is produced."""
+
+    async def request(
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
+    ) -> ModelResponse:
+        raise RuntimeError("provider unavailable")
+
+
+class DelayedModel(TestModel):
+    """Hold a deterministic provider request open until the test releases it."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            call_tools=[], custom_output_args={"mode": "chat", "reply": "Delayed answer"}
+        )
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def request(
+        self,
+        messages: list[ModelMessage],
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
+    ) -> ModelResponse:
+        self.started.set()
+        await self.release.wait()
+        return await super().request(messages, model_settings, model_request_parameters)
+
+
+class FailingProgressQueue(asyncio.Queue[CoachEvent]):
+    """Fail one progress publication while allowing the terminal failure event through."""
+
+    async def put(self, item: CoachEvent) -> None:
+        if item.event == "assistant_thinking":
+            raise RuntimeError("progress transport unavailable")
+        await super().put(item)
+
+
+class FailingProgressRegistry(dict[UUID, CoachJob]):
+    """Attach the failing progress adapter to jobs created through the real HTTP route."""
+
+    def __setitem__(self, key: UUID, value: CoachJob) -> None:
+        value.queue = FailingProgressQueue()
+        super().__setitem__(key, value)
+
+
 @pytest.fixture
 async def session_app(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[SessionApp]:
     exporter = InMemorySpanExporter()
@@ -125,8 +178,6 @@ async def session_app(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[SessionA
     )
     app.dependency_overrides[get_current_account] = lambda: account
     monkeypatch.setattr(deck_service, "get_deck", AsyncMock(return_value=deck))
-    memory = CoachMemoryResponse(deck_id=deck.id, account_id=account.id, notes="Keep Sol Ring")
-    monkeypatch.setattr(coach_memory_service, "get_memory", AsyncMock(return_value=memory))
     settings = Settings(
         _env_file=None,
         database_url="unused",
@@ -197,54 +248,97 @@ async def test_sync_assistant_turns_share_session_and_capture_only_current_conte
     assert all("session.id" not in (s.attributes or {}) for s in http_roots)
 
 
-@pytest.mark.parametrize("message", ["Hello", "What do you have in memory?"])
-async def test_background_turn_completes_after_start_response(
+async def test_background_turn_streams_progress_and_preserves_tracing(
     session_app: SessionApp,
-    monkeypatch: pytest.MonkeyPatch,
-    message: str,
 ) -> None:
+    """A background turn publishes real orchestration progress and a traced result."""
     chat = session_app
-    started_work, release = asyncio.Event(), asyncio.Event()
-    memory = CoachMemoryResponse(deck_id=chat.deck_id, account_id=chat.account.id, notes="Sol Ring")
+    response = await chat.client.post(
+        f"/api/v1/decks/{chat.deck_id}/coach/start",
+        json={"message": "Give me a normal answer."},
+    )
 
-    async def delayed_memory(*args: object) -> CoachMemoryResponse:
-        started_work.set()
-        await release.wait()
-        return memory
-
-    monkeypatch.setattr(coach_memory_service, "get_memory", delayed_memory)
-    path = f"/api/v1/decks/{chat.deck_id}/coach"
-    response = await chat.client.post(path + "/start", json={"message": message})
     assert response.status_code == 200
-    await asyncio.wait_for(started_work.wait(), timeout=2)
-    assert await chat.turns() == []
-    release.set()
     job_id = response.json()["data"]["job_id"]
-    stream = await asyncio.wait_for(chat.client.get(f"{path}/{job_id}/stream"), timeout=3)
+    stream = await chat.client.get(f"/api/v1/decks/{chat.deck_id}/coach/{job_id}/stream")
+
+    assert stream.status_code == 200
+    assert "assistant_routing" in stream.text
+    assert "assistant_grounding" in stream.text
     assert "event: done" in stream.text
+    assert '"reply": "Test answer"' in stream.text
+    assert "coach_memory" not in stream.text
+    assert "memory_updated" not in stream.text
     turns = await chat.turns()
     assert len(turns) == 1
-    assert turns[0].parent is None
-    assert message in _text(turns[0], "gen_ai.input.messages")
-    assert _text(turns[0], "gen_ai.output.messages")
-    if message.startswith("What"):
-        assert "Sol Ring" in _text(turns[0], "gen_ai.output.messages")
-    assert "event: progress" in stream.text
+    assert "Give me a normal answer." in _text(turns[0], "gen_ai.input.messages")
+    assert "Test answer" in _text(turns[0], "gen_ai.output.messages")
 
 
-async def test_background_failure_records_failed_turn(
+async def test_background_provider_failure_streams_recoverable_answer(
     session_app: SessionApp,
-    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A model transport failure reaches the SSE client as a recoverable Assistant answer."""
+    chat = session_app
+    failing_model = FailingModel(call_tools=[])
+    with mtg_assistant.get_agent().override(model=failing_model):
+        response = await chat.client.post(
+            f"/api/v1/decks/{chat.deck_id}/coach/start",
+            json={"message": "Answer despite a provider failure."},
+        )
+        assert response.status_code == 200
+        job_id = response.json()["data"]["job_id"]
+        stream = await chat.client.get(f"/api/v1/decks/{chat.deck_id}/coach/{job_id}/stream")
+
+    assert stream.status_code == 200
+    assert "event: done" in stream.text
+    assert "I couldn't complete a verified answer. Please try the request again." in stream.text
+    turns = await chat.turns()
+    assert len(turns) == 1
+    assert "Answer despite a provider failure." in _text(turns[0], "gen_ai.input.messages")
+
+
+async def test_start_response_returns_while_background_turn_is_open(
+    session_app: SessionApp,
 ) -> None:
     chat = session_app
-    monkeypatch.setattr(
-        coach_memory_service, "get_memory", AsyncMock(side_effect=RuntimeError("offline"))
-    )
+    model = DelayedModel()
     path = f"/api/v1/decks/{chat.deck_id}/coach"
-    response = await chat.client.post(path + "/start", json={"message": "Hello"})
+    with mtg_assistant.get_agent().override(model=model):
+        try:
+            response = await asyncio.wait_for(
+                chat.client.post(path + "/start", json={"message": "Wait for the provider."}),
+                timeout=2,
+            )
+            assert response.status_code == 200
+            await asyncio.wait_for(model.started.wait(), timeout=2)
+            assert await chat.turns() == []
+            job_id = response.json()["data"]["job_id"]
+        finally:
+            model.release.set()
+        stream = await asyncio.wait_for(chat.client.get(f"{path}/{job_id}/stream"), timeout=3)
+
+    assert "event: done" in stream.text
+    assert "Delayed answer" in stream.text
+    turns = await chat.turns()
+    assert len(turns) == 1
+    assert turns[0].status.is_ok
+
+
+async def test_uncaught_background_failure_streams_failed_event_and_failed_trace(
+    session_app: SessionApp,
+) -> None:
+    chat = session_app
+    chat.app.state.coach_jobs = FailingProgressRegistry()
+    path = f"/api/v1/decks/{chat.deck_id}/coach"
+    response = await chat.client.post(path + "/start", json={"message": "Start this turn."})
+    assert response.status_code == 200
     job_id = response.json()["data"]["job_id"]
     stream = await asyncio.wait_for(chat.client.get(f"{path}/{job_id}/stream"), timeout=3)
+
     assert "event: failed" in stream.text
+    assert "progress transport unavailable" in stream.text
+    assert "event: done" not in stream.text
     turns = await chat.turns()
     assert len(turns) == 1
     assert turns[0].status.is_ok is False

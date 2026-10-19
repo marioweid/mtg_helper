@@ -6,7 +6,6 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
 
 import asyncpg
 import httpx
@@ -164,53 +163,6 @@ async def sync_one_hub_card_stats(
     }
 
 
-async def load_hub_tags(pool: asyncpg.Pool) -> set[str]:
-    """Return active Moxfield hub tag ids."""
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT tag FROM moxfield_hubs WHERE active AND enabled ORDER BY name"
-        )
-    return {row["tag"] for row in rows}
-
-
-async def load_hub_prompt_catalog(pool: asyncpg.Pool) -> str:
-    """Return compact hub lines for LLM keyword extraction prompts."""
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT h.tag, h.name, count(s.card_id) AS card_count
-            FROM moxfield_hubs h
-            LEFT JOIN moxfield_hub_card_stats s ON s.hub_id = h.id
-            WHERE h.active AND h.enabled
-            GROUP BY h.id, h.tag, h.name
-            ORDER BY h.name
-            """
-        )
-    return "\n".join(f"- {row['tag']}: {row['name']} ({row['card_count']} cards)" for row in rows)
-
-
-async def list_hub_tag_groups(pool: asyncpg.Pool) -> list[dict[str, Any]]:
-    """Return frontend-ready active Moxfield hub groups."""
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT tag, name, description
-            FROM moxfield_hubs
-            WHERE active AND enabled
-            ORDER BY name
-            """
-        )
-    return [
-        {
-            "category": "moxfield_hubs",
-            "display_name": "Moxfield themes",
-            "keywords": [
-                {"tag": row["tag"], "label": row["name"], "deck_count": None} for row in rows
-            ],
-        }
-    ]
-
-
 async def list_hubs(pool: asyncpg.Pool) -> list[dict[str, Any]]:
     """Return active Moxfield hubs for admin controls."""
     async with pool.acquire() as conn:
@@ -227,40 +179,6 @@ async def list_hubs(pool: asyncpg.Pool) -> list[dict[str, Any]]:
             """
         )
     return [dict(row) for row in rows]
-
-
-async def score_hubs(
-    pool: asyncpg.Pool,
-    tags: list[str],
-    commander_color_identity: list[str],
-) -> dict[UUID, float]:
-    """Resolve selected hub tags into local card-id synergy scores."""
-    if not tags:
-        return {}
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT canonical.id AS card_id, max(s.synergy_score) AS score
-            FROM moxfield_hub_card_stats s
-            JOIN moxfield_hubs h ON h.id = s.hub_id
-            JOIN cards source ON source.id = s.card_id
-            JOIN cards canonical
-              ON COALESCE(canonical.oracle_id, canonical.id)
-               = COALESCE(source.oracle_id, source.id)
-             AND canonical.is_canonical
-            WHERE h.tag = ANY($1::text[])
-              AND h.active AND h.enabled
-              AND canonical.color_identity <@ $2::text[]
-              AND canonical.legalities->>'commander' = 'legal'
-              AND COALESCE(canonical.border_color, '') != 'gold'
-              AND COALESCE(canonical.security_stamp, '') != 'acorn'
-              AND canonical.type_line NOT LIKE '%Conspiracy%'
-            GROUP BY canonical.id
-            """,
-            tags,
-            commander_color_identity,
-        )
-    return {row["card_id"]: float(row["score"] or 0.0) for row in rows}
 
 
 async def rebuild_card_hub_tags(pool: asyncpg.Pool) -> None:

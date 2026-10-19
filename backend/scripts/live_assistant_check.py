@@ -21,8 +21,8 @@ import asyncpg
 from mtg_helper.config import settings
 from mtg_helper.models.ai import CommanderCoachRequest
 from mtg_helper.services import deck_service
-from mtg_helper.services.commander_coach.orchestrator import run_coach
 from mtg_helper.services.deck_url_import_service import import_from_url, parse_deck_url
+from mtg_helper.services.mtg_assistant import run_assistant as run_coach
 
 _OWNER_EMAIL = "live-eval@mtg.local"
 

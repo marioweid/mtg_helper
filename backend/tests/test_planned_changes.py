@@ -359,3 +359,52 @@ async def test_shopping_list_rejects_unowned_collection(
 
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "INVALID_COLLECTION"
+
+
+async def test_basic_land_plan_completes_partially_then_as_revision(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    """Both completion routes preserve physical counts, inventory, and revision history."""
+    deck_id = await create_test_deck(client)
+    forest_id = str(
+        await db_pool.fetchval("SELECT scryfall_id FROM cards WHERE name = $1", "Forest")
+    )
+    collection_id = await _create_collection(client, "Land binder")
+    await _add_collection_card(client, collection_id, forest_id, quantity=3)
+    plan = await _plan_card(client, deck_id, forest_id, quantity=3)
+    assert plan is not None
+    selected = await client.patch(
+        f"/api/v1/decks/{deck_id}/planned-changes/{plan['id']}",
+        json={"collection_id": collection_id},
+    )
+    assert selected.status_code == 200
+
+    partial = await client.post(
+        f"/api/v1/decks/{deck_id}/planned-changes/{plan['id']}/complete",
+        json={"quantity": 1},
+    )
+
+    assert partial.status_code == 200
+    assert partial.json()["data"]["quantity"] == 2
+    deck = (await client.get(f"/api/v1/decks/{deck_id}")).json()["data"]
+    inventory = (await client.get(f"/api/v1/collections/{collection_id}/cards")).json()["data"]
+    assert [(card["name"], card["quantity"]) for card in deck["cards"]] == [("Forest", 1)]
+    assert deck["physical_card_count"] == 2
+    assert deck["planned_card_count"] == 4
+    assert inventory[0]["quantity"] == 2
+
+    completed = await client.post(
+        f"/api/v1/decks/{deck_id}/revisions",
+        json={"title": "Finish the land additions", "plan_ids": [plan["id"]]},
+    )
+
+    assert completed.status_code == 201
+    assert completed.json()["data"]["changes"][0]["quantity"] == 2
+    deck = (await client.get(f"/api/v1/decks/{deck_id}")).json()["data"]
+    inventory = (await client.get(f"/api/v1/collections/{collection_id}/cards")).json()["data"]
+    history = (await client.get(f"/api/v1/decks/{deck_id}/revisions")).json()["data"]
+    assert [(card["name"], card["quantity"]) for card in deck["cards"]] == [("Forest", 3)]
+    assert deck["planned_changes"] == []
+    assert inventory == []
+    assert {revision["source"] for revision in history} == {"single_plan", "selected_plans"}
+    assert len(history) == 2

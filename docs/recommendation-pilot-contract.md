@@ -2,11 +2,10 @@
 
 ## Now
 
-Discover is implemented but **default off**. This is not live enablement, spending approval or
-deployment. No application provider calls were made. New Cards retains its existing workflow;
+Discover is implemented but **default off**. This document is not live enablement, spending approval,
+or deployment verification. New Cards retains its existing workflow;
 Top Picks is labeled Community Picks with the same backend, source selection and caches.
 
-The [integration plan](recommendation-live-pilot-integration-plan.md) remains the design reference.
 This document describes the actual first pilot and its limitations, not a recommendation-accuracy
 claim. Account enablement and the proposed spending ceilings require separate confirmation.
 **Draft 3 commander strategies** offers selectable source-only directions before card generation.
@@ -18,7 +17,7 @@ matches use the shared artwork-first card grid.
 ## Behavior
 
 - Commander-only, eligible paper Commander nonlands. Partner/background decks and collection scopes
-  are gated. Physical/planned/avoided cards are exclusions, never model support.
+  are gated. Physical/planned cards are exclusions, never model support.
 - Explicit goals and literal Oracle/type/keyword/mana-value constraints. Narrative preferences are
   unverified; no bracket, price, collection-ownership or combo guarantee is implemented.
 - Source browsing, inspection, rules lookup, refresh and pending additions need no model calls.
@@ -39,7 +38,7 @@ matches use the shared artwork-first card grid.
   checked at planning and transactional completion, including revision completion paths.
 - Origin flags survive quantity changes, normal plan merges and Oracle duplicate repair. Manual
   Cards/Rule 0 paths are not relabeled as Discover and do not acquire the flag automatically.
-- Pilot feedback is isolated from legacy weights, cross-deck profiles and evaluation fixtures.
+- Pilot feedback is run-scoped and isolated from retired personalization data and evaluation fixtures.
 
 ## Shared code and preserved research
 
@@ -176,13 +175,13 @@ hash and exact terms. Polling projects persisted results and overlays current ex
 than reconstructing sources or evaluating advice. Missing sources do not disable Cards or Community
 Picks. Revoking the capability stops future run stages; an in-flight request may still bill.
 
-## Verification and remaining gates
+## Recorded verification and remaining gates
 
 See `backend/tests/test_recommendation_{core,pilot}.py` and the frontend Discover tests.
 Database/API/SDK tests use isolated PostgreSQL and replace external HTTP only. They do not
 exercise paid model behavior.
 
-Completed checks:
+Historical implementation checks (not rerun merely by editing this document):
 
 - 164 offline backend checks: all 135 preserved evaluation checks, 10 application-core checks,
   6 strategy-choice checks and 13 artwork checks.

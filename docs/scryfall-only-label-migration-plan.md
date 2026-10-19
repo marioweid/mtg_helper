@@ -2,6 +2,10 @@
 
 ## Now
 
+Implementation status: the publication foundation exists; consumer replacement is unfinished.
+Deployment/test counts below are historical October 13 evidence, not current container state.
+Follow [VERIFY.md](../VERIFY.md) for the current isolated/live development workflow.
+
 **Canonical source publication implemented and tested; replacement is still in progress.**
 Scryfall becomes the only global card-label and printed-keyword source. The user explicitly keeps
 personal deck-local manual categories. [Measured coverage and limits](research/scryfall-tag-coverage/README.md)
@@ -44,7 +48,7 @@ no-database tests, and found no repair-induced regression. Database/live-sync an
 was executed by the implementation owner, not independently rerun. This approval covers the
 publication foundation only, not unfinished label-consumer migration or application deployment.
 
-Local-only [isolated staging](scryfall-label-staging.md) is now running at `http://localhost:3000`.
+At the October 13 checkpoint, [isolated staging](scryfall-label-staging.md) ran at `http://localhost:3000`.
 A staging Admin sync completed successfully and reports matching generations: 32,165 cards,
 4,577 tags and 236,717 current direct memberships. Staging has its own database volume and runtime
 secrets, no working AI key, and no application-data mounts. The original application database remains

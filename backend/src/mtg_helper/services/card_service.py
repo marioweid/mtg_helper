@@ -209,26 +209,3 @@ async def resolve_card_by_name(pool: asyncpg.Pool, name: str) -> CardResponse | 
                 name,
             )
     return _row_to_card(row) if row else None
-
-
-async def resolve_card_names(
-    pool: asyncpg.Pool, names: list[str]
-) -> tuple[list[CardResponse], list[str]]:
-    """Resolve a list of card names, returning matched cards and unresolved names.
-
-    Args:
-        pool: asyncpg connection pool.
-        names: List of card names from AI output.
-
-    Returns:
-        Tuple of (matched CardResponse list, unresolved name list).
-    """
-    matched: list[CardResponse] = []
-    unresolved: list[str] = []
-    for name in names:
-        card = await resolve_card_by_name(pool, name)
-        if card is not None:
-            matched.append(card)
-        else:
-            unresolved.append(name)
-    return matched, unresolved

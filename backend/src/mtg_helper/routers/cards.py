@@ -3,11 +3,10 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 
 from mtg_helper.models.cards import CardResponse, CardSearchParams
 from mtg_helper.models.common import DataResponse, PaginationMeta
-from mtg_helper.services import card_service, scryfall
+from mtg_helper.services import card_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
 
@@ -63,10 +62,3 @@ async def get_card(
             detail={"code": "CARD_NOT_FOUND", "message": f"Card {scryfall_id} not found"},
         )
     return DataResponse(data=card)
-
-
-@router.post("/sync")
-async def sync_cards(request: Request) -> JSONResponse:
-    """Trigger a Scryfall bulk data sync. Downloads and upserts all Commander-legal cards."""
-    result = await scryfall.run_sync(request.app.state.db_pool)
-    return JSONResponse(status_code=202, content={"data": result})

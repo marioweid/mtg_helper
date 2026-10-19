@@ -17,7 +17,6 @@ interface Props {
   onCardClick?: (card: DeckCardItem) => void;
   onRemove?: (scryfallId: string) => void;
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
-  petCardNames?: Set<string>;
   comboCardIds?: Set<string>;
   collapsedGroups?: ReadonlySet<string>;
   onToggleGroup?: (groupKey: string) => void;
@@ -65,14 +64,12 @@ function CompactRow({
   onCardClick,
   onRemove,
   onSetQuantity,
-  isPet,
   inCombo,
 }: {
   card: DeckCardItem;
   onCardClick?: (card: DeckCardItem) => void;
   onRemove?: (scryfallId: string) => void;
   onSetQuantity?: (scryfallId: string, quantity: number) => void | Promise<void>;
-  isPet: boolean;
   inCombo: boolean;
 }) {
   const clickable = !!onCardClick;
@@ -118,11 +115,6 @@ function CompactRow({
             {card.name}
           </CardHover>
         </div>
-        {isPet && (
-          <span className="shrink-0 text-red-400" title="Pet card">
-            ♥
-          </span>
-        )}
         <DeckFitIndicator card={card} />
         <PlannedCutBadge quantity={card.planned_cut_quantity} />
         {inCombo && (
@@ -174,7 +166,6 @@ export function DeckCompactColumns({
   onCardClick,
   onRemove,
   onSetQuantity,
-  petCardNames,
   comboCardIds,
   collapsedGroups,
   onToggleGroup,
@@ -195,7 +186,6 @@ export function DeckCompactColumns({
           {...(onCardClick ? { onCardClick } : {})}
           {...(onRemove ? { onRemove } : {})}
           {...(onSetQuantity ? { onSetQuantity } : {})}
-          {...(petCardNames ? { petCardNames } : {})}
           {...(comboCardIds ? { comboCardIds } : {})}
         />
       ))}
@@ -216,7 +206,6 @@ function CompactGroup({
   onCardClick,
   onRemove,
   onSetQuantity,
-  petCardNames,
   comboCardIds,
 }: CompactGroupProps) {
   const contentId = useId();
@@ -264,7 +253,6 @@ function CompactGroup({
                 {...(onCardClick ? { onCardClick } : {})}
                 {...(onRemove ? { onRemove } : {})}
                 {...(onSetQuantity ? { onSetQuantity } : {})}
-                isPet={petCardNames?.has(card.name) ?? false}
                 inCombo={comboCardIds?.has(card.scryfall_id) ?? false}
               />
             ))}

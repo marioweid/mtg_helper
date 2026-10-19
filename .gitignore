@@ -240,21 +240,12 @@ __marimo__/
 # Public Scryfall-only coverage receipts; full archives and operational backups stay ignored.
 !docs/research/scryfall-tag-coverage/*.json
 
-# Terraform
-infra/terraform/.terraform/
-infra/terraform/*.tfstate
-infra/terraform/*.tfstate.*
-infra/terraform/terraform.tfvars
-infra/terraform/tfplan
 **/.env.prod
-docs/superpowers/*
-!docs/superpowers/specs/
-docs/superpowers/specs/*
-!docs/superpowers/specs/2026-08-21-openai-responses-migration-design.md
-.superpowers/
-
-# Local Codex app/thread configuration
-.codex/config.toml
-
 # Local dev data (portable postgres, caches, logs)
 .local/
+
+# Local agent specifications, reports, and run artifacts
+/.agent/
+/.codex/
+/.superpowers/
+/docs/superpowers/

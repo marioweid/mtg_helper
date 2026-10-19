@@ -16,24 +16,6 @@ def _row_to_account(row: asyncpg.Record) -> AccountResponse:
     )
 
 
-async def create_account(pool: asyncpg.Pool, display_name: str) -> AccountResponse:
-    """Create a new account.
-
-    Args:
-        pool: asyncpg connection pool.
-        display_name: Human-readable name for the account.
-
-    Returns:
-        The newly created account.
-    """
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "INSERT INTO accounts (display_name) VALUES ($1) RETURNING *",
-            display_name,
-        )
-    return _row_to_account(row)
-
-
 async def upsert_by_google_sub(
     pool: asyncpg.Pool,
     *,

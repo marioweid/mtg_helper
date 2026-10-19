@@ -69,7 +69,6 @@ export default function DeckDetailPage() {
   const deckId = params["id"] as string;
   const [deck, setDeck] = useState<DeckDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [petCardNames, setPetCardNames] = useState<Set<string>>(new Set());
   const [editingDescription, setEditingDescription] = useState(false);
   const [draftDescription, setDraftDescription] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
@@ -188,22 +187,6 @@ export default function DeckDetailPage() {
       cancelled = true;
     };
   }, [deckId]);
-
-  useEffect(() => {
-    apiClient
-      .listPreferences()
-      .then((prefs) => {
-        const names = new Set(
-          prefs
-            .filter((p) => p.preference_type === "pet_card" && p.card_name)
-            .map((p) => p.card_name as string),
-        );
-        setPetCardNames(names);
-      })
-      .catch(() => {
-        /* non-critical */
-      });
-  }, []);
 
   async function handleSaveDescription() {
     if (!deck) return;
@@ -460,7 +443,6 @@ export default function DeckDetailPage() {
                   onCardClick={(c) => setSelectedCardId(c.deck_card_id)}
                   onRemove={handleRemoveCard}
                   onSetQuantity={handleSetQuantity}
-                  petCardNames={petCardNames}
                   comboCardIds={comboCardIds}
                   collapsedGroups={collapsedGroups[groupMode]}
                   onToggleGroup={handleToggleGroup}

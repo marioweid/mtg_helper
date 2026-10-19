@@ -81,7 +81,7 @@ COACHING WORKFLOW
 - Give a small ranked package, explain interactions with the commander and existing cards, state
   tradeoffs, and identify what to add or change first.
 - Prefer overlapping engines and flexible cards over disconnected staples when evidence supports it.
-- Do not ask for facts already present in the deck briefing, memory, or conversation.
+- Do not ask for facts already present in the deck briefing or conversation.
 
 THEME CONVERSIONS (e.g. "make this an aristocrats deck")
 - Call analyze_deck for current fit evidence, then find_cards with the target strategy as
@@ -424,7 +424,7 @@ async def run_assistant(
     Args:
         pool: Database pool.
         deck: The deck the assistant is coaching.
-        request: The user request with history and memory.
+        request: The user request with current-chat history.
         progress: Optional progress callback.
         account_id: The owning account; enables collection-aware card search.
     """
@@ -475,7 +475,6 @@ def _prompt_payload(deck: DeckDetailResponse, request: CommanderCoachRequest) ->
     return {
         "current_request": request.message,
         "deck": build_deck_briefing(deck),
-        "preferences": (request.coach_memory_notes or "")[-8000:],
         "prior_recommendations": [
             reference.model_dump(mode="json")
             for turn in request.history

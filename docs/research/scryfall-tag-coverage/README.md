@@ -121,11 +121,11 @@ or establish automatic-planner improvement. No additional model evaluation or da
 
 ## Historical reproduction and checks
 
-The evaluator, preserved regression-plan inputs and replay commands remain in the separate
-`research/commander-core-improvement` checkout. This publication release includes frozen findings,
-not unrelated admission experiments or their executable research harness. The ordinary research
-replay verifies source hashes and performs no provider/database requests. Exact replay additionally
-requires the ignored bulk archives matching the URLs/hashes in `protocol.json`.
+The evaluator, regression-plan inputs and replay commands were kept in a separate
+`research/commander-core-improvement` checkout at this checkpoint. That executable admission harness
+is not included here; this repository preserves its frozen findings, not a runnable reproduction
+of that experiment. Exact replay would also require the ignored bulk archives matching the
+URLs/hashes in `protocol.json`. The ordinary publication/parser tests remain available here.
 
 Historical scoped result: **35 tests passed**, lint and types passed. A deliberate transitive-hierarchy
 mutation made its behavior test fail; restored code passes.

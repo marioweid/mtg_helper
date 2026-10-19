@@ -14,10 +14,8 @@ from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services import bracket_service, mana_base_service
 from mtg_helper.services.commander_coach import pipeline
 from mtg_helper.services.deck_fit_service import WeakCardEvidence, weak_card_evidence
-from mtg_helper.services.theme_service import score_themes
 
 _MAX_THEME_MATCHES = 5
-_MAX_CANDIDATES = 12
 _MAX_GAME_CHANGER_NAMES = 10
 _BASIC_LAND_TYPES = {"Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"}
 
@@ -31,17 +29,6 @@ class ThemeMatch(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     source: Literal["group", "moxfield", "archidekt"]
     confidence: float = Field(ge=0.0, le=1.0)
-
-
-class ThemeCardCandidate(BaseModel):
-    """One legal card ranked by stored theme statistics."""
-
-    card: CardSearchHit
-    theme_score: float
-    evidence_source: Literal["hub_tag_stats", "local_tags"] = "hub_tag_stats"
-    game_changer: bool = False
-    commander_matches: list[str] = Field(default_factory=list)
-    role_matches: list[str] = Field(default_factory=list)
 
 
 class DeckAnalysis(BaseModel):
@@ -149,71 +136,6 @@ async def search_themes(
         )
         for score, row in ranked[: min(limit, _MAX_THEME_MATCHES)]
     ]
-
-
-async def find_theme_cards(
-    pool: asyncpg.Pool,
-    deck: DeckDetailResponse,
-    theme_tags: list[str],
-    *,
-    max_price_eur_cents: int | None = None,
-    roles: list[str] | None = None,
-    limit: int = 8,
-) -> list[ThemeCardCandidate]:
-    """Return legal, novel cards ranked by selected hub/tag statistics."""
-    scores = await score_themes(pool, theme_tags, pipeline.deck_colors(deck))
-    if not scores:
-        return await _fallback_theme_cards(
-            pool,
-            deck,
-            theme_tags,
-            max_price_eur_cents=max_price_eur_cents,
-            roles=roles,
-            limit=limit,
-        )
-    card_ids = sorted(scores, key=lambda card_id: scores[card_id], reverse=True)[:80]
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            _THEME_CARD_SQL,
-            card_ids,
-            _existing_names(deck),
-            max_price_eur_cents,
-        )
-    candidates = [_candidate_from_row(row, scores, deck) for row in rows]
-    if roles:
-        wanted = set(roles)
-        candidates = [item for item in candidates if wanted & set(item.role_matches)]
-    candidates.sort(key=lambda item: (item.theme_score, len(item.commander_matches)), reverse=True)
-    return candidates[: min(limit, _MAX_CANDIDATES)]
-
-
-async def _fallback_theme_cards(
-    pool: asyncpg.Pool,
-    deck: DeckDetailResponse,
-    theme_tags: list[str],
-    *,
-    max_price_eur_cents: int | None,
-    roles: list[str] | None,
-    limit: int,
-) -> list[ThemeCardCandidate]:
-    """Use local tags when source statistics are unavailable."""
-    local_tags = sorted({tag.split(":", maxsplit=1)[-1] for tag in theme_tags})
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            _LOCAL_TAG_CARD_SQL,
-            local_tags,
-            pipeline.deck_colors(deck),
-            _existing_names(deck),
-            max_price_eur_cents,
-        )
-    candidates = [
-        _candidate_from_row(row, {}, deck).model_copy(update={"evidence_source": "local_tags"})
-        for row in rows
-    ]
-    if roles:
-        wanted = set(roles)
-        candidates = [item for item in candidates if wanted & set(item.role_matches)]
-    return candidates[: min(limit, _MAX_CANDIDATES)]
 
 
 def analyze_deck(deck: DeckDetailResponse) -> DeckAnalysis:
@@ -429,62 +351,6 @@ def _normalize(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
-def _existing_names(deck: DeckDetailResponse) -> list[str]:
-    return [card.name for card in deck.cards]
-
-
-def _candidate_from_row(
-    row: asyncpg.Record,
-    scores: dict[UUID, float],
-    deck: DeckDetailResponse,
-) -> ThemeCardCandidate:
-    hit = CardSearchHit(
-        scryfall_id=row["scryfall_id"],
-        name=row["name"],
-        mana_cost=row["mana_cost"],
-        cmc=float(row["cmc"]) if row["cmc"] is not None else None,
-        type_line=row["type_line"],
-        oracle_text=row["oracle_text"],
-        color_identity=list(row["color_identity"] or []),
-        tags=list(row["tags"] or []),
-        price_eur_cents=row["price_eur_cents"],
-    )
-    blob = _card_blob(hit)
-    commander_words = _commander_words(deck)
-    return ThemeCardCandidate(
-        card=hit,
-        theme_score=round(scores.get(row["id"], 0.0), 3),
-        game_changer=bool(row["game_changer"]),
-        commander_matches=sorted(commander_words & set(blob.split()))[:6],
-        role_matches=_roles(blob),
-    )
-
-
-def _commander_words(deck: DeckDetailResponse) -> set[str]:
-    commander = deck.commander_card
-    if commander is None:
-        return set()
-    words = set(_normalize(" ".join([commander.name, commander.oracle_text or ""])).split())
-    return {word for word in words if len(word) >= 5}
-
-
-def _card_blob(card: CardSearchHit) -> str:
-    return _normalize(
-        " ".join([card.name, card.type_line or "", card.oracle_text or "", *card.tags])
-    )
-
-
-def _roles(blob: str) -> list[str]:
-    terms = {
-        "draw": ("draw", "card advantage"),
-        "interaction": ("destroy", "exile", "counter target"),
-        "ramp": ("add mana", "search your library for a land"),
-        "protection": ("hexproof", "indestructible", "protection"),
-        "payoff": ("whenever", "double", "additional", "each opponent"),
-    }
-    return [role for role, needles in terms.items() if any(term in blob for term in needles)]
-
-
 def _structural_issues(deck: DeckDetailResponse) -> list[LegalityIssue]:
     issues: list[LegalityIssue] = []
     total = sum(card.quantity for card in deck.cards) + 1 + int(deck.partner_id is not None)
@@ -599,37 +465,4 @@ SELECT 'archidekt:' || t.tag, t.name, t.description, ARRAY[]::text[], 'archidekt
 FROM archidekt_tags t
 LEFT JOIN theme_group_members m ON m.archidekt_tag_id = t.id
 WHERE t.active AND t.enabled AND m.id IS NULL
-"""
-
-
-_THEME_CARD_SQL = """
-SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text, color_identity,
-       tags, game_changer,
-       ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents
-FROM cards
-WHERE id = ANY($1::uuid[])
-  AND name <> ALL($2::text[])
-  AND legalities->>'commander' = 'legal'
-  AND ($3::integer IS NULL OR
-       ((prices->>'eur') IS NOT NULL AND
-        ROUND((prices->>'eur')::numeric * 100)::integer <= $3))
-  AND type_line NOT ILIKE '%Basic Land%'
-"""
-
-
-_LOCAL_TAG_CARD_SQL = """
-SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text, color_identity,
-       tags, game_changer,
-       ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents
-FROM cards
-WHERE (tags && $1::text[] OR hub_tags && $1::text[] OR mtgjson_tags && $1::text[])
-  AND color_identity <@ $2::text[]
-  AND name <> ALL($3::text[])
-  AND legalities->>'commander' = 'legal'
-  AND ($4::integer IS NULL OR
-       ((prices->>'eur') IS NOT NULL AND
-        ROUND((prices->>'eur')::numeric * 100)::integer <= $4))
-  AND type_line NOT ILIKE '%Basic Land%'
-ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST
-LIMIT 40
 """

@@ -33,9 +33,8 @@ function roleReasonTitle(card: DeckCardItem, role: string, auto: boolean): strin
  * Shared detail surface for a deck card — image, type line, oracle text,
  * category chip editor (manual + auto-tagged states), and remove button.
  *
- * Used by both ``DeckCategoryGroup`` (inline list expansion) and
- * ``CardDetailModal`` (grid view). The ``showImage`` flag controls whether
- * the card art appears; the list view sets it to false to keep rows compact.
+ * The modal owns opening and closing; this surface keeps card actions beside
+ * their details. ``showImage`` controls whether it also renders the card art.
  */
 export function CardDetailPanel({
   card,

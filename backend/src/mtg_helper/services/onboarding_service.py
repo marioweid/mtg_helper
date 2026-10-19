@@ -98,8 +98,8 @@ async def quickstart(
     Args:
         pool: asyncpg connection pool.
         email: Authenticated account email; deck owner.
-        account_id: Authenticated account UUID; passed to build_stage so
-            preference and feedback weights are honored.
+        account_id: Authenticated account UUID; passed to build_stage for
+            collection ownership enrichment.
         commander_scryfall_id: Commander to build around.
         partner_scryfall_id: Optional partner commander.
         bracket: Deck bracket (1–5); default 2 (precon-friendly).
