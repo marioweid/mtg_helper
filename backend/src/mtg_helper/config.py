@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    run_startup_maintenance: bool = True
     openai_api_key: Annotated[SecretStr, Field(min_length=1)]
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
     mtgjson_all_printings_url: str = "https://mtgjson.com/api/v5/AllPrintings.json.zip"

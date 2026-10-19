@@ -36,6 +36,12 @@ uv run pytest -q
 - All SQL is plain asyncpg with `$1, $2` positional params — never f-string SQL values
 - Schema lives in `backend/src/mtg_helper/sql/schema.sql`
 - Auto-initialized via `docker-entrypoint-initdb.d/` on first `docker compose up`
+- Read `VERIFY.md` before booting, testing, or changing database configuration.
+- Live-data mode is for schema-compatible refactors; normal edits affect production.
+- Validate schema changes and migrations on the isolated local database before committing
+  or deploying. Keep live-mode startup maintenance disabled.
+- Run destructive tests only against the disposable local `_test` database. Never point
+  `TEST_DATABASE_URL`, schema resets, repairs, or migration experiments at shared live data.
 
 ## API design
 

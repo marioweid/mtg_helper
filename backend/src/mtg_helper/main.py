@@ -57,10 +57,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
-    await apply_schema(app.state.db_pool)
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
     app.state.coach_jobs = {}
+    try:
+        if settings.run_startup_maintenance:
+            await _run_startup_maintenance(app)
+        else:
+            _log.warning("Startup maintenance disabled; normal application writes remain enabled")
+        yield
+    finally:
+        await close_pool(app.state.db_pool)
+
+
+async def _run_startup_maintenance(app: FastAPI) -> None:
+    """Initialize isolated or production deployments, never shared live development."""
+    await apply_schema(app.state.db_pool)
 
     card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
     if card_count == 0:
@@ -86,9 +98,6 @@ async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
             _log.exception("MTGJSON keyword sync failed on startup; continuing with fallback data")
 
     await _ensure_theme_catalogs(app)
-
-    yield
-    await close_pool(app.state.db_pool)
 
 
 async def _ensure_theme_catalogs(app: FastAPI) -> None:

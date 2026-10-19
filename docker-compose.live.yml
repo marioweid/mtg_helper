@@ -1,0 +1,7 @@
+# Explicit opt-in: normal application writes immediately affect the hosted app.
+# The local postgres service remains available for isolated tests only.
+services:
+  backend:
+    environment:
+      DATABASE_URL: ${LIVE_DATABASE_URL:?Set LIVE_DATABASE_URL in the ignored root .env}
+      RUN_STARTUP_MAINTENANCE: "false"
