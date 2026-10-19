@@ -13,15 +13,6 @@
 #      repository's push webhook.
 
 services:
-  qdrant:
-    image: qdrant/qdrant:v1.17
-    restart: unless-stopped
-    environment:
-      QDRANT__LOG_LEVEL: INFO
-      QDRANT__TELEMETRY_DISABLED: "true"
-    volumes:
-      - ${MTG_HELPER_DATA_DIR:-/srv/mtg-helper/data}/qdrant:/qdrant/storage
-
   backend:
     build:
       context: ./backend
@@ -48,11 +39,7 @@ services:
       ASSAY_ENDPOINT: ${ASSAY_ENDPOINT:-}
       ASSAY_API_KEY: ${ASSAY_API_KEY:-}
       ASSAY_APPLICATION: ${ASSAY_APPLICATION:-}
-      QDRANT_URL: http://qdrant:6333
       ENABLE_OPTIMIZER: ${ENABLE_OPTIMIZER:-false}
-    depends_on:
-      qdrant:
-        condition: service_started
     networks:
       - default
       - shared_database
@@ -77,7 +64,7 @@ services:
     depends_on:
       - backend
 
-  # Daily Scryfall discovery; tag/embedding refresh remains weekly.
+  # Daily Scryfall discovery; full source refresh and tagging remain weekly.
   # Initial sync also runs on backend startup when the cards table is empty.
   scryfall-sync:
     image: alpine/curl:latest
