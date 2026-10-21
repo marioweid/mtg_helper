@@ -30,12 +30,12 @@ class ModelTransport:
         body = json.loads(request.content)
         self.calls.append(body)
         payload = json.loads(body["input"])
-        support = payload["physical"][0]
+        support = payload["commanders"][0]
         judgments = {}
         for card in payload["candidates"]:
             judgments[card["key"]] = {
                 "label": "reject" if card["name"] == "New 0" else "strong",
-                "reason": "Fits the supplied physical support",
+                "reason": "Fits the supplied commander",
                 "caveat": "Unverified interaction",
                 "required_changes": [],
                 "evidence": [

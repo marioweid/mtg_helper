@@ -79,6 +79,7 @@ class DeckState:
     catalog: asyncpg.Record | None
     job: asyncpg.Record | None
     dismissed: int
+    hidden: set[UUID]
     ready: bool
 
     def valid(self, candidate: Candidate) -> bool:
@@ -88,7 +89,7 @@ class DeckState:
     def pending(self) -> list[Candidate]:
         return [candidate for candidate in self.candidates if not self.valid(candidate)]
 
-    def response(self) -> NewCardsResponse:
+    def response(self) -> NewCardsResponse:  # noqa: C901 - one complete read-model state boundary
         """Render only currently eligible, exact-context assessments; never start work on reads."""
         now = datetime.now(UTC)
         picks = []
@@ -100,7 +101,8 @@ class DeckState:
             assessment = Assessment.model_validate(json_value(row["assessment"]))
             assessed_times.append(row["assessed_at"])
             if assessment.label != "reject":
-                picks.append(candidate.pick(assessment))
+                if candidate.oracle_id not in self.hidden:
+                    picks.append(candidate.pick(assessment))
         complete = len(assessed_times) == len(self.candidates)
         result = NewCardsResponse(
             catalog_updated_at=self.catalog["published_at"] if self.catalog else None,
@@ -139,6 +141,8 @@ def _job_status(result: NewCardsResponse, job: asyncpg.Record, now: datetime) ->
     elif job["error"]:
         result.status = "error"
         result.error = job["error"]
+    else:
+        result.status = "waiting"
 
 
 async def owned_deck(
@@ -249,6 +253,19 @@ async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> 
         deck["id"],
         owner.account_id,
     )
+    hidden_rows = await conn.fetch(
+        """
+        SELECT c.oracle_id FROM deck_cards dc JOIN cards c ON c.id = dc.card_id
+        WHERE dc.deck_id = $1
+        UNION
+        SELECT c.oracle_id FROM deck_card_plans p JOIN cards c ON c.id = p.card_id
+        WHERE p.deck_id = $1 AND p.direction = 'addition'
+        UNION
+        SELECT oracle_id FROM new_card_dismissals WHERE deck_id = $1 AND account_id = $2
+        """,
+        deck["id"],
+        owner.account_id,
+    )
     return DeckState(
         constellation_key,
         context,
@@ -257,5 +274,6 @@ async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> 
         catalog,
         job,
         dismissed,
+        {row["oracle_id"] for row in hidden_rows},
         ready and catalog is not None,
     )

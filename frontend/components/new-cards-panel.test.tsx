@@ -162,7 +162,7 @@ describe("New Cards panel lifecycle and HTTP actions", () => {
     expect(markup).toContain("Released, Commander-legal paper cards only");
     expect(markup).toContain("Scryfall catalog updated 2026-07-21");
     expect(markup).toContain("8 of 12 currently eligible cards assessed");
-    expect(markup).toContain("Partial coverage");
+    expect(markup).toContain("Waiting for a complete Commander-Konstellation check");
     expect(markup).toContain("Strong fits");
     expect(markup).not.toContain("Worth testing");
     expect(markup.indexOf("Source rule text.")).toBeLessThan(markup.indexOf("Generated advice"));
@@ -175,20 +175,17 @@ describe("New Cards panel lifecycle and HTTP actions", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("analyzes only on click, polls while running, and stops on completion", async () => {
+  it("never offers Analyze and polls a waiting status until it becomes complete", async () => {
+    fetchMock.mockResolvedValueOnce(respond({ ...result, status: "waiting" }));
     html();
     await flush();
-    fetchMock.mockResolvedValueOnce(respond({ ...result, status: "running" }, 202));
-    click("Analyze next eight");
-    await flush();
-    expect(fetchMock.mock.calls[1]?.[0]).toContain("/new-cards/analyze");
-    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("POST");
-    expect(html()).toContain("Analysis running");
+    expect(html()).not.toContain("Analyze next eight");
+    fetchMock.mockResolvedValueOnce(respond({ ...result, remaining_count: 0, status: "idle" }));
     await vi.advanceTimersByTimeAsync(3000);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(html()).not.toContain("Analysis running");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(html()).not.toContain("still pending");
     await vi.advanceTimersByTimeAsync(9000);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a pending read superseded by dismiss and cancels timers on exit", async () => {
@@ -309,7 +306,7 @@ describe("New Cards planning and request failures", () => {
     expect(html()).not.toContain("No strong fits");
   });
 
-  it.each(["Plan addition", "Dismiss", "Analyze next eight"])(
+  it.each(["Plan addition", "Dismiss"])(
     "shows failed %s and keeps usable results",
     async (action) => {
       html();
@@ -394,9 +391,9 @@ describe("New Cards source and empty states", () => {
   it.each([
     [{ status: "unavailable", picks: [] }, "Not ready"],
     [{ status: "error", error: "Model unavailable", picks: [] }, "analysis failed, not a no-match"],
-    [{ status: "running", picks: [] }, "analysis is still running"],
+    [{ status: "running", picks: [] }, "Commander-Konstellation check is still pending"],
     [{ picks: [], stale: true }, "not a no-match result"],
-    [{ picks: [] }, "Analyze unassessed cards"],
+    [{ picks: [] }, "waiting for admin processing"],
     [{ picks: [], remaining_count: 0 }, "No strong fits or cards worth testing"],
     [{ picks: [], remaining_count: 0, eligible_count: 0 }, "No released cards"],
   ] satisfies [Partial<NewCardsResponse>, string][])(
@@ -477,6 +474,6 @@ describe("New Cards source and empty states", () => {
     await flush();
     expect(html()).toContain("not available");
     expect(html()).toContain("unknown date");
-    expect(html()).toContain("Source or analysis is stale");
+    expect(html()).toContain("Source data is stale");
   });
 });

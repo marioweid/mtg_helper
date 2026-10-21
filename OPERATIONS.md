@@ -213,12 +213,13 @@ same transaction as canonical cards. Failed/truncated refreshes retain the previ
 additional temporary disk/network space for the compressed history (130 MiB download cap) and memory
 for the existing Oracle export. No manual data migration or new credentials are needed.
 
-To test: open a deck → **New Cards**, inspect the source date and coverage, then click **Analyze next
-eight**. Reads/refreshes are free of model calls. Each click requests at most eight unassessed cards;
-rejected cards count toward coverage. Per account: one active lease across decks/workers, 30 batches
-per UTC day, 180 KB input cap, 7,000 output tokens, low reasoning, no retries, 90-second analysis
-bound. Provider failures still consume the reserved daily slot. After restart/interruption, an
-abandoned lease expires in two minutes; the user retries explicitly. There is no automatic resume.
+Open a deck → **New Cards** to inspect its source date, coverage and complete Commander-Konstellation
+result. Reads and status refreshes never make model calls. An administrator enables the global
+automatic flag after a successful catalog publication, or explicitly starts one global run. Work is
+shared by Commander-Konstellation, globally serial, and limited to 100 packages per UTC day by
+default; each package contains at most eight cards with a 180 KB input cap, 7,000 output tokens, low
+reasoning, no SDK retries, and a 90-second bound. A reserved provider attempt counts even when it
+fails or is interrupted, and automatic retry waits until the next UTC day.
 
 Advice is unverified: neither research evaluator passed trusted-recommendation acceptance. The pilot
 shows exact source rules separately and excludes previews, unknown origins, promo-only originals and
@@ -226,9 +227,8 @@ unresolved special products. Original regular-product releases use the 60-day UT
 promos or later representative printings. Coverage is conservative, not a complete spoiler feed.
 
 **Plan addition** is explicit and idempotent; it never edits physical cards or plans supporting swaps.
-Current physical cards, partners, goals and pending plans invalidate affected cached advice.
-Retired account preferences and memory notes no longer affect advice or its cache identity.
-Pending additions are not support. Dismissals persist per account/deck; the UI can undo
+Only Commander facts and relevant candidate facts invalidate shared advice; deck contents, goals,
+plans, prices and images do not. Pending additions are not support. Dismissals persist per account/deck; the UI can undo
 the latest dismissal. Saved plans survive age expiry. Pilot-origin plans recheck current local
 legality, color identity and copy limits during single/batch completion; failures roll back the whole
 revision. Manual/Rule 0 plans retain existing policy. A stale catalog is visibly flagged after two

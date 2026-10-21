@@ -11,6 +11,7 @@ import asyncpg
 
 from mtg_helper.config import settings
 from mtg_helper.models.new_cards import NewCardsResponse
+from mtg_helper.services import feature_flag_service
 from mtg_helper.services.new_cards import repository
 from mtg_helper.services.new_cards.completion import validate_addition
 from mtg_helper.services.new_cards.evaluator import Assessment, EvidenceRequest, NewCardEvaluator
@@ -47,6 +48,9 @@ class NewCardsService:
 
     async def control_status(self) -> dict[str, object]:
         """Return the global control snapshot without triggering source or model work."""
+        automatic_enabled = await feature_flag_service.is_enabled(
+            self.pool, feature_flag_service.FLAG_NEW_CARDS_AUTOMATIC, None, False
+        )
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
             assert row is not None
@@ -54,9 +58,12 @@ class NewCardsService:
                 "SELECT count(*) FILTER (WHERE error IS NULL) AS waiting, "
                 "count(*) FILTER (WHERE error IS NOT NULL) AS failed FROM new_card_claims"
             )
+            catalog = await conn.fetchrow(
+                "SELECT published_at FROM new_card_catalog_state WHERE singleton"
+            )
             return {
                 "process_enabled": settings.enable_new_cards_worker,
-                "automatic_enabled": row["automatic_enabled"],
+                "automatic_enabled": automatic_enabled,
                 "daily_limit": row["daily_limit"],
                 "calls": row["calls"] if row["quota_day"] == datetime.now(UTC).date() else 0,
                 "quota_day": row["quota_day"].isoformat(),
@@ -65,6 +72,8 @@ class NewCardsService:
                 "automatic_active": row["automatic_active"],
                 "cancelled": row["cancelled"],
                 "last_error": row["last_error"],
+                "source_updated_at": catalog["published_at"].isoformat() if catalog else None,
+                "last_run_at": row["updated_at"].isoformat(),
                 "waiting": counts["waiting"] if counts else 0,
                 "failed": counts["failed"] if counts else 0,
             }
@@ -75,11 +84,24 @@ class NewCardsService:
             raise NewCardsError("New Cards execution is disabled for this process.", 503)
         if daily_limit is not None and daily_limit < 1:
             raise NewCardsError("Daily limit must be a positive integer.")
+        if automatic_enabled is not None:
+            await feature_flag_service.set_flag(
+                self.pool, feature_flag_service.FLAG_NEW_CARDS_AUTOMATIC, automatic_enabled
+            )
         async with self.pool.acquire() as conn:
+            # Enabling is prospective: an already-published catalog does not create a run.
+            if automatic_enabled:
+                catalog_day = await conn.fetchval(
+                    "SELECT published_at::date FROM new_card_catalog_state WHERE singleton"
+                )
+                await conn.execute(
+                    "UPDATE new_card_runs SET last_catalog_day = $1, updated_at = now() "
+                    "WHERE singleton",
+                    catalog_day,
+                )
             await conn.execute(
-                "UPDATE new_card_runs SET automatic_enabled = COALESCE($1, automatic_enabled), "
-                "daily_limit = COALESCE($2, daily_limit), updated_at = now() WHERE singleton",
-                automatic_enabled,
+                "UPDATE new_card_runs SET daily_limit = COALESCE($1, daily_limit), "
+                "updated_at = now() WHERE singleton",
                 daily_limit,
             )
 
@@ -102,6 +124,10 @@ class NewCardsService:
                 "UPDATE new_card_runs SET manual_active = true, cancelled = false, "
                 "last_error = NULL, updated_at = now() WHERE singleton"
             )
+            await conn.execute(
+                "UPDATE new_card_claims SET error = NULL, attempted_day = NULL "
+                "WHERE error IS NOT NULL"
+            )
 
     async def drain_manual(self) -> None:
         """Serially drain currently used constellations for one manual attempt."""
@@ -117,6 +143,49 @@ class NewCardsService:
                     "UPDATE new_card_runs SET manual_active = false, updated_at = now() "
                     "WHERE singleton"
                 )
+
+    async def drain_one(self) -> bool:
+        """Run one authorized package, if durable state says that work may start."""
+        if not settings.enable_new_cards_worker:
+            return False
+        work = await self._next_manual_work()
+        if work is None:
+            async with self.pool.acquire() as conn:
+                run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
+                assert run is not None
+                active = run["active_token"] and run["active_lease_until"] > datetime.now(UTC)
+                if not active:
+                    await conn.execute(
+                        "UPDATE new_card_runs SET manual_active = false, updated_at = now() "
+                        "WHERE singleton AND manual_active"
+                    )
+            return False
+        await self.run(work)
+        return True
+
+    async def activate_published_day(self) -> None:
+        """Durably activate one automatic day after a successful catalog publication."""
+        if not settings.enable_new_cards_worker:
+            return
+        if not await feature_flag_service.is_enabled(
+            self.pool, feature_flag_service.FLAG_NEW_CARDS_AUTOMATIC, None, False
+        ):
+            return
+        async with self.pool.acquire() as conn, conn.transaction():
+            catalog_day = await conn.fetchval(
+                "SELECT published_at::date FROM new_card_catalog_state WHERE singleton"
+            )
+            if catalog_day is None:
+                return
+            run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton FOR UPDATE")
+            assert run is not None
+            if run["last_catalog_day"] == catalog_day:
+                return
+            await conn.execute(
+                "UPDATE new_card_runs SET automatic_active = true, cancelled = false, "
+                "last_catalog_day = $1, last_error = NULL, updated_at = now() WHERE singleton",
+                catalog_day,
+            )
 
     async def _manual_permitted(self) -> bool:
         async with self.pool.acquire() as conn:
@@ -181,6 +250,9 @@ class NewCardsService:
     async def run(self, work: Work) -> None:
         """Execute one no-retry call and publish only if the lease and all input versions match."""
         try:
+            if not await self._execution_permitted(work.token):
+                await self._release(work)
+                return
             async with asyncio.timeout(90):
                 assessments = await self.evaluator.evaluate(work.request)
             await self._publish(work, assessments)
@@ -193,6 +265,33 @@ class NewCardsService:
                 work,
                 "Analysis failed or did not pass evidence checks. "
                 "Cached suggestions are retained; retry or report this issue.",
+            )
+
+    async def _execution_permitted(self, token: UUID) -> bool:
+        """Recheck process policy and the durable start authorization before a paid call."""
+        if not settings.enable_new_cards_worker:
+            return False
+        async with self.pool.acquire() as conn:
+            run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
+            assert run is not None
+            return bool(
+                run["active_token"] == token
+                and not run["cancelled"]
+                and (run["manual_active"] or run["automatic_active"])
+            )
+
+    async def _release(self, work: Work) -> None:
+        """Release an unstarted lease after a cancellation or process lock change."""
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE new_card_claims SET token = NULL, lease_until = NULL, updated_at = now() "
+                "WHERE token = $1",
+                work.token,
+            )
+            await conn.execute(
+                "UPDATE new_card_runs SET active_token = NULL, active_lease_until = NULL, "
+                "updated_at = now() WHERE singleton AND active_token = $1",
+                work.token,
             )
 
     async def _publish(self, work: Work, assessments: list[Assessment]) -> None:
@@ -236,6 +335,11 @@ class NewCardsService:
                 state.constellation_key,
                 work.token,
             )
+            await conn.execute(
+                "UPDATE new_card_runs SET active_token = NULL, active_lease_until = NULL, "
+                "updated_at = now() WHERE singleton AND active_token = $1",
+                work.token,
+            )
 
     async def _fail(self, work: Work, message: str) -> None:
         async with self.pool.acquire() as conn:
@@ -245,6 +349,12 @@ class NewCardsService:
                 "UPDATE new_card_claims SET token = NULL, lease_until = NULL, error = $3, "
                 "updated_at = now() WHERE constellation_key = $1 AND token = $2",
                 state.constellation_key,
+                work.token,
+                message,
+            )
+            await conn.execute(
+                "UPDATE new_card_runs SET active_token = NULL, active_lease_until = NULL, "
+                "last_error = $2, updated_at = now() WHERE singleton AND active_token = $1",
                 work.token,
                 message,
             )
@@ -364,9 +474,14 @@ async def _claim_lease(conn: asyncpg.Connection, constellation_key: str) -> UUID
         constellation_key,
     )
     now = datetime.now(UTC)
-    if job["token"] and job["lease_until"] > now:
+    if job["attempted_day"] == now.date():
         return None
     run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton FOR UPDATE")
+    assert run is not None
+    if run["active_token"] and run["active_lease_until"] > now:
+        return None
+    if run["cancelled"] or not (run["manual_active"] or run["automatic_active"]):
+        return None
     calls = run["calls"] if run["quota_day"] == now.date() else 0
     if calls >= run["daily_limit"]:
         raise NewCardsError("Global daily New Cards limit reached. Try again tomorrow UTC.", 429)
@@ -380,8 +495,45 @@ async def _claim_lease(conn: asyncpg.Connection, constellation_key: str) -> UUID
         now.date(),
     )
     await conn.execute(
-        "UPDATE new_card_runs SET quota_day = $1, calls = $2, updated_at = now() WHERE singleton",
+        "UPDATE new_card_runs SET quota_day = $1, calls = $2, active_token = $3, "
+        "active_lease_until = now() + interval '2 minutes', updated_at = now() WHERE singleton",
         now.date(),
         calls + 1,
+        token,
     )
     return token
+
+
+class NewCardsWorker:
+    """Small application-owned worker that resumes durable New Cards claims."""
+
+    def __init__(self, service: NewCardsService) -> None:
+        self._service = service
+        self._stopping = False
+        self._task: asyncio.Task[None] | None = None
+
+    def start(self) -> None:
+        """Start the bounded poll loop once application resources are ready."""
+        self._task = asyncio.create_task(self._run(), name="new-cards-worker")
+
+    async def stop(self) -> None:
+        """Stop claiming new work and wait briefly for the active package to settle."""
+        self._stopping = True
+        if self._task is None:
+            return
+        try:
+            async with asyncio.timeout(95):
+                await self._task
+        except TimeoutError:
+            self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)
+
+    async def _run(self) -> None:
+        while not self._stopping:
+            try:
+                await self._service.activate_published_day()
+                worked = await self._service.drain_one()
+            except Exception:
+                _log.exception("New Cards worker iteration failed")
+                worked = False
+            await asyncio.sleep(0.05 if worked else 1)

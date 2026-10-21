@@ -218,6 +218,7 @@ function NewCardsResults({
   busy: boolean;
   controller: NewCardsController;
 }) {
+  if (result.status === "source_stale") return <EmptyResults result={result} />;
   const groups = [
     { label: "strong", title: "Strong fits" },
     { label: "worth_testing", title: "Worth testing" },

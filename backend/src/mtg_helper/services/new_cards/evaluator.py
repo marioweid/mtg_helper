@@ -82,11 +82,7 @@ class EvidenceRequest:
     """Bind a provider call to public Commander and candidate facts only."""
 
     def __init__(self, context: dict[str, Any], candidates: list[dict[str, Any]]) -> None:
-        # ``physical`` is accepted solely to decode historical stored pilot
-        # judgments. NewCardsService only supplies ``commanders`` and payload()
-        # still exposes no private fields.
-        self._legacy_context = "commanders" not in context
-        commanders = context.get("commanders", context.get("physical", []))
+        commanders = context.get("commanders", [])
         self.support = {f"D{i:02}": card for i, card in enumerate(commanders)}
         self.candidates = {f"C{i:02}": card for i, card in enumerate(candidates, 1)}
         self.sources = self.support | self.candidates
@@ -139,19 +135,10 @@ class EvidenceRequest:
             raise ValueError("Model omitted candidate evidence; retry analysis")
         if item.label == "strong" and (item.required_changes or not refs & self.support.keys()):
             raise ValueError("Strong suggestion lacks commander evidence; retry analysis")
-        caveat = item.caveat
-        if self._legacy_context:
-            cuts = [
-                self.support[ref]["name"]
-                for ref in refs & self.support.keys()
-                if self.support[ref].get("pending_cut")
-            ]
-            if cuts:
-                caveat += " Pending cuts remove cited support: " + ", ".join(sorted(cuts)) + "."
         return Assessment(
             label=item.label,
             reason=item.reason,
-            caveat=caveat,
+            caveat=item.caveat,
             required_changes=item.required_changes,
             evidence=evidence,
         )

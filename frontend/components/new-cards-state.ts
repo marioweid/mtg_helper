@@ -154,7 +154,7 @@ export class NewCardsController {
   }
 
   private schedulePoll() {
-    if (this.state.result?.status === "running") {
+    if (this.state.result?.status === "running" || this.state.result?.status === "waiting") {
       this.timer = setTimeout(() => void this.refresh(), 3000);
     }
   }

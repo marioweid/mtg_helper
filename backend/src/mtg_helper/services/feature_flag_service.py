@@ -13,7 +13,8 @@ import asyncpg
 
 FLAG_OPTIMIZER = "optimizer"
 FLAG_RECOMMENDATIONS = "recommendations"
-FeatureFlag = Literal["optimizer", "recommendations"]
+FLAG_NEW_CARDS_AUTOMATIC = "new_cards_automatic"
+FeatureFlag = Literal["optimizer", "recommendations", "new_cards_automatic"]
 
 
 async def is_enabled(

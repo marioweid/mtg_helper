@@ -37,7 +37,9 @@ from mtg_helper.services import (
     theme_service,
 )
 from mtg_helper.services.admin_jobs import JobRegistry
+from mtg_helper.services.new_cards.evaluator import NewCardEvaluator
 from mtg_helper.services.new_cards.repository import NewCardsError
+from mtg_helper.services.new_cards.service import NewCardsService, NewCardsWorker
 from mtg_helper.services.recommendations.repository import DiscoveryError
 
 _log = logging.getLogger(__name__)
@@ -65,8 +67,18 @@ async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
             await _run_startup_maintenance(app)
         else:
             _log.warning("Startup maintenance disabled; normal application writes remain enabled")
+        app.state.new_cards_worker = None
+        if getattr(settings, "enable_new_cards_worker", False):
+            new_cards_service = NewCardsService(
+                app.state.db_pool, NewCardEvaluator(settings.openai_api_key.get_secret_value())
+            )
+            app.state.new_cards_worker = NewCardsWorker(new_cards_service)
+            app.state.new_cards_worker.start()
         yield
     finally:
+        worker = getattr(app.state, "new_cards_worker", None)
+        if worker is not None:
+            await worker.stop()
         await close_pool(app.state.db_pool)
 
 

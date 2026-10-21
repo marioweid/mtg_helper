@@ -864,7 +864,6 @@ CREATE TABLE IF NOT EXISTS new_card_shared_assessments (
 
 CREATE TABLE IF NOT EXISTS new_card_runs (
     singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
-    automatic_enabled BOOLEAN NOT NULL DEFAULT false,
     daily_limit INTEGER NOT NULL DEFAULT 100 CHECK (daily_limit > 0),
     quota_day DATE NOT NULL DEFAULT ((now() AT TIME ZONE 'UTC')::date),
     calls INTEGER NOT NULL DEFAULT 0,
@@ -873,8 +872,13 @@ CREATE TABLE IF NOT EXISTS new_card_runs (
     cancelled BOOLEAN NOT NULL DEFAULT false,
     last_catalog_day DATE,
     last_error TEXT,
+    active_token UUID,
+    active_lease_until TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE new_card_runs DROP COLUMN IF EXISTS automatic_enabled;
+ALTER TABLE new_card_runs ADD COLUMN IF NOT EXISTS active_token UUID;
+ALTER TABLE new_card_runs ADD COLUMN IF NOT EXISTS active_lease_until TIMESTAMPTZ;
 INSERT INTO new_card_runs (singleton) VALUES (true) ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS new_card_claims (
