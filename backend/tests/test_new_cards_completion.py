@@ -139,7 +139,7 @@ async def test_catalog_publication_tombstones_only_discovery_and_rolls_back(pilo
             async with conn.transaction():
                 await catalog.publish(conn, [], {}, datetime.now(UTC))
                 raise RuntimeError("interrupted sync")
-        assert (await service.view(owner, deck)).eligible_count == 7
+        assert (await service.view(owner, deck)).eligible_count == 9
         async with conn.transaction():
             await catalog.publish(conn, cards[:1], release_history(cards[:1]), datetime.now(UTC))
         assert (

@@ -99,6 +99,11 @@ class NewCardsService:
                     "WHERE singleton",
                     catalog_day,
                 )
+            elif automatic_enabled is False:
+                await conn.execute(
+                    "UPDATE new_card_runs SET automatic_active = false, updated_at = now() "
+                    "WHERE singleton"
+                )
             await conn.execute(
                 "UPDATE new_card_runs SET daily_limit = COALESCE($1, daily_limit), "
                 "updated_at = now() WHERE singleton",
@@ -156,8 +161,10 @@ class NewCardsService:
                 active = run["active_token"] and run["active_lease_until"] > datetime.now(UTC)
                 if not active:
                     await conn.execute(
-                        "UPDATE new_card_runs SET manual_active = false, updated_at = now() "
-                        "WHERE singleton AND manual_active"
+                        "UPDATE new_card_runs SET manual_active = false, automatic_active = "
+                        "CASE WHEN quota_day = $1 AND calls >= daily_limit THEN automatic_active "
+                        "ELSE false END, updated_at = now() WHERE singleton",
+                        datetime.now(UTC).date(),
                     )
             return False
         await self.run(work)
@@ -186,6 +193,7 @@ class NewCardsService:
                 "last_catalog_day = $1, last_error = NULL, updated_at = now() WHERE singleton",
                 catalog_day,
             )
+        await self._queue_automatic_constellations()
 
     async def _manual_permitted(self) -> bool:
         async with self.pool.acquire() as conn:
@@ -198,20 +206,60 @@ class NewCardsService:
 
     async def _next_manual_work(self) -> Work | None:
         async with self.pool.acquire() as conn:
+            run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
+            assert run is not None
+            automatic_only = run["automatic_active"] and not run["manual_active"]
             rows = await conn.fetch(
                 "SELECT d.id, a.id AS account_id, a.email FROM decks d "
                 "JOIN accounts a ON lower(a.email) = lower(d.owner_email) ORDER BY d.id"
             )
         for row in rows:
             try:
+                if automatic_only and not await self._is_automatic_constellation(row):
+                    continue
                 work = await self.claim(Owner(row["account_id"], row["email"]), row["id"])
             except NewCardsError as error:
-                if error.status in (429, 503):
+                if error.status == 429:
                     return None
                 continue
             if work is not None:
                 return work
         return None
+
+    async def _is_automatic_constellation(self, row: asyncpg.Record) -> bool:
+        """Allow an automatic day to process only its publication-time snapshot."""
+        async with self.pool.acquire() as conn:
+            deck = await repository.owned_deck(
+                conn, Owner(row["account_id"], row["email"]), row["id"]
+            )
+            state = await repository.load(conn, Owner(row["account_id"], row["email"]), deck)
+            return bool(
+                await conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM new_card_claims WHERE constellation_key = $1)",
+                    state.constellation_key,
+                )
+            )
+
+    async def _queue_automatic_constellations(self) -> None:
+        """Persist the used Commander-Konstellationen at daily publication time."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT d.id, a.id AS account_id, a.email FROM decks d "
+                "JOIN accounts a ON lower(a.email) = lower(d.owner_email) ORDER BY d.id"
+            )
+        for row in rows:
+            async with self.pool.acquire() as conn, conn.transaction():
+                owner = Owner(row["account_id"], row["email"])
+                deck = await repository.owned_deck(conn, owner, row["id"], lock=True)
+                state = await repository.load(conn, owner, deck)
+                if not state.ready:
+                    continue
+                await _ensure_constellation(conn, state)
+                await conn.execute(
+                    "INSERT INTO new_card_claims (constellation_key) VALUES ($1) "
+                    "ON CONFLICT DO NOTHING",
+                    state.constellation_key,
+                )
 
     async def claim(self, owner: Owner, deck_id: UUID) -> Work | None:
         """Claim globally shared work after an authorized global start."""
@@ -236,14 +284,7 @@ class NewCardsService:
                 request.payload()  # Check bounds before consuming a quota slot.
             except ValueError as exc:
                 raise NewCardsError(str(exc)) from exc
-            await conn.execute(
-                "INSERT INTO new_card_constellations (key, commander_oracle_ids, commander_facts) "
-                "VALUES ($1, $2, $3::jsonb) ON CONFLICT (key) DO UPDATE SET "
-                "commander_facts = EXCLUDED.commander_facts, updated_at = now()",
-                state.constellation_key,
-                [UUID(card["oracle_id"]) for card in state.context["commanders"]],
-                json.dumps(state.context["commanders"]),
-            )
+            await _ensure_constellation(conn, state)
             token = await _claim_lease(conn, state.constellation_key)
             return Work(owner, deck_id, token, candidates, request) if token else None
 
@@ -330,7 +371,8 @@ class NewCardsService:
                 ],
             )
             await conn.execute(
-                "UPDATE new_card_claims SET token = NULL, lease_until = NULL, error = NULL, "
+                "UPDATE new_card_claims SET token = NULL, lease_until = NULL, "
+                "attempted_day = NULL, error = NULL, "
                 "updated_at = now() WHERE constellation_key = $1 AND token = $2",
                 state.constellation_key,
                 work.token,
@@ -460,6 +502,18 @@ async def _archive_superseded_assessments(
             )
             for row in archived
         ],
+    )
+
+
+async def _ensure_constellation(conn: asyncpg.Connection, state: repository.DeckState) -> None:
+    """Store current Commander facts before a shared claim references the constellation."""
+    await conn.execute(
+        "INSERT INTO new_card_constellations (key, commander_oracle_ids, commander_facts) "
+        "VALUES ($1, $2, $3::jsonb) ON CONFLICT (key) DO UPDATE SET "
+        "commander_facts = EXCLUDED.commander_facts, updated_at = now()",
+        state.constellation_key,
+        [UUID(card["oracle_id"]) for card in state.context["commanders"]],
+        json.dumps(state.context["commanders"]),
     )
 
 

@@ -389,6 +389,26 @@ describe("New Cards in-flight safeguards", () => {
 
 describe("New Cards source and empty states", () => {
   it.each([
+    [{ status: "idle", remaining_count: 0 }, "Strong fits"],
+    [{ status: "idle", remaining_count: 0, picks: [] }, "No strong fits"],
+    [{ status: "waiting", picks: [] }, "still pending"],
+    [{ status: "running", picks: [] }, "Analysis running"],
+    [{ status: "daily_limit", picks: [] }, "processing limit reached"],
+    [{ status: "error", error: "Model unavailable", picks: [] }, "analysis failed"],
+    [{ status: "source_stale", stale: true, picks: [] }, "Sources are too old"],
+  ] satisfies [Partial<NewCardsResponse>, string][])(
+    "ac12 renders the %j state without an analysis action",
+    async (override, text) => {
+      fetchMock.mockResolvedValueOnce(respond({ ...result, ...override }));
+      html();
+      await flush();
+      const markup = html();
+      expect(markup).toContain(text);
+      expect(markup).not.toContain("Analyze next eight");
+    },
+  );
+
+  it.each([
     [{ status: "unavailable", picks: [] }, "Not ready"],
     [{ status: "error", error: "Model unavailable", picks: [] }, "analysis failed, not a no-match"],
     [{ status: "running", picks: [] }, "Commander-Konstellation check is still pending"],

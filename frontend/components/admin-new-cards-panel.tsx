@@ -42,6 +42,7 @@ export function AdminNewCardsPanel() {
   const [saving, setSaving] = useState(false);
   const [confirmingStart, setConfirmingStart] = useState(false);
   const locked = !status.process_enabled;
+  const unsafeToStart = saving || error !== null;
 
   async function load() {
     const response = await fetch("/api/v1/admin/new-cards");
@@ -83,6 +84,41 @@ export function AdminNewCardsPanel() {
       aria-label="New Cards controls"
     >
       <h2 className="font-semibold text-white">New Cards global controls</h2>
+      <NewCardsStatus status={status} locked={locked} />
+      <NewCardsActions
+        limit={limit}
+        locked={locked}
+        saving={saving}
+        unsafeToStart={unsafeToStart}
+        onLimitChange={setLimit}
+        onSave={() =>
+          void action("/api/v1/admin/new-cards", {
+            automatic_enabled: !status.automatic_enabled,
+            daily_limit: Number(limit),
+          })
+        }
+        onStart={() => setConfirmingStart(true)}
+        onCancel={() => void action("/api/v1/admin/new-cards/cancel")}
+      />
+      <StartConfirmation
+        confirming={confirmingStart}
+        saving={saving}
+        unsafeToStart={unsafeToStart}
+        onClose={() => setConfirmingStart(false)}
+        onConfirm={() => {
+          setConfirmingStart(false);
+          void action("/api/v1/admin/new-cards/start");
+        }}
+      />
+      {error && <p role="alert">New Cards control failed: {error}</p>}
+      {status.last_error && <p role="alert">Last run error: {status.last_error}</p>}
+    </section>
+  );
+}
+
+function NewCardsStatus({ status, locked }: { status: Status; locked: boolean }) {
+  return (
+    <>
       <p className="text-sm text-gray-300">
         Process execution: {status.process_enabled ? "enabled" : "disabled"}.{" "}
         {locked && "This process cannot make paid calls."}
@@ -99,60 +135,79 @@ export function AdminNewCardsPanel() {
       <p className="text-sm text-gray-300">
         Usage: {status.calls} / {status.daily_limit} · UTC reset {status.next_reset}
       </p>
+    </>
+  );
+}
+
+function NewCardsActions({
+  limit,
+  locked,
+  saving,
+  unsafeToStart,
+  onLimitChange,
+  onSave,
+  onStart,
+  onCancel,
+}: {
+  limit: string;
+  locked: boolean;
+  saving: boolean;
+  unsafeToStart: boolean;
+  onLimitChange: (limit: string) => void;
+  onSave: () => void;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <>
       <label className="block text-sm">
         Daily package limit
         <input
           aria-label="Daily package limit"
           className="ml-2 rounded text-black"
           value={limit}
-          onChange={(event) => setLimit(event.target.value)}
+          onChange={(event) => onLimitChange(event.target.value)}
           disabled={locked || saving}
         />
       </label>
       <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={locked || saving}
-          onClick={() =>
-            void action("/api/v1/admin/new-cards", {
-              automatic_enabled: !status.automatic_enabled,
-              daily_limit: Number(limit),
-            })
-          }
-        >
+        <button type="button" disabled={locked || saving} onClick={onSave}>
           Save automation
         </button>
-        <button type="button" disabled={locked || saving} onClick={() => setConfirmingStart(true)}>
+        <button type="button" disabled={locked || unsafeToStart} onClick={onStart}>
           Start all
         </button>
-        <button
-          type="button"
-          disabled={locked || saving}
-          onClick={() => void action("/api/v1/admin/new-cards/cancel")}
-        >
+        <button type="button" disabled={locked || saving} onClick={onCancel}>
           Cancel run
         </button>
       </div>
-      {confirmingStart && (
-        <div role="dialog" aria-label="Confirm global New Cards start" className="space-x-2">
-          <span>Start all pending Commander checks?</span>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => {
-              setConfirmingStart(false);
-              void action("/api/v1/admin/new-cards/start");
-            }}
-          >
-            Confirm start
-          </button>
-          <button type="button" disabled={saving} onClick={() => setConfirmingStart(false)}>
-            Keep waiting
-          </button>
-        </div>
-      )}
-      {error && <p role="alert">New Cards control failed: {error}</p>}
-      {status.last_error && <p role="alert">Last run error: {status.last_error}</p>}
-    </section>
+    </>
+  );
+}
+
+function StartConfirmation({
+  confirming,
+  saving,
+  unsafeToStart,
+  onClose,
+  onConfirm,
+}: {
+  confirming: boolean;
+  saving: boolean;
+  unsafeToStart: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!confirming) return null;
+  return (
+    <div role="dialog" aria-label="Confirm global New Cards start" className="space-x-2">
+      <span>Start all pending Commander checks?</span>
+      <button type="button" disabled={unsafeToStart} onClick={onConfirm}>
+        Confirm start
+      </button>
+      <button type="button" disabled={saving} onClick={onClose}>
+        Keep waiting
+      </button>
+    </div>
   );
 }

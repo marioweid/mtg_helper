@@ -92,6 +92,7 @@ class DeckState:
     def response(self) -> NewCardsResponse:  # noqa: C901 - one complete read-model state boundary
         """Render only currently eligible, exact-context assessments; never start work on reads."""
         now = datetime.now(UTC)
+        stale = bool(self.catalog and now - self.catalog["published_at"] > timedelta(days=2))
         picks = []
         assessed_times = []
         for candidate in self.candidates:
@@ -113,9 +114,9 @@ class DeckState:
             dismissed_count=self.dismissed,
             # A Commander-Konstellation is only publishable as a complete
             # result.  A stale partial cache is never advice.
-            picks=picks if complete else [],
+            picks=picks if complete and not stale else [],
         )
-        result.stale = bool(self.catalog and now - self.catalog["published_at"] > timedelta(days=2))
+        result.stale = stale
         if not self.ready:
             result.status = "unavailable"
             result.error = (
