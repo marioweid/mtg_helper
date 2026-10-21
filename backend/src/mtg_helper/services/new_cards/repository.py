@@ -72,6 +72,7 @@ class Candidate:
 
 @dataclass(slots=True)
 class DeckState:
+    constellation_key: str
     context: dict[str, Any]
     candidates: list[Candidate]
     cached: dict[UUID, asyncpg.Record]
@@ -100,6 +101,7 @@ class DeckState:
             assessed_times.append(row["assessed_at"])
             if assessment.label != "reject":
                 picks.append(candidate.pick(assessment))
+        complete = len(assessed_times) == len(self.candidates)
         result = NewCardsResponse(
             catalog_updated_at=self.catalog["published_at"] if self.catalog else None,
             analyzed_at=max(assessed_times, default=None),
@@ -107,19 +109,23 @@ class DeckState:
             assessed_count=len(assessed_times),
             remaining_count=len(self.candidates) - len(assessed_times),
             dismissed_count=self.dismissed,
-            picks=picks,
+            # A Commander-Konstellation is only publishable as a complete
+            # result.  A stale partial cache is never advice.
+            picks=picks if complete else [],
         )
         result.stale = bool(self.catalog and now - self.catalog["published_at"] > timedelta(days=2))
-        result.stale |= any(
-            c.oracle_id in self.cached and not self.valid(c) for c in self.candidates
-        )
         if not self.ready:
             result.status = "unavailable"
             result.error = (
                 "Run Admin card sync to populate complete release history and deck facts."
             )
+        elif result.stale:
+            result.status = "source_stale"
+            result.error = "Card sources are too old for a current complete result."
         elif self.job:
             _job_status(result, self.job, now)
+        elif not complete:
+            result.status = "waiting"
         return result
 
 
@@ -159,51 +165,26 @@ async def _context(
     commanders = [deck["commander_id"]] + ([deck["partner_id"]] if deck["partner_id"] else [])
     rows = await conn.fetch(
         """
-        SELECT c.id, c.oracle_id, n.facts, COALESCE(dc.quantity, 1) AS quantity,
-               COALESCE(p.direction = 'cut', false) AS pending_cut
-        FROM cards c LEFT JOIN deck_cards dc ON dc.card_id = c.id AND dc.deck_id = $1
-        LEFT JOIN deck_card_plans p ON p.card_id = c.id AND p.deck_id = $1
+        SELECT c.id, c.oracle_id, n.facts
+        FROM cards c
         LEFT JOIN new_card_catalog n ON n.oracle_id = c.oracle_id
             AND n.generation = (SELECT generation FROM new_card_catalog_state WHERE singleton)
-        WHERE dc.deck_id = $1 OR c.id = ANY($2::uuid[])
-        ORDER BY c.oracle_id, c.id
+        WHERE c.id = ANY($1::uuid[])
+        ORDER BY array_position($1::uuid[], c.id)
         """,
-        deck["id"],
         commanders,
     )
-    physical = []
+    commander_facts = []
     for row in rows:
         if row["facts"] is not None:
-            physical.append(
-                json_value(row["facts"])
-                | {
-                    "quantity": row["quantity"],
-                    "pending_cut": row["pending_cut"],
-                    "commander": row["id"] in commanders,
-                }
-            )
-    plans = await conn.fetch(
-        "SELECT c.name, p.direction, p.quantity FROM deck_card_plans p "
-        "JOIN cards c ON c.id = p.card_id WHERE p.deck_id = $1 ORDER BY c.name, p.direction",
-        deck["id"],
-    )
-    context = {
-        "physical": physical,
-        "name": deck["name"],
-        "description": deck["description"],
-        "bracket": deck["bracket"],
-        "themes": list(deck["archetype_tags"]),
-        "role_targets": json_value(deck["stage_targets"]),
-        "planned_changes": [dict(p) for p in plans],
-    }
-    return context, len(physical) == len(rows) and len(rows) >= len(commanders)
+            commander_facts.append(json_value(row["facts"]))
+    return {"commanders": commander_facts}, len(commander_facts) == len(commanders)
 
 
 async def _candidates(
     conn: asyncpg.Connection,
-    owner: Owner,
-    deck_id: UUID,
     colors: list[str],
+    commander_oracles: list[UUID],
 ) -> list[asyncpg.Record]:
     return list(
         await conn.fetch(
@@ -215,27 +196,15 @@ async def _candidates(
             SELECT c.* FROM cards c WHERE c.oracle_id = n.oracle_id AND c.is_canonical
             ORDER BY c.id LIMIT 1
         ) c ON true
-        WHERE n.released_at <= $4 AND n.released_at > $4::date - 60
+        WHERE n.released_at <= $2 AND n.released_at > $2::date - 60
           AND n.facts->>'commander_legality' = 'legal'
-          AND c.legalities->>'commander' = 'legal' AND c.color_identity <@ $3::text[]
-          AND NOT EXISTS (
-              SELECT 1 FROM deck_cards dc JOIN cards pc ON pc.id = dc.card_id
-              WHERE dc.deck_id = $1 AND pc.oracle_id = n.oracle_id)
-          AND NOT EXISTS (
-              SELECT 1 FROM decks d JOIN cards pc ON pc.id IN (d.commander_id, d.partner_id)
-              WHERE d.id = $1 AND pc.oracle_id = n.oracle_id)
-          AND NOT EXISTS (
-              SELECT 1 FROM deck_card_plans p JOIN cards pc ON pc.id = p.card_id
-              WHERE p.deck_id = $1 AND p.direction = 'addition' AND pc.oracle_id = n.oracle_id)
-          AND NOT EXISTS (
-              SELECT 1 FROM new_card_dismissals x
-              WHERE x.deck_id = $1 AND x.account_id = $2 AND x.oracle_id = n.oracle_id)
+           AND c.legalities->>'commander' = 'legal' AND c.color_identity <@ $3::text[]
+          AND n.oracle_id <> ALL($1::uuid[])
         ORDER BY n.released_at DESC, c.name, n.oracle_id
         """,
-            deck_id,
-            owner.account_id,
-            colors,
+            commander_oracles,
             datetime.now(UTC).date(),
+            colors,
         )
     )
 
@@ -243,16 +212,14 @@ async def _candidates(
 async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> DeckState:
     """Load one owner's context and live candidate exclusions within the caller's transaction."""
     context, ready = await _context(conn, owner, deck)
-    colors = sorted(
-        {
-            color
-            for card in context["physical"]
-            if card["commander"]
-            for color in card["color_identity"]
-        }
+    colors = sorted({color for card in context["commanders"] for color in card["color_identity"]})
+    constellation_key = fingerprint(
+        {"commanders": [card["oracle_id"] for card in context["commanders"]]}
     )
-    context_hash = fingerprint({"deck": context, "model": OPENAI_MODEL, "version": VERSION})
-    rows = await _candidates(conn, owner, deck["id"], colors)
+    context_hash = fingerprint({"commanders": context, "model": OPENAI_MODEL, "version": VERSION})
+    rows = await _candidates(
+        conn, colors, [UUID(card["oracle_id"]) for card in context["commanders"]]
+    )
     candidates = []
     for row in rows:
         facts = CardFacts.model_validate(json_value(row["facts"]))
@@ -271,15 +238,11 @@ async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> 
                 )
             )
     cache = await conn.fetch(
-        "SELECT * FROM new_card_assessments WHERE deck_id = $1 AND account_id = $2",
-        deck["id"],
-        owner.account_id,
+        "SELECT * FROM new_card_shared_assessments WHERE constellation_key = $1", constellation_key
     )
     catalog = await conn.fetchrow("SELECT * FROM new_card_catalog_state WHERE singleton")
     job = await conn.fetchrow(
-        "SELECT * FROM new_card_jobs WHERE account_id = $1 AND deck_id = $2",
-        owner.account_id,
-        deck["id"],
+        "SELECT * FROM new_card_claims WHERE constellation_key = $1", constellation_key
     )
     dismissed = await conn.fetchval(
         "SELECT count(*) FROM new_card_dismissals WHERE deck_id = $1 AND account_id = $2",
@@ -287,6 +250,7 @@ async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> 
         owner.account_id,
     )
     return DeckState(
+        constellation_key,
         context,
         candidates,
         {r["oracle_id"]: r for r in cache},

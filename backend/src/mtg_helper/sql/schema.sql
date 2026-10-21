@@ -843,6 +843,48 @@ CREATE TABLE IF NOT EXISTS new_card_jobs (
 -- Default-off source-backed Discover pilot; legacy tables and judgments are unchanged.
 ALTER TABLE new_card_catalog ADD COLUMN IF NOT EXISTS source_facts JSONB;
 ALTER TABLE new_card_catalog_state ADD COLUMN IF NOT EXISTS source_sha256 TEXT;
+
+-- Shared Commander-Konstellation cache.  The pilot-era per-deck tables above are
+-- intentionally retained as historical records and are never read as this cache.
+CREATE TABLE IF NOT EXISTS new_card_constellations (
+    key TEXT PRIMARY KEY,
+    commander_oracle_ids UUID[] NOT NULL,
+    commander_facts JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS new_card_shared_assessments (
+    constellation_key TEXT NOT NULL REFERENCES new_card_constellations(key) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    input_hash TEXT NOT NULL,
+    assessment JSONB NOT NULL,
+    assessed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (constellation_key, oracle_id)
+);
+
+CREATE TABLE IF NOT EXISTS new_card_runs (
+    singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+    automatic_enabled BOOLEAN NOT NULL DEFAULT false,
+    daily_limit INTEGER NOT NULL DEFAULT 100 CHECK (daily_limit > 0),
+    quota_day DATE NOT NULL DEFAULT ((now() AT TIME ZONE 'UTC')::date),
+    calls INTEGER NOT NULL DEFAULT 0,
+    manual_active BOOLEAN NOT NULL DEFAULT false,
+    automatic_active BOOLEAN NOT NULL DEFAULT false,
+    cancelled BOOLEAN NOT NULL DEFAULT false,
+    last_catalog_day DATE,
+    last_error TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO new_card_runs (singleton) VALUES (true) ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS new_card_claims (
+    constellation_key TEXT PRIMARY KEY REFERENCES new_card_constellations(key) ON DELETE CASCADE,
+    token UUID,
+    lease_until TIMESTAMPTZ,
+    attempted_day DATE,
+    error TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS recommendation_origin BOOLEAN
     NOT NULL DEFAULT false;
 

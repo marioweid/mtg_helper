@@ -74,14 +74,6 @@ function NewCardsControls({ state, controller }: StateProps) {
         <button
           type="button"
           className={BUTTON}
-          disabled={cannotAnalyze(state.result) || state.busy || state.loading}
-          onClick={() => void controller.analyze()}
-        >
-          Analyze next eight
-        </button>
-        <button
-          type="button"
-          className={BUTTON}
           disabled={state.busy || state.loading}
           onClick={() => void controller.refresh()}
         >
@@ -137,13 +129,6 @@ function NewCardsProgress({ state, controller }: StateProps) {
   );
 }
 
-function cannotAnalyze(result: NewCardsResponse | null): boolean {
-  if (!result) return true;
-  return (
-    result.status === "unavailable" || result.status === "running" || result.remaining_count === 0
-  );
-}
-
 function PilotWarning() {
   return (
     <div className={`${BOX} space-y-2 text-sm text-gray-300`}>
@@ -158,9 +143,10 @@ function PilotWarning() {
         origin filters; special-product coverage is incomplete. No community sources are used.
       </p>
       <p>
-        Catalog refresh is daily in production. Opening this tab or refreshing status never starts
-        analysis or source sync. Planning adds one pending addition, not a physical deck edit.
-        Advice uses your current physical deck; planned additions are not present support.
+        Catalog refresh and Commander-Konstellation checks are admin-controlled. Opening this tab,
+        refreshing status, and planning never start analysis or source sync. Advice only considers
+        the Commander-Konstellation, not this deck's strategy or contents; you decide whether a card
+        fits your actual deck. Planning adds one pending addition, not a physical deck edit.
       </p>
     </div>
   );
@@ -192,12 +178,14 @@ function NewCardsCoverage({ result }: { result: NewCardsResponse | null }) {
       </p>
       {result.stale && (
         <p className="text-amber-300">
-          Source or analysis is stale. Ask an admin to sync old source data, or analyze remaining
-          cards.
+          Source data is stale. Ask an admin to sync it; this is not a no-match result.
         </p>
       )}
       {result.remaining_count > 0 && (
-        <p>Partial coverage. Unassessed cards are not evidence of no matches.</p>
+        <p>
+          Waiting for a complete Commander-Konstellation check. Unassessed cards are not evidence of
+          no matches.
+        </p>
       )}
       {result.status === "running" && (
         <p role="status">Analysis running; status updates automatically.</p>
@@ -207,8 +195,14 @@ function NewCardsCoverage({ result }: { result: NewCardsResponse | null }) {
           Not ready. Source catalog or deck context is unavailable; ask an admin to sync if needed.
         </p>
       )}
+      {result.status === "source_stale" && (
+        <p className="text-amber-300">Sources are too old for a current complete result.</p>
+      )}
+      {result.status === "daily_limit" && (
+        <p>Global daily processing limit reached; waiting for the next UTC reset.</p>
+      )}
       {result.status === "error" && (
-        <p className="text-red-300">Analysis failed. Retry explicitly with Analyze next eight.</p>
+        <p className="text-red-300">Analysis failed. Ask an admin to start a new global run.</p>
       )}
       {result.error && <RequestError message={result.error} />}
     </div>
@@ -251,13 +245,18 @@ function NewCardsResults({
 
 function EmptyResults({ result }: { result: NewCardsResponse }) {
   if (result.status === "unavailable") return null;
-  if (result.status === "running") return <p>No picks yet; analysis is still running.</p>;
+  if (result.status === "source_stale")
+    return <p>No current picks. Sources are too old, not a no-match result.</p>;
+  if (result.status === "daily_limit")
+    return <p>No picks yet; global processing resumes after the next UTC reset.</p>;
+  if (result.status === "running" || result.status === "waiting")
+    return <p>No picks yet; the Commander-Konstellation check is still pending.</p>;
   if (result.status === "error")
     return <p>No usable picks; analysis failed, not a no-match result.</p>;
   if (result.stale)
     return <p>No current picks. Source or analysis is stale, not a no-match result.</p>;
   if (result.remaining_count > 0)
-    return <p>No picks yet. Analyze unassessed cards to find matches.</p>;
+    return <p>No picks yet. The Commander-Konstellation check is waiting for admin processing.</p>;
   if (result.eligible_count === 0)
     return <p>No released cards currently meet the pilot filters.</p>;
   return (
@@ -297,7 +296,7 @@ function GeneratedAdvice({ pick }: { pick: NewCardPick }) {
       ) : (
         <p>No supporting changes reported; this is not a guarantee of fit.</p>
       )}
-      <h5 className="font-medium">Source evidence: candidate and physical support</h5>
+      <h5 className="font-medium">Source evidence: candidate and commander</h5>
       {pick.evidence.length > 0 ? (
         <ul className="space-y-1">
           {pick.evidence.map((item, index) => (
@@ -310,8 +309,8 @@ function GeneratedAdvice({ pick }: { pick: NewCardPick }) {
         <p>No supporting evidence returned.</p>
       )}
       <p className="text-xs text-gray-400">
-        Pending additions are not support facts. Review caveats for supporting cards with pending
-        cuts. Evidence and supporting-change suggestions are model claims, not verified rules.
+        Evidence and hypothetical supporting-change suggestions are model claims, not verified
+        rules. This does not claim that the deck already contains needed support.
       </p>
     </div>
   );

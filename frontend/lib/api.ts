@@ -225,9 +225,6 @@ export const apiClient = {
 
   getNewCards: (deckId: string) => request<NewCardsResponse>(`/decks/${deckId}/new-cards`),
 
-  analyzeNewCards: (deckId: string) =>
-    request<NewCardsResponse>(`/decks/${deckId}/new-cards/analyze`, { method: "POST" }),
-
   dismissNewCard: (deckId: string, oracleId: string) =>
     request<NewCardsResponse>(`/decks/${deckId}/new-cards/${oracleId}/dismiss`, {
       method: "POST",

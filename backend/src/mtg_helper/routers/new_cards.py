@@ -1,9 +1,9 @@
-"""Owner-authorized experimental New Cards read, analysis and explicit planning endpoints."""
+"""Owner-authorized experimental New Cards read and explicit planning endpoints."""
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, Depends, Request
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.config import settings
@@ -35,21 +35,6 @@ async def get_cards(
     deck_id: UUID, request: Request, account: Account
 ) -> DataResponse[NewCardsResponse]:
     return DataResponse(data=await _service(request).view(_owner(account), deck_id))
-
-
-@router.post("/analyze", status_code=202)
-async def analyze(
-    deck_id: UUID,
-    request: Request,
-    account: Account,
-    background: BackgroundTasks,
-) -> DataResponse[NewCardsResponse]:
-    service = _service(request)
-    owner = _owner(account)
-    work = await service.claim(owner, deck_id)
-    if work is not None:
-        background.add_task(service.run, work)
-    return DataResponse(data=await service.view(owner, deck_id))
 
 
 @router.post("/{oracle_id}/dismiss")
