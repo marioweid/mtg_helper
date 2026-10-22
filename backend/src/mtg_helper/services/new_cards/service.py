@@ -10,11 +10,18 @@ from uuid import UUID, uuid4
 import asyncpg
 
 from mtg_helper.config import settings
-from mtg_helper.models.new_cards import NewCardsResponse
+from mtg_helper.models.new_cards import CardFacts, NewCardsResponse
 from mtg_helper.services import feature_flag_service
+from mtg_helper.services.agents._model import OPENAI_MODEL
 from mtg_helper.services.new_cards import repository
 from mtg_helper.services.new_cards.completion import validate_addition
-from mtg_helper.services.new_cards.evaluator import Assessment, EvidenceRequest, NewCardEvaluator
+from mtg_helper.services.new_cards.evaluator import (
+    VERSION,
+    Assessment,
+    EvidenceRequest,
+    NewCardEvaluator,
+    fingerprint,
+)
 from mtg_helper.services.new_cards.repository import Candidate, NewCardsError, Owner, json_value
 from mtg_helper.services.planned_change_service import InvalidPlanError
 
@@ -55,11 +62,8 @@ class NewCardsService:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
             assert row is not None
-            counts = await conn.fetchrow(
-                "SELECT count(*) FILTER (WHERE error IS NULL AND completed_at IS NULL) AS waiting, "
-                "count(*) FILTER (WHERE completed_at IS NOT NULL) AS finished, "
-                "count(*) FILTER (WHERE error IS NOT NULL) AS failed FROM new_card_claims"
-            )
+            claims = await conn.fetch("SELECT * FROM new_card_claims")
+            states = [await _control_claim_state(conn, claim) for claim in claims]
             catalog = await conn.fetchrow(
                 "SELECT published_at FROM new_card_catalog_state WHERE singleton"
             )
@@ -72,9 +76,9 @@ class NewCardsService:
                 "last_error": row["last_error"],
                 "source_updated_at": catalog["published_at"].isoformat() if catalog else None,
                 "last_run_at": row["updated_at"].isoformat(),
-                "waiting": counts["waiting"] if counts else 0,
-                "finished": counts["finished"] if counts else 0,
-                "failed": counts["failed"] if counts else 0,
+                "waiting": states.count("waiting"),
+                "finished": states.count("finished"),
+                "failed": states.count("failed"),
             }
 
     async def configure(self, automatic_enabled: bool | None) -> None:
@@ -261,7 +265,11 @@ class NewCardsService:
                 return
             async with asyncio.timeout(90):
                 assessments = await self.evaluator.evaluate(work.request)
-            await self._publish(work, assessments)
+            if not await self._publish(work, assessments):
+                await self._fail(
+                    work,
+                    "Analysis was interrupted. Start a new global run to retry this constellation.",
+                )
         except NewCardsError as exc:
             await self._fail(work, str(exc))
         except Exception as exc:
@@ -300,7 +308,7 @@ class NewCardsService:
                 work.token,
             )
 
-    async def _publish(self, work: Work, assessments: list[Assessment]) -> None:
+    async def _publish(self, work: Work, assessments: list[Assessment]) -> bool:
         async with self.pool.acquire() as conn, conn.transaction():
             deck = await repository.owned_deck(conn, work.owner, work.deck_id, lock=True)
             lease = await conn.fetchrow(
@@ -310,8 +318,7 @@ class NewCardsService:
                 work.token,
             )
             if lease is None:
-                await self._release(work)
-                return  # A later claimant owns publication; this worker cannot overwrite it.
+                return False  # A later claimant owns publication; this worker cannot overwrite it.
             state = await repository.load(conn, work.owner, deck)
             current = {candidate.oracle_id: candidate.input_hash for candidate in state.candidates}
             if any(current.get(c.oracle_id) != c.input_hash for c in work.candidates):
@@ -355,6 +362,7 @@ class NewCardsService:
                 "updated_at = now() WHERE singleton AND active_token = $1",
                 work.token,
             )
+            return True
 
     async def _fail(self, work: Work, message: str) -> None:
         async with self.pool.acquire() as conn:
@@ -450,9 +458,70 @@ async def _ensure_constellation(conn: asyncpg.Connection, state: repository.Deck
         "VALUES ($1, $2, $3::jsonb) ON CONFLICT (key) DO UPDATE SET "
         "commander_facts = EXCLUDED.commander_facts, updated_at = now()",
         state.constellation_key,
-        [UUID(card["oracle_id"]) for card in state.context["commanders"]],
+        state.commander_oracle_ids,
         json.dumps(state.context["commanders"]),
     )
+
+
+async def _control_claim_state(conn: asyncpg.Connection, claim: asyncpg.Record) -> str:
+    """Classify one persisted claim against its current Commander and candidate facts."""
+    if claim["error"]:
+        return "failed"
+    if claim["completed_at"] and await _constellation_is_current(conn, claim["constellation_key"]):
+        return "finished"
+    return "waiting"
+
+
+async def _constellation_is_current(conn: asyncpg.Connection, constellation_key: str) -> bool:
+    """Return whether a shared cache covers every current candidate for its constellation."""
+    constellation = await conn.fetchrow(
+        "SELECT commander_oracle_ids FROM new_card_constellations WHERE key = $1", constellation_key
+    )
+    if constellation is None:
+        return False
+    commander_ids = constellation["commander_oracle_ids"]
+    rows = await conn.fetch(
+        "SELECT catalog.facts FROM unnest($1::uuid[]) WITH ORDINALITY "
+        "AS commander(oracle_id, position) "
+        "LEFT JOIN new_card_catalog catalog ON catalog.oracle_id = commander.oracle_id "
+        "AND catalog.generation = (SELECT generation FROM new_card_catalog_state WHERE singleton) "
+        "ORDER BY commander.position",
+        commander_ids,
+    )
+    if len(rows) != len(commander_ids) or any(row["facts"] is None for row in rows):
+        return False
+    commanders = [json_value(row["facts"]) for row in rows]
+    colors = sorted({color for card in commanders for color in card["color_identity"]})
+    context_hash = fingerprint(
+        {
+            "commanders": {"commanders": commanders},
+            "model": OPENAI_MODEL,
+            "version": VERSION,
+        }
+    )
+    cached = {
+        row["oracle_id"]: row["input_hash"]
+        for row in await conn.fetch(
+            "SELECT oracle_id, input_hash FROM new_card_shared_assessments "
+            "WHERE constellation_key = $1",
+            constellation_key,
+        )
+    }
+    candidates = await repository._candidates(conn, colors, commander_ids)
+    for row in candidates:
+        facts = CardFacts.model_validate(json_value(row["facts"]))
+        if set(facts.color_identity) > set(colors):
+            continue
+        input_hash = fingerprint(
+            {
+                "context": context_hash,
+                "candidate": facts.model_dump(mode="json"),
+                "release": row["released_at"],
+            }
+        )
+        if cached.get(facts.oracle_id) != input_hash:
+            return False
+    return True
 
 
 async def _claim_lease(

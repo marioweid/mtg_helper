@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { AdminNewCardsPanel } from "@/components/admin-new-cards-panel";
+import { AdminNewCardsPanel, StartConfirmation } from "@/components/admin-new-cards-panel";
 
 const fixture = vi.hoisted(() => ({
   status: null as {
@@ -60,5 +60,21 @@ describe("Admin New Cards controls", () => {
 
     expect(html).toContain("Run: idle · Waiting 0 · Finished 1 · Failed 0");
     fixture.status = null;
+  });
+
+  it("ac13 disables an already-open confirmation when the process becomes locked", () => {
+    const html = renderToStaticMarkup(
+      <StartConfirmation
+        confirming
+        locked
+        saving={false}
+        unsafeToStart={false}
+        onClose={() => undefined}
+        onConfirm={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Confirm global New Cards start");
+    expect(html).toContain('disabled=""');
   });
 });

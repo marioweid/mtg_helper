@@ -104,6 +104,7 @@ export function AdminNewCardsPanel() {
       />
       <StartConfirmation
         confirming={confirmingStart}
+        locked={locked}
         saving={saving}
         unsafeToStart={unsafeToStart}
         onClose={() => setConfirmingStart(false)}
@@ -170,14 +171,16 @@ function NewCardsActions({
   );
 }
 
-function StartConfirmation({
+export function StartConfirmation({
   confirming,
+  locked,
   saving,
   unsafeToStart,
   onClose,
   onConfirm,
 }: {
   confirming: boolean;
+  locked: boolean;
   saving: boolean;
   unsafeToStart: boolean;
   onClose: () => void;
@@ -187,7 +190,7 @@ function StartConfirmation({
   return (
     <div role="dialog" aria-label="Confirm global New Cards start" className="space-x-2">
       <span>Start all pending Commander checks?</span>
-      <button type="button" disabled={unsafeToStart} onClick={onConfirm}>
+      <button type="button" disabled={locked || unsafeToStart} onClick={onConfirm}>
         Confirm start
       </button>
       <button type="button" disabled={saving} onClick={onClose}>

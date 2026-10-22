@@ -1,45 +1,43 @@
-# Build notes — round 2
+# Build notes — round 3
 
-- `backend/src/mtg_helper/services/feature_flag_service.py`: removes New Cards automation from
-  generic admin flags and rejects account-scoped automation access at the service boundary.
-- `backend/src/mtg_helper/services/new_cards/repository.py`: reports a complete current
-  Commander-Konstellation as `idle` and splits the status read model below the complexity limit.
-- `backend/src/mtg_helper/services/new_cards/service.py`: records completed constellations and
-  reports separate waiting, finished, and failed global-control counts.
-- `backend/src/mtg_helper/sql/schema.sql`: persists completion timestamps and removes obsolete
-  account-specific New Cards automation rows on schema application.
-- `backend/tests/test_new_cards_automation.py`: makes the concurrent-claim check deterministic and
-  covers completed status and generic/account automation bypass prevention.
-- `frontend/components/admin-new-cards-panel.tsx`: shows finished work separately and refreshes the
-  read-only control status every three seconds.
-- `frontend/components/admin-new-cards-panel.test.tsx`: covers the honest finished status display.
-- `frontend/components/new-cards-panel.tsx`: describes a completed, deck-locally dismissed result
-  as no further visible cards rather than pending work.
-- `frontend/components/new-cards-panel.test.tsx`: covers the all-dismissed completed display.
+- `backend/src/mtg_helper/services/new_cards/repository.py`: keys a Commander-Konstellation from
+  every stored Commander Oracle ID even when facts are missing, and hides picks while unavailable.
+- `backend/src/mtg_helper/services/new_cards/service.py`: records an expired in-flight provider
+  call as an interrupted attempt, and derives admin finished counts from current Commander and
+  candidate input hashes.
+- `backend/tests/test_new_cards_automation.py`: covers missing-partner cache isolation, expired
+  provider-result retry suppression, and stale finished-count invalidation.
+- `frontend/components/admin-new-cards-panel.tsx`: disables an already-open start confirmation
+  when polling reports that the process lock is active.
+- `frontend/components/admin-new-cards-panel.test.tsx`: renders the locked confirmation safeguard.
+- `docs/scryfall-publication-production.md`: closes autonomous New Cards admission and verifies
+  durable claims/runs as part of the production drain procedure.
 
 ## Verification
 
 ```text
-backend: TEST_DATABASE_URL=postgresql://mtg@127.0.0.1:55441/mtg_helper_test
-         uv run pytest -q -W error tests/test_new_cards_automation.py
-         15 passed in 13.93s
-backend: selected AC06/AC11/AC13/AC14 regression, ruff check/format, ty check
-         4 passed, 11 deselected; all static checks passed
-backend: ruff check --ignore-noqa --select C901 new_cards/repository.py
-         All checks passed
-frontend: vitest New Cards components
-          38 passed
-frontend: full vitest / tsc / oxlint / oxfmt / next build
-          116 passed; no type, lint, or format errors; build succeeded
+backend (disposable loopback PostgreSQL 16, port 55441):
+  TEST_DATABASE_URL=postgresql://mtg@127.0.0.1:55441/mtg_helper_test
+  uv run pytest -q -W error tests/test_new_cards_automation.py tests/test_new_cards_completion.py tests/test_new_cards_discovery.py
+  75 passed in 38.55s
+
+backend static checks:
+  uv run ruff format --check .; uv run ruff check .; uv run ty check src/
+  232 files already formatted; all checks passed
+
+frontend fallback commands (pnpm unavailable):
+  vitest 117 passed; tsc, oxlint, oxfmt passed; next build succeeded
+
+full backend suite:
+  1311 passed, 9 failed in 572.18s
 ```
 
-The isolated PostgreSQL 16 cluster was started on loopback port 55441 and stopped after testing.
-The full backend suite completed with 1309 passed and 9 failures in unrelated buylist, keyword,
-planned-change, and tag-service tests. They are outside this round's requested FAIL/VIOLATES scope;
-no changes were made to them.
+There is no repository-wide `make gate`; the targeted acceptance checks and all static/frontend
+checks are green. The nine full-backend failures are the evaluator-established BASE failures in
+buylist, keyword extraction, planned changes, and tag classification; they are outside this round's
+only requested FAIL/VIOLATES scope and were not changed.
 
 ## Deviations
 
-No product-scope deviation. The existing untracked `GLOSSARY.md` was preserved. The full backend
-suite is not green because of the nine out-of-scope failures listed above; the targeted acceptance
-suite and all required static/frontend checks are green.
+No product-scope deviation. The existing untracked `GLOSSARY.md` was preserved. No paid model,
+live data, OAuth prompt, deployment, or push was used.

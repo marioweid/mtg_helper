@@ -52,6 +52,27 @@ async def test_ac02_missing_context_does_not_block_other_decks(
     assert len(model.calls) == 2
 
 
+async def test_ac02_missing_partner_never_reuses_solo_assessments(pilot, db_pool, model) -> None:
+    deck, owner, service, _ = pilot
+    await drain(service)
+    async with db_pool.acquire() as conn:
+        partner_id = await conn.fetchval("SELECT id FROM cards WHERE name = 'Doubling Season'")
+        assert partner_id is not None
+        await conn.execute("UPDATE decks SET partner_id = $2 WHERE id = $1", deck, partner_id)
+        await conn.execute(
+            "DELETE FROM new_card_catalog WHERE oracle_id = "
+            "(SELECT oracle_id FROM cards WHERE id = $1)",
+            partner_id,
+        )
+
+    result = await service.view(owner, deck)
+
+    assert result.status == "unavailable"
+    assert result.assessed_count == 0
+    assert result.picks == []
+    assert len(model.calls) == 2
+
+
 async def test_ac03_worker_drains_all_delta_without_repeat_work(pilot, model) -> None:
     _, _, service, _ = pilot
     await service.start_manual()
@@ -96,6 +117,25 @@ async def test_ac06_simultaneous_workers_share_one_claim(pilot) -> None:
     claims = [work for work in (first, second) if work is not None]
     assert len(claims) == 1
     await service.run(claims[0])
+
+
+async def test_ac06_expired_provider_result_waits_for_another_run(pilot, db_pool, model) -> None:
+    deck, owner, service, _ = pilot
+    work = await service.claim(owner, deck)
+    assert work is not None
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE new_card_claims SET lease_until = now() - interval '1 second' "
+            "WHERE constellation_key = $1",
+            work.constellation_key,
+        )
+    await service.run(work)
+
+    result = await service.view(owner, deck)
+    assert result.status == "error"
+    assert result.assessed_count == 0
+    assert not await service.drain_one()
+    assert len(model.calls) == 1
 
 
 async def test_ac07_large_delta_has_no_daily_package_limit(pilot, db_pool, model) -> None:
@@ -178,11 +218,20 @@ async def test_ac11_picks_appear_only_after_the_complete_delta(pilot, model) -> 
 
 
 async def test_ac13_control_status_counts_finished_constellations(pilot) -> None:
-    _, _, service, _ = pilot
+    _, _, service, sources = pilot
     await drain(service)
     status = await service.control_status()
     assert status["waiting"] == 0
     assert status["finished"] == 1
+    async with service.pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE new_card_catalog SET facts = jsonb_set(facts, '{oracle_text}', "
+            "'\"Changed facts.\"') WHERE oracle_id = $1",
+            UUID(sources[0]["oracle_id"]),
+        )
+    status = await service.control_status()
+    assert status["waiting"] == 1
+    assert status["finished"] == 0
 
 
 async def test_ac14_disabled_process_rejects_global_start(

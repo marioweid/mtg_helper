@@ -76,9 +76,13 @@ this same release without reopening writers during the write freeze. Check statu
    replacement images before the maintenance interval; do not recreate PostgreSQL, Portainer
    or other homeserver applications. Retain the existing runtime environment, data directory,
    frontend port/binding, public OAuth URL, credentials, admin allowlist and tracing configuration.
-3. Close admission by stopping only the MTG Helper sync worker and frontend. Keep the backend alive
-   while waiting for admin jobs and model leases to drain; fail closed if this cannot be established.
-   Then stop the backend and recheck no active leases before backup or candidate startup.
+3. Close admission before the drain: stop the MTG Helper sync worker and frontend, then restart the
+   backend with `ENABLE_NEW_CARDS_WORKER=false`. This process lock prevents new autonomous New Cards
+   claims and admin starts while the backend remains available for the drain. Wait for admin jobs and
+   model leases to drain; fail closed if this cannot be established. Before stopping the backend and
+   before backup or candidate startup, verify `new_card_claims` has no `token`/`lease_until` and
+   `new_card_runs` has no `active_token`/`active_lease_until`. Do not resume the New Cards worker
+   until the deployed backend is healthy and the maintenance interval is over.
    Take another restricted production backup and capture fresh personal-table
    fingerprints and historical-source fingerprints. Rehearsal counts are not the final baseline if
    users have changed data since the first backup.

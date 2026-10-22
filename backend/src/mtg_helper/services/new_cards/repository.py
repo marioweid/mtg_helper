@@ -74,6 +74,7 @@ class Candidate:
 class DeckState:
     constellation_key: str
     context: dict[str, Any]
+    commander_oracle_ids: list[UUID]
     candidates: list[Candidate]
     cached: dict[UUID, asyncpg.Record]
     catalog: asyncpg.Record | None
@@ -102,7 +103,7 @@ class DeckState:
             assessed_count=len(assessed_times),
             remaining_count=len(self.candidates) - len(assessed_times),
             dismissed_count=self.dismissed,
-            picks=picks if complete and not stale else [],
+            picks=picks if self.ready and complete and not stale else [],
         )
         _set_status(result, ready=self.ready, stale=stale, complete=complete, job=self.job, now=now)
         return result
@@ -181,7 +182,7 @@ async def owned_deck(
 
 async def _context(
     conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record
-) -> tuple[dict, bool]:
+) -> tuple[dict, bool, list[UUID]]:
     commanders = [deck["commander_id"]] + ([deck["partner_id"]] if deck["partner_id"] else [])
     rows = await conn.fetch(
         """
@@ -198,7 +199,9 @@ async def _context(
     for row in rows:
         if row["facts"] is not None:
             commander_facts.append(json_value(row["facts"]))
-    return {"commanders": commander_facts}, len(commander_facts) == len(commanders)
+    commander_oracle_ids = [row["oracle_id"] for row in rows]
+    ready = len(commander_facts) == len(commanders) and len(commander_oracle_ids) == len(commanders)
+    return {"commanders": commander_facts}, ready, commander_oracle_ids
 
 
 async def _candidates(
@@ -231,15 +234,11 @@ async def _candidates(
 
 async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> DeckState:
     """Load one owner's context and live candidate exclusions within the caller's transaction."""
-    context, ready = await _context(conn, owner, deck)
+    context, ready, commander_oracle_ids = await _context(conn, owner, deck)
     colors = sorted({color for card in context["commanders"] for color in card["color_identity"]})
-    constellation_key = fingerprint(
-        {"commanders": [card["oracle_id"] for card in context["commanders"]]}
-    )
+    constellation_key = fingerprint({"commanders": [str(value) for value in commander_oracle_ids]})
     context_hash = fingerprint({"commanders": context, "model": OPENAI_MODEL, "version": VERSION})
-    rows = await _candidates(
-        conn, colors, [UUID(card["oracle_id"]) for card in context["commanders"]]
-    )
+    rows = await _candidates(conn, colors, commander_oracle_ids)
     candidates = []
     for row in rows:
         facts = CardFacts.model_validate(json_value(row["facts"]))
@@ -285,6 +284,7 @@ async def load(conn: asyncpg.Connection, owner: Owner, deck: asyncpg.Record) -> 
     return DeckState(
         constellation_key,
         context,
+        commander_oracle_ids,
         candidates,
         {r["oracle_id"]: r for r in cache},
         catalog,
