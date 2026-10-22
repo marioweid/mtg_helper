@@ -600,6 +600,8 @@ class NewCardsWorker:
         while not self._stopping:
             try:
                 await self._service.activate_published_day()
+                if self._stopping:
+                    break
                 worked = await self._service.drain_one()
             except Exception:
                 _log.exception("New Cards worker iteration failed")
