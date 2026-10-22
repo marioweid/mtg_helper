@@ -5,9 +5,6 @@ import { useEffect, useState } from "react";
 type Status = {
   process_enabled: boolean;
   automatic_enabled: boolean;
-  daily_limit: number;
-  calls: number;
-  next_reset: string;
   manual_active: boolean;
   automatic_active: boolean;
   cancelled: boolean;
@@ -23,9 +20,6 @@ type StatusResponse = { data: Status };
 const EMPTY: Status = {
   process_enabled: false,
   automatic_enabled: false,
-  daily_limit: 100,
-  calls: 0,
-  next_reset: "unknown",
   manual_active: false,
   automatic_active: false,
   cancelled: false,
@@ -37,7 +31,6 @@ const EMPTY: Status = {
 /** Global New Cards controls, deliberately separate from deck-level results. */
 export function AdminNewCardsPanel() {
   const [status, setStatus] = useState(EMPTY);
-  const [limit, setLimit] = useState("100");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmingStart, setConfirmingStart] = useState(false);
@@ -49,7 +42,6 @@ export function AdminNewCardsPanel() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const next = ((await response.json()) as StatusResponse).data;
     setStatus(next);
-    setLimit(String(next.daily_limit));
   }
 
   useEffect(() => {
@@ -70,7 +62,6 @@ export function AdminNewCardsPanel() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const next = ((await response.json()) as StatusResponse).data;
       setStatus(next);
-      setLimit(String(next.daily_limit));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Request failed");
     } finally {
@@ -86,15 +77,12 @@ export function AdminNewCardsPanel() {
       <h2 className="font-semibold text-white">New Cards global controls</h2>
       <NewCardsStatus status={status} locked={locked} />
       <NewCardsActions
-        limit={limit}
         locked={locked}
         saving={saving}
         unsafeToStart={unsafeToStart}
-        onLimitChange={setLimit}
         onSave={() =>
           void action("/api/v1/admin/new-cards", {
             automatic_enabled: !status.automatic_enabled,
-            daily_limit: Number(limit),
           })
         }
         onStart={() => setConfirmingStart(true)}
@@ -132,44 +120,27 @@ function NewCardsStatus({ status, locked }: { status: Status; locked: boolean })
         Source updated {status.source_updated_at ?? "not available"} · Last run{" "}
         {status.last_run_at ?? "not available"}.
       </p>
-      <p className="text-sm text-gray-300">
-        Usage: {status.calls} / {status.daily_limit} · UTC reset {status.next_reset}
-      </p>
     </>
   );
 }
 
 function NewCardsActions({
-  limit,
   locked,
   saving,
   unsafeToStart,
-  onLimitChange,
   onSave,
   onStart,
   onCancel,
 }: {
-  limit: string;
   locked: boolean;
   saving: boolean;
   unsafeToStart: boolean;
-  onLimitChange: (limit: string) => void;
   onSave: () => void;
   onStart: () => void;
   onCancel: () => void;
 }) {
   return (
     <>
-      <label className="block text-sm">
-        Daily package limit
-        <input
-          aria-label="Daily package limit"
-          className="ml-2 rounded text-black"
-          value={limit}
-          onChange={(event) => onLimitChange(event.target.value)}
-          disabled={locked || saving}
-        />
-      </label>
       <div className="flex gap-2">
         <button type="button" disabled={locked || saving} onClick={onSave}>
           Save automation

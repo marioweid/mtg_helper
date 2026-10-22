@@ -15,8 +15,9 @@ describe("Admin New Cards controls", () => {
 
     expect(html).toContain("Process execution: disabled");
     expect(html).toContain("This process cannot make paid calls.");
-    expect(html).toContain("Usage: 0 / 100");
     expect(html).toContain('disabled=""');
     expect(html).not.toContain("Analyze next eight");
+    expect(html).not.toContain("Daily package limit");
+    expect(html).not.toContain("UTC reset");
   });
 });

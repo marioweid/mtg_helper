@@ -3,7 +3,7 @@
 import asyncio
 import json
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -77,9 +77,11 @@ async def test_ac05_catalog_publication_activates_automatic_work_once(
     pilot, db_pool, model
 ) -> None:
     _, _, service, _ = pilot
-    await service.configure(True, None)
+    await service.configure(True)
     async with db_pool.acquire() as conn:
-        await conn.execute("UPDATE new_card_runs SET last_catalog_day = NULL WHERE singleton")
+        await conn.execute(
+            "UPDATE new_card_runs SET last_catalog_generation = NULL WHERE singleton"
+        )
     await service.activate_published_day()
     await drain(service)
     await service.activate_published_day()
@@ -90,23 +92,51 @@ async def test_ac06_simultaneous_workers_share_one_claim(pilot) -> None:
     _, _, service, _ = pilot
     await service.start_manual()
     first, second = await asyncio.gather(service.drain_one(), service.drain_one())
-    assert first and second
+    assert sum((first, second)) == 1
 
 
-async def test_ac07_limit_rejects_the_second_package(pilot, model) -> None:
+async def test_ac07_large_delta_has_no_daily_package_limit(pilot, db_pool, model) -> None:
     _, _, service, _ = pilot
-    await service.configure(None, 1)
+    today = datetime.now(UTC).date()
+    async with db_pool.acquire() as conn:
+        generation = await conn.fetchval(
+            "SELECT generation FROM new_card_catalog_state WHERE singleton"
+        )
+        cards = []
+        catalog_rows = []
+        for index in range(792):
+            oracle_id = uuid4()
+            facts = {
+                "oracle_id": str(oracle_id),
+                "name": f"Bulk {index}",
+                "color_identity": ["G"],
+                "commander_legality": "legal",
+                "oracle_text": "Draw a card.",
+                "type_line": "Instant",
+            }
+            cards.append((uuid4(), oracle_id, facts["name"], json.dumps({"commander": "legal"})))
+            catalog_rows.append((oracle_id, today, json.dumps(facts), generation))
+        await conn.executemany(
+            "INSERT INTO cards (scryfall_id, oracle_id, name, legalities, is_canonical) "
+            "VALUES ($1, $2, $3, $4::jsonb, true)",
+            cards,
+        )
+        await conn.executemany(
+            "INSERT INTO new_card_catalog (oracle_id, released_at, facts, generation) "
+            "VALUES ($1, $2, $3::jsonb, $4)",
+            catalog_rows,
+        )
     await service.start_manual()
     await drain(service)
-    assert len(model.calls) == 1
+    assert len(model.calls) == 101
 
 
 async def test_ac08_disabling_automation_prevents_a_new_claim(pilot, model) -> None:
     _, _, service, _ = pilot
     await service.cancel()
-    await service.configure(True, None)
+    await service.configure(True)
     await service.activate_published_day()
-    await service.configure(False, None)
+    await service.configure(False)
     assert not await service.drain_one()
     assert model.calls == []
 

@@ -43,7 +43,7 @@ export interface CardResponse {
 
 // Experimental released-card pilot
 export interface NewCardsResponse {
-  status: "unavailable" | "idle" | "waiting" | "running" | "daily_limit" | "source_stale" | "error";
+  status: "unavailable" | "idle" | "waiting" | "running" | "source_stale" | "error";
   catalog_updated_at: string | null;
   analyzed_at: string | null;
   stale: boolean;

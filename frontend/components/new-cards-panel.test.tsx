@@ -393,7 +393,6 @@ describe("New Cards source and empty states", () => {
     [{ status: "idle", remaining_count: 0, picks: [] }, "No strong fits"],
     [{ status: "waiting", picks: [] }, "still pending"],
     [{ status: "running", picks: [] }, "Analysis running"],
-    [{ status: "daily_limit", picks: [] }, "processing limit reached"],
     [{ status: "error", error: "Model unavailable", picks: [] }, "analysis failed"],
     [{ status: "source_stale", stale: true, picks: [] }, "Sources are too old"],
   ] satisfies [Partial<NewCardsResponse>, string][])(

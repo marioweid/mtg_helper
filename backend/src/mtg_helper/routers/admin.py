@@ -14,7 +14,7 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field
 
 from mtg_helper.config import settings
 from mtg_helper.db import apply_schema
@@ -54,10 +54,10 @@ def _new_cards(request: Request) -> NewCardsService:
 
 
 class NewCardsControlUpdate(BaseModel):
-    """Optional global automation and quota changes."""
+    """Optional global automation change."""
 
+    model_config = ConfigDict(extra="forbid")
     automatic_enabled: bool | None = None
-    daily_limit: StrictInt | None = Field(default=None, ge=1)
 
 
 @router.get("/admin/new-cards")
@@ -70,9 +70,9 @@ async def new_cards_status(request: Request) -> DataResponse[dict[str, object]]:
 async def configure_new_cards(
     body: NewCardsControlUpdate, request: Request
 ) -> DataResponse[dict[str, object]]:
-    """Store global automation and daily budget settings."""
+    """Store global automation settings."""
     service = _new_cards(request)
-    await service.configure(body.automatic_enabled, body.daily_limit)
+    await service.configure(body.automatic_enabled)
     return DataResponse(data=await service.control_status())
 
 

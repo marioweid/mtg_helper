@@ -20,7 +20,7 @@ All successful responses below use the existing `{data: ...}` envelope.
 
 ```ts
 interface NewCardsResponse {
-  status: "unavailable" | "idle" | "waiting" | "running" | "daily_limit" | "error";
+  status: "unavailable" | "idle" | "waiting" | "running" | "source_stale" | "error";
   catalog_updated_at: string | null;
   analyzed_at: string | null;
   stale: boolean;
@@ -71,8 +71,8 @@ assessed, but incomplete or stale work never publishes picks or a no-match resul
 
 Global admin routes are `GET`/`PUT /api/v1/admin/new-cards`, `POST /admin/new-cards/start`, and
 `POST /admin/new-cards/cancel`. They require both admin authorization and the process-level
-`ENABLE_NEW_CARDS_WORKER=true` opt-in; Compose explicitly keeps this disabled. The global daily limit
-defaults to 100 packages and is charged before a provider call.
+`ENABLE_NEW_CARDS_WORKER=true` opt-in; Compose explicitly keeps this disabled. There is no budget,
+quota, reset or per-account override: an active run serially processes its Prüfdeltas.
 
 ## Pilot boundaries
 

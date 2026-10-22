@@ -243,8 +243,8 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
             """
         )
         await conn.execute(
-            "UPDATE new_card_runs SET daily_limit = 100, calls = 0, manual_active = false, "
-            "automatic_active = false, cancelled = false, last_catalog_day = NULL, "
+            "UPDATE new_card_runs SET manual_active = false, "
+            "automatic_active = false, cancelled = false, last_catalog_generation = NULL, "
             "last_error = NULL, "
             "active_token = NULL, active_lease_until = NULL, updated_at = now() WHERE singleton"
         )

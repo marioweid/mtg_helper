@@ -216,10 +216,10 @@ for the existing Oracle export. No manual data migration or new credentials are 
 Open a deck → **New Cards** to inspect its source date, coverage and complete Commander-Konstellation
 result. Reads and status refreshes never make model calls. An administrator enables the global
 automatic flag after a successful catalog publication, or explicitly starts one global run. Work is
-shared by Commander-Konstellation, globally serial, and limited to 100 packages per UTC day by
-default; each package contains at most eight cards with a 180 KB input cap, 7,000 output tokens, low
-reasoning, no SDK retries, and a 90-second bound. A reserved provider attempt counts even when it
-fails or is interrupted, and automatic retry waits until the next UTC day.
+shared by Commander-Konstellation and globally serial. Each package contains at most eight cards with
+a 180 KB input cap, 7,000 output tokens, low reasoning, no SDK retries, and a 90-second bound. A
+failed or interrupted constellation is not retried within that run; a later catalog publication or
+explicit admin start may retry it.
 
 Advice is unverified: neither research evaluator passed trusted-recommendation acceptance. The pilot
 shows exact source rules separately and excludes previews, unknown origins, promo-only originals and

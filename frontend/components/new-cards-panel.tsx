@@ -198,9 +198,6 @@ function NewCardsCoverage({ result }: { result: NewCardsResponse | null }) {
       {result.status === "source_stale" && (
         <p className="text-amber-300">Sources are too old for a current complete result.</p>
       )}
-      {result.status === "daily_limit" && (
-        <p>Global daily processing limit reached; waiting for the next UTC reset.</p>
-      )}
       {result.status === "error" && (
         <p className="text-red-300">Analysis failed. Ask an admin to start a new global run.</p>
       )}
@@ -248,8 +245,6 @@ function EmptyResults({ result }: { result: NewCardsResponse }) {
   if (result.status === "unavailable") return null;
   if (result.status === "source_stale")
     return <p>No current picks. Sources are too old, not a no-match result.</p>;
-  if (result.status === "daily_limit")
-    return <p>No picks yet; global processing resumes after the next UTC reset.</p>;
   if (result.status === "running" || result.status === "waiting")
     return <p>No picks yet; the Commander-Konstellation check is still pending.</p>;
   if (result.status === "error")

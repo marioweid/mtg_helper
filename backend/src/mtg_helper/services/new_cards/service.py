@@ -19,7 +19,6 @@ from mtg_helper.services.new_cards.repository import Candidate, NewCardsError, O
 from mtg_helper.services.planned_change_service import InvalidPlanError
 
 _log = logging.getLogger(__name__)
-DAILY_BATCH_LIMIT = 100
 
 
 @dataclass(slots=True)
@@ -27,6 +26,8 @@ class Work:
     owner: Owner
     deck_id: UUID
     token: UUID
+    run_token: UUID
+    constellation_key: str
     candidates: list[Candidate]
     request: EvidenceRequest
 
@@ -64,10 +65,6 @@ class NewCardsService:
             return {
                 "process_enabled": settings.enable_new_cards_worker,
                 "automatic_enabled": automatic_enabled,
-                "daily_limit": row["daily_limit"],
-                "calls": row["calls"] if row["quota_day"] == datetime.now(UTC).date() else 0,
-                "quota_day": row["quota_day"].isoformat(),
-                "next_reset": f"{datetime.now(UTC).date() + timedelta(days=1)}T00:00:00Z",
                 "manual_active": row["manual_active"],
                 "automatic_active": row["automatic_active"],
                 "cancelled": row["cancelled"],
@@ -78,12 +75,10 @@ class NewCardsService:
                 "failed": counts["failed"] if counts else 0,
             }
 
-    async def configure(self, automatic_enabled: bool | None, daily_limit: int | None) -> None:
-        """Persist safe global settings; limits never reset consumed quota."""
+    async def configure(self, automatic_enabled: bool | None) -> None:
+        """Persist the default-off global automation setting."""
         if not settings.enable_new_cards_worker:
             raise NewCardsError("New Cards execution is disabled for this process.", 503)
-        if daily_limit is not None and daily_limit < 1:
-            raise NewCardsError("Daily limit must be a positive integer.")
         if automatic_enabled is not None:
             await feature_flag_service.set_flag(
                 self.pool, feature_flag_service.FLAG_NEW_CARDS_AUTOMATIC, automatic_enabled
@@ -91,24 +86,19 @@ class NewCardsService:
         async with self.pool.acquire() as conn:
             # Enabling is prospective: an already-published catalog does not create a run.
             if automatic_enabled:
-                catalog_day = await conn.fetchval(
-                    "SELECT published_at::date FROM new_card_catalog_state WHERE singleton"
+                generation = await conn.fetchval(
+                    "SELECT generation FROM new_card_catalog_state WHERE singleton"
                 )
                 await conn.execute(
-                    "UPDATE new_card_runs SET last_catalog_day = $1, updated_at = now() "
+                    "UPDATE new_card_runs SET last_catalog_generation = $1, updated_at = now() "
                     "WHERE singleton",
-                    catalog_day,
+                    generation,
                 )
             elif automatic_enabled is False:
                 await conn.execute(
                     "UPDATE new_card_runs SET automatic_active = false, updated_at = now() "
                     "WHERE singleton"
                 )
-            await conn.execute(
-                "UPDATE new_card_runs SET daily_limit = COALESCE($1, daily_limit), "
-                "updated_at = now() WHERE singleton",
-                daily_limit,
-            )
 
     async def cancel(self) -> None:
         """Prevent future claims while permitting an already-bound call to finish."""
@@ -124,20 +114,29 @@ class NewCardsService:
         """Mark one shared manual run active; the worker drains it serially."""
         if not settings.enable_new_cards_worker:
             raise NewCardsError("New Cards execution is disabled for this process.", 503)
-        async with self.pool.acquire() as conn:
+        async with self.pool.acquire() as conn, conn.transaction():
+            run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton FOR UPDATE")
+            assert run is not None
+            if run["manual_active"] or run["automatic_active"]:
+                await conn.execute(
+                    "UPDATE new_card_runs SET manual_active = true, cancelled = false, "
+                    "updated_at = now() WHERE singleton"
+                )
+                return
             await conn.execute(
                 "UPDATE new_card_runs SET manual_active = true, cancelled = false, "
-                "last_error = NULL, updated_at = now() WHERE singleton"
+                "last_error = NULL, attempt_token = $1, updated_at = now() WHERE singleton",
+                uuid4(),
             )
             await conn.execute(
-                "UPDATE new_card_claims SET error = NULL, attempted_day = NULL "
-                "WHERE error IS NOT NULL"
+                "UPDATE new_card_claims SET error = NULL, attempt_token = NULL, token = NULL, "
+                "lease_until = NULL, updated_at = now()"
             )
 
     async def drain_manual(self) -> None:
         """Serially drain currently used constellations for one manual attempt."""
         try:
-            while await self._manual_permitted():
+            while True:
                 work = await self._next_manual_work()
                 if work is None:
                     break
@@ -161,10 +160,8 @@ class NewCardsService:
                 active = run["active_token"] and run["active_lease_until"] > datetime.now(UTC)
                 if not active:
                     await conn.execute(
-                        "UPDATE new_card_runs SET manual_active = false, automatic_active = "
-                        "CASE WHEN quota_day = $1 AND calls >= daily_limit THEN automatic_active "
-                        "ELSE false END, updated_at = now() WHERE singleton",
-                        datetime.now(UTC).date(),
+                        "UPDATE new_card_runs SET manual_active = false, automatic_active = false, "
+                        "updated_at = now() WHERE singleton",
                     )
             return False
         await self.run(work)
@@ -179,87 +176,49 @@ class NewCardsService:
         ):
             return
         async with self.pool.acquire() as conn, conn.transaction():
-            catalog_day = await conn.fetchval(
-                "SELECT published_at::date FROM new_card_catalog_state WHERE singleton"
+            catalog = await conn.fetchrow(
+                "SELECT generation FROM new_card_catalog_state WHERE singleton"
             )
-            if catalog_day is None:
+            if catalog is None:
                 return
             run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton FOR UPDATE")
             assert run is not None
-            if run["last_catalog_day"] == catalog_day:
+            if run["last_catalog_generation"] == catalog["generation"]:
                 return
+            active = run["manual_active"] or run["automatic_active"]
             await conn.execute(
                 "UPDATE new_card_runs SET automatic_active = true, cancelled = false, "
-                "last_catalog_day = $1, last_error = NULL, updated_at = now() WHERE singleton",
-                catalog_day,
+                "last_catalog_generation = $1, last_error = NULL, "
+                "attempt_token = CASE WHEN $2 THEN attempt_token ELSE $3 END, "
+                "updated_at = now() WHERE singleton",
+                catalog["generation"],
+                active,
+                uuid4(),
             )
-        await self._queue_automatic_constellations()
-
-    async def _manual_permitted(self) -> bool:
-        async with self.pool.acquire() as conn:
-            run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
-            assert run is not None
-            calls = run["calls"] if run["quota_day"] == datetime.now(UTC).date() else 0
-            return bool(
-                run["manual_active"] and not run["cancelled"] and calls < run["daily_limit"]
-            )
+            if not active:
+                await conn.execute(
+                    "UPDATE new_card_claims SET error = NULL, attempt_token = NULL, token = NULL, "
+                    "lease_until = NULL, updated_at = now()"
+                )
 
     async def _next_manual_work(self) -> Work | None:
         async with self.pool.acquire() as conn:
             run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
             assert run is not None
-            automatic_only = run["automatic_active"] and not run["manual_active"]
+            if run["cancelled"] or not (run["manual_active"] or run["automatic_active"]):
+                return None
             rows = await conn.fetch(
                 "SELECT d.id, a.id AS account_id, a.email FROM decks d "
                 "JOIN accounts a ON lower(a.email) = lower(d.owner_email) ORDER BY d.id"
             )
         for row in rows:
             try:
-                if automatic_only and not await self._is_automatic_constellation(row):
-                    continue
                 work = await self.claim(Owner(row["account_id"], row["email"]), row["id"])
-            except NewCardsError as error:
-                if error.status == 429:
-                    return None
+            except NewCardsError:
                 continue
             if work is not None:
                 return work
         return None
-
-    async def _is_automatic_constellation(self, row: asyncpg.Record) -> bool:
-        """Allow an automatic day to process only its publication-time snapshot."""
-        async with self.pool.acquire() as conn:
-            deck = await repository.owned_deck(
-                conn, Owner(row["account_id"], row["email"]), row["id"]
-            )
-            state = await repository.load(conn, Owner(row["account_id"], row["email"]), deck)
-            return bool(
-                await conn.fetchval(
-                    "SELECT EXISTS(SELECT 1 FROM new_card_claims WHERE constellation_key = $1)",
-                    state.constellation_key,
-                )
-            )
-
-    async def _queue_automatic_constellations(self) -> None:
-        """Persist the used Commander-Konstellationen at daily publication time."""
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT d.id, a.id AS account_id, a.email FROM decks d "
-                "JOIN accounts a ON lower(a.email) = lower(d.owner_email) ORDER BY d.id"
-            )
-        for row in rows:
-            async with self.pool.acquire() as conn, conn.transaction():
-                owner = Owner(row["account_id"], row["email"])
-                deck = await repository.owned_deck(conn, owner, row["id"], lock=True)
-                state = await repository.load(conn, owner, deck)
-                if not state.ready:
-                    continue
-                await _ensure_constellation(conn, state)
-                await conn.execute(
-                    "INSERT INTO new_card_claims (constellation_key) VALUES ($1) "
-                    "ON CONFLICT DO NOTHING",
-                    state.constellation_key,
-                )
 
     async def claim(self, owner: Owner, deck_id: UUID) -> Work | None:
         """Claim globally shared work after an authorized global start."""
@@ -281,12 +240,16 @@ class NewCardsService:
                 state.context, [c.facts.model_dump(mode="json") for c in candidates]
             )
             try:
-                request.payload()  # Check bounds before consuming a quota slot.
+                request.payload()  # Check provider bounds before claiming work.
             except ValueError as exc:
                 raise NewCardsError(str(exc)) from exc
             await _ensure_constellation(conn, state)
-            token = await _claim_lease(conn, state.constellation_key)
-            return Work(owner, deck_id, token, candidates, request) if token else None
+            token, run_token = await _claim_lease(conn, state.constellation_key)
+            return (
+                Work(owner, deck_id, token, run_token, state.constellation_key, candidates, request)
+                if token and run_token
+                else None
+            )
 
     async def run(self, work: Work) -> None:
         """Execute one no-retry call and publish only if the lease and all input versions match."""
@@ -345,11 +308,12 @@ class NewCardsService:
                 work.token,
             )
             if lease is None:
+                await self._release(work)
                 return  # A later claimant owns publication; this worker cannot overwrite it.
             state = await repository.load(conn, work.owner, deck)
             current = {candidate.oracle_id: candidate.input_hash for candidate in state.candidates}
             if any(current.get(c.oracle_id) != c.input_hash for c in work.candidates):
-                raise NewCardsError("Deck, plans, or source changed. Analyze again.", 409)
+                raise NewCardsError("Commander facts or card sources changed. Analyze again.", 409)
             pairs = list(zip(work.candidates, assessments, strict=True))
             await conn.executemany(
                 """
@@ -372,7 +336,7 @@ class NewCardsService:
             )
             await conn.execute(
                 "UPDATE new_card_claims SET token = NULL, lease_until = NULL, "
-                "attempted_day = NULL, error = NULL, "
+                "attempt_token = NULL, error = NULL, "
                 "updated_at = now() WHERE constellation_key = $1 AND token = $2",
                 state.constellation_key,
                 work.token,
@@ -385,13 +349,13 @@ class NewCardsService:
 
     async def _fail(self, work: Work, message: str) -> None:
         async with self.pool.acquire() as conn:
-            deck = await repository.owned_deck(conn, work.owner, work.deck_id)
-            state = await repository.load(conn, work.owner, deck)
             await conn.execute(
-                "UPDATE new_card_claims SET token = NULL, lease_until = NULL, error = $3, "
+                "UPDATE new_card_claims SET token = NULL, lease_until = NULL, "
+                "attempt_token = $3, error = $4, "
                 "updated_at = now() WHERE constellation_key = $1 AND token = $2",
-                state.constellation_key,
+                work.constellation_key,
                 work.token,
+                work.run_token,
                 message,
             )
             await conn.execute(
@@ -470,41 +434,6 @@ class NewCardsService:
             )
 
 
-async def _archive_superseded_assessments(
-    conn: asyncpg.Connection,
-    work: Work,
-    pairs: list[tuple[Candidate, Assessment]],
-) -> None:
-    """Retain cache entries when a fresh context replaces their current value."""
-    existing = await conn.fetch(
-        "SELECT oracle_id, input_hash, assessment, assessed_at FROM new_card_assessments "
-        "WHERE deck_id = $1 AND account_id = $2 AND oracle_id = ANY($3::uuid[])",
-        work.deck_id,
-        work.owner.account_id,
-        [candidate.oracle_id for candidate, _ in pairs],
-    )
-    incoming = {candidate.oracle_id: candidate.input_hash for candidate, _ in pairs}
-    archived = [row for row in existing if row["input_hash"] != incoming[row["oracle_id"]]]
-    if not archived:
-        return
-    await conn.executemany(
-        "INSERT INTO new_card_assessment_history "
-        "(deck_id, account_id, oracle_id, input_hash, assessment, assessed_at) "
-        "VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
-        [
-            (
-                work.deck_id,
-                work.owner.account_id,
-                row["oracle_id"],
-                row["input_hash"],
-                row["assessment"],
-                row["assessed_at"],
-            )
-            for row in archived
-        ],
-    )
-
-
 async def _ensure_constellation(conn: asyncpg.Connection, state: repository.DeckState) -> None:
     """Store current Commander facts before a shared claim references the constellation."""
     await conn.execute(
@@ -517,8 +446,10 @@ async def _ensure_constellation(conn: asyncpg.Connection, state: repository.Deck
     )
 
 
-async def _claim_lease(conn: asyncpg.Connection, constellation_key: str) -> UUID | None:
-    """Reserve one global package and its daily budget before calling the provider."""
+async def _claim_lease(
+    conn: asyncpg.Connection, constellation_key: str
+) -> tuple[UUID | None, UUID | None]:
+    """Reserve one global package before calling the provider."""
     await conn.execute(
         "INSERT INTO new_card_claims (constellation_key) VALUES ($1) ON CONFLICT DO NOTHING",
         constellation_key,
@@ -528,34 +459,39 @@ async def _claim_lease(conn: asyncpg.Connection, constellation_key: str) -> UUID
         constellation_key,
     )
     now = datetime.now(UTC)
-    if job["attempted_day"] == now.date():
-        return None
     run = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton FOR UPDATE")
     assert run is not None
+    run_token = run["attempt_token"]
+    assert run_token is not None
+    if job["attempt_token"] == run_token:
+        return None, None
     if run["active_token"] and run["active_lease_until"] > now:
-        return None
+        return None, None
     if run["cancelled"] or not (run["manual_active"] or run["automatic_active"]):
-        return None
-    calls = run["calls"] if run["quota_day"] == now.date() else 0
-    if calls >= run["daily_limit"]:
-        raise NewCardsError("Global daily New Cards limit reached. Try again tomorrow UTC.", 429)
+        return None, None
+    if job["token"] is not None:
+        await conn.execute(
+            "UPDATE new_card_claims SET token = NULL, lease_until = NULL, attempt_token = $2, "
+            "error = $3, updated_at = now() WHERE constellation_key = $1",
+            constellation_key,
+            run_token,
+            "Analysis was interrupted. Start a new global run to retry this constellation.",
+        )
+        return None, None
     token = uuid4()
     await conn.execute(
         "UPDATE new_card_claims SET token = $2, "
         "lease_until = now() + interval '2 minutes', "
-        "attempted_day = $3, error = NULL, updated_at = now() WHERE constellation_key = $1",
+        "error = NULL, updated_at = now() WHERE constellation_key = $1",
         constellation_key,
         token,
-        now.date(),
     )
     await conn.execute(
-        "UPDATE new_card_runs SET quota_day = $1, calls = $2, active_token = $3, "
-        "active_lease_until = now() + interval '2 minutes', updated_at = now() WHERE singleton",
-        now.date(),
-        calls + 1,
+        "UPDATE new_card_runs SET active_token = $1, active_lease_until = "
+        "now() + interval '2 minutes', updated_at = now() WHERE singleton",
         token,
     )
-    return token
+    return token, run_token
 
 
 class NewCardsWorker:
