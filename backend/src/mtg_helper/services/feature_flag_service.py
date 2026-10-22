@@ -13,11 +13,13 @@ import asyncpg
 
 FLAG_OPTIMIZER = "optimizer"
 FLAG_RECOMMENDATIONS = "recommendations"
+FLAG_NEW_CARDS_AUTOMATIC = "new_cards_automatic"
 FeatureFlag = Literal["optimizer", "recommendations"]
+RuntimeFeatureFlag = FeatureFlag | Literal["new_cards_automatic"]
 
 
 async def is_enabled(
-    pool: asyncpg.Pool, flag: FeatureFlag, account_id: UUID | None, default: bool
+    pool: asyncpg.Pool, flag: RuntimeFeatureFlag, account_id: UUID | None, default: bool
 ) -> bool:
     """Resolve a flag for an account.
 
@@ -32,6 +34,7 @@ async def is_enabled(
         The resolved boolean: account override, else global override, else
         ``default``.
     """
+    account_id = None if flag == FLAG_NEW_CARDS_AUTOMATIC else account_id
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT account_id, enabled FROM feature_flags "
@@ -48,9 +51,10 @@ async def is_enabled(
 
 
 async def set_flag(
-    pool: asyncpg.Pool, flag: FeatureFlag, enabled: bool, account_id: UUID | None = None
+    pool: asyncpg.Pool, flag: RuntimeFeatureFlag, enabled: bool, account_id: UUID | None = None
 ) -> None:
     """Upsert a global (``account_id`` omitted) or per-account flag override."""
+    _validate_global_new_cards_flag(flag, account_id)
     async with pool.acquire() as conn:
         if account_id is None:
             await conn.execute(
@@ -71,8 +75,11 @@ async def set_flag(
             )
 
 
-async def clear_flag(pool: asyncpg.Pool, flag: FeatureFlag, account_id: UUID | None = None) -> None:
+async def clear_flag(
+    pool: asyncpg.Pool, flag: RuntimeFeatureFlag, account_id: UUID | None = None
+) -> None:
     """Delete a global or per-account override, reverting to the next scope."""
+    _validate_global_new_cards_flag(flag, account_id)
     async with pool.acquire() as conn:
         if account_id is None:
             await conn.execute(
@@ -82,6 +89,12 @@ async def clear_flag(pool: asyncpg.Pool, flag: FeatureFlag, account_id: UUID | N
             await conn.execute(
                 "DELETE FROM feature_flags WHERE flag = $1 AND account_id = $2", flag, account_id
             )
+
+
+def _validate_global_new_cards_flag(flag: RuntimeFeatureFlag, account_id: UUID | None) -> None:
+    """Reject account-scoped writes for the globally controlled New Cards process."""
+    if flag == FLAG_NEW_CARDS_AUTOMATIC and account_id is not None:
+        raise ValueError("New Cards automation is a global setting and has no account overrides.")
 
 
 async def list_flags(pool: asyncpg.Pool) -> list[dict[str, Any]]:

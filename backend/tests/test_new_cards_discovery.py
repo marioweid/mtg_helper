@@ -100,10 +100,9 @@ def test_faces_preserve_numeric_source_and_access_boundaries():
 
 
 def request():
-    physical = card_facts(printing(name="Support")).model_dump(mode="json")
-    physical["pending_cut"] = True
+    commander = card_facts(printing(name="Commander")).model_dump(mode="json")
     return EvidenceRequest(
-        {"physical": [physical]}, [card_facts(printing()).model_dump(mode="json")]
+        {"commanders": [commander]}, [card_facts(printing()).model_dump(mode="json")]
     )
 
 
@@ -122,10 +121,10 @@ def judgment():
     }
 
 
-def test_identity_binding_and_pending_cut_warning():
+def test_identity_binding_uses_commander_evidence():
     item = request().decode(json.dumps(judgment()))[0]
-    assert [e.name for e in item.evidence] == ["Example", "Support"]
-    assert "Pending cuts remove cited support: Support." in item.caveat
+    assert [e.name for e in item.evidence] == ["Example", "Commander"]
+    assert item.caveat == "Needs testing"
     assert request().schema()["required"] == ["C01"]
 
 

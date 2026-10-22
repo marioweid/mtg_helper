@@ -30,12 +30,12 @@ class ModelTransport:
         body = json.loads(request.content)
         self.calls.append(body)
         payload = json.loads(body["input"])
-        support = payload["physical"][0]
+        support = payload["commanders"][0]
         judgments = {}
         for card in payload["candidates"]:
             judgments[card["key"]] = {
                 "label": "reject" if card["name"] == "New 0" else "strong",
-                "reason": "Fits the supplied physical support",
+                "reason": "Fits the supplied commander",
                 "caveat": "Unverified interaction",
                 "required_changes": [],
                 "evidence": [
@@ -92,9 +92,15 @@ def model(monkeypatch: pytest.MonkeyPatch) -> ModelTransport:
 
 @pytest_asyncio.fixture
 async def pilot(
-    client: httpx.AsyncClient, db_pool: asyncpg.Pool, model: ModelTransport
+    client: httpx.AsyncClient,
+    db_pool: asyncpg.Pool,
+    model: ModelTransport,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[UUID, Owner, NewCardsService, list[dict[str, Any]]]:
     """Publish an owned synthetic deck and released cards against the disposable database."""
+    monkeypatch.setattr(
+        "mtg_helper.services.new_cards.service.settings.enable_new_cards_worker", True
+    )
     deck_id = UUID(await create_test_deck(client))
     async with db_pool.acquire() as conn:
         account = await conn.fetchrow(
@@ -149,4 +155,5 @@ async def pilot(
             await catalog.publish(conn, sources, release_history(sources), datetime.now(UTC))
     owner = Owner(account["id"], account["email"])
     service = NewCardsService(db_pool, NewCardEvaluator("test"))
+    await service.start_manual()
     return deck_id, owner, service, sources[-9:]

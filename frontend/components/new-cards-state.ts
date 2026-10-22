@@ -46,7 +46,7 @@ export class NewCardsController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts a read-only load; only an explicit analyze action can start AI work. */
+  /** Starts a read-only status load; this panel never starts AI work. */
   start() {
     this.active = true;
     void this.refresh();
@@ -61,9 +61,6 @@ export class NewCardsController {
   }
 
   refresh = () => this.run("Refresh New Cards", () => apiClient.getNewCards(this.deckId));
-
-  analyze = () =>
-    this.run("Analyze next eight", () => apiClient.analyzeNewCards(this.deckId), true);
 
   dismiss = (pick: NewCardPick) =>
     this.run(
@@ -157,7 +154,7 @@ export class NewCardsController {
   }
 
   private schedulePoll() {
-    if (this.state.result?.status === "running") {
+    if (this.state.result?.status === "running" || this.state.result?.status === "waiting") {
       this.timer = setTimeout(() => void this.refresh(), 3000);
     }
   }

@@ -229,7 +229,8 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
     try:
         await conn.execute(
             """
-            TRUNCATE new_card_catalog, new_card_catalog_state, new_card_assessment_history,
+            TRUNCATE new_card_shared_assessments, new_card_claims, new_card_constellations,
+                new_card_catalog, new_card_catalog_state, new_card_assessment_history,
                 scryfall_tag_state, scryfall_tag_memberships,
                 scryfall_tag_descendants, scryfall_tags,
                 feature_flags, moxfield_commander_recs, moxfield_hub_card_stats,
@@ -240,6 +241,12 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
                 theme_group_suggestions, theme_group_members, theme_groups,
                 archidekt_tag_card_stats, archidekt_tags CASCADE
             """
+        )
+        await conn.execute(
+            "UPDATE new_card_runs SET manual_active = false, "
+            "automatic_active = false, cancelled = false, last_catalog_generation = NULL, "
+            "last_error = NULL, "
+            "active_token = NULL, active_lease_until = NULL, updated_at = now() WHERE singleton"
         )
         await conn.execute(
             """

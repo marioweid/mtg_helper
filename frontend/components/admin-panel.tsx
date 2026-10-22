@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminDiscoverPanel } from "@/components/admin-discover-panel";
+import { AdminNewCardsPanel } from "@/components/admin-new-cards-panel";
 import { ScryfallPublication, type ScryfallSourceStatus } from "@/components/scryfall-publication";
 import { ThemeManager } from "@/components/theme-manager";
 
@@ -262,6 +263,7 @@ export function AdminPanel() {
     <div className="space-y-4">
       <AdminDiscoverPanel />
       <ScryfallPublication source={status.scryfall_sources} />
+      <AdminNewCardsPanel />
       {JOBS.map(({ id, label, path, description }) => {
         const snapshot = status[SLOT_BY_ID[id]];
         const running = snapshot.status === "running";

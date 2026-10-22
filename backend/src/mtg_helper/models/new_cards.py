@@ -50,7 +50,7 @@ class NewCardPick(NewCardFace):
 
 
 class NewCardsResponse(BaseModel):
-    status: Literal["unavailable", "idle", "running", "error"] = "idle"
+    status: Literal["unavailable", "idle", "waiting", "running", "source_stale", "error"] = "idle"
     catalog_updated_at: datetime | None = None
     analyzed_at: datetime | None = None
     stale: bool = False

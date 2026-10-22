@@ -11,9 +11,6 @@ All routes require the current account and deck ownership. Base `/api/v1/decks/{
 All successful responses below use the existing `{data: ...}` envelope.
 
 - `GET /new-cards` → `NewCardsResponse`. Read-only; never starts AI or catalog sync.
-- `POST /new-cards/analyze` → `NewCardsResponse` (202). Explicitly assess next eight unassessed
-  eligible cards in background. One active analysis per account across workers, durable PostgreSQL
-  lease, bounded timeout/tokens, no retries, daily account quota. Repeated clicks share current work.
 - `POST /new-cards/{oracle_id}/dismiss` → `NewCardsResponse`.
 - `DELETE /new-cards/{oracle_id}/dismiss` → `NewCardsResponse` (undo).
 - `POST /new-cards/{oracle_id}/plan` → `NewCardsResponse`. Plan one addition only, idempotently;
@@ -23,7 +20,7 @@ All successful responses below use the existing `{data: ...}` envelope.
 
 ```ts
 interface NewCardsResponse {
-  status: "unavailable" | "idle" | "running" | "error";
+  status: "unavailable" | "idle" | "waiting" | "running" | "source_stale" | "error";
   catalog_updated_at: string | null;
   analyzed_at: string | null;
   stale: boolean;
@@ -66,11 +63,16 @@ interface NewCardPick {
 }
 ```
 
-GET filters expired, in-deck, pending-addition, dismissed and illegal cards on every read.
-Coverage refers to the currently eligible pool; rejects count as assessed. No minimum suggestion
-count. Incomplete coverage must not look like a completed empty result. Old-context assessments are
-not displayed as current. Support facts use physical cards only; pending cuts are included as warnings.
-Retired account preferences, feedback ranking and Coach memory do not affect advice or cache identity.
+GET only reads the shared Commander-Konstellation result; it never starts model work. Candidates and
+cache identity use Commander Oracle IDs/facts, card facts, release date and evaluator version — never
+deck content, account identity, strategy, plans, preferences, goals, bracket or memory. Dismissal and
+planning remain deck-local. Coverage refers to the current shared candidate pool; rejects count as
+assessed, but incomplete or stale work never publishes picks or a no-match result.
+
+Global admin routes are `GET`/`PUT /api/v1/admin/new-cards`, `POST /admin/new-cards/start`, and
+`POST /admin/new-cards/cancel`. They require both admin authorization and the process-level
+`ENABLE_NEW_CARDS_WORKER=true` opt-in; Compose explicitly keeps this disabled. There is no budget,
+quota, reset or per-account override: an active run serially processes its Prüfdeltas.
 
 ## Pilot boundaries
 

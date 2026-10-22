@@ -5,3 +5,4 @@ services:
     environment:
       DATABASE_URL: ${LIVE_DATABASE_URL:?Set LIVE_DATABASE_URL in the ignored root .env}
       RUN_STARTUP_MAINTENANCE: "false"
+      ENABLE_NEW_CARDS_WORKER: "false"

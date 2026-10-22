@@ -26,13 +26,13 @@ personalization-free contract. Research budgets remain exhausted. See [contract]
 - Source validation replayed the ignored, frozen 2026-10-04 Scryfall archives: all **38,705** Oracle
   fact records validated; **472** released/legal designs met conservative pilot discovery filters
   as of October 7. This is not a per-deck ranking or recall measurement, and used no new download.
-- In-memory mutations disabling quotation verification and increasing the daily quota were both
-  caught by their tests. Source files were unchanged. Frontend sequence-guard mutation was also
+- In-memory mutations disabling quotation verification were caught by their tests. Source files were
+  unchanged. Frontend sequence-guard mutation was also
   caught during UI implementation.
 - API/SQL tests cover all five owner boundaries, read-without-work, eight-card batches, rejected
   coverage, source/candidate/deck/notes/preferences/pending-plan invalidation, partner color union,
   dismiss/undo, explicit idempotent planning, source publication locks, account-wide leases,
-  stale worker rejection, quota reset, failed-provider cache retention, input bounds, missing
+   stale worker rejection, failed-provider cache retention, input bounds, missing
   catalogs, exact expiry/future filtering, and additive schema replay.
 - Both completion routes reject banned/off-color/duplicate/withdrawn/now-commander additions and
   roll back the entire revision. Saved plans survive age expiry; canonical repair preserves pilot

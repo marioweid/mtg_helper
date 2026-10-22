@@ -828,21 +828,67 @@ CREATE TABLE IF NOT EXISTS new_card_assessment_history (
     PRIMARY KEY (deck_id, account_id, oracle_id, input_hash)
 );
 
--- One durable lease/quota row per account, not an in-process task registry.
-CREATE TABLE IF NOT EXISTS new_card_jobs (
-    account_id UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-    deck_id UUID REFERENCES decks(id) ON DELETE SET NULL,
-    token UUID,
-    lease_until TIMESTAMPTZ,
-    quota_day DATE NOT NULL DEFAULT ((now() AT TIME ZONE 'UTC')::date),
-    calls INTEGER NOT NULL DEFAULT 0,
-    error TEXT,
-    finished_at TIMESTAMPTZ
-);
+-- Replaced per-account quota leases are operational state, not user history.
+DROP TABLE IF EXISTS new_card_jobs;
 
 -- Default-off source-backed Discover pilot; legacy tables and judgments are unchanged.
 ALTER TABLE new_card_catalog ADD COLUMN IF NOT EXISTS source_facts JSONB;
 ALTER TABLE new_card_catalog_state ADD COLUMN IF NOT EXISTS source_sha256 TEXT;
+
+-- Shared Commander-Konstellation cache.  The pilot-era per-deck tables above are
+-- intentionally retained as historical records and are never read as this cache.
+CREATE TABLE IF NOT EXISTS new_card_constellations (
+    key TEXT PRIMARY KEY,
+    commander_oracle_ids UUID[] NOT NULL,
+    commander_facts JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS new_card_shared_assessments (
+    constellation_key TEXT NOT NULL REFERENCES new_card_constellations(key) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    input_hash TEXT NOT NULL,
+    assessment JSONB NOT NULL,
+    assessed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (constellation_key, oracle_id)
+);
+
+CREATE TABLE IF NOT EXISTS new_card_runs (
+    singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+    manual_active BOOLEAN NOT NULL DEFAULT false,
+    automatic_active BOOLEAN NOT NULL DEFAULT false,
+    cancelled BOOLEAN NOT NULL DEFAULT false,
+    last_catalog_generation UUID,
+    attempt_token UUID,
+    last_error TEXT,
+    active_token UUID,
+    active_lease_until TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE new_card_runs DROP COLUMN IF EXISTS automatic_enabled;
+ALTER TABLE new_card_runs DROP COLUMN IF EXISTS daily_limit;
+ALTER TABLE new_card_runs DROP COLUMN IF EXISTS quota_day;
+ALTER TABLE new_card_runs DROP COLUMN IF EXISTS calls;
+ALTER TABLE new_card_runs DROP COLUMN IF EXISTS last_catalog_day;
+ALTER TABLE new_card_runs ADD COLUMN IF NOT EXISTS last_catalog_generation UUID;
+ALTER TABLE new_card_runs ADD COLUMN IF NOT EXISTS attempt_token UUID;
+ALTER TABLE new_card_runs ADD COLUMN IF NOT EXISTS active_token UUID;
+ALTER TABLE new_card_runs ADD COLUMN IF NOT EXISTS active_lease_until TIMESTAMPTZ;
+INSERT INTO new_card_runs (singleton) VALUES (true) ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS new_card_claims (
+    constellation_key TEXT PRIMARY KEY REFERENCES new_card_constellations(key) ON DELETE CASCADE,
+    token UUID,
+    lease_until TIMESTAMPTZ,
+    attempt_token UUID,
+    error TEXT,
+    completed_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE new_card_claims DROP COLUMN IF EXISTS attempted_day;
+ALTER TABLE new_card_claims ADD COLUMN IF NOT EXISTS attempt_token UUID;
+ALTER TABLE new_card_claims ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+DELETE FROM feature_flags WHERE flag = 'new_cards_automatic' AND account_id IS NOT NULL;
 ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS recommendation_origin BOOLEAN
     NOT NULL DEFAULT false;
 
