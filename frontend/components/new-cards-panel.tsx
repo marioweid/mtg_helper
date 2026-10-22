@@ -255,6 +255,8 @@ function EmptyResults({ result }: { result: NewCardsResponse }) {
     return <p>No picks yet. The Commander-Konstellation check is waiting for admin processing.</p>;
   if (result.eligible_count === 0)
     return <p>No released cards currently meet the pilot filters.</p>;
+  if (result.dismissed_count > 0)
+    return <p>No further matching cards are visible for this deck.</p>;
   return (
     <p>No strong fits or cards worth testing in the assessed eligible pool. No filler picks.</p>
   );

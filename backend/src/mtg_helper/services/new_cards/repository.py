@@ -89,12 +89,28 @@ class DeckState:
     def pending(self) -> list[Candidate]:
         return [candidate for candidate in self.candidates if not self.valid(candidate)]
 
-    def response(self) -> NewCardsResponse:  # noqa: C901 - one complete read-model state boundary
+    def response(self) -> NewCardsResponse:
         """Render only currently eligible, exact-context assessments; never start work on reads."""
         now = datetime.now(UTC)
         stale = bool(self.catalog and now - self.catalog["published_at"] > timedelta(days=2))
-        picks = []
-        assessed_times = []
+        picks, assessed_times = self._assessments()
+        complete = len(assessed_times) == len(self.candidates)
+        result = NewCardsResponse(
+            catalog_updated_at=self.catalog["published_at"] if self.catalog else None,
+            analyzed_at=max(assessed_times, default=None),
+            eligible_count=len(self.candidates),
+            assessed_count=len(assessed_times),
+            remaining_count=len(self.candidates) - len(assessed_times),
+            dismissed_count=self.dismissed,
+            picks=picks if complete and not stale else [],
+        )
+        _set_status(result, ready=self.ready, stale=stale, complete=complete, job=self.job, now=now)
+        return result
+
+    def _assessments(self) -> tuple[list[NewCardPick], list[datetime]]:
+        """Return visible picks and assessment timestamps for current candidates only."""
+        picks: list[NewCardPick] = []
+        assessed_times: list[datetime] = []
         for candidate in self.candidates:
             if not self.valid(candidate):
                 continue
@@ -104,32 +120,31 @@ class DeckState:
             if assessment.label != "reject":
                 if candidate.oracle_id not in self.hidden:
                     picks.append(candidate.pick(assessment))
-        complete = len(assessed_times) == len(self.candidates)
-        result = NewCardsResponse(
-            catalog_updated_at=self.catalog["published_at"] if self.catalog else None,
-            analyzed_at=max(assessed_times, default=None),
-            eligible_count=len(self.candidates),
-            assessed_count=len(assessed_times),
-            remaining_count=len(self.candidates) - len(assessed_times),
-            dismissed_count=self.dismissed,
-            # A Commander-Konstellation is only publishable as a complete
-            # result.  A stale partial cache is never advice.
-            picks=picks if complete and not stale else [],
-        )
-        result.stale = stale
-        if not self.ready:
-            result.status = "unavailable"
-            result.error = (
-                "Run Admin card sync to populate complete release history and deck facts."
-            )
-        elif result.stale:
-            result.status = "source_stale"
-            result.error = "Card sources are too old for a current complete result."
-        elif self.job:
-            _job_status(result, self.job, now)
-        elif not complete:
+        return picks, assessed_times
+
+
+def _set_status(
+    result: NewCardsResponse,
+    *,
+    ready: bool,
+    stale: bool,
+    complete: bool,
+    job: asyncpg.Record | None,
+    now: datetime,
+) -> None:
+    """Set the read-model status, preserving ``idle`` for completed checks."""
+    result.stale = stale
+    if not ready:
+        result.status = "unavailable"
+        result.error = "Run Admin card sync to populate complete release history and deck facts."
+    elif stale:
+        result.status = "source_stale"
+        result.error = "Card sources are too old for a current complete result."
+    elif not complete:
+        if job:
+            _job_status(result, job, now)
+        else:
             result.status = "waiting"
-        return result
 
 
 def _job_status(result: NewCardsResponse, job: asyncpg.Record, now: datetime) -> None:

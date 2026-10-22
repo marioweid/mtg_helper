@@ -882,10 +882,13 @@ CREATE TABLE IF NOT EXISTS new_card_claims (
     lease_until TIMESTAMPTZ,
     attempt_token UUID,
     error TEXT,
+    completed_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE new_card_claims DROP COLUMN IF EXISTS attempted_day;
 ALTER TABLE new_card_claims ADD COLUMN IF NOT EXISTS attempt_token UUID;
+ALTER TABLE new_card_claims ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+DELETE FROM feature_flags WHERE flag = 'new_cards_automatic' AND account_id IS NOT NULL;
 ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS recommendation_origin BOOLEAN
     NOT NULL DEFAULT false;
 

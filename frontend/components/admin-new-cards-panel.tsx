@@ -9,6 +9,7 @@ type Status = {
   automatic_active: boolean;
   cancelled: boolean;
   waiting: number;
+  finished: number;
   failed: number;
   last_error: string | null;
   source_updated_at?: string | null;
@@ -24,6 +25,7 @@ const EMPTY: Status = {
   automatic_active: false,
   cancelled: false,
   waiting: 0,
+  finished: 0,
   failed: 0,
   last_error: null,
 };
@@ -37,15 +39,27 @@ export function AdminNewCardsPanel() {
   const locked = !status.process_enabled;
   const unsafeToStart = saving || error !== null;
 
-  async function load() {
-    const response = await fetch("/api/v1/admin/new-cards");
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const next = ((await response.json()) as StatusResponse).data;
-    setStatus(next);
-  }
-
   useEffect(() => {
-    void load().catch((cause: unknown) => setError(String(cause)));
+    let active = true;
+    async function refresh() {
+      try {
+        const response = await fetch("/api/v1/admin/new-cards");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const next = ((await response.json()) as StatusResponse).data;
+        if (active) {
+          setStatus(next);
+          setError(null);
+        }
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : "Request failed");
+      }
+    }
+    void refresh();
+    const timer = setInterval(() => void refresh(), 3000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   async function action(path: string, body?: object) {
@@ -114,7 +128,7 @@ function NewCardsStatus({ status, locked }: { status: Status; locked: boolean })
       <p className="text-sm text-gray-300">
         Automatic: {status.automatic_enabled ? "on" : "off"} · Run:{" "}
         {status.manual_active || status.automatic_active ? "active" : "idle"} · Waiting{" "}
-        {status.waiting} · Failed {status.failed}
+        {status.waiting} · Finished {status.finished} · Failed {status.failed}
       </p>
       <p className="text-sm text-gray-300">
         Source updated {status.source_updated_at ?? "not available"} · Last run{" "}

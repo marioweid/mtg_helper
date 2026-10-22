@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from mtg_helper.services import feature_flag_service
 from mtg_helper.services.new_cards.service import NewCardsService
 from tests.conftest import SCHEMA_PATH, create_test_deck
 
@@ -89,10 +90,12 @@ async def test_ac05_catalog_publication_activates_automatic_work_once(
 
 
 async def test_ac06_simultaneous_workers_share_one_claim(pilot) -> None:
-    _, _, service, _ = pilot
+    deck, owner, service, _ = pilot
     await service.start_manual()
-    first, second = await asyncio.gather(service.drain_one(), service.drain_one())
-    assert sum((first, second)) == 1
+    first, second = await asyncio.gather(service.claim(owner, deck), service.claim(owner, deck))
+    claims = [work for work in (first, second) if work is not None]
+    assert len(claims) == 1
+    await service.run(claims[0])
 
 
 async def test_ac07_large_delta_has_no_daily_package_limit(pilot, db_pool, model) -> None:
@@ -171,15 +174,32 @@ async def test_ac11_picks_appear_only_after_the_complete_delta(pilot, model) -> 
     assert await service.drain_one()
     result = await service.view(owner, deck)
     assert result.remaining_count == 0 and len(result.picks) == 8 and len(model.calls) == 2
+    assert result.status == "idle"
 
 
-async def test_ac14_disabled_process_rejects_global_start(pilot, monkeypatch) -> None:
+async def test_ac13_control_status_counts_finished_constellations(pilot) -> None:
     _, _, service, _ = pilot
+    await drain(service)
+    status = await service.control_status()
+    assert status["waiting"] == 0
+    assert status["finished"] == 1
+
+
+async def test_ac14_disabled_process_rejects_global_start(
+    pilot, client, db_pool, monkeypatch
+) -> None:
+    _, owner, service, _ = pilot
     monkeypatch.setattr(
         "mtg_helper.services.new_cards.service.settings.enable_new_cards_worker", False
     )
     with pytest.raises(ValueError, match="disabled"):
         await service.start_manual()
+    response = await client.put(
+        "/api/v1/admin/feature-flags/new_cards_automatic", json={"enabled": True}
+    )
+    assert response.status_code == 422
+    with pytest.raises(ValueError, match="global setting"):
+        await feature_flag_service.set_flag(db_pool, "new_cards_automatic", True, owner.account_id)
 
 
 async def test_ac15_real_evaluator_receives_only_evidence_facts(pilot, model) -> None:

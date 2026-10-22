@@ -425,6 +425,21 @@ describe("New Cards source and empty states", () => {
     },
   );
 
+  it("describes a complete all-dismissed result as no further visible cards", async () => {
+    fetchMock.mockResolvedValueOnce(
+      respond({
+        ...result,
+        picks: [],
+        assessed_count: 12,
+        remaining_count: 0,
+        dismissed_count: 8,
+      }),
+    );
+    html();
+    await flush();
+    expect(html()).toContain("No further matching cards are visible for this deck");
+  });
+
   it("renders all faces and worth-testing advice without filler or scores", async () => {
     fetchMock.mockResolvedValueOnce(
       respond({

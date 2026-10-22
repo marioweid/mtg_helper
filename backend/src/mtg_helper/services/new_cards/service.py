@@ -56,7 +56,8 @@ class NewCardsService:
             row = await conn.fetchrow("SELECT * FROM new_card_runs WHERE singleton")
             assert row is not None
             counts = await conn.fetchrow(
-                "SELECT count(*) FILTER (WHERE error IS NULL) AS waiting, "
+                "SELECT count(*) FILTER (WHERE error IS NULL AND completed_at IS NULL) AS waiting, "
+                "count(*) FILTER (WHERE completed_at IS NOT NULL) AS finished, "
                 "count(*) FILTER (WHERE error IS NOT NULL) AS failed FROM new_card_claims"
             )
             catalog = await conn.fetchrow(
@@ -72,6 +73,7 @@ class NewCardsService:
                 "source_updated_at": catalog["published_at"].isoformat() if catalog else None,
                 "last_run_at": row["updated_at"].isoformat(),
                 "waiting": counts["waiting"] if counts else 0,
+                "finished": counts["finished"] if counts else 0,
                 "failed": counts["failed"] if counts else 0,
             }
 
@@ -334,12 +336,19 @@ class NewCardsService:
                     for c, assessment in pairs
                 ],
             )
+            published_oracle_ids = {candidate.oracle_id for candidate in work.candidates}
+            complete = all(
+                state.valid(candidate) or candidate.oracle_id in published_oracle_ids
+                for candidate in state.candidates
+            )
             await conn.execute(
                 "UPDATE new_card_claims SET token = NULL, lease_until = NULL, "
-                "attempt_token = NULL, error = NULL, "
-                "updated_at = now() WHERE constellation_key = $1 AND token = $2",
+                "attempt_token = NULL, error = NULL, completed_at = "
+                "CASE WHEN $3 THEN now() ELSE NULL END, updated_at = now() "
+                "WHERE constellation_key = $1 AND token = $2",
                 state.constellation_key,
                 work.token,
+                complete,
             )
             await conn.execute(
                 "UPDATE new_card_runs SET active_token = NULL, active_lease_until = NULL, "
@@ -351,7 +360,7 @@ class NewCardsService:
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE new_card_claims SET token = NULL, lease_until = NULL, "
-                "attempt_token = $3, error = $4, "
+                "attempt_token = $3, error = $4, completed_at = NULL, "
                 "updated_at = now() WHERE constellation_key = $1 AND token = $2",
                 work.constellation_key,
                 work.token,
@@ -480,7 +489,7 @@ async def _claim_lease(
         return None, None
     token = uuid4()
     await conn.execute(
-        "UPDATE new_card_claims SET token = $2, "
+        "UPDATE new_card_claims SET token = $2, completed_at = NULL, "
         "lease_until = now() + interval '2 minutes', "
         "error = NULL, updated_at = now() WHERE constellation_key = $1",
         constellation_key,
