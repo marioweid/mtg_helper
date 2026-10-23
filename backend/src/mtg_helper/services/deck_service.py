@@ -151,6 +151,7 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         ai_reasoning=row["ai_reasoning"],
         qualifying_stages=stages,
         role_reasons=builder_roles.reasons,
+        oracle_tags=_parse_oracle_tags(row["oracle_tags"]),
         tags=tags,
         hub_tags=tags,
         mtgjson_tags=mtgjson_tags,
@@ -158,6 +159,16 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
         game_changer=bool(row["game_changer"]) if "game_changer" in row.keys() else False,
     )
+
+
+def _parse_oracle_tags(raw: object) -> list[dict[str, str]]:
+    """Normalize the source-tag JSON projection from the deck detail view."""
+    if raw is None:
+        return []
+    values = json.loads(raw) if isinstance(raw, str) else raw
+    if not isinstance(values, list):
+        raise TypeError("Deck Oracle tags must be a JSON array")
+    return [dict(item) for item in values if isinstance(item, Mapping)]
 
 
 def _normalize_email(email: str) -> str:
@@ -453,7 +464,11 @@ async def _fetch_commander_summary(
     """Load minimal card fields for the deck detail commander preview."""
     row = await conn.fetchrow(
         "SELECT id, name, mana_cost, cmc, type_line, oracle_text, image_uri, "
-        "color_identity, power, tags, hub_tags, mtgjson_tags, game_changer "
+        "color_identity, power, tags, hub_tags, mtgjson_tags, game_changer, "
+        "COALESCE((SELECT jsonb_agg(jsonb_build_object('id', t.id, 'slug', t.slug, "
+        "'label', t.metadata->>'label') ORDER BY t.slug) FROM scryfall_tag_memberships m "
+        "JOIN scryfall_tags t ON t.id = m.tag_id WHERE m.oracle_id = cards.oracle_id), "
+        "'[]'::jsonb) AS oracle_tags "
         "FROM cards WHERE id = $1",
         card_id,
     )
@@ -471,6 +486,7 @@ async def _fetch_commander_summary(
         image_uri=row["image_uri"],
         color_identity=list(row["color_identity"] or []),
         power=_parse_power(row["power"]),
+        oracle_tags=_parse_oracle_tags(row["oracle_tags"]),
         tags=hub_tags,
         hub_tags=hub_tags,
         mtgjson_tags=mtgjson_tags,

@@ -71,7 +71,8 @@ assessed, but incomplete or stale work never publishes picks or a no-match resul
 
 Global admin routes are `GET`/`PUT /api/v1/admin/new-cards`, `POST /admin/new-cards/start`, and
 `POST /admin/new-cards/cancel`. They require both admin authorization and the process-level
-`ENABLE_NEW_CARDS_WORKER=true` opt-in; Compose explicitly keeps this disabled. There is no budget,
+`ENABLE_NEW_CARDS_WORKER` defaults to true in the production stack and remains explicitly disabled
+in local and live-data Compose. There is no budget,
 quota, reset or per-account override: an active run serially processes its Prüfdeltas.
 
 ## Pilot boundaries

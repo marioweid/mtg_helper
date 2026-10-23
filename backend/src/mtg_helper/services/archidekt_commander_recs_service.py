@@ -12,7 +12,6 @@ from uuid import UUID
 import asyncpg
 import httpx
 
-from mtg_helper.config import settings
 from mtg_helper.services.deck_url_import_service import (
     DeckFetchError,
     FetchedDeck,
@@ -127,7 +126,7 @@ async def _fetch_valid_decks(
         if len(valid) >= _MAX_DECKS:
             return valid[:_MAX_DECKS]
         if offset + _FETCH_CONCURRENCY < len(deck_ids):
-            await asyncio.sleep(max(0.0, settings.archidekt_tag_delay_seconds))
+            await asyncio.sleep(1.0)
     return valid
 
 

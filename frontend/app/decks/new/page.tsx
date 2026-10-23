@@ -19,22 +19,21 @@ const OPTIONS: { href: string; title: string; subtitle: string; description: str
     href: "/decks/new/keywords",
     title: "Pick keywords",
     subtitle: "Fastest path",
-    description:
-      "Pick a commander, then select Moxfield hub themes. Suggestions are tag-driven from there.",
+    description: "Pick a commander, then select Scryfall Oracle tags and printed keywords.",
   },
   {
     href: "/decks/new/agent",
     title: "Chat with the agent",
     subtitle: "Best for fuzzy ideas",
     description:
-      "Describe what you want; the agent asks 1-3 short questions, then converges on Moxfield hub themes for you. You can fine-tune the chips before creating.",
+      "Describe what you want; the agent asks 1-3 short questions, then suggests Scryfall source labels for you to fine-tune.",
   },
   {
     href: "/decks/import",
     title: "Import a deck list",
     subtitle: "Already have a list",
     description:
-      "Paste a Moxfield/Archidekt list or URL. After import you'll set Moxfield hub themes from the cards we detected so further suggestions stay on-theme.",
+      "Paste a deck list or URL. After import you can review Scryfall source labels before continuing.",
   },
 ];
 
@@ -43,7 +42,7 @@ export default function NewDeckChooser() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Start a new deck"
-        subtitle="Three paths. Pick whichever fits your mood - they all converge on Moxfield hub themes."
+        subtitle="Three paths. Pick whichever fits your mood - they all use Scryfall source labels."
       />
 
       <p className="mb-6 text-xs text-gray-500">

@@ -988,3 +988,44 @@ CREATE TABLE IF NOT EXISTS recommendation_feedback (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (run_id, oracle_id)
 );
+
+-- Recreate after source tables so deck reads expose direct Scryfall identities
+-- without changing the legacy columns until the reviewed cutover migration.
+CREATE OR REPLACE VIEW deck_detail_view AS
+SELECT
+    dc.deck_id,
+    dc.id AS deck_card_id,
+    dc.quantity,
+    dc.categories,
+    dc.added_by,
+    dc.ai_reasoning,
+    c.id AS card_id,
+    c.scryfall_id,
+    c.oracle_id,
+    c.name,
+    c.mana_cost,
+    c.cmc,
+    c.type_line,
+    c.oracle_text,
+    c.color_identity,
+    c.image_uri,
+    c.rarity,
+    c.tags,
+    c.hub_tags,
+    c.mtgjson_tags,
+    COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+            'id', t.id, 'slug', t.slug, 'label', t.metadata->>'label'
+        ) ORDER BY t.slug)
+        FROM scryfall_tag_memberships m
+        JOIN scryfall_tags t ON t.id = m.tag_id
+        WHERE m.oracle_id = c.oracle_id
+    ), '[]'::jsonb) AS oracle_tags,
+    CASE
+        WHEN (c.prices->>'eur') IS NULL THEN NULL
+        ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
+    END AS price_eur_cents,
+    c.power,
+    c.game_changer
+FROM deck_cards dc
+JOIN cards c ON dc.card_id = c.id;
