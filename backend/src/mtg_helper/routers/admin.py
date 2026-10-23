@@ -23,7 +23,6 @@ from mtg_helper.services import (
     archidekt_tag_service,
     feature_flag_service,
     moxfield_hub_service,
-    mtgjson,
     scryfall,
     scryfall_tag_repository,
     theme_service,
@@ -39,7 +38,6 @@ from mtg_helper.services.admin_jobs import (
 )
 from mtg_helper.services.new_cards.evaluator import NewCardEvaluator
 from mtg_helper.services.new_cards.service import NewCardsService
-from mtg_helper.services.tag_service import run_batch_tag
 
 router = APIRouter(tags=["admin"])
 
@@ -130,74 +128,9 @@ async def sync_cards(request: Request) -> dict[str, Any]:
     return _response(job)
 
 
-@router.post("/admin/sync-mtgjson", status_code=202)
-async def sync_mtgjson(request: Request) -> dict[str, Any]:
-    """Kick off MTGJSON sidecar metadata sync + diff as a background task."""
-    job = _registry(request).mtgjson
-    _ensure_idle(job)
-    start(job)
-    asyncio.create_task(
-        _wrap(job, mtgjson.run_sync(request.app.state.db_pool, progress=make_progress_cb(job)))
-    )
-    return _response(job)
-
-
-@router.post("/admin/sync-moxfield-hubs", status_code=202)
-async def sync_moxfield_hubs(request: Request) -> dict[str, Any]:
-    """Refresh Moxfield hub catalog and card membership as a background task."""
-    job = _registry(request).tag
-    _ensure_idle(job)
-    start(job)
-    asyncio.create_task(
-        _wrap(
-            job,
-            moxfield_hub_service.sync_hub_card_stats(
-                request.app.state.db_pool,
-                progress=make_progress_cb(job),
-            ),
-        )
-    )
-    return _response(job)
-
-
-@router.post("/admin/sync-archidekt-tags", status_code=202)
-async def sync_archidekt_tags(request: Request) -> dict[str, Any]:
-    """Refresh Archidekt tag catalog and card membership in the background."""
-    job = _registry(request).tag
-    _ensure_idle(job)
-    start(job)
-    asyncio.create_task(
-        _wrap(
-            job,
-            archidekt_tag_service.sync_tag_card_stats(
-                request.app.state.db_pool, progress=make_progress_cb(job)
-            ),
-        )
-    )
-    return _response(job)
-
-
-@router.post("/admin/tag-cards", status_code=202)
-async def tag_cards(request: Request) -> dict[str, Any]:
-    """Kick off a rule-based tagging pass as a background task."""
-    job = _registry(request).tag
-    _ensure_idle(job)
-    start(job)
-    asyncio.create_task(
-        _wrap(
-            job,
-            run_batch_tag(
-                request.app.state.db_pool,
-                progress=make_progress_cb(job),
-            ),
-        )
-    )
-    return _response(job)
-
-
 @router.post("/admin/refresh-all", status_code=202)
 async def refresh_all(request: Request) -> dict[str, Any]:
-    """Run the complete source refresh and card tagging pipeline."""
+    """Refresh Scryfall card facts and Oracle tags together."""
     job = _registry(request).refresh_all
     _ensure_idle(job)
     start(job)
@@ -206,30 +139,14 @@ async def refresh_all(request: Request) -> dict[str, Any]:
 
 
 async def _run_refresh_all(app: FastAPI, job: JobState) -> dict[str, Any]:
-    """Chain schema, source syncs, and tagging under one refresh-all job state."""
+    """Apply schema then publish one atomic Scryfall source generation."""
     cb = make_progress_cb(job)
     cb("applying schema", 0, 1)
     await apply_schema(app.state.db_pool)
     cb("applying schema", 1, 1)
     scryfall_result = await scryfall.run_sync(app.state.db_pool, progress=cb)
-    mtgjson_result = await mtgjson.run_sync(app.state.db_pool, progress=cb)
-    moxfield_hub_result = await moxfield_hub_service.sync_hub_card_stats(
-        app.state.db_pool, progress=cb
-    )
-    archidekt_result = await archidekt_tag_service.sync_tag_card_stats(
-        app.state.db_pool, progress=cb
-    )
-    await theme_service.seed_groups(app.state.db_pool)
-    tag_result = await run_batch_tag(app.state.db_pool, progress=cb)
     return {
         "cards_processed": scryfall_result.get("cards_processed"),
-        "mtgjson_cards_processed": mtgjson_result.get("mtgjson_cards_processed"),
-        "mtgjson_keywords_processed": mtgjson_result.get("mtgjson_keywords_processed"),
-        "moxfield_hubs_processed": moxfield_hub_result.get("moxfield_hubs_processed"),
-        "moxfield_hub_cards_matched": moxfield_hub_result.get("moxfield_hub_cards_matched"),
-        "archidekt_tags_processed": archidekt_result.get("archidekt_tags_processed"),
-        "archidekt_tag_cards_matched": archidekt_result.get("archidekt_tag_cards_matched"),
-        "cards_tagged": tag_result.get("cards_tagged"),
     }
 
 
@@ -239,8 +156,6 @@ async def status(request: Request) -> dict[str, Any]:
     registry = _registry(request)
     return {
         "sync": asdict(registry.sync),
-        "mtgjson": asdict(registry.mtgjson),
-        "tag": asdict(registry.tag),
         "refresh_all": asdict(registry.refresh_all),
         "theme_suggest": asdict(registry.theme_suggest),
         "scryfall_sources": await scryfall_tag_repository.publication_status(

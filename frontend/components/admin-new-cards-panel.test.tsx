@@ -59,6 +59,8 @@ describe("Admin New Cards controls", () => {
     const html = renderToStaticMarkup(<AdminNewCardsPanel />);
 
     expect(html).toContain("Run: idle · Waiting 0 · Finished 1 · Failed 0");
+    expect(html).toContain("Disable daily checks");
+    expect(html).toContain("bg-indigo-600");
     fixture.status = null;
   });
 

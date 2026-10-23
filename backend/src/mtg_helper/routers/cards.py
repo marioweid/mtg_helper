@@ -18,6 +18,7 @@ def _search_params(
     cmc_min: float | None = Query(default=None),
     cmc_max: float | None = Query(default=None),
     keywords: str | None = Query(default=None),
+    oracle_tag_ids: str | None = Query(default=None),
     commander_legal: bool = Query(default=True),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -30,6 +31,7 @@ def _search_params(
         cmc_min=cmc_min,
         cmc_max=cmc_max,
         keywords=keywords,
+        oracle_tag_ids=oracle_tag_ids,
         commander_legal=commander_legal,
         limit=limit,
         offset=offset,
@@ -42,7 +44,13 @@ async def search_cards(
     params: CardSearchParams = Depends(_search_params),
 ) -> DataResponse[list[CardResponse]]:
     """Search cards with optional filters."""
-    cards, total = await card_service.search_cards(request.app.state.db_pool, params)
+    try:
+        cards, total = await card_service.search_cards(request.app.state.db_pool, params)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_ORACLE_TAG", "message": str(exc)},
+        ) from exc
     return DataResponse(
         data=cards,
         meta=PaginationMeta(total=total, limit=params.limit, offset=params.offset),

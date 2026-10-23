@@ -413,6 +413,16 @@ export interface KeywordGroup {
   keywords: KeywordChip[];
 }
 
+export interface SourceTagChip {
+  id: string;
+  slug: string;
+  label: string;
+}
+
+export interface PrintedKeywordChip {
+  keyword: string;
+}
+
 /**
  * Total number of physical cards across rows. Sums ``quantity`` so basic-land
  * rows like "18 Forest" count as 18, not 1. Treats missing quantity as 1.

@@ -41,7 +41,8 @@ import type {
   CommanderSuggestResponse,
   KeywordExtractRequest,
   KeywordExtractResponse,
-  KeywordGroup,
+  PrintedKeywordChip,
+  SourceTagChip,
   ManaFixResponse,
   NewCardsResponse,
   OptimizeJobStatus,
@@ -525,8 +526,8 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  listOfficialKeywords: () => request<KeywordGroup[]>("/tags/keywords"),
-  listHubTags: () => request<KeywordGroup[]>("/tags/hubs"),
+  listOracleTags: () => request<SourceTagChip[]>("/tags/oracle"),
+  listPrintedKeywords: () => request<PrintedKeywordChip[]>("/tags/keywords"),
 
   exportMoxfield: (deckId: string): Promise<string> =>
     fetch(`${CLIENT_BASE}/decks/${deckId}/export/moxfield`).then((res) => {

@@ -50,8 +50,12 @@ export function NewCardsPanel({ deckId, onPlanChanged }: Props) {
 
   return (
     <section aria-label="New Cards" className="space-y-4">
-      <PilotWarning />
-      <NewCardsControls state={state} controller={controller} />
+      {!!state.result?.picks.length && (
+        <>
+          <PilotWarning />
+          <NewCardsCoverage result={state.result} />
+        </>
+      )}
       <NewCardsErrors state={state} controller={controller} />
       <NewCardsProgress state={state} controller={controller} />
       {state.result && (
@@ -66,28 +70,11 @@ interface StateProps {
   controller: NewCardsController;
 }
 
-function NewCardsControls({ state, controller }: StateProps) {
-  return (
-    <div className={`${BOX} space-y-3`}>
-      <NewCardsCoverage result={state.result} />
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={state.busy || state.loading}
-          onClick={() => void controller.refresh()}
-        >
-          Refresh status
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function NewCardsErrors({ state, controller }: StateProps) {
   return (
     <>
       {state.error && <RequestError message={state.error} />}
+      {state.result?.error && <RequestError message={state.result.error} />}
       {state.planRefreshError && (
         <RequestError message={state.planRefreshError}>
           <button
@@ -143,9 +130,9 @@ function PilotWarning() {
         origin filters; special-product coverage is incomplete. No community sources are used.
       </p>
       <p>
-        Catalog refresh and Commander-Konstellation checks are admin-controlled. Opening this tab,
-        refreshing status, and planning never start analysis or source sync. Advice only considers
-        the Commander-Konstellation, not this deck's strategy or contents; you decide whether a card
+        Catalog refresh and Commander-Konstellation checks are admin-controlled. Opening this tab
+        and planning never start analysis or source sync. Advice only considers the
+        Commander-Konstellation, not this deck's strategy or contents; you decide whether a card
         fits your actual deck. Planning adds one pending addition, not a physical deck edit.
       </p>
     </div>
@@ -201,7 +188,6 @@ function NewCardsCoverage({ result }: { result: NewCardsResponse | null }) {
       {result.status === "error" && (
         <p className="text-red-300">Analysis failed. Ask an admin to start a new global run.</p>
       )}
-      {result.error && <RequestError message={result.error} />}
     </div>
   );
 }
@@ -242,10 +228,12 @@ function NewCardsResults({
 }
 
 function EmptyResults({ result }: { result: NewCardsResponse }) {
-  if (result.status === "unavailable") return null;
+  if (result.status === "unavailable")
+    return <p>Not ready. An admin can check the source status.</p>;
   if (result.status === "source_stale")
     return <p>No current picks. Sources are too old, not a no-match result.</p>;
-  if (result.status === "running" || result.status === "waiting")
+  if (result.status === "running") return <p role="status">Analysis running…</p>;
+  if (result.status === "waiting")
     return <p>No picks yet; the Commander-Konstellation check is still pending.</p>;
   if (result.status === "error")
     return <p>No usable picks; analysis failed, not a no-match result.</p>;
@@ -253,13 +241,7 @@ function EmptyResults({ result }: { result: NewCardsResponse }) {
     return <p>No current picks. Source or analysis is stale, not a no-match result.</p>;
   if (result.remaining_count > 0)
     return <p>No picks yet. The Commander-Konstellation check is waiting for admin processing.</p>;
-  if (result.eligible_count === 0)
-    return <p>No released cards currently meet the pilot filters.</p>;
-  if (result.dismissed_count > 0)
-    return <p>No further matching cards are visible for this deck.</p>;
-  return (
-    <p>No strong fits or cards worth testing in the assessed eligible pool. No filler picks.</p>
-  );
+  return <p>No new cards.</p>;
 }
 
 function SourceRules({ face }: { face: NewCardFace }) {

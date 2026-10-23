@@ -30,6 +30,10 @@ const EMPTY: Status = {
   last_error: null,
 };
 
+const BUTTON =
+  "rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
 /** Global New Cards controls, deliberately separate from deck-level results. */
 export function AdminNewCardsPanel() {
   const [status, setStatus] = useState(EMPTY);
@@ -91,6 +95,7 @@ export function AdminNewCardsPanel() {
       <h2 className="font-semibold text-white">New Cards global controls</h2>
       <NewCardsStatus status={status} locked={locked} />
       <NewCardsActions
+        automaticEnabled={status.automatic_enabled}
         locked={locked}
         saving={saving}
         unsafeToStart={unsafeToStart}
@@ -140,6 +145,7 @@ function NewCardsStatus({ status, locked }: { status: Status; locked: boolean })
 }
 
 function NewCardsActions({
+  automaticEnabled,
   locked,
   saving,
   unsafeToStart,
@@ -147,6 +153,7 @@ function NewCardsActions({
   onStart,
   onCancel,
 }: {
+  automaticEnabled: boolean;
   locked: boolean;
   saving: boolean;
   unsafeToStart: boolean;
@@ -156,14 +163,19 @@ function NewCardsActions({
 }) {
   return (
     <>
-      <div className="flex gap-2">
-        <button type="button" disabled={locked || saving} onClick={onSave}>
-          Save automation
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={BUTTON} disabled={locked || saving} onClick={onSave}>
+          {automaticEnabled ? "Disable daily checks" : "Enable daily checks"}
         </button>
-        <button type="button" disabled={locked || unsafeToStart} onClick={onStart}>
+        <button
+          type="button"
+          className={BUTTON}
+          disabled={locked || unsafeToStart}
+          onClick={onStart}
+        >
           Start all
         </button>
-        <button type="button" disabled={locked || saving} onClick={onCancel}>
+        <button type="button" className={BUTTON} disabled={locked || saving} onClick={onCancel}>
           Cancel run
         </button>
       </div>
@@ -190,10 +202,15 @@ export function StartConfirmation({
   return (
     <div role="dialog" aria-label="Confirm global New Cards start" className="space-x-2">
       <span>Start all pending Commander checks?</span>
-      <button type="button" disabled={locked || unsafeToStart} onClick={onConfirm}>
+      <button
+        type="button"
+        className={BUTTON}
+        disabled={locked || unsafeToStart}
+        onClick={onConfirm}
+      >
         Confirm start
       </button>
-      <button type="button" disabled={saving} onClick={onClose}>
+      <button type="button" className={BUTTON} disabled={saving} onClick={onClose}>
         Keep waiting
       </button>
     </div>

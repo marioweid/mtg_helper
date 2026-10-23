@@ -149,6 +149,21 @@ afterEach(() => {
 });
 
 describe("New Cards panel lifecycle and HTTP actions", () => {
+  it("shows a simple complete empty result without refresh or analysis controls", async () => {
+    fetchMock.mockResolvedValueOnce(
+      respond({ ...result, picks: [], remaining_count: 0, assessed_count: 12 }),
+    );
+    html();
+    await flush();
+
+    const markup = html();
+    expect(markup).toContain("No new cards.");
+    expect(markup).not.toContain("Refresh status");
+    expect(markup).not.toContain("Coverage:");
+    expect(markup).not.toContain("Experimental pilot");
+    expect(buttons(view())).toHaveLength(0);
+  });
+
   it("loads with authenticated GET and separates source facts from advice", async () => {
     html();
     await flush();
@@ -189,12 +204,12 @@ describe("New Cards panel lifecycle and HTTP actions", () => {
   });
 
   it("ignores a pending read superseded by dismiss and cancels timers on exit", async () => {
+    fetchMock.mockResolvedValueOnce(respond({ ...result, status: "running" }));
     html();
     await flush();
     const oldRead = deferred<Response>();
     fetchMock.mockReturnValueOnce(oldRead.promise);
-    click("Refresh status");
-    await flush();
+    await vi.advanceTimersByTimeAsync(3000);
     expect(fetchMock.mock.calls[1]?.[0]).toContain("/decks/deck-1/new-cards");
     fetchMock.mockResolvedValueOnce(respond({ ...result, status: "running" }));
     click("Dismiss");
@@ -229,18 +244,17 @@ describe("New Cards refresh and dismissal", () => {
   });
 
   it("keeps old picks visibly stale until a network retry succeeds", async () => {
+    fetchMock.mockResolvedValueOnce(respond({ ...result, status: "running" }));
     html();
     await flush();
     fetchMock.mockRejectedValueOnce(new Error("offline"));
-    click("Refresh status");
-    await flush();
+    await vi.advanceTimersByTimeAsync(3000);
     expect(html()).toContain("New Creature");
     expect(html()).toContain("may be stale");
     expect(html()).toContain("Refresh New Cards failed: offline");
     const retry = deferred<Response>();
     fetchMock.mockReturnValueOnce(retry.promise);
-    click("Refresh status");
-    await flush();
+    await vi.advanceTimersByTimeAsync(3000);
     expect(html()).toContain("may be stale");
     retry.resolve(respond(result));
     await flush();
@@ -288,8 +302,6 @@ describe("New Cards planning and request failures", () => {
     parent.reject(new Error("parent offline"));
     await flush();
     expect(html()).toContain("Addition planned, but deck refresh failed: parent offline");
-    click("Refresh status");
-    await flush();
     expect(html()).toContain("Retry deck refresh");
     click("Retry deck refresh");
     await flush();
@@ -303,7 +315,7 @@ describe("New Cards planning and request failures", () => {
     html();
     await flush();
     expect(html()).toContain("Refresh New Cards failed: offline");
-    expect(html()).not.toContain("No strong fits");
+    expect(html()).not.toContain("No new cards.");
   });
 
   it.each(["Plan addition", "Dismiss"])(
@@ -390,7 +402,7 @@ describe("New Cards in-flight safeguards", () => {
 describe("New Cards source and empty states", () => {
   it.each([
     [{ status: "idle", remaining_count: 0 }, "Strong fits"],
-    [{ status: "idle", remaining_count: 0, picks: [] }, "No strong fits"],
+    [{ status: "idle", remaining_count: 0, picks: [] }, "No new cards."],
     [{ status: "waiting", picks: [] }, "still pending"],
     [{ status: "running", picks: [] }, "Analysis running"],
     [{ status: "error", error: "Model unavailable", picks: [] }, "analysis failed"],
@@ -410,11 +422,11 @@ describe("New Cards source and empty states", () => {
   it.each([
     [{ status: "unavailable", picks: [] }, "Not ready"],
     [{ status: "error", error: "Model unavailable", picks: [] }, "analysis failed, not a no-match"],
-    [{ status: "running", picks: [] }, "Commander-Konstellation check is still pending"],
+    [{ status: "running", picks: [] }, "Analysis running"],
     [{ picks: [], stale: true }, "not a no-match result"],
     [{ picks: [] }, "waiting for admin processing"],
-    [{ picks: [], remaining_count: 0 }, "No strong fits or cards worth testing"],
-    [{ picks: [], remaining_count: 0, eligible_count: 0 }, "No released cards"],
+    [{ picks: [], remaining_count: 0 }, "No new cards."],
+    [{ picks: [], remaining_count: 0, eligible_count: 0 }, "No new cards."],
   ] satisfies [Partial<NewCardsResponse>, string][])(
     "shows %j accurately",
     async (override, text) => {
@@ -437,7 +449,7 @@ describe("New Cards source and empty states", () => {
     );
     html();
     await flush();
-    expect(html()).toContain("No further matching cards are visible for this deck");
+    expect(html()).toContain("No new cards.");
   });
 
   it("renders all faces and worth-testing advice without filler or scores", async () => {
