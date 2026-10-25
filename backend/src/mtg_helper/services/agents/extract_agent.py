@@ -18,32 +18,13 @@ from mtg_helper.services.agents._prompts import (
 )
 from mtg_helper.services.agents._usage import log_run_usage
 from mtg_helper.services.agents.describe_agent import CommanderNotFoundError
-from mtg_helper.services.theme_service import load_theme_prompt_catalog, load_theme_tags
+from mtg_helper.services.keyword_catalog_service import (
+    _source_ids,
+    load_oracle_tag_prompt_catalog,
+)
+from mtg_helper.services.scryfall_tag_repository import require_tag_ids
 
 _MAX_OUTPUT_TOKENS = 2048
-
-KEYWORD_EXAMPLES: tuple[str, ...] = (
-    "landfall",
-    "surveil",
-    "scry",
-    "dredge",
-    "flashback",
-    "escape",
-    "descend",
-    "threshold",
-    "delirium",
-    "morbid",
-    "undergrowth",
-    "proliferate",
-    "investigate",
-    "connive",
-    "discover",
-    "explore",
-    "cascade",
-    "storm",
-    "toxic",
-    "infect",
-)
 
 
 @dataclass
@@ -58,17 +39,15 @@ class ExtractDeps:
     partner_oracle: str | None
     bracket: int
     at_history_limit: bool
-    hub_catalog: str
+    oracle_tag_catalog: str
 
 
 def _build_system_prompt(deps: ExtractDeps) -> str:
     color_str = ", ".join(deps.commander_colors) if deps.commander_colors else "colorless"
     bracket_desc = BRACKET_DESCRIPTIONS.get(deps.bracket, "")
-    vocab_str = ", ".join(KEYWORD_EXAMPLES)
-
     parts = [
         "You are a Magic: The Gathering Commander deck strategist.",
-        "Your job is to identify a small set of shared deck theme tags",
+        "Your job is to identify a small set of Scryfall Oracle tags",
         "that match the player's deck vision. The downstream retrieval system",
         "uses these tags as the primary card-suggestion signal.",
         "",
@@ -88,14 +67,8 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
     parts += [
         f"\nPower level: Bracket {deps.bracket} — {bracket_desc}",
         "",
-        "Use theme tags from this local Moxfield and Archidekt catalog:",
-        deps.hub_catalog,
-        "",
-        "MTGJSON mechanic examples, for context only, include:",
-        vocab_str,
-        "",
-        "Prefer hub tags like graveyard, blink, reanimator, aristocrats,",
-        "voltron, spellslinger, etb, pingers, or plus_one_plus_one_counters.",
+        "Select Oracle-tag UUIDs from this Scryfall catalog:",
+        deps.oracle_tag_catalog,
         "",
         "RULES:",
         "- Ask 1-3 short, focused questions to narrow the keyword plan while done=false.",
@@ -103,7 +76,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- Reference the commander's specific abilities when picking what to ask.",
         "- The `reply` field holds the conversational text shown to the user.",
         "- Set done=true ONLY when you have enough information.",
-        "- When done=true, populate archetype_tags with theme tags from the catalog,",
+        "- When done=true, populate archetype_tags with Oracle-tag UUIDs from the catalog,",
         "  suggested_name, and stage_targets.",
         "",
         "STAGE TARGET GUIDELINES (defaults are fixed):",
@@ -114,7 +87,7 @@ def _build_system_prompt(deps: ExtractDeps) -> str:
         "- theme has no fixed target — fills remaining slots",
         "",
         "FORBIDDEN:",
-        "- Do NOT invent tags outside the local theme catalog.",
+        "- Do NOT invent source identities outside the Scryfall catalog.",
         "- Do NOT write a prose `description` field.",
         "- Do NOT mention internal matching implementation details.",
     ]
@@ -173,8 +146,8 @@ async def extract_turn(
         message: Latest user message; empty string means the initial prompt.
 
     Returns:
-        ``KeywordExtractResponse`` with the reply, completion flag, and the
-        running Moxfield hub theme tag selection.
+        ``KeywordExtractResponse`` with the reply, completion flag, and selected
+        Scryfall Oracle-tag identities.
 
     Raises:
         CommanderNotFoundError: If the commander card is not in the database.
@@ -201,7 +174,7 @@ async def extract_turn(
         partner_oracle=partner_oracle,
         bracket=bracket,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
-        hub_catalog=await load_theme_prompt_catalog(pool),
+        oracle_tag_catalog=await load_oracle_tag_prompt_catalog(pool),
     )
     user_message = message.strip() or "I want to build a deck with this commander."
     result = await get_agent().run(
@@ -217,6 +190,7 @@ async def extract_turn(
     )
     log_run_usage("extract", "turn", result.usage())
     output = result.output
-    allowed = await load_theme_tags(pool)
-    output.archetype_tags = [tag for tag in output.archetype_tags if tag in allowed]
+    source_ids = _source_ids(output.archetype_tags)
+    await require_tag_ids(pool, source_ids)
+    output.archetype_tags = [str(source_id) for source_id in source_ids]
     return output

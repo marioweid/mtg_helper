@@ -130,8 +130,8 @@ async def test_describe_unknown_commander(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_extract_keywords_filters_unknown_tags(client: AsyncClient) -> None:
-    """The KeywordExtractResponse validator keeps MTGJSON tags only."""
+async def test_extract_keywords_rejects_invalid_source_selections(client: AsyncClient) -> None:
+    """The extract route rejects non-source identities emitted by a model."""
     with _override_extract(
         {
             "reply": "Locked in.",
@@ -149,7 +149,5 @@ async def test_extract_keywords_filters_unknown_tags(client: AsyncClient) -> Non
                 "message": "surveil lands",
             },
         )
-    assert resp.status_code == 200
-    data = resp.json()["data"]
-    assert data["done"] is True
-    assert data["archetype_tags"] == ["surveil", "landfall"]
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["code"] == "INVALID_SOURCE_SELECTION"

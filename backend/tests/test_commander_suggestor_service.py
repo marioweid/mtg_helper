@@ -4,6 +4,7 @@ import json
 from uuid import UUID
 
 import asyncpg
+import pytest
 from httpx import AsyncClient
 
 from mtg_helper.models.ai import CommanderSuggestIntent
@@ -15,22 +16,6 @@ BANNED_ID = UUID("cccccccc-3333-4333-8333-cccccccccccc")
 PINGER_ID = UUID("dddddddd-4444-4444-8444-dddddddddddd")
 
 
-async def _insert_keyword(pool: asyncpg.Pool, label: str, tag: str) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute(
-            """
-            INSERT INTO mtgjson_keywords (keyword, tag, label, category)
-            VALUES ($1, $2, $1, 'keyword_ability')
-            ON CONFLICT (keyword) DO UPDATE
-            SET tag = EXCLUDED.tag,
-                label = EXCLUDED.label,
-                category = EXCLUDED.category
-            """,
-            label,
-            tag,
-        )
-
-
 async def _insert_card(
     pool: asyncpg.Pool,
     *,
@@ -39,9 +24,7 @@ async def _insert_card(
     type_line: str,
     oracle_text: str,
     colors: list[str],
-    tags: list[str],
     keywords: list[str] | None = None,
-    traits: list[str] | None = None,
     legality: str = "legal",
     edhrec_rank: int | None = None,
 ) -> None:
@@ -51,19 +34,17 @@ async def _insert_card(
             INSERT INTO cards (
                 scryfall_id, oracle_id, name, color_identity, colors, oracle_text,
                 type_line, cmc, mana_cost, rarity, set_code, legalities, prices,
-                tags, keywords, traits, token_types, edhrec_rank, is_canonical
+                keywords, edhrec_rank, is_canonical
             )
             VALUES (
                 $1, $2, $3, $4, $4, $5, $6, 4, '{2}{B}{G}', 'mythic', 'test',
-                $7, '{}', $8, $9, $10, '{}', $11, true
+                $7, '{}', $8, $9, true
             )
             ON CONFLICT (scryfall_id) DO UPDATE
             SET oracle_text = EXCLUDED.oracle_text,
                 type_line = EXCLUDED.type_line,
                 legalities = EXCLUDED.legalities,
-                tags = EXCLUDED.tags,
                 keywords = EXCLUDED.keywords,
-                traits = EXCLUDED.traits,
                 edhrec_rank = EXCLUDED.edhrec_rank
             """,
             scryfall_id,
@@ -73,9 +54,7 @@ async def _insert_card(
             oracle_text,
             type_line,
             json.dumps({"commander": legality}),
-            tags,
             keywords or [],
-            traits or [],
             edhrec_rank,
         )
 
@@ -83,7 +62,6 @@ async def _insert_card(
 async def test_suggest_commanders_marks_card_advantage_without_score_boost(
     db_pool: asyncpg.Pool,
 ) -> None:
-    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -91,9 +69,7 @@ async def test_suggest_commanders_marks_card_advantage_without_score_boost(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="During each of your turns, you may play a card from your graveyard.",
         colors=["B", "G", "U"],
-        tags=["escape"],
         keywords=["Escape"],
-        traits=["etb"],
         edhrec_rank=100,
     )
     await _insert_card(
@@ -103,23 +79,21 @@ async def test_suggest_commanders_marks_card_advantage_without_score_boost(
         type_line="Legendary Creature - Zombie",
         oracle_text="Whenever a creature dies, each opponent loses 1 life.",
         colors=["B", "G"],
-        tags=["morbid"],
         keywords=["Morbid"],
         edhrec_rank=200,
     )
 
-    intent = CommanderSuggestIntent(mechanic_tags=["escape"], traits=["etb"], direction="graveyard")
+    intent = CommanderSuggestIntent(mechanic_tags=["Escape"], direction="graveyard")
     results = await commander_suggestor_service.suggest_commanders(db_pool, intent)
 
     assert results[0].card.scryfall_id == MULDROTHA_ID
     assert "Card advantage signal" in results[0].score_reasons
-    assert "escape" in results[0].matched_tags
+    assert "Escape" in results[0].matched_tags
 
 
 async def test_suggest_commanders_prioritizes_selected_keyword(
     db_pool: asyncpg.Pool,
 ) -> None:
-    await _insert_keyword(db_pool, "Surveil", "surveil")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -127,7 +101,6 @@ async def test_suggest_commanders_prioritizes_selected_keyword(
         type_line="Legendary Creature - Wizard",
         oracle_text="Whenever you cast a spell, draw a card.",
         colors=["U"],
-        tags=[],
         edhrec_rank=1,
     )
     await _insert_card(
@@ -137,23 +110,21 @@ async def test_suggest_commanders_prioritizes_selected_keyword(
         type_line="Legendary Creature - Zombie",
         oracle_text="Whenever you surveil, return a card from your graveyard.",
         colors=["B", "U"],
-        tags=[],
         keywords=["Surveil"],
         edhrec_rank=20000,
     )
 
-    intent = CommanderSuggestIntent(mechanic_tags=["surveil"])
+    intent = CommanderSuggestIntent(mechanic_tags=["Surveil"])
     results = await commander_suggestor_service.suggest_commanders(db_pool, intent)
 
     assert results[0].card.scryfall_id == GENERIC_ID
     assert "Keyword overlap" in results[0].score_reasons
-    assert "surveil" in results[0].matched_tags
+    assert "Surveil" in results[0].matched_tags
 
 
 async def test_suggest_commanders_filters_illegal_and_off_color(
     db_pool: asyncpg.Pool,
 ) -> None:
-    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -161,7 +132,6 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="Draw a card from your graveyard.",
         colors=["B", "G", "U"],
-        tags=["escape"],
         keywords=["Escape"],
     )
     await _insert_card(
@@ -171,12 +141,11 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
         type_line="Legendary Creature - Horror",
         oracle_text="Draw a card.",
         colors=["B"],
-        tags=["escape"],
         keywords=["Escape"],
         legality="banned",
     )
 
-    intent = CommanderSuggestIntent(mechanic_tags=["escape"], color_identity=["B"])
+    intent = CommanderSuggestIntent(mechanic_tags=["Escape"], color_identity=["B"])
     results = await commander_suggestor_service.suggest_commanders(db_pool, intent)
     result_ids = {item.card.scryfall_id for item in results}
 
@@ -187,7 +156,6 @@ async def test_suggest_commanders_filters_illegal_and_off_color(
 async def test_suggest_commanders_exact_color_match_requires_same_identity(
     db_pool: asyncpg.Pool,
 ) -> None:
-    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -195,7 +163,6 @@ async def test_suggest_commanders_exact_color_match_requires_same_identity(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="Draw a card from your graveyard.",
         colors=["B", "G", "U"],
-        tags=["escape"],
         keywords=["Escape"],
     )
     await _insert_card(
@@ -205,13 +172,12 @@ async def test_suggest_commanders_exact_color_match_requires_same_identity(
         type_line="Legendary Creature - Zombie",
         oracle_text="Draw a card from your graveyard.",
         colors=["B"],
-        tags=["escape"],
         keywords=["Escape"],
     )
 
-    loose = CommanderSuggestIntent(mechanic_tags=["escape"], color_identity=["B"])
+    loose = CommanderSuggestIntent(mechanic_tags=["Escape"], color_identity=["B"])
     exact = CommanderSuggestIntent(
-        mechanic_tags=["escape"],
+        mechanic_tags=["Escape"],
         color_identity=["B"],
         exact_color_identity=True,
     )
@@ -231,7 +197,6 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
     client: AsyncClient,
     db_pool: asyncpg.Pool,
 ) -> None:
-    await _insert_keyword(db_pool, "Escape", "escape")
     await _insert_card(
         db_pool,
         scryfall_id=MULDROTHA_ID,
@@ -239,9 +204,7 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
         type_line="Legendary Creature - Elemental Avatar",
         oracle_text="You may cast creature cards from your graveyard. Draw a card.",
         colors=["B", "G", "U"],
-        tags=["escape"],
         keywords=["Escape"],
-        traits=["etb"],
     )
 
     resp = await client.post(
@@ -250,9 +213,7 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
             "message": "",
             "intent_override": {
                 "archetype_tags": [],
-                "mechanic_tags": ["escape"],
-                "traits": ["etb"],
-                "token_types": [],
+                "mechanic_tags": ["Escape"],
                 "color_identity": ["B", "G", "U"],
                 "exact_color_identity": False,
                 "excluded_colors": [],
@@ -267,13 +228,12 @@ async def test_suggest_commanders_endpoint_reranks_from_intent_override(
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["commanders"][0]["card"]["scryfall_id"] == str(MULDROTHA_ID)
-    assert data["intent"]["mechanic_tags"] == ["escape"]
+    assert data["intent"]["mechanic_tags"] == ["Escape"]
 
 
-async def test_build_response_drops_invented_mechanic_tags(
+async def test_build_response_rejects_invented_mechanic_tags(
     db_pool: asyncpg.Pool,
 ) -> None:
-    await _insert_keyword(db_pool, "Surveil", "surveil")
     await _insert_card(
         db_pool,
         scryfall_id=GENERIC_ID,
@@ -281,21 +241,18 @@ async def test_build_response_drops_invented_mechanic_tags(
         type_line="Legendary Creature - Wizard",
         oracle_text="Whenever you surveil, draw a card.",
         colors=["U", "B"],
-        tags=[],
         keywords=["Surveil"],
     )
 
-    intent = CommanderSuggestIntent(mechanic_tags=["etb_ping", "surveil"])
-    response = await commander_suggestor_service.build_response(
-        db_pool,
-        reply="Sure.",
-        done=False,
-        intent=intent,
-        limit=8,
-    )
-
-    assert response.intent.mechanic_tags == ["surveil"]
-    assert "etb_ping" not in response.commanders[0].matched_tags
+    intent = CommanderSuggestIntent(mechanic_tags=["invented label", "Surveil"])
+    with pytest.raises(ValueError, match="Unknown printed Scryfall keyword"):
+        await commander_suggestor_service.build_response(
+            db_pool,
+            reply="Sure.",
+            done=False,
+            intent=intent,
+            limit=8,
+        )
 
 
 async def test_suggest_commanders_uses_dynamic_text_filters_for_etb_ping(
@@ -308,7 +265,6 @@ async def test_suggest_commanders_uses_dynamic_text_filters_for_etb_ping(
         type_line="Legendary Creature - Wizard",
         oracle_text="Whenever you cast a spell, draw a card.",
         colors=["U"],
-        tags=[],
         edhrec_rank=1,
     )
     await _insert_card(
@@ -321,14 +277,10 @@ async def test_suggest_commanders_uses_dynamic_text_filters_for_etb_ping(
             "ETB Pinger Legend deals 1 damage to each opponent."
         ),
         colors=["B", "R"],
-        tags=[],
-        traits=["etb"],
         edhrec_rank=50000,
     )
 
     intent = CommanderSuggestIntent(
-        mechanic_tags=["etb_ping"],
-        traits=["etb"],
         oracle_terms=["enters", "damage"],
         required_phrases=["enters", "damage"],
     )

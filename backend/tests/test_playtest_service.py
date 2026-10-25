@@ -215,11 +215,11 @@ class TestExpandDeck:
 
 class TestParseDrawCount:
     def test_default_when_no_oracle(self):
-        assert _parse_draw_count(None) == 1
-        assert _parse_draw_count("") == 1
+        assert _parse_draw_count(None) == 0
+        assert _parse_draw_count("") == 0
 
     def test_default_when_no_match(self):
-        assert _parse_draw_count("Counter target spell.") == 1
+        assert _parse_draw_count("Counter target spell.") == 0
 
     def test_word_count(self):
         assert _parse_draw_count("Target player draws two cards.") == 2
@@ -243,12 +243,12 @@ class TestToSimCardEffects:
             mana_cost="{G}",
             cmc=1,
             color_identity=["G"],
-            qualifying_stages=["ramp"],
+            oracle_text="{T}: Add {G}.",
         )
         sim = _to_sim_card(card)
         assert sim.is_ramp is True
         assert sim.is_draw is False
-        assert sim.ramp_produces == ("G",)
+        assert sim.mana_colors == ("G",)
 
     def test_ramp_artifact_colorless(self):
         card = _make_card(
@@ -257,11 +257,11 @@ class TestToSimCardEffects:
             cmc=1,
             type_line="Artifact",
             color_identity=[],
-            qualifying_stages=["ramp"],
+            oracle_text="{T}: Add {C}{C}.",
         )
         sim = _to_sim_card(card)
         assert sim.is_ramp is True
-        assert sim.ramp_produces == ("C",)
+        assert sim.mana_colors == ("C",)
 
     def test_draw_spell(self):
         card = _make_card(
@@ -303,7 +303,7 @@ class TestRampEffect:
             mana_cost="{G}",
             cmc=1,
             color_identity=["G"],
-            qualifying_stages=["ramp"],
+            oracle_text="{T}: Add {G}.",
             quantity=59,
         )
         deck = _make_deck([forest, elves], ["G"])
@@ -487,9 +487,8 @@ class TestOpeningHandStats:
 
 
 class TestDeadCardsAndInteraction:
-    def test_interaction_excluded_from_dead_count(self):
-        # Forest base + a single colored removal spell that won't be cast in
-        # early turns (CMC 4) — it must NOT show up as dead because of tags.
+    def test_legacy_interaction_label_does_not_classify_a_card(self):
+        """The simulator does not infer a permanent interaction label."""
         forest = _make_card(
             "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=37
         )
@@ -498,14 +497,12 @@ class TestDeadCardsAndInteraction:
             mana_cost="{2}{G}",
             cmc=3,
             color_identity=["G"],
-            tags=["interaction"],
             quantity=62,
         )
         deck = _make_deck([forest, removal], ["G"])
         stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=2, seed=5))
-        # Removal sits in hand for T1 — should be counted as interaction, not dead.
-        assert stats.per_turn[0].avg_interaction_in_hand > 0.0
-        assert stats.per_turn[0].avg_dead_cards == 0.0
+        assert stats.per_turn[0].avg_interaction_in_hand == 0.0
+        assert stats.per_turn[0].avg_dead_cards > 0.0
 
     def test_untagged_uncastable_counted_as_dead(self):
         forest = _make_card(
@@ -525,24 +522,21 @@ class TestDeadCardsAndInteraction:
 
 
 class TestTutorAsDraw:
-    def test_tutor_resolution_adds_to_cards_drawn_extra(self):
+    def test_legacy_tutor_label_does_not_draw_cards(self):
         forest = _make_card(
             "Forest", type_line="Basic Land — Forest", color_identity=["G"], quantity=37
         )
-        # A 1-mana "tutor" — not tagged as draw, only as tutor — should pull one
-        # card from the top of the library per resolution.
         tutor = _make_card(
             "Mock Tutor",
             mana_cost="{G}",
             cmc=1,
             color_identity=["G"],
-            tags=["tutor"],
             quantity=62,
         )
         deck = _make_deck([forest, tutor], ["G"])
         stats = simulate(deck, PlaytestSimulateRequest(trials=200, turns=3, seed=13))
-        assert stats.per_turn[2].avg_tutors_cast > 0.0
-        assert stats.per_turn[2].avg_cards_drawn_extra > 0.0
+        assert stats.per_turn[2].avg_tutors_cast == 0.0
+        assert stats.per_turn[2].avg_cards_drawn_extra == 0.0
 
 
 class TestFirstMissedLand:
@@ -871,16 +865,13 @@ class TestManaProducers:
         assert set(sim.mana_colors) == {"C", "U", "B"}
         assert sim.is_creature is False
 
-    def test_cultivate_falls_back_to_ramp_tag(self):
-        # Sorcery that searches for a land — no "Add" in oracle text. The
-        # ramp tag drives the single-source fallback in _apply_spell_effects.
+    def test_cultivate_does_not_fall_back_to_a_role_label(self):
         cultivate = _make_card(
             "Cultivate",
             mana_cost="{2}{G}",
             cmc=3,
             type_line="Sorcery",
             color_identity=["G"],
-            qualifying_stages=["ramp"],
             oracle_text=(
                 "Search your library for up to two basic land cards, reveal "
                 "those cards, put one onto the battlefield tapped and the other "
@@ -889,8 +880,8 @@ class TestManaProducers:
         )
         sim = _to_sim_card(cultivate)
         assert sim.mana_count == 0
-        assert sim.is_ramp is True
-        assert sim.ramp_produces == ("G",)
+        assert sim.is_ramp is False
+        assert sim.ramp_produces == ()
 
     def test_sol_ring_yields_same_turn_mana_in_sim(self):
         # Deck of forests + Sol Rings — on T1 player drops a Forest *and* may

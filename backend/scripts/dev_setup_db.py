@@ -1,4 +1,4 @@
-"""Local dev database bootstrap: schema, Scryfall cards, keywords, hubs, tags.
+"""Local development database bootstrap: schema and Scryfall card facts.
 
 Run from backend/ with the local DATABASE_URL in backend/.env. Uses the same
 services as the production admin pipeline but without HTTP auth.
@@ -11,14 +11,7 @@ import logging
 import asyncpg
 
 from mtg_helper.db import apply_schema
-from mtg_helper.services import (
-    archidekt_tag_service,
-    moxfield_hub_service,
-    mtgjson,
-    scryfall,
-    tag_service,
-    theme_service,
-)
+from mtg_helper.services import scryfall
 
 
 async def _run(phase: str, coro: object) -> None:
@@ -36,12 +29,6 @@ async def main() -> None:  # noqa: C901 - dev CLI with sequential optional phase
             "schema",
             "analyze",
             "cards",
-            "keywords",
-            "hubs",
-            "hub_stats",
-            "archidekt",
-            "tags",
-            "groups",
         ],
         default=None,
     )
@@ -65,18 +52,6 @@ async def main() -> None:  # noqa: C901 - dev CLI with sequential optional phase
             print("[analyze] done", flush=True)
         if only is None or "cards" in only:
             await _run("scryfall", scryfall.run_sync(pool))
-        if only is None or "keywords" in only:
-            await _run("mtgjson-keywords", mtgjson.sync_keywords(pool))
-        if only is None or "hubs" in only:
-            await _run("moxfield-hub-catalog", moxfield_hub_service.sync_hubs(pool))
-        if only is None or "hub_stats" in only:
-            await _run("moxfield-hub-stats", moxfield_hub_service.sync_hub_card_stats(pool))
-        if only is None or "archidekt" in only:
-            await _run("archidekt-tags", archidekt_tag_service.sync_tags(pool))
-        if only is None or "groups" in only:
-            await _run("theme-groups", theme_service.seed_groups(pool))
-        if only is None or "tags" in only:
-            await _run("card-tags", tag_service.run_batch_tag(pool))
     finally:
         await pool.close()
 

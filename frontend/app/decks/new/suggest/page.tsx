@@ -50,8 +50,6 @@ function emptyIntent(): CommanderSuggestIntent {
   return {
     archetype_tags: [],
     mechanic_tags: [],
-    traits: [],
-    token_types: [],
     color_identity: null,
     exact_color_identity: false,
     excluded_colors: [],
@@ -150,7 +148,7 @@ export default function CommanderSuggestPage() {
           intent={intent}
           hubTags={hubTags}
           mechanicTags={mechanicTags}
-          onHubTagsLoaded={setHubTags}
+          onOracleTagsLoaded={setHubTags}
           onMechanicTagsLoaded={setMechanicTags}
           onChange={rerank}
         />
@@ -344,14 +342,14 @@ function KeywordPanel({
   intent,
   hubTags,
   mechanicTags,
-  onHubTagsLoaded,
+  onOracleTagsLoaded,
   onMechanicTagsLoaded,
   onChange,
 }: {
   intent: CommanderSuggestIntent;
   hubTags: string[];
   mechanicTags: string[];
-  onHubTagsLoaded: (tags: string[]) => void;
+  onOracleTagsLoaded: (tags: string[]) => void;
   onMechanicTagsLoaded: (tags: string[]) => void;
   onChange: Rerank;
 }) {
@@ -362,7 +360,7 @@ function KeywordPanel({
       <h2 className="mb-3 text-sm font-semibold text-white">Inferred themes</h2>
       <ArchetypeChipPicker
         value={[...intent.archetype_tags, ...intent.mechanic_tags]}
-        onHubTagsLoaded={onHubTagsLoaded}
+        onOracleTagsLoaded={onOracleTagsLoaded}
         onMechanicTagsLoaded={onMechanicTagsLoaded}
         onChange={(tags) =>
           onChange({

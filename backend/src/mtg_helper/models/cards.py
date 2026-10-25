@@ -31,6 +31,15 @@ class CardResponse(BaseModel):
     released_at: date | None
     edhrec_rank: int | None
     game_changer: bool = False
+    oracle_tags: list["OracleTagResponse"] = Field(default_factory=list)
+
+
+class OracleTagResponse(BaseModel):
+    """A Scryfall Oracle-tag identity attached to a card."""
+
+    id: UUID
+    slug: str
+    label: str
 
 
 class CardSearchParams(BaseModel):
@@ -42,6 +51,7 @@ class CardSearchParams(BaseModel):
     cmc_min: Decimal | None = None
     cmc_max: Decimal | None = None
     keywords: str | None = None
+    oracle_tag_ids: str | None = None
     commander_legal: bool = True
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)

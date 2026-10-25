@@ -1,9 +1,6 @@
 """Compact deterministic tools used by the conversational MTG Assistant."""
 
-import re
 from collections import Counter
-from collections.abc import Mapping
-from typing import Literal
 from uuid import UUID
 
 import asyncpg
@@ -15,20 +12,8 @@ from mtg_helper.services import bracket_service, mana_base_service
 from mtg_helper.services.commander_coach import pipeline
 from mtg_helper.services.deck_fit_service import WeakCardEvidence, weak_card_evidence
 
-_MAX_THEME_MATCHES = 5
 _MAX_GAME_CHANGER_NAMES = 10
 _BASIC_LAND_TYPES = {"Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"}
-
-
-class ThemeMatch(BaseModel):
-    """One bounded theme-catalog match."""
-
-    tag: str
-    label: str
-    description: str | None = None
-    aliases: list[str] = Field(default_factory=list)
-    source: Literal["group", "moxfield", "archidekt"]
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
 class DeckAnalysis(BaseModel):
@@ -105,37 +90,6 @@ class GameChangerCheck(BaseModel):
     results: list[GameChangerStatus] = Field(default_factory=list)
     unknown_names: list[str] = Field(default_factory=list)
     ruleset: str = "project-commander-brackets-v1"
-
-
-async def search_themes(
-    pool: asyncpg.Pool,
-    query: str,
-    *,
-    limit: int = _MAX_THEME_MATCHES,
-) -> list[ThemeMatch]:
-    """Search group and source metadata without placing the full catalog in a prompt."""
-    normalized = _normalize(query)
-    if not normalized:
-        return []
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(_THEME_CATALOG_SQL)
-    ranked: list[tuple[float, asyncpg.Record]] = []
-    for row in rows:
-        score = _theme_match_score(normalized, row)
-        if score > 0:
-            ranked.append((score, row))
-    ranked.sort(key=lambda item: (item[0], item[1]["source"] == "group"), reverse=True)
-    return [
-        ThemeMatch(
-            tag=row["tag"],
-            label=row["label"],
-            description=row["description"],
-            aliases=list(row["aliases"] or []),
-            source=row["source"],
-            confidence=min(1.0, score),
-        )
-        for score, row in ranked[: min(limit, _MAX_THEME_MATCHES)]
-    ]
 
 
 def analyze_deck(deck: DeckDetailResponse) -> DeckAnalysis:
@@ -327,30 +281,6 @@ async def check_game_changers(pool: asyncpg.Pool, names: list[str]) -> GameChang
     return GameChangerCheck(results=results, unknown_names=unknown)
 
 
-def _theme_match_score(query: str, row: Mapping[str, object]) -> float:
-    tag = _normalize(str(row["tag"]).split(":", maxsplit=1)[-1])
-    label = _normalize(str(row["label"]))
-    raw_aliases = row["aliases"]
-    aliases = (
-        [_normalize(str(alias)) for alias in raw_aliases]
-        if isinstance(raw_aliases, list | tuple)
-        else []
-    )
-    description = _normalize(str(row["description"] or ""))
-    if query in {tag, label, *aliases}:
-        return 1.0
-    if query in tag or query in label or any(query in alias for alias in aliases):
-        return 0.9
-    query_words = set(query.split())
-    searchable = set(" ".join([tag, label, *aliases, description]).split())
-    overlap = len(query_words & searchable) / max(1, len(query_words))
-    return overlap * 0.8 if overlap >= 0.34 else 0.0
-
-
-def _normalize(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
-
-
 def _structural_issues(deck: DeckDetailResponse) -> list[LegalityIssue]:
     issues: list[LegalityIssue] = []
     total = sum(card.quantity for card in deck.cards) + 1 + int(deck.partner_id is not None)
@@ -448,21 +378,3 @@ def _database_legality_issues(
             )
         )
     return issues
-
-
-_THEME_CATALOG_SQL = """
-SELECT g.slug AS tag, g.label, g.description, g.aliases, 'group' AS source
-FROM theme_groups g
-WHERE g.enabled AND g.deleted_at IS NULL
-  AND EXISTS (SELECT 1 FROM theme_group_members member WHERE member.group_id = g.id)
-UNION ALL
-SELECT 'moxfield:' || h.tag, h.name, h.description, ARRAY[]::text[], 'moxfield'
-FROM moxfield_hubs h
-LEFT JOIN theme_group_members m ON m.moxfield_hub_id = h.id
-WHERE h.active AND h.enabled AND m.id IS NULL
-UNION ALL
-SELECT 'archidekt:' || t.tag, t.name, t.description, ARRAY[]::text[], 'archidekt'
-FROM archidekt_tags t
-LEFT JOIN theme_group_members m ON m.archidekt_tag_id = t.id
-WHERE t.active AND t.enabled AND m.id IS NULL
-"""

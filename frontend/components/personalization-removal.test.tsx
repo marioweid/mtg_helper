@@ -103,7 +103,6 @@ function suggestion(id: string, name: string): CardSuggestion {
     highlight_reasons: null,
     price_eur_cents: null,
     owned_in: [],
-    qualifying_stages: ["ramp"],
     sources: ["Tags"],
     game_changer: false,
   };

@@ -181,8 +181,8 @@ ADMIN_EMAILS="you@example.com,other@example.com"
 The frontend obtains `is_admin` from the current account; the backend enforces access.
 Standalone staging uses root `ADMIN_EMAILS` as described in its own runbook.
 
-Use **Refresh All** for the complete source-sync and rule-based tagging pipeline. It includes
-Scryfall, MTGJSON, Moxfield and Archidekt; no separate indexing service is required.
+Use **Refresh All** to apply the schema and publish one atomic Scryfall card, Oracle-tag, and
+printed-keyword generation. No separate label or vector service is required.
 
 ```bash
 TOKEN="<configured INTERNAL_API_TOKEN>"
@@ -195,14 +195,14 @@ For production internal jobs use `http://backend:8000` from the stack network, a
 does. The public frontend proxy requires a Google session; an internal token alone does not
 authenticate through it. Do not expose the backend publicly to run maintenance.
 
-For a Scryfall-only refresh, use `/api/v1/admin/sync-cards`; for rule-based tagging only,
-use `/api/v1/admin/tag-cards`. Jobs run in the background; inspect `/api/v1/admin/status`
-or the Admin UI for completion before starting dependent work.
+For a Scryfall refresh without schema apply, use `/api/v1/admin/sync-cards`. Jobs run in the
+background; inspect `/api/v1/admin/status` or the Admin UI for completion before starting
+dependent work.
 
 Daily card auto-sync runs **only in prod** via `scryfall-sync` in `docker-compose.prod.yml`.
-It runs full source sync and tagging on startup and every seventh day; intervening daily runs
-only sync shared Scryfall facts/history. This does not run deck AI analysis. Locally, sync manually
-from Admin. Backend startup also syncs when `cards` is empty.
+It runs a full Scryfall refresh on startup and every seventh day; intervening daily runs publish
+shared Scryfall facts, history, Oracle tags, and printed keywords. This does not run deck AI
+analysis. Locally, sync manually from Admin. Backend startup also syncs when `cards` is empty.
 
 ### Experimental New Cards pilot
 

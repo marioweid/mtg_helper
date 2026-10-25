@@ -52,7 +52,6 @@ class CardSuggestion(BaseModel):
     highlight_reasons: list[str] | None = None
     price_eur_cents: int | None = None
     owned_in: list[CollectionMembership] = Field(default_factory=list)
-    qualifying_stages: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
     game_changer: bool = False
 
@@ -114,7 +113,7 @@ class DescribeResponse(BaseModel):
 
 
 class KeywordExtractRequest(BaseModel):
-    """Request body for the Moxfield hub theme-extracting deck agent."""
+    """Request body for the Scryfall Oracle-tag selection deck agent."""
 
     commander_scryfall_id: UUID
     partner_scryfall_id: UUID | None = None
@@ -420,8 +419,8 @@ class CommanderCoachStartResponse(BaseModel):
 class KeywordExtractResponse(BaseModel):
     """Response from the keyword-extracting deck agent.
 
-    ``archetype_tags`` is the running set of canonical Moxfield hub theme tags the
-    agent has inferred from the conversation.
+    ``archetype_tags`` is the running set of Scryfall Oracle-tag UUIDs the agent
+    selected from the current source catalog.
     """
 
     reply: str
@@ -433,8 +432,8 @@ class KeywordExtractResponse(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_known_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Accept Moxfield hub theme tags; preserve order."""
-        return _dedupe_tag_shape(value)
+        """Preserve source identities for database validation at the route boundary."""
+        return _dedupe_source_values(value)
 
 
 class CommanderSuggestIntent(BaseModel):
@@ -442,8 +441,6 @@ class CommanderSuggestIntent(BaseModel):
 
     archetype_tags: list[str] = Field(default_factory=list, max_length=24)
     mechanic_tags: list[str] = Field(default_factory=list, max_length=24)
-    traits: list[str] = Field(default_factory=list, max_length=12)
-    token_types: list[str] = Field(default_factory=list, max_length=12)
     color_identity: list[str] | None = Field(default=None, max_length=5)
     exact_color_identity: bool = False
     excluded_colors: list[str] = Field(default_factory=list, max_length=5)
@@ -458,63 +455,14 @@ class CommanderSuggestIntent(BaseModel):
     @field_validator("archetype_tags", mode="after")
     @classmethod
     def _filter_archetype_tags(cls, value: list[str]) -> list[str]:
-        """Keep Moxfield hub theme tags; DB sanitization checks catalog membership."""
-        return _dedupe_tag_shape(value)
+        """Preserve Oracle-tag UUIDs exactly until catalog validation."""
+        return _dedupe_source_values(value)
 
     @field_validator("mechanic_tags", mode="after")
     @classmethod
     def _filter_mechanic_tags(cls, value: list[str]) -> list[str]:
-        """Keep known printed mechanic tags only."""
-        return _filter_commander_suggest_tags(value, include_mechanics=True)
-
-    @field_validator("traits", mode="after")
-    @classmethod
-    def _filter_traits(cls, value: list[str]) -> list[str]:
-        """Keep supported mechanical traits only."""
-        return _dedupe_allowed(value, {"etb", "activated", "evasion"})
-
-    @field_validator("token_types", mode="after")
-    @classmethod
-    def _filter_token_types(cls, value: list[str]) -> list[str]:
-        """Keep simple canonical token type tags."""
-        allowed = {
-            "treasure",
-            "food",
-            "clue",
-            "blood",
-            "powerstone",
-            "map",
-            "incubator",
-            "zombie",
-            "soldier",
-            "spirit",
-            "saproling",
-            "goblin",
-            "elf",
-            "squirrel",
-            "angel",
-            "demon",
-            "dragon",
-            "elemental",
-            "beast",
-            "bird",
-            "cat",
-            "human",
-            "knight",
-            "warrior",
-            "thopter",
-            "servo",
-            "insect",
-            "rat",
-            "snake",
-            "wolf",
-            "vampire",
-            "faerie",
-            "merfolk",
-            "plant",
-            "horror",
-        }
-        return _dedupe_allowed(value, allowed)
+        """Preserve exact printed keyword identities until catalog validation."""
+        return _dedupe_source_values(value)
 
     @field_validator("color_identity", mode="after")
     @classmethod
@@ -554,8 +502,6 @@ class CommanderSuggestion(BaseModel):
     score: float
     score_reasons: list[str] = Field(default_factory=list)
     matched_tags: list[str] = Field(default_factory=list)
-    matched_traits: list[str] = Field(default_factory=list)
-    matched_token_types: list[str] = Field(default_factory=list)
     card_advantage_reasons: list[str] = Field(default_factory=list)
 
 
@@ -592,73 +538,17 @@ def _dedupe_allowed(
     return [color for color in order if color in seen]
 
 
-def _filter_commander_suggest_tags(value: list[str], *, include_mechanics: bool) -> list[str]:
-    """Filter commander tags against the MTGJSON keyword vocabulary shape."""
-    if include_mechanics:
-        return _dedupe_sane_tags(value)
-    return []
-
-
-def _dedupe_tag_shape(value: list[str]) -> list[str]:
-    """Accept short snake-case tag ids without importing DB state."""
+def _dedupe_source_values(value: list[str]) -> list[str]:
+    """Strip and deduplicate source values without changing their identities."""
     seen: set[str] = set()
     out: list[str] = []
     for item in value:
         if not isinstance(item, str):
             continue
-        tag = item.strip().lower()
-        if tag and tag not in seen and tag.replace("_", "").isalnum():
-            seen.add(tag)
-            out.append(tag)
-    return out
-
-
-def _dedupe_sane_tags(value: list[str]) -> list[str]:
-    """Accept locally synced MTGJSON keyword tags without importing DB state."""
-    old_custom_tags = {
-        "ramp",
-        "draw",
-        "interaction",
-        "tutor",
-        "token",
-        "plus_one_counters",
-        "lifegain",
-        "graveyard",
-        "aristocrats",
-        "cost_reduction",
-        "anthem",
-        "card_selection",
-        "equipment",
-        "voltron",
-        "stax",
-        "group_hug",
-        "fast_mana",
-        "blink",
-        "extra_turn",
-        "land_destruction",
-        "tribal",
-        "reanimator",
-        "spellslinger",
-        "wheels",
-        "treasure_matters",
-        "food_matters",
-        "clue_matters",
-        "infect_toxic",
-    }
-    seen: set[str] = set()
-    out: list[str] = []
-    for item in value:
-        if not isinstance(item, str):
-            continue
-        tag = item.strip().lower()
-        if (
-            tag
-            and tag not in old_custom_tags
-            and tag not in seen
-            and tag.replace("_", "").isalnum()
-        ):
-            seen.add(tag)
-            out.append(tag)
+        source_value = item.strip()
+        if source_value and source_value not in seen:
+            seen.add(source_value)
+            out.append(source_value)
     return out
 
 

@@ -203,6 +203,26 @@ async def publication_status(pool: asyncpg.Pool) -> dict:
     }
 
 
+async def require_tag_ids(pool: asyncpg.Pool, identities: list[UUID]) -> None:
+    """Reject unknown Oracle-tag source identities before a card filter executes.
+
+    Args:
+        pool: PostgreSQL pool containing the current Scryfall generation.
+        identities: UUID identities requested by an application route.
+
+    Raises:
+        ValueError: If any identity is not present in the current source generation.
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id FROM scryfall_tags WHERE id = ANY($1::uuid[])", identities
+        )
+    found = {row["id"] for row in rows}
+    missing = set(identities) - found
+    if missing:
+        raise ValueError(f"Unknown Scryfall Oracle-tag UUID: {min(missing)}")
+
+
 def restore(blob: bytes, digest: str, cards_hash: str) -> OracleTagCatalog:
     """Verify an immutable tag snapshot and its card binding before replaying searches."""
     snapshot = unpack(blob, digest)

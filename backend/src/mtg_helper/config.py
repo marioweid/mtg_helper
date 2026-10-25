@@ -19,15 +19,9 @@ class Settings(BaseSettings):
     run_startup_maintenance: bool = True
     openai_api_key: Annotated[SecretStr, Field(min_length=1)]
     scryfall_bulk_data_url: str = "https://api.scryfall.com/bulk-data"
-    mtgjson_all_printings_url: str = "https://mtgjson.com/api/v5/AllPrintings.json.zip"
-    mtgjson_keywords_url: str = "https://mtgjson.com/api/v5/Keywords.json"
     moxfield_base_url: str = "https://api2.moxfield.com"
-    moxfield_hub_delay_seconds: float = 5.0
-    moxfield_hub_stale_after_hours: float = 168.0
     moxfield_binder_page_delay_seconds: float = 0.25
     archidekt_base_url: str = "https://archidekt.com/api"
-    archidekt_tag_delay_seconds: float = 1.0
-    archidekt_tag_stale_after_hours: float = 168.0
 
     # Remote Assay tracing is disabled unless all three values are supplied.
     assay_endpoint: str = ""

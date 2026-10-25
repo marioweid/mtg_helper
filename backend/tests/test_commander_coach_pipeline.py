@@ -390,13 +390,9 @@ async def test_find_cards_passes_natural_theme_hints_to_discovery() -> None:
     assert result.evidence_source is CardEvidenceSource.GLOBAL_FALLBACK
 
 
-def test_find_cards_input_treats_natural_theme_tags_as_hints() -> None:
-    filters = mtg_assistant.AssistantCardSearchInput(
-        theme_tags=["Food sacrifice", "aristocrats"],
-    )
-
-    assert filters.theme_tags == ["aristocrats"]
-    assert filters.theme_hints == ["Food sacrifice"]
+def test_find_cards_input_rejects_non_source_theme_tags() -> None:
+    with pytest.raises(ValueError, match="Scryfall UUIDs"):
+        mtg_assistant.AssistantCardSearchInput(theme_tags=["Food sacrifice", "aristocrats"])
 
 
 def test_assistant_drops_ungrounded_cards_and_unknown_cuts() -> None:
