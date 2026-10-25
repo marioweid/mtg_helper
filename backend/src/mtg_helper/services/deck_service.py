@@ -1,8 +1,6 @@
 """Deck CRUD service with color identity validation."""
 
-import asyncio
 import json
-import logging
 from collections.abc import Mapping
 from uuid import UUID
 
@@ -23,16 +21,23 @@ from mtg_helper.models.decks import (
 from mtg_helper.services import (
     card_identity_service,
     collection_service,
-    deck_fit_service,
     mana_curve_service,
     planned_change_service,
 )
-from mtg_helper.services.builder_roles import derive_builder_roles
-
-_log = logging.getLogger(__name__)
+from mtg_helper.services.scryfall_tag_repository import require_tag_ids
 
 # Ordered list of build stages. "created" is the initial state before any stage.
 STAGES: list[str] = ["theme", "ramp", "draw", "interaction", "lands", "complete"]
+
+
+async def _validate_source_tags(pool: asyncpg.Pool, values: list[str]) -> list[str]:
+    """Return canonical Oracle-tag UUID strings from a deck selection."""
+    try:
+        source_ids = [UUID(value) for value in values]
+    except ValueError as exc:
+        raise ValueError("Deck Oracle tags must be Scryfall source UUIDs") from exc
+    await require_tag_ids(pool, source_ids)
+    return list(dict.fromkeys(str(source_id) for source_id in source_ids))
 
 
 def next_stage(current: str) -> str | None:
@@ -122,15 +127,7 @@ def _parse_power(raw: str | None) -> int | None:
 
 
 def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
-    hub_tags = list(row["hub_tags"] or []) if "hub_tags" in row.keys() else []
-    tags = hub_tags or (list(row["tags"] or []) if "tags" in row.keys() else [])
-    mtgjson_tags = list(row["mtgjson_tags"] or []) if "mtgjson_tags" in row.keys() else []
     categories = list(row["categories"] or [])
-    builder_roles = derive_builder_roles(tags, mtgjson_tags, row["type_line"])
-    stages = list(builder_roles.roles)
-    for cat in categories:
-        if cat not in stages:
-            stages.append(cat)
     power = _parse_power(row["power"]) if "power" in row.keys() else None
     return DeckCardItem(
         deck_card_id=row["deck_card_id"],
@@ -149,12 +146,8 @@ def _row_to_deck_card_item(row: asyncpg.Record) -> DeckCardItem:
         categories=categories,
         added_by=row["added_by"],
         ai_reasoning=row["ai_reasoning"],
-        qualifying_stages=stages,
-        role_reasons=builder_roles.reasons,
         oracle_tags=_parse_oracle_tags(row["oracle_tags"]),
-        tags=tags,
-        hub_tags=tags,
-        mtgjson_tags=mtgjson_tags,
+        keywords=list(row["keywords"] or []),
         power=power,
         price_eur_cents=row["price_eur_cents"] if "price_eur_cents" in row.keys() else None,
         game_changer=bool(row["game_changer"]) if "game_changer" in row.keys() else False,
@@ -259,15 +252,12 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
     Raises:
         CardNotFoundError: If the commander or partner is not in the local DB.
     """
+    archetype_tags = await _validate_source_tags(pool, data.archetype_tags)
     async with pool.acquire() as conn:
         commander_id = await _resolve_scryfall_id(conn, data.commander_scryfall_id)
         partner_id = None
         if data.partner_scryfall_id:
             partner_id = await _resolve_scryfall_id(conn, data.partner_scryfall_id)
-        archetype_tags = list(data.archetype_tags)
-        if not archetype_tags:
-            archetype_tags = await _commander_seed_tags(conn, commander_id)
-
         row = await conn.fetchrow(
             """
             INSERT INTO decks (name, commander_id, partner_id, description, bracket, owner_email,
@@ -285,34 +275,7 @@ async def create_deck(pool: asyncpg.Pool, data: DeckCreate, email: str) -> DeckR
             list(data.suggestion_collection_ids),
             archetype_tags,
         )
-    deck = _row_to_deck(row)
-    asyncio.create_task(_safe_moxfield_refresh(pool, deck.commander_id))
-    return deck
-
-
-async def _commander_seed_tags(conn: asyncpg.Connection, commander_id: UUID) -> list[str]:
-    """Use the commander's Moxfield hub tags as initial deck identity when available."""
-    row = await conn.fetchrow(
-        """
-        SELECT hub_tags, tags
-        FROM cards
-        WHERE id = $1
-        """,
-        commander_id,
-    )
-    if row is None:
-        return []
-    return list(row["hub_tags"] or row["tags"] or [])
-
-
-async def _safe_moxfield_refresh(pool: asyncpg.Pool, commander_id: UUID) -> None:
-    """Pre-warm the Moxfield top-decks cache for a freshly created deck's commander."""
-    from mtg_helper.services import moxfield_recs_service
-
-    try:
-        await moxfield_recs_service.get_or_refresh(pool, commander_id)
-    except Exception:
-        _log.exception("Background Moxfield refresh failed for commander %s", commander_id)
+    return _row_to_deck(row)
 
 
 async def list_decks(
@@ -451,10 +414,6 @@ async def get_deck(
         planned_card_count=planned_card_count,
         planned_changes=planned_changes,
     )
-    try:
-        await deck_fit_service.enrich_deck_fit(pool, deck)
-    except Exception:  # noqa: BLE001 - scoring must not make deck detail unavailable
-        _log.exception("Deck fit scoring failed for deck %s", deck_id)
     return deck
 
 
@@ -464,7 +423,7 @@ async def _fetch_commander_summary(
     """Load minimal card fields for the deck detail commander preview."""
     row = await conn.fetchrow(
         "SELECT id, name, mana_cost, cmc, type_line, oracle_text, image_uri, "
-        "color_identity, power, tags, hub_tags, mtgjson_tags, game_changer, "
+        "color_identity, power, keywords, game_changer, "
         "COALESCE((SELECT jsonb_agg(jsonb_build_object('id', t.id, 'slug', t.slug, "
         "'label', t.metadata->>'label') ORDER BY t.slug) FROM scryfall_tag_memberships m "
         "JOIN scryfall_tags t ON t.id = m.tag_id WHERE m.oracle_id = cards.oracle_id), "
@@ -474,8 +433,6 @@ async def _fetch_commander_summary(
     )
     if row is None:
         return None
-    hub_tags = list(row["hub_tags"] or row["tags"] or [])
-    mtgjson_tags = list(row["mtgjson_tags"] or [])
     return CommanderCardSummary(
         id=row["id"],
         name=row["name"],
@@ -487,9 +444,7 @@ async def _fetch_commander_summary(
         color_identity=list(row["color_identity"] or []),
         power=_parse_power(row["power"]),
         oracle_tags=_parse_oracle_tags(row["oracle_tags"]),
-        tags=hub_tags,
-        hub_tags=hub_tags,
-        mtgjson_tags=mtgjson_tags,
+        keywords=list(row["keywords"] or []),
         game_changer=bool(row["game_changer"]),
     )
 
@@ -515,6 +470,8 @@ async def update_deck(
     updates = data.model_dump(exclude_none=True)
     if not updates:
         return await _fetch_deck(pool, deck_id)
+    if "archetype_tags" in updates:
+        updates["archetype_tags"] = await _validate_source_tags(pool, updates["archetype_tags"])
 
     # Serialize JSONB fields for asyncpg
     if "stage_targets" in updates:
@@ -769,7 +726,7 @@ async def update_deck_card_categories(
 
     A card can belong to multiple buckets (e.g. ramp + draw); pass an empty
     list to clear all manual categories. The card will still be auto-bucketed
-    by its ``qualifying_stages`` derived from the cards table.
+    by the personal categories already assigned to its deck card.
 
     Args:
         pool: asyncpg connection pool.

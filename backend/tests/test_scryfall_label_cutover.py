@@ -105,6 +105,83 @@ async def test_ac05_invalid_source_id_is_an_actionable_error(client: AsyncClient
     assert response.json()["detail"]["code"] == "INVALID_ORACLE_TAG"
 
 
+@pytest.mark.asyncio
+async def test_ac06_deck_selection_rejects_unknown_source_id(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    """Deck selection persists only current concrete source identities."""
+    await _seed_tags(db_pool)
+    response = await client.post(
+        "/api/v1/decks",
+        json={
+            "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
+            "name": "Invalid source selection",
+            "archetype_tags": ["10000000-0000-0000-0000-000000000099"],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "INVALID_SOURCE_SELECTION"
+
+
+@pytest.mark.asyncio
+async def test_ac08_apply_removes_retired_storage_and_is_idempotent(
+    db_pool: asyncpg.Pool,
+) -> None:
+    """A populated rehearsal keeps source selections while dropping retired storage."""
+    migration = _migration_module()
+    source_hash = "a" * 64
+    tag_hash = "b" * 64
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO recommendation_sources (sha256, kind, payload) VALUES "
+            "($1, 'cards', '\\x00'), ($2, 'oracle_tags', '\\x00')",
+            source_hash,
+            tag_hash,
+        )
+        await conn.execute(
+            "INSERT INTO new_card_catalog_state "
+            "(singleton, generation, started_at, published_at, card_count, source_sha256) "
+            "VALUES (true, gen_random_uuid(), now(), now(), 1, $1)",
+            source_hash,
+        )
+        await conn.execute(
+            "INSERT INTO scryfall_tag_state "
+            "(singleton, source_sha256, tag_sha256, archive_sha256, manifest, started_at, "
+            "published_at, tag_count, membership_count) "
+            "VALUES (true, $1, $2, $3, '{}', now(), now(), 1000, 1000)",
+            source_hash,
+            tag_hash,
+            source_hash,
+        )
+        await _seed_tags(db_pool)
+        await conn.execute(
+            "ALTER TABLE cards ADD COLUMN tags text[] NOT NULL DEFAULT '{}'; "
+            "ALTER TABLE cards ADD COLUMN hub_tags text[] NOT NULL DEFAULT '{}'; "
+            "ALTER TABLE cards ADD COLUMN mtgjson_tags text[] NOT NULL DEFAULT '{}'; "
+            "ALTER TABLE cards ADD COLUMN traits text[] NOT NULL DEFAULT '{}'; "
+            "ALTER TABLE cards ADD COLUMN token_types text[] NOT NULL DEFAULT '{}'; "
+            "CREATE TABLE mtgjson_keywords (keyword text PRIMARY KEY)"
+        )
+        deck_id = await conn.fetchval(
+            "INSERT INTO decks (name, commander_id, archetype_tags) "
+            "SELECT 'Cutover', id, ARRAY['child'] FROM cards WHERE scryfall_id = $1 RETURNING id",
+            HAZEL_SCRYFALL_ID,
+        )
+        aliases, identities = await migration._load_source(conn)
+        updates, unresolved = await migration._plan(conn, aliases, identities)
+        assert not unresolved
+        await migration._apply(conn, updates)
+        assert await conn.fetchval("SELECT archetype_tags FROM decks WHERE id = $1", deck_id) == [
+            str(CHILD)
+        ]
+        assert not await conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'cards' AND column_name = 'mtgjson_tags')"
+        )
+        assert not await conn.fetchval("SELECT to_regclass('public.mtgjson_keywords') IS NOT NULL")
+        await migration._apply(conn, {})
+
+
 @pytest.mark.no_db
 def test_ac06_rejects_non_uuid_oracle_tag_model_choices() -> None:
     """Model selections must be concrete Scryfall source identities."""
@@ -143,6 +220,16 @@ def test_ac09_requires_an_isolated_target_and_private_new_report(tmp_path: Path)
     report.write_text("existing", encoding="utf-8")
     with pytest.raises(ValueError, match="refusing to overwrite"):
         migration._private_report_path(report)
+
+
+@pytest.mark.no_db
+def test_ac09_rejects_loopback_alias_for_application_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Loopback aliases identify the same application target, not a safe rehearsal."""
+    migration = _migration_module()
+    monkeypatch.setenv("DATABASE_URL", "postgresql://mtg@localhost:55451/scryfall_build3_test")
+    assert not migration._is_safe_target("postgresql://mtg@127.0.0.1:55451/scryfall_build3_test")
 
 
 @pytest.mark.no_db

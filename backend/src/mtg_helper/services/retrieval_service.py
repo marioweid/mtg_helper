@@ -1,4 +1,4 @@
-"""Structured retrieval service: tags + FTS + trusted inclusion scoring."""
+"""Structured retrieval service over Oracle-tag memberships and card facts."""
 
 import asyncio
 import logging
@@ -9,18 +9,17 @@ from uuid import UUID
 
 import asyncpg
 
-from mtg_helper.services import moxfield_recs_service, theme_service
-
 _log = logging.getLogger(__name__)
 
 # Target CMC distribution for a typical commander deck (excluding lands/commander).
 # Keys are CMC buckets; 6 means "6 or more". Values are target fractions.
 _TARGET_CMC: dict[int, float] = {0: 0.05, 1: 0.08, 2: 0.22, 3: 0.25, 4: 0.18, 5: 0.12, 6: 0.10}
+_MAX_INNER_POOL = 1000
 
 
 @dataclass
 class TypeFilter:
-    """Parsed type/subtype/keyword/trait preferences from a user query.
+    """Parsed type, subtype, and printed-keyword preferences from a user query.
 
     When present, cards matching these criteria get a score boost during fusion.
     When ``strict=True``, cards with zero matches are scored 0.0 (hard-filtered out).
@@ -33,8 +32,6 @@ class TypeFilter:
     card_types: list[str]
     subtypes: list[str]
     keywords: list[str] = field(default_factory=list)
-    traits: list[str] = field(default_factory=list)
-    token_types: list[str] = field(default_factory=list)
     strict: bool = False
     match_all_categories: bool = False
 
@@ -44,12 +41,9 @@ class RepresentationQuery:
     """Structured deterministic terms used for representation scoring."""
 
     tags: list[str] = field(default_factory=list)
-    mtgjson_tags: list[str] = field(default_factory=list)
     card_types: list[str] = field(default_factory=list)
     subtypes: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
-    traits: list[str] = field(default_factory=list)
-    token_types: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -109,7 +103,6 @@ class RetrievedCard:
     color_identity: list[str]
     image_uri: str | None
     tags: list[str]
-    token_types: list[str]
     edhrec_rank: int | None
     power: str | None
     toughness: str | None
@@ -118,214 +111,28 @@ class RetrievedCard:
     score: float
     game_changer: bool = False
     signals: list[str] = field(default_factory=list)
-    hub_weight: float = 0.0
-    moxfield_weight: float = 0.0
-
-
-# Maps natural-language terms to tag names
-_TAG_SYNONYMS: dict[str, list[str]] = {
-    "ramp": ["ramp"],
-    "mana": ["ramp"],
-    "acceleration": ["ramp"],
-    "rocking": ["ramp"],
-    "draw": ["draw"],
-    "card draw": ["draw"],
-    "card advantage": ["draw"],
-    "cantrip": ["draw"],
-    "removal": ["interaction"],
-    "kill": ["interaction"],
-    "destroy": ["interaction"],
-    "exile": ["interaction"],
-    "interaction": ["interaction"],
-    "interactive": ["interaction"],
-    "board wipe": ["interaction"],
-    "wrath": ["interaction"],
-    "sweeper": ["interaction"],
-    "counterspell": ["interaction"],
-    "counter": ["interaction"],
-    "counters": ["interaction", "plus_one_counters"],
-    "tutor": ["tutor"],
-    "search": ["tutor"],
-    "token": ["tokens"],
-    "tokens": ["tokens"],
-    "+1/+1": ["plus_one_plus_one_counters"],
-    "plus one": ["plus_one_plus_one_counters"],
-    "counters strategy": ["plus_one_plus_one_counters"],
-    "lifegain": ["lifegain"],
-    "life": ["lifegain"],
-    "gain life": ["lifegain"],
-    "graveyard": ["graveyard"],
-    "reanimator": ["graveyard"],
-    "recursion": ["graveyard"],
-    "graveyard hate": ["interaction"],
-    "exile graveyard": ["interaction"],
-    "graveyard removal": ["interaction"],
-    "sacrifice": ["sacrifice"],
-    "sac": ["sacrifice"],
-    "aristocrats": ["aristocrats"],
-    "death": ["aristocrats"],
-    "equipment": ["equipment"],
-    "voltron": ["voltron", "equipment"],
-    "aura": ["voltron"],
-    "stax": ["stax"],
-    "tax": ["stax"],
-    "group hug": ["group_hug"],
-    "hug": ["group_hug"],
-    "fast mana": ["fast_mana"],
-    "blink": ["blink"],
-    "flicker": ["blink"],
-    "mill": ["mill"],
-    "protection": ["interaction"],
-    "hexproof": ["interaction"],
-    "indestructible": ["interaction"],
-    "extra turn": ["extra_turn"],
-    "land destruction": ["land_destruction"],
-    "tribal": ["tribal"],
-    "cost reduction": ["cost_reduction"],
-    "discount": ["cost_reduction"],
-    "cheaper": ["cost_reduction"],
-    "anthem": ["anthem"],
-    "global buff": ["anthem"],
-    "lord effect": ["anthem"],
-    "proliferate": ["proliferate"],
-    "scry": ["card_selection"],
-    "surveil": ["card_selection"],
-    "card selection": ["card_selection"],
-    "filtering": ["card_selection"],
-    "treasure": ["treasure"],
-    "food token": ["food"],
-    "clue token": ["clues"],
-    "blood token": ["tokens"],
-    "powerstone": ["tokens"],
-    "treasure token": ["treasure"],
-    # New archetype synonyms (tag_service v2)
-    "reanimate": ["reanimator"],
-    "reanimation": ["reanimator"],
-    "cascade": ["cascade"],
-    "storm": ["storm"],
-    "landfall": ["landfall"],
-    "lands matter": ["landfall"],
-    "spellslinger": ["spellslinger"],
-    "spells matter": ["spellslinger"],
-    "wheels": ["wheels"],
-    "wheel": ["wheels"],
-    "treasure matters": ["treasure"],
-    "treasures matter": ["treasure"],
-    "food matters": ["food"],
-    "clue matters": ["clues"],
-    "infect": ["infect"],
-    "toxic": ["infect"],
-    "poison": ["infect"],
-}
-
-# Token types that can be detected from a query (maps query word → canonical name)
-_TOKEN_TYPE_NAMES: dict[str, str] = {
-    "treasure": "treasure",
-    "food": "food",
-    "clue": "clue",
-    "blood": "blood",
-    "powerstone": "powerstone",
-    "map": "map",
-    "incubator": "incubator",
-    # Creature token types
-    "zombie": "zombie",
-    "soldier": "soldier",
-    "spirit": "spirit",
-    "saproling": "saproling",
-    "goblin": "goblin",
-    "elf": "elf",
-    "squirrel": "squirrel",
-    "angel": "angel",
-    "demon": "demon",
-    "dragon": "dragon",
-    "elemental": "elemental",
-    "beast": "beast",
-    "bird": "bird",
-    "cat": "cat",
-    "human": "human",
-    "knight": "knight",
-    "warrior": "warrior",
-    "thopter": "thopter",
-    "servo": "servo",
-    "insect": "insect",
-    "rat": "rat",
-    "snake": "snake",
-    "wolf": "wolf",
-    "vampire": "vampire",
-    "faerie": "faerie",
-    "merfolk": "merfolk",
-    "plant": "plant",
-    "horror": "horror",
-}
-
-# Stages that a card auto-cross-counts into based on tags / type. Theme is
-# deck-specific (no tag mapping) and is excluded from auto-membership.
-_STAGE_TAG_MEMBERSHIP: dict[str, frozenset[str]] = {
-    "ramp": frozenset({"ramp", "fast_mana", "cost_reduction"}),
-    "draw": frozenset({"draw", "card_draw"}),
-    "interaction": frozenset({"interaction"}),
-}
-
-
-def card_qualifying_stages(tags: list[str], type_line: str | None) -> list[str]:
-    """Return the build stages this card naturally fits into.
-
-    A card may qualify for multiple stages — e.g. a card tagged both `ramp`
-    and `draw` qualifies for both. Lands always qualify for the `lands`
-    stage by type and never for the non-land stages (basics auto-tag as
-    ``ramp`` from "Add {G}" oracle text — that boost only makes sense for
-    nonland cards). `theme` is excluded.
-
-    Args:
-        tags: Tag list from `cards.tags`.
-        type_line: Card type line (used to detect lands).
-
-    Returns:
-        Deduplicated list of stage names.
-    """
-    is_land = bool(type_line and "Land" in type_line)
-    if is_land:
-        return ["lands"]
-    tag_set = set(tags)
-    return [s for s, req in _STAGE_TAG_MEMBERSHIP.items() if tag_set & req]
 
 
 # Maps stage names to (query_text, query_tags)
 _STAGE_QUERIES: dict[str, tuple[str, list[str]]] = {
-    "ramp": ("mana ramp acceleration mana rocks mana dorks", ["ramp", "fast_mana"]),
-    "draw": ("card draw card advantage cantrips", ["draw"]),
-    "interaction": (
-        "removal counterspell board wipe protection graveyard hate",
-        ["interaction"],
-    ),
-    "lands": ("lands mana base mana fixing", ["ramp"]),
+    "ramp": ("mana acceleration", []),
+    "draw": ("draw cards", []),
+    "interaction": ("removal counterspell board wipe protection", []),
+    "lands": ("lands mana base mana fixing", []),
 }
 
 
 def parse_query_tags(query: str) -> list[str]:
-    """Extract tag names from a natural-language query string.
-
-    Args:
-        query: Free-form user query or prompt text.
-
-    Returns:
-        Deduplicated list of matching tag names.
-    """
-    q_lower = query.lower()
-    found: list[str] = []
-    # Try multi-word keys first (longest match), then single words
-    keys: list[str] = list(_TAG_SYNONYMS.keys())
-    keys.sort(key=len, reverse=True)
-    for key in keys:
-        if key in q_lower:
-            found.extend(_TAG_SYNONYMS[key])
-    seen: set[str] = set()
-    result: list[str] = []
-    for tag in found:
-        if tag not in seen:
-            seen.add(tag)
-            result.append(tag)
-    return result
+    """Return explicit Oracle-tag UUIDs written in a query, never inferred labels."""
+    values: list[str] = []
+    for token in query.replace(",", " ").split():
+        try:
+            value = str(UUID(token))
+        except ValueError:
+            continue
+        if value not in values:
+            values.append(value)
+    return values
 
 
 _CARD_TYPE_NAMES: frozenset[str] = frozenset(
@@ -539,21 +346,6 @@ _KEYWORD_PHRASES: frozenset[str] = frozenset(
     }
 )
 
-# Maps user query terms/phrases to trait names (longer keys checked first)
-_TRAIT_SYNONYMS: dict[str, str] = {
-    "enters the battlefield": "etb",
-    "enter the battlefield": "etb",
-    "activated ability": "activated",
-    "activated abilities": "activated",
-    "tap ability": "activated",
-    "etb": "etb",
-    "enters": "etb",
-    "activated": "activated",
-    "evasion": "evasion",
-    "evasive": "evasion",
-    "unblockable": "evasion",
-}
-
 
 def _classify_query_word(
     stripped: str,
@@ -588,7 +380,7 @@ def parse_query_types(query: str) -> TypeFilter | None:
     """Extract type/subtype/keyword/trait preferences from a natural-language query.
 
     Returns None when no filter terms are detected, keeping the feature inactive
-    for queries that don't mention card types, keywords, or traits.
+    for queries that don't mention card types, subtypes, or printed keywords.
 
     Strict mode is enabled when 2+ filter terms are detected across all
     dimensions — strict queries zero-out zero-match cards.
@@ -603,24 +395,14 @@ def parse_query_types(query: str) -> TypeFilter | None:
     card_types: list[str] = []
     subtypes: list[str] = []
     keywords: list[str] = []
-    traits: list[str] = []
-    token_types: list[str] = []
     seen_types: set[str] = set()
     seen_subs: set[str] = set()
     seen_kw: set[str] = set()
-    seen_traits: set[str] = set()
-    seen_tokens: set[str] = set()
 
     for phrase in _KEYWORD_PHRASES:
         if phrase in q_lower and phrase not in seen_kw:
             seen_kw.add(phrase)
             keywords.append(phrase.title())
-
-    for key in sorted(_TRAIT_SYNONYMS, key=len, reverse=True):
-        trait = _TRAIT_SYNONYMS[key]
-        if key in q_lower and trait not in seen_traits:
-            seen_traits.add(trait)
-            traits.append(trait)
 
     for word in q_lower.split():
         stripped = word.strip(".,!?;:'\"")
@@ -633,20 +415,14 @@ def parse_query_types(query: str) -> TypeFilter | None:
             subtypes=subtypes,
             keywords=keywords,
         )
-        if stripped in _TOKEN_TYPE_NAMES and stripped not in seen_tokens:
-            seen_tokens.add(stripped)
-            token_types.append(_TOKEN_TYPE_NAMES[stripped])
-
-    if not card_types and not subtypes and not keywords and not traits and not token_types:
+    if not card_types and not subtypes and not keywords:
         return None
 
-    total_terms = len(card_types) + len(subtypes) + len(keywords) + len(traits) + len(token_types)
+    total_terms = len(card_types) + len(subtypes) + len(keywords)
     return TypeFilter(
         card_types=card_types,
         subtypes=subtypes,
         keywords=keywords,
-        traits=traits,
-        token_types=token_types,
         strict=total_terms >= 2,
     )
 
@@ -708,11 +484,11 @@ async def _search_tags(
     owned_card_ids: frozenset[UUID] | None = None,
     price_filter: PriceFilter | None = None,
 ) -> list[tuple[UUID, int]]:
-    """Tag-overlap search via Postgres GIN array index.
+    """Oracle-tag-overlap search via direct Scryfall memberships.
 
     Args:
         pool: asyncpg connection pool.
-        query_tags: Tags to match against cards.tags.
+        query_tags: Scryfall Oracle-tag UUIDs to match.
         commander_color_identity: Commander's color identity (subset filter).
         exclude_ids: Card UUIDs to exclude.
         exclude_lands: If True, exclude land cards from results.
@@ -725,8 +501,12 @@ async def _search_tags(
     """
     if not query_tags:
         return []
+    try:
+        source_ids = [UUID(tag) for tag in query_tags]
+    except ValueError:
+        return []
     land_filter = "AND type_line NOT LIKE '%Land%'" if exclude_lands else ""
-    params: list = [query_tags, commander_color_identity, exclude_ids, limit]
+    params: list = [source_ids, commander_color_identity, exclude_ids, limit]
     collection_filter = ""
     if owned_card_ids is not None:
         params.append(list(owned_card_ids))
@@ -736,17 +516,15 @@ async def _search_tags(
         rows = await conn.fetch(
             f"""
             SELECT id,
-                   array_length(
-                       ARRAY(
-                           SELECT unnest(tags || mtgjson_tags)
-                           INTERSECT
-                           SELECT unnest($1::text[])
-                       ), 1
-                   ) AS overlap
+                   (SELECT count(*) FROM scryfall_tag_memberships membership
+                    WHERE membership.oracle_id = cards.oracle_id
+                      AND membership.tag_id = ANY($1::uuid[])) AS overlap
             FROM cards
-            WHERE (
-                tags || mtgjson_tags
-            ) && $1::text[]
+            WHERE EXISTS (
+                SELECT 1 FROM scryfall_tag_memberships membership
+                WHERE membership.oracle_id = cards.oracle_id
+                  AND membership.tag_id = ANY($1::uuid[])
+            )
               AND is_canonical
               AND color_identity <@ $2::text[]
               AND legalities->>'commander' = 'legal'
@@ -758,15 +536,7 @@ async def _search_tags(
               {collection_filter}
               {price_clause}
             ORDER BY
-                array_length(
-                    ARRAY(
-                        SELECT unnest(
-                            tags || mtgjson_tags
-                        )
-                        INTERSECT
-                        SELECT unnest($1::text[])
-                    ), 1
-                ) DESC NULLS LAST,
+                overlap DESC NULLS LAST,
                 edhrec_rank ASC NULLS LAST
             LIMIT $4
             """,
@@ -894,24 +664,20 @@ def _curve_fit_score(cmc: Decimal | None, deck_cmc_counts: dict[int, int] | None
 
 
 def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
-    """Score a card based on how many requested types/subtypes/keywords/traits it matches.
+    """Score a card by requested types, subtypes, and printed keywords.
 
     Returns a [0.0, 1.0] value proportional to the fraction of requested filter
     terms the card satisfies. A card with no matches scores 0.0.
 
     Args:
-        row: DB row with card_types, subtypes, keywords, traits fields.
-        type_filter: Parsed type/keyword/trait preferences from the user query.
+        row: DB row with card_types, subtypes, and keywords.
+        type_filter: Parsed type, subtype, and keyword preferences.
 
     Returns:
         Match fraction in [0.0, 1.0].
     """
     requested_count = (
-        len(type_filter.card_types)
-        + len(type_filter.subtypes)
-        + len(type_filter.keywords)
-        + len(type_filter.traits)
-        + len(type_filter.token_types)
+        len(type_filter.card_types) + len(type_filter.subtypes) + len(type_filter.keywords)
     )
     if not requested_count:
         return 0.0
@@ -919,15 +685,11 @@ def _type_match_score(row: "asyncpg.Record", type_filter: TypeFilter) -> float:
     card_types = set(row["card_types"])
     subtypes = set(row["subtypes"])
     card_keywords = {k.lower() for k in row["keywords"]}
-    card_traits = set(row["traits"])
-    card_token_types = set(row["token_types"])
 
     per_category = (
         (type_filter.card_types, card_types & set(type_filter.card_types)),
         (type_filter.subtypes, subtypes & set(type_filter.subtypes)),
         (type_filter.keywords, card_keywords & {k.lower() for k in type_filter.keywords}),
-        (type_filter.traits, card_traits & set(type_filter.traits)),
-        (type_filter.token_types, card_token_types & set(type_filter.token_types)),
     )
     if type_filter.match_all_categories:
         for requested, matched_set in per_category:
@@ -945,12 +707,9 @@ def _build_representation_query(
     """Build deterministic representation terms from parsed query context."""
     query = RepresentationQuery(
         tags=list(query_tags),
-        mtgjson_tags=list(query_tags),
         card_types=list(type_filter.card_types) if type_filter else [],
         subtypes=list(type_filter.subtypes) if type_filter else [],
         keywords=list(type_filter.keywords) if type_filter else [],
-        traits=list(type_filter.traits) if type_filter else [],
-        token_types=list(type_filter.token_types) if type_filter else [],
     )
     if _representation_term_count(query) == 0:
         return None
@@ -964,34 +723,15 @@ def _representation_match_score(row: "asyncpg.Record", query: RepresentationQuer
         return 0.0
 
     tag_matches = set(row["tags"]) & set(query.tags)
-    mtgjson_matches = set(row.get("mtgjson_tags") or []) & set(query.mtgjson_tags)
     type_matches = set(row["card_types"]) & set(query.card_types)
     subtype_matches = set(row["subtypes"]) & set(query.subtypes)
     keyword_matches = {k.lower() for k in row["keywords"]} & {k.lower() for k in query.keywords}
-    trait_matches = set(row["traits"]) & set(query.traits)
-    token_matches = set(row["token_types"]) & set(query.token_types)
-    matched = (
-        len(tag_matches)
-        + len(mtgjson_matches)
-        + len(type_matches)
-        + len(subtype_matches)
-        + len(keyword_matches)
-        + len(trait_matches)
-        + len(token_matches)
-    )
+    matched = len(tag_matches) + len(type_matches) + len(subtype_matches) + len(keyword_matches)
     return matched / requested
 
 
 def _representation_term_count(query: RepresentationQuery) -> int:
-    return (
-        len(query.tags)
-        + len(query.mtgjson_tags)
-        + len(query.card_types)
-        + len(query.subtypes)
-        + len(query.keywords)
-        + len(query.traits)
-        + len(query.token_types)
-    )
+    return len(query.tags) + len(query.card_types) + len(query.subtypes) + len(query.keywords)
 
 
 def _color_affinity_score(
@@ -1025,8 +765,6 @@ _W_POPULARITY: float = 0.10
 _W_CURVE: float = 0.10
 _W_COLOR: float = 0.05
 _W_REPRESENTATION: float = 0.08
-_W_DECK_INCLUSION: float = 0.20
-_W_MOXFIELD_INCLUSION: float = 0.20
 
 _MULTI_TAG_SYNERGY_EXEMPT = frozenset({"theme", "bangers"})
 _MULTI_TAG_SYNERGY_THRESHOLD = 3
@@ -1041,8 +779,6 @@ class _ScoreContext:
     deck_cmc_counts: dict[int, int] | None
     type_filter: TypeFilter | None
     stage: str | None
-    hub_inclusion: dict[UUID, float]
-    moxfield_inclusion: dict[UUID, float]
     representation_query: RepresentationQuery | None
     max_overlap: int
     max_rank: int
@@ -1055,8 +791,6 @@ class _ScoreComponents:
     popularity: float
     curve: float
     color: float
-    inclusion: float
-    moxfield_inclusion: float
     representation: float
 
 
@@ -1070,8 +804,6 @@ def _build_score_context(
     deck_cmc_counts: dict[int, int] | None,
     type_filter: TypeFilter | None,
     stage: str | None,
-    hub_inclusion: dict[UUID, float] | None,
-    moxfield_inclusion: dict[UUID, float] | None,
     prefer_keywords: bool,
     representation_query: RepresentationQuery | None,
 ) -> _ScoreContext:
@@ -1090,8 +822,6 @@ def _build_score_context(
         deck_cmc_counts=deck_cmc_counts,
         type_filter=type_filter,
         stage=stage,
-        hub_inclusion=hub_inclusion or {},
-        moxfield_inclusion=moxfield_inclusion or {},
         representation_query=representation_query,
         max_overlap=max(tag_overlaps.values(), default=1) or 1,
         max_rank=max(ranks, default=1) or 1,
@@ -1120,8 +850,6 @@ def _score_components(uid: UUID, row: "asyncpg.Record", context: _ScoreContext) 
         popularity=popularity,
         curve=_curve_fit_score(row["cmc"], context.deck_cmc_counts),
         color=_color_affinity_score(list(row["color_identity"]), context.commander_colors),
-        inclusion=context.hub_inclusion.get(uid, 0.0),
-        moxfield_inclusion=context.moxfield_inclusion.get(uid, 0.0),
         representation=representation,
     )
 
@@ -1145,8 +873,6 @@ def _combine_score(
         + _W_COLOR * components.color
         + _W_POPULARITY * components.popularity
         + _W_CURVE * components.curve
-        + _W_DECK_INCLUSION * components.inclusion
-        + _W_MOXFIELD_INCLUSION * components.moxfield_inclusion
     )
 
 
@@ -1160,8 +886,6 @@ def _compute_weighted_scores(
     deck_cmc_counts: dict[int, int] | None,
     type_filter: TypeFilter | None = None,
     stage: str | None = None,
-    hub_inclusion: dict[UUID, float] | None = None,
-    moxfield_inclusion: dict[UUID, float] | None = None,
     prefer_keywords: bool = False,
     representation_query: RepresentationQuery | None = None,
 ) -> dict[UUID, float]:
@@ -1200,8 +924,6 @@ def _compute_weighted_scores(
         deck_cmc_counts=deck_cmc_counts,
         type_filter=type_filter,
         stage=stage,
-        hub_inclusion=hub_inclusion,
-        moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=prefer_keywords,
         representation_query=representation_query,
     )
@@ -1248,279 +970,52 @@ def _annotate_representation_signals(
             entry.append("representation")
 
 
-def _annotate_hub_signals(
-    signal_map: dict[UUID, list[str]],
-    hub_inclusion: dict[UUID, float],
-    cards_by_id: dict[UUID, "asyncpg.Record"],
-) -> None:
-    """Add 'hub' to signal_map for cards present in selected Moxfield hubs."""
-    for uid, weight in hub_inclusion.items():
-        if weight <= 0.0 or uid not in cards_by_id:
-            continue
-        entry = signal_map.setdefault(uid, [])
-        if "hub" not in entry:
-            entry.append("hub")
-
-
-async def _fetch_inclusion_signals(
+async def _fetch_excluded_source_card_ids(
     pool: asyncpg.Pool,
-    commander_id: UUID | None,
+    source_tags: frozenset[str] | None,
     commander_color_identity: list[str],
-    bracket: int | None,
-    query_tags: list[str],
-) -> tuple[dict[UUID, float], dict[UUID, float]]:
-    """Fetch Moxfield hub and top-commander-pick scores; swallow source failures."""
-    _ = bracket
-    hub_inclusion: dict[UUID, float] = {}
-    moxfield_inclusion: dict[UUID, float] = {}
-    try:
-        hub_inclusion = await theme_service.score_themes(pool, query_tags, commander_color_identity)
-    except Exception:
-        _log.exception("Moxfield hub inclusion lookup failed; continuing without boost")
-    if commander_id is not None:
-        try:
-            mox_payload = await moxfield_recs_service.get_or_refresh(pool, commander_id)
-            moxfield_inclusion = await moxfield_recs_service.score_inclusion(
-                pool, mox_payload, commander_color_identity
-            )
-        except Exception:
-            _log.exception("Moxfield inclusion lookup failed; continuing without boost")
-    return hub_inclusion, moxfield_inclusion
+) -> frozenset[UUID] | None:
+    """Return canonical cards with a directly selected Oracle-tag membership."""
+    if not source_tags:
+        return None
+    source_ids = [UUID(tag) for tag in source_tags]
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT cards.id
+            FROM cards
+            JOIN scryfall_tag_memberships memberships ON memberships.oracle_id = cards.oracle_id
+            WHERE cards.is_canonical
+              AND cards.color_identity <@ $2::text[]
+              AND memberships.tag_id = ANY($1::uuid[])
+            """,
+            source_ids,
+            commander_color_identity,
+        )
+    return frozenset(row["id"] for row in rows)
 
 
-def _annotate_moxfield_signals(
-    signal_map: dict[UUID, list[str]],
-    moxfield_inclusion: dict[UUID, float],
-    cards_by_id: dict[UUID, "asyncpg.Record"],
-) -> None:
-    """Add 'top_commander_pick' for cards present in top-liked commander decks."""
-    for uid, weight in moxfield_inclusion.items():
-        if weight <= 0.0 or uid not in cards_by_id:
-            continue
-        entry = signal_map.setdefault(uid, [])
-        if "top_commander_pick" not in entry:
-            entry.append("top_commander_pick")
-
-
-# Hard cap on the inner candidate pool. Each Load More click bumps the requested
-# limit (frontend sends target=80 with the growing exclude list); inner searches
-# scale with that limit. 1000 leaves plenty of headroom before stages exhaust.
-_MAX_INNER_POOL: int = 1000
-
-
-def _filter_inclusion_by_stage(
-    inclusion: dict[UUID, float],
-    cards_by_id: dict[UUID, "asyncpg.Record"],
-    stage: str | None,
-) -> dict[UUID, float]:
-    """Drop trusted Moxfield cards that don't fit the active stage.
-
-    Stages with explicit tag membership (ramp/interaction/draw/utility) keep
-    only cards whose tags overlap. The ``lands`` stage keeps only lands. The
-    catch-all stages (``theme``, ``bangers``, ``None``) pass through unchanged
-    because a high-trust hub or commander-deck card is fair game there.
-
-    Without this filter, the trusted quota injects globally popular staples
-    (Sol Ring, Arcane Signet) into every stage's top results, including the
-    interaction and draw stages where they have no thematic fit.
-    """
-    if stage is None or stage in {"theme", "bangers"}:
-        return inclusion
-    if stage == "lands":
-        return {
-            uid: w
-            for uid, w in inclusion.items()
-            if uid in cards_by_id and "Land" in (cards_by_id[uid]["type_line"] or "")
-        }
-    required = _STAGE_TAG_MEMBERSHIP.get(stage, frozenset())
-    if not required:
-        return inclusion
-    filtered: dict[UUID, float] = {}
-    for uid, w in inclusion.items():
-        row = cards_by_id.get(uid)
-        if row is not None and _row_matches_stage(row, stage):
-            filtered[uid] = w
-    return filtered
+def _filter_source_rows(
+    rows: list["asyncpg.Record"],
+    required_source_tag: str | None,
+    excluded_card_ids: frozenset[UUID] | None,
+) -> list["asyncpg.Record"]:
+    """Apply direct Oracle-tag tab membership without alias expansion."""
+    return [
+        row
+        for row in rows
+        if (required_source_tag is None or required_source_tag in set(row["tags"] or []))
+        and (excluded_card_ids is None or row["id"] not in excluded_card_ids)
+    ]
 
 
 def _filter_rows_by_stage(
     rows: list["asyncpg.Record"], stage: str | None
 ) -> list["asyncpg.Record"]:
-    """Apply the functional role gate to every candidate in a build stage."""
-    if stage is None or stage in {"theme", "bangers"}:
+    """Keep land-stage retrieval factual without assigning card roles."""
+    if stage != "lands":
         return rows
-    return [row for row in rows if _row_matches_stage(row, stage)]
-
-
-def _row_matches_stage(row: "asyncpg.Record", stage: str) -> bool:
-    if stage == "lands":
-        return "Land" in (row["type_line"] or "")
-    required = _STAGE_TAG_MEMBERSHIP.get(stage, frozenset())
-    return not required or bool(set(row["tags"] or []) & required)
-
-
-def _filter_theme_rows(
-    rows: list["asyncpg.Record"],
-    *,
-    required_hub_tag: str | None = None,
-    excluded_hub_tags: frozenset[str] | None = None,
-    allowed_theme_ids: frozenset[UUID] | None = None,
-    excluded_theme_ids: frozenset[UUID] | None = None,
-) -> list["asyncpg.Record"]:
-    """Keep theme rows in the selected Moxfield hub bucket.
-
-    A concrete theme tab requires exact hub membership. The Etc tab uses
-    the inverse: cards that do not belong to any selected deck archetype tag.
-    """
-    if required_hub_tag is None and not excluded_hub_tags:
-        return rows
-
-    filtered: list[asyncpg.Record] = []
-    for row in rows:
-        uid = row["id"]
-        if (
-            required_hub_tag is not None
-            and not _row_matches_local_theme_bucket(row, required_hub_tag)
-            and uid not in (allowed_theme_ids or frozenset())
-        ):
-            continue
-        if excluded_hub_tags and any(
-            _row_matches_local_theme_bucket(row, tag) for tag in excluded_hub_tags
-        ):
-            continue
-        if excluded_theme_ids and uid in excluded_theme_ids:
-            continue
-        filtered.append(row)
-    return filtered
-
-
-def _row_matches_local_theme_bucket(row: "asyncpg.Record", tag: str) -> bool:
-    """Return True when local structured fields prove theme membership."""
-    normalized_tag = _normalize_theme_tag(tag)
-    row_tags = set(row["hub_tags"] or row["tags"] or [])
-    if normalized_tag in row_tags:
-        return True
-    return False
-
-
-def _normalize_theme_tag(tag: str) -> str:
-    """Normalize one selected theme tag for local bucket comparisons."""
-    return tag.strip().lower().replace("-", "_")
-
-
-def _theme_pinned_uncategorizable(
-    trusted: list[tuple[UUID, float]],
-    cards_by_id: dict[UUID, "asyncpg.Record"],
-    limit: int,
-) -> list[UUID]:
-    """Return trusted cards with no qualifying stage, capped at ``limit``.
-
-    Used by the theme stage to guarantee top-deck staples that don't match any
-    mechanical stage (e.g. enchantress cost-reducers) keep a slot.
-    """
-    pinned: list[UUID] = []
-    for uid, _ in trusted:
-        row = cards_by_id.get(uid)
-        if row is None:
-            continue
-        if not card_qualifying_stages(list(row["tags"] or []), row["type_line"]):
-            pinned.append(uid)
-        if len(pinned) >= limit:
-            break
-    return pinned
-
-
-def _apply_trusted_quota(
-    scores: dict[UUID, float],
-    hub_inclusion: dict[UUID, float],
-    moxfield_inclusion: dict[UUID, float],
-    cards_by_id: dict[UUID, "asyncpg.Record"],
-    limit: int,
-    *,
-    stage: str | None = None,
-    quota: float = 1.0,
-) -> list[UUID]:
-    """Reserve a fraction of the page for trusted cards, fill the rest with composite.
-
-    Ordering of the returned list:
-
-    1. ``theme``-stage uncategorizable pins (cards with no qualifying mechanical
-       stage but high trust — see :func:`_theme_pinned_uncategorizable`).
-    2. Trusted cards (hub + top commander pick inclusion >= 0 with a positive composite
-       score), sorted by trusted score desc then composite score desc. Capped
-       at ``floor(limit * quota)`` slots so the composite channel always has
-       room to surface keyword/text winners when ``quota < 1.0``. A card
-       present in all 10 top Moxfield decks (trust = 1.0) therefore ranks
-       above one in 5 decks (trust = 0.5).
-    3. Composite-ranked fill (keyword + FTS scoring) for any
-       remaining slots up to ``limit``.
-
-    The result is then truncated to ``limit`` so over-allocation from large
-    trusted pools is bounded; pagination at the caller (``retrieve_candidates``)
-    walks deeper trusted slices as ``limit = offset + page_size`` grows.
-
-    Args:
-        scores: Final composite scores per card UUID.
-        hub_inclusion: Moxfield hub inclusion scores per card UUID.
-        moxfield_inclusion: Top commander pick scores per card UUID.
-        cards_by_id: Raw DB rows indexed by card UUID.
-        limit: Maximum number of UIDs to return (page_end in pagination terms).
-        stage: Active build stage; controls the theme uncategorizable-pin pass.
-        quota: Fraction of ``limit`` reserved for trusted cards. ``1.0`` keeps
-            the historical "all trusted first" behavior; ``0.5`` yields the
-            50/50 mix that lets keyword/text winners share the page.
-
-    Returns:
-        Ordered list of UUIDs: pinned + trusted (capped by quota) + composite
-        fill, truncated to ``limit``.
-    """
-    if limit <= 0:
-        return []
-
-    composite_ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)
-
-    trusted: list[tuple[UUID, float]] = []
-    for uid in {*hub_inclusion, *moxfield_inclusion}:
-        if uid not in cards_by_id or scores.get(uid, 0.0) <= 0.0:
-            continue
-        trusted_score = max(hub_inclusion.get(uid, 0.0), moxfield_inclusion.get(uid, 0.0))
-        if trusted_score <= 0.0:
-            continue
-        trusted.append((uid, trusted_score))
-
-    trusted.sort(key=lambda item: (item[1], scores.get(item[0], 0.0)), reverse=True)
-
-    pinned = _theme_pinned_uncategorizable(trusted, cards_by_id, limit) if stage == "theme" else []
-    pinned_set = set(pinned)
-
-    # Pinned cards count against the trusted budget so the page total stays bounded.
-    trusted_budget = max(0, int(limit * quota) - len(pinned))
-    reserved = [uid for uid, _ in trusted if uid not in pinned_set][:trusted_budget]
-    reserved_set = pinned_set | set(reserved)
-
-    remaining = max(0, limit - len(pinned) - len(reserved))
-    fill = [uid for uid in composite_ranked if uid not in reserved_set][:remaining]
-    return (pinned + reserved + fill)[:limit]
-
-
-async def _fetch_excluded_theme_ids(
-    pool: asyncpg.Pool,
-    excluded_hub_tags: frozenset[str] | None,
-    commander_color_identity: list[str],
-) -> frozenset[UUID] | None:
-    if not excluded_hub_tags:
-        return None
-    try:
-        return frozenset(
-            set(
-                await theme_service.score_themes(
-                    pool, list(excluded_hub_tags), commander_color_identity
-                )
-            )
-        )
-    except Exception:
-        _log.exception("Moxfield hub exclusion lookup failed; continuing with tag-only Etc")
-        return None
+    return [row for row in rows if "Land" in (row["type_line"] or "")]
 
 
 @dataclass(frozen=True)
@@ -1539,8 +1034,8 @@ class _RetrievalRequest:
     commander_id: UUID | None
     bracket: int | None
     prefer_keywords: bool
-    required_hub_tag: str | None
-    excluded_hub_tags: frozenset[str] | None
+    required_source_tag: str | None
+    excluded_source_tags: frozenset[str] | None
 
 
 @dataclass
@@ -1549,8 +1044,6 @@ class _CandidateSearch:
     tag_overlaps: dict[UUID, int]
     fts_set: set[UUID]
     signal_map: dict[UUID, list[str]]
-    hub_inclusion: dict[UUID, float]
-    moxfield_inclusion: dict[UUID, float]
     excluded_theme_ids: frozenset[UUID] | None
 
 
@@ -1559,8 +1052,6 @@ class _RankingResult:
     top_ids: list[UUID]
     scores: dict[UUID, float]
     signal_map: dict[UUID, list[str]]
-    hub_inclusion: dict[UUID, float]
-    moxfield_inclusion: dict[UUID, float]
 
 
 def _owned_ids(request: _RetrievalRequest) -> frozenset[UUID] | None:
@@ -1601,32 +1092,14 @@ async def _collect_candidate_search(
         ),
     )
     tag_overlaps, fts_set, signal_map = _build_signal_map(tag_results, fts_ids)
-    hub_inclusion, moxfield_inclusion = await _fetch_inclusion_signals(
-        pool,
-        request.commander_id,
-        request.commander_color_identity,
-        request.bracket,
-        request.query_tags,
+    excluded_theme_ids = await _fetch_excluded_source_card_ids(
+        pool, request.excluded_source_tags, request.commander_color_identity
     )
-    excluded_theme_ids = await _fetch_excluded_theme_ids(
-        pool, request.excluded_hub_tags, request.commander_color_identity
-    )
-    deck_exclude = set(request.deck_card_ids)
-    extra_ids = [
-        uid
-        for uid in {*hub_inclusion, *moxfield_inclusion}
-        if uid not in tag_overlaps
-        and uid not in fts_set
-        and uid not in deck_exclude
-        and (owned_ids is None or uid in owned_ids)
-    ]
     return _CandidateSearch(
-        all_ids=list({*tag_overlaps, *fts_set, *extra_ids}),
+        all_ids=list({*tag_overlaps, *fts_set}),
         tag_overlaps=tag_overlaps,
         fts_set=fts_set,
         signal_map=signal_map,
-        hub_inclusion=hub_inclusion,
-        moxfield_inclusion=moxfield_inclusion,
         excluded_theme_ids=excluded_theme_ids,
     )
 
@@ -1646,13 +1119,7 @@ async def _load_candidate_rows(
     )
     if excluded_names:
         rows = [row for row in rows if _normalize_card_name(row["name"]) not in excluded_names]
-    rows = _filter_theme_rows(
-        rows,
-        required_hub_tag=request.required_hub_tag,
-        excluded_hub_tags=request.excluded_hub_tags,
-        allowed_theme_ids=frozenset(search.hub_inclusion),
-        excluded_theme_ids=search.excluded_theme_ids,
-    )
+    rows = _filter_source_rows(rows, request.required_source_tag, search.excluded_theme_ids)
     return _filter_rows_by_stage(rows, request.stage)
 
 
@@ -1662,10 +1129,6 @@ def _rank_candidates(
     rows: list["asyncpg.Record"],
 ) -> _RankingResult:
     cards_by_id = {row["id"]: row for row in rows}
-    hub_inclusion = _filter_inclusion_by_stage(search.hub_inclusion, cards_by_id, request.stage)
-    moxfield_inclusion = _filter_inclusion_by_stage(
-        search.moxfield_inclusion, cards_by_id, request.stage
-    )
     representation_query = _build_representation_query(request.query_tags, request.type_filter)
     scores = _compute_weighted_scores(
         search.all_ids,
@@ -1676,31 +1139,17 @@ def _rank_candidates(
         deck_cmc_counts=request.deck_cmc_counts,
         type_filter=request.type_filter,
         stage=request.stage,
-        hub_inclusion=hub_inclusion,
-        moxfield_inclusion=moxfield_inclusion,
         prefer_keywords=request.prefer_keywords,
         representation_query=representation_query,
     )
     _annotate_type_signals(search.signal_map, cards_by_id, request.type_filter)
     _annotate_representation_signals(search.signal_map, cards_by_id, representation_query)
-    _annotate_hub_signals(search.signal_map, hub_inclusion, cards_by_id)
-    _annotate_moxfield_signals(search.signal_map, moxfield_inclusion, cards_by_id)
     page_end = request.offset + request.limit
-    ranked = _apply_trusted_quota(
-        scores,
-        hub_inclusion,
-        moxfield_inclusion,
-        cards_by_id,
-        page_end,
-        stage=request.stage,
-        quota=1.0,
-    )
+    ranked = sorted(scores, key=lambda uid: scores[uid], reverse=True)[:page_end]
     return _RankingResult(
         top_ids=ranked[request.offset : page_end],
         scores=scores,
         signal_map=search.signal_map,
-        hub_inclusion=hub_inclusion,
-        moxfield_inclusion=moxfield_inclusion,
     )
 
 
@@ -1728,7 +1177,6 @@ def _build_retrieved_cards(
                 color_identity=list(row["color_identity"]),
                 image_uri=row["image_uri"],
                 tags=list(row["tags"]),
-                token_types=list(row["token_types"]),
                 edhrec_rank=row["edhrec_rank"],
                 power=row["power"],
                 toughness=row["toughness"],
@@ -1737,8 +1185,6 @@ def _build_retrieved_cards(
                 game_changer=bool(row["game_changer"]),
                 score=ranking.scores[uid],
                 signals=ranking.signal_map.get(uid, []),
-                hub_weight=ranking.hub_inclusion.get(uid, 0.0),
-                moxfield_weight=ranking.moxfield_inclusion.get(uid, 0.0),
             )
         )
     return result
@@ -1775,12 +1221,12 @@ async def retrieve_candidates(
     commander_id: UUID | None = None,
     bracket: int | None = None,
     prefer_keywords: bool = False,
-    required_hub_tag: str | None = None,
-    excluded_hub_tags: frozenset[str] | None = None,
+    required_source_tag: str | None = None,
+    excluded_source_tags: frozenset[str] | None = None,
 ) -> list[RetrievedCard]:
     """Run structured retrieval and return top candidate cards with weighted scoring.
 
-    Combines tag (Postgres GIN), full-text (Postgres FTS), Moxfield hub inclusion,
+    Combines tag (Postgres GIN), full-text (Postgres FTS), source tag inclusion,
     top commander picks, and deterministic card representation matches.
 
     Args:
@@ -1795,15 +1241,13 @@ async def retrieve_candidates(
         type_filter: Optional type/subtype preferences for soft score boosting.
         collection_filter: When set, restricts candidates to owned cards.
         price_filter: When set, excludes cards above the EUR cap (nonfoil).
-        commander_id: When set, fetches top Moxfield commander-deck picks and
-            applies the commander-pick ranking signal.
+        commander_id: Retained request context for callers.
         bracket: Deck bracket.
         prefer_keywords: When True (deck supplies explicit archetype keywords),
             slightly increases tag/keyword synergy weight.
-        required_hub_tag: For a selected theme tab, require exact hub membership
-            so unrelated trusted cards cannot leak into the tab.
-        excluded_hub_tags: For the Etc theme tab, exclude cards that belong to
-            any selected deck archetype hub.
+        required_source_tag: For a selected theme tab, require direct Oracle-tag membership.
+        excluded_source_tags: For the Etc theme tab, exclude cards that belong to
+            any selected deck Oracle tag.
 
     Returns:
         List of RetrievedCard ordered by final weighted score descending.
@@ -1823,8 +1267,8 @@ async def retrieve_candidates(
         commander_id=commander_id,
         bracket=bracket,
         prefer_keywords=prefer_keywords,
-        required_hub_tag=required_hub_tag,
-        excluded_hub_tags=excluded_hub_tags,
+        required_source_tag=required_source_tag,
+        excluded_source_tags=excluded_source_tags,
     )
     return await _retrieve_candidates(pool, request)
 
@@ -1855,11 +1299,13 @@ async def _fetch_candidates(
             f"""
             SELECT id, scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
                    color_identity, image_uri,
-                   tags,
-                   hub_tags,
-                   mtgjson_tags,
+                    COALESCE((
+                        SELECT array_agg(m.tag_id::text ORDER BY m.tag_id)
+                        FROM scryfall_tag_memberships m
+                        WHERE m.oracle_id = cards.oracle_id
+                    ), '{{}}') AS tags,
                    edhrec_rank, power, toughness, rarity, game_changer,
-                   card_types, subtypes, keywords, traits, token_types,
+                    card_types, subtypes, keywords,
                    CASE
                        WHEN (prices->>'eur') IS NULL THEN NULL
                        ELSE ROUND((prices->>'eur')::numeric * 100)::integer

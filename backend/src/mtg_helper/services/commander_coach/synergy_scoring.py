@@ -157,7 +157,7 @@ def _candidate_sql(term_count: int) -> str:
         )
     return (
         "SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text, "
-        "color_identity, tags, ROUND((prices->>'eur')::numeric * 100)::integer "
+        "color_identity, keywords, ROUND((prices->>'eur')::numeric * 100)::integer "
         "AS price_eur_cents FROM cards WHERE is_canonical "
         "AND color_identity <@ $1::text[] "
         "AND name <> ALL($2::text[]) AND legalities->>'commander' = 'legal' "
@@ -175,7 +175,7 @@ def _hit_from_row(row: asyncpg.Record) -> CardSearchHit:
         type_line=row["type_line"],
         oracle_text=row["oracle_text"],
         color_identity=list(row["color_identity"] or []),
-        tags=list(row["tags"] or []),
+        tags=list(row["keywords"] or []),
         price_eur_cents=row["price_eur_cents"],
     )
 

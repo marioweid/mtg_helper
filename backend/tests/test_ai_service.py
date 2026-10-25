@@ -42,7 +42,6 @@ def _make_candidate(
         color_identity=[],
         image_uri=None,
         tags=[],
-        token_types=[],
         edhrec_rank=None,
         power=None,
         toughness=None,
@@ -115,20 +114,21 @@ def test_stage_query_uses_stage_defaults_without_archetype_tags() -> None:
     query = _resolve_stage_query("ramp", "tokens matter", [], None)
 
     assert query == (
-        "mana ramp acceleration mana rocks mana dorks tokens matter",
-        ["ramp", "fast_mana"],
+        "mana acceleration tokens matter",
+        [],
         False,
         None,
         None,
     )
 
 
-def test_stage_query_merges_archetype_and_stage_tags_without_duplicates() -> None:
-    query = _resolve_stage_query("ramp", None, ["tokens", "ramp"], None)
+def test_stage_query_uses_only_source_uuid_archetypes() -> None:
+    source_id = "10000000-0000-0000-0000-000000000001"
+    query = _resolve_stage_query("ramp", None, [source_id, "invented-theme"], None)
 
     assert query == (
-        "mana ramp acceleration mana rocks mana dorks",
-        ["tokens", "ramp", "fast_mana"],
+        "mana acceleration",
+        [source_id],
         True,
         None,
         None,
@@ -136,32 +136,39 @@ def test_stage_query_merges_archetype_and_stage_tags_without_duplicates() -> Non
 
 
 def test_theme_query_requires_and_normalizes_selected_archetype() -> None:
-    query = _resolve_stage_query("theme", "artifact tokens", ["artifact_tokens"], "Artifact-Tokens")
+    source_id = "10000000-0000-0000-0000-000000000001"
+    query = _resolve_stage_query("theme", "artifact tokens", [source_id], source_id.upper())
 
     assert query == (
-        "artifact tokens synergy theme artifact tokens",
-        ["artifact_tokens"],
+        f"artifact tokens synergy theme {source_id}",
+        [source_id],
         True,
-        "artifact_tokens",
+        source_id,
         None,
     )
 
 
 def test_theme_query_rejects_tag_outside_deck_archetypes() -> None:
-    query = _resolve_stage_query("theme", "artifact tokens", ["artifact_tokens"], "spellslinger")
+    query = _resolve_stage_query(
+        "theme",
+        "artifact tokens",
+        ["10000000-0000-0000-0000-000000000001"],
+        "10000000-0000-0000-0000-000000000002",
+    )
 
     assert query is None
 
 
 def test_theme_etc_query_excludes_explicit_archetypes() -> None:
-    query = _resolve_stage_query("theme", "artifact tokens", ["tokens", "artifacts"], "__etc")
+    source_id = "10000000-0000-0000-0000-000000000001"
+    query = _resolve_stage_query("theme", "artifact tokens", [source_id], "__etc")
 
     assert query == (
         "artifact tokens synergy theme commander staples support",
-        ["tokens"],
+        [],
         True,
         None,
-        frozenset({"tokens", "artifacts"}),
+        frozenset({source_id}),
     )
 
 
@@ -262,7 +269,7 @@ def test_highlight_reasons_banger_two_signals() -> None:
 
 
 def test_highlight_reasons_banger_known_signals() -> None:
-    card = _make_candidate(["tag", "fts", "moxfield"], score=_BANGER_SCORE_THRESHOLD)
+    card = _make_candidate(["tag", "fts", "type"], score=_BANGER_SCORE_THRESHOLD)
     reasons = _compute_highlight_reasons(card)
     assert reasons is not None
     assert reasons == ["High tag relevance", "Strong text match"]

@@ -18,90 +18,6 @@ from mtg_helper.services.keyword_catalog_service import sanitize_commander_inten
 _WUBRG = ["W", "U", "B", "R", "G"]
 _DEFAULT_STAGE_TARGETS = {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}
 
-_ARCHETYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("graveyard", ("graveyard", "grave", "recursion", "yard")),
-    ("self_mill", ("self mill", "self-mill")),
-    ("reanimator", ("reanimator", "reanimate", "cheat in", "big value")),
-    ("blink", ("blink", "flicker")),
-    ("etb", ("etb", "enter the battlefield", "enters the battlefield")),
-    ("aristocrats", ("aristocrat", "death trigger", "dies")),
-    ("sacrifice", ("sacrifice", "sac outlet", "sac ")),
-    ("tokens", ("token", "tokens")),
-    ("plus_one_plus_one_counters", ("+1/+1", "plus one", "counters")),
-    ("landfall", ("landfall", "lands matter")),
-    ("spellslinger", ("spellslinger", "instant", "sorcery")),
-    ("storm", ("storm",)),
-    ("cascade", ("cascade",)),
-    ("wheels", ("wheel", "discard hand")),
-    ("lifegain", ("lifegain", "life gain")),
-    ("proliferate", ("proliferate",)),
-    ("voltron", ("voltron",)),
-    ("equipment", ("equipment",)),
-    ("mill", ("mill",)),
-    ("treasure", ("treasure",)),
-    ("food", ("food", "forage")),
-    ("clues", ("clue", "investigate")),
-    ("pingers", ("ping", "pinger")),
-)
-
-_PLAN_MECHANIC_HINTS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
-    (
-        ("dredge", "flashback", "escape", "descend", "threshold", "delirium"),
-        ("graveyard", "grave", "recursion", "yard"),
-    ),
-    (
-        ("unearth", "encore", "persist", "undying"),
-        ("reanimator", "reanimate", "cheat in", "big value"),
-    ),
-    (("exile",), ("blink", "flicker", "etb", "enter the battlefield")),
-    (("morbid",), ("aristocrat", "death trigger", "dies")),
-    (("sacrifice",), ("sacrifice", "sac outlet", "sac ")),
-    (("create",), ("token", "tokens")),
-    (("landfall",), ("landfall", "lands")),
-    (("magecraft",), ("spellslinger", "instant", "sorcery")),
-    (("storm",), ("storm",)),
-    (("cascade",), ("cascade",)),
-    (("discard",), ("wheel", "discard hand")),
-    (("lifelink",), ("lifegain", "life gain")),
-    (("proliferate",), ("+1/+1", "counters")),
-    (("equip",), ("voltron", "auras", "equipment")),
-    (("mill",), ("mill", "self mill", "self-mill")),
-    (("treasure",), ("treasure",)),
-    (("food", "forage"), ("food", "forage")),
-    (("investigate",), ("clue", "investigate")),
-)
-
-_MECHANIC_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("dredge", ("dredge",)),
-    ("escape", ("escape",)),
-    ("flashback", ("flashback",)),
-    ("disturb", ("disturb",)),
-    ("encore", ("encore",)),
-    ("descend", ("descend",)),
-    ("forage", ("forage",)),
-    ("plot", ("plot",)),
-    ("saddle", ("saddle",)),
-    ("discover", ("discover",)),
-    ("explore", ("explore",)),
-    ("proliferate", ("proliferate",)),
-)
-
-_TRAIT_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("etb", ("etb", "enter the battlefield", "enters the battlefield")),
-    ("activated", ("activated ability", "tap ability")),
-    ("evasion", ("evasion", "flying", "unblockable")),
-)
-
-_TOKEN_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("treasure", ("treasure",)),
-    ("food", ("food",)),
-    ("clue", ("clue", "investigate")),
-    ("zombie", ("zombie",)),
-    ("squirrel", ("squirrel",)),
-    ("spirit", ("spirit",)),
-    ("dragon", ("dragon",)),
-)
-
 _COLOR_WORDS = {
     "white": "W",
     "azorius": "WU",
@@ -140,8 +56,6 @@ class _Candidate:
 
     card: CardResponse
     tags: list[str]
-    traits: list[str]
-    token_types: list[str]
 
 
 def _parse_jsonb(value: Any) -> dict:
@@ -176,13 +90,9 @@ def _row_to_candidate(row: asyncpg.Record) -> _Candidate:
         edhrec_rank=row["edhrec_rank"],
         game_changer=bool(row["game_changer"]),
     )
-    hub_tags = list(row["hub_tags"] or []) if "hub_tags" in row.keys() else []
-    tags = hub_tags or list(row["tags"] or [])
     return _Candidate(
         card=card,
-        tags=tags,
-        traits=list(row["traits"] or []),
-        token_types=list(row["token_types"] or []),
+        tags=list(row["oracle_tag_ids"] or []),
     )
 
 
@@ -194,17 +104,9 @@ def parse_intent_fallback(
     message: str,
     previous: CommanderSuggestIntent | None,
 ) -> CommanderSuggestIntent:
-    """Infer useful intent from obvious words when the LLM is unavailable."""
+    """Keep ordinary text and color facts when the model is unavailable."""
     merged = previous.model_copy(deep=True) if previous else CommanderSuggestIntent()
     text = message.lower()
-    merged.archetype_tags = _merge_vocab(
-        merged.archetype_tags, _match_hints(text, _ARCHETYPE_HINTS)
-    )
-    merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_hints(text, _MECHANIC_HINTS))
-    if not merged.archetype_tags:
-        merged.mechanic_tags = _merge_vocab(merged.mechanic_tags, _match_plan_mechanics(text))
-    merged.traits = _merge_vocab(merged.traits, _match_hints(text, _TRAIT_HINTS))
-    merged.token_types = _merge_vocab(merged.token_types, _match_hints(text, _TOKEN_HINTS))
     filters = _match_dynamic_filters(text)
     merged.oracle_terms = _merge_vocab(merged.oracle_terms, filters["oracle_terms"])
     merged.required_phrases = _merge_vocab(merged.required_phrases, filters["required_phrases"])
@@ -215,18 +117,6 @@ def parse_intent_fallback(
     if text.strip():
         merged.direction = text.strip()[:500]
     return merged
-
-
-def _match_hints(text: str, hints: tuple[tuple[str, tuple[str, ...]], ...]) -> list[str]:
-    return [tag for tag, needles in hints if any(needle in text for needle in needles)]
-
-
-def _match_plan_mechanics(text: str) -> list[str]:
-    tags: list[str] = []
-    for mechanics, needles in _PLAN_MECHANIC_HINTS:
-        if any(needle in text for needle in needles):
-            tags.extend(mechanics)
-    return tags
 
 
 def _merge_vocab(current: list[str], additions: list[str]) -> list[str]:
@@ -299,7 +189,11 @@ async def _fetch_candidates(pool: asyncpg.Pool) -> list[_Candidate]:
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT *
+            SELECT cards.*, COALESCE((
+                SELECT array_agg(tag_id::text ORDER BY tag_id)
+                FROM scryfall_tag_memberships
+                WHERE oracle_id = cards.oracle_id
+            ), '{}') AS oracle_tag_ids
             FROM cards
             WHERE is_canonical
               AND legalities->>'commander' = 'legal'
@@ -323,14 +217,10 @@ def _score_candidate(candidate: _Candidate, intent: CommanderSuggestIntent) -> C
     score = _color_score(candidate.card.color_identity, intent, reasons)
     matched_tags = _intersection(candidate.tags, [*intent.archetype_tags, *intent.mechanic_tags])
     matched_keywords = _intersection(_keyword_tags(candidate.card.keywords), intent.mechanic_tags)
-    matched_traits = _intersection(candidate.traits, intent.traits)
-    matched_tokens = _intersection(candidate.token_types, intent.token_types)
 
     score += len(matched_tags) * 10
     score += len(matched_keywords) * 12
-    score += len(matched_traits) * 8
-    score += len(matched_tokens) * 6
-    reasons.extend(_match_reasons(matched_tags, matched_keywords, matched_traits, matched_tokens))
+    reasons.extend(_match_reasons(matched_tags, matched_keywords))
     advantage_reasons = _card_advantage_reasons(candidate.card.oracle_text)
     if advantage_reasons:
         reasons.append("Card advantage signal")
@@ -344,8 +234,6 @@ def _score_candidate(candidate: _Candidate, intent: CommanderSuggestIntent) -> C
         score=round(float(score), 3),
         score_reasons=_dedupe(reasons)[:6],
         matched_tags=_dedupe([*matched_tags, *matched_keywords]),
-        matched_traits=matched_traits,
-        matched_token_types=matched_tokens,
         card_advantage_reasons=advantage_reasons,
     )
 
@@ -374,44 +262,19 @@ def _intersection(left: list[str], right: list[str]) -> list[str]:
 
 
 def _keyword_tags(keywords: list[str]) -> list[str]:
-    return [re.sub(r"[^a-z0-9]+", "_", keyword.strip().lower()).strip("_") for keyword in keywords]
+    return keywords
 
 
 def _match_reasons(
     tags: list[str],
     keywords: list[str],
-    traits: list[str],
-    tokens: list[str],
 ) -> list[str]:
     reasons: list[str] = []
     if tags:
         reasons.append("Theme overlap")
     if keywords:
         reasons.append("Keyword overlap")
-    if _has_graveyard_keyword(tags):
-        reasons.append("Graveyard engine")
-    if "etb" in traits or "exile" in tags:
-        reasons.append("ETB payoff")
-    if tokens:
-        reasons.append("Token synergy")
     return reasons
-
-
-def _has_graveyard_keyword(tags: list[str]) -> bool:
-    graveyard_keywords = {
-        "dredge",
-        "flashback",
-        "escape",
-        "descend",
-        "threshold",
-        "delirium",
-        "undergrowth",
-        "unearth",
-        "encore",
-        "persist",
-        "undying",
-    }
-    return bool(set(tags) & graveyard_keywords)
 
 
 def _card_advantage_reasons(oracle_text: str | None) -> list[str]:
@@ -437,9 +300,6 @@ def _text_intent_score(
     if "graveyard" in direction and "graveyard" in text:
         score += 6
         reasons.append("Mentions graveyard")
-    if "etb" in intent.traits and "enters" in text:
-        score += 6
-        reasons.append("Mentions entering the battlefield")
     if "reanimator" in direction and "battlefield" in text and "graveyard" in text:
         score += 5
         reasons.append("Supports reanimation")
@@ -489,31 +349,19 @@ def _phrase_matches(text: str, phrase: str) -> bool:
 
 
 def _stage_targets(intent: CommanderSuggestIntent) -> dict[str, int]:
-    targets = dict(_DEFAULT_STAGE_TARGETS)
-    tags = set(intent.archetype_tags) | set(intent.mechanic_tags)
-    if "storm" in tags or "spellslinger" in tags or "magecraft" in tags:
-        targets["draw"] = 14
-    if tags & {"graveyard", "self_mill", "reanimator"} or _has_graveyard_keyword(
-        intent.mechanic_tags
-    ):
-        targets["interaction"] = 10
-    return targets
+    del intent
+    return dict(_DEFAULT_STAGE_TARGETS)
 
 
 def _suggested_name(intent: CommanderSuggestIntent) -> str | None:
-    tags = intent.mechanic_tags or intent.archetype_tags
-    if not tags:
-        return None
-    label = tags[0].replace("_", " ").title()
-    return f"{label} Brew"
+    del intent
+    return None
 
 
 def _has_specific_intent(intent: CommanderSuggestIntent) -> bool:
     return bool(
         intent.archetype_tags
         or intent.mechanic_tags
-        or intent.traits
-        or intent.token_types
         or intent.color_identity
         or intent.oracle_terms
         or intent.required_phrases

@@ -26,13 +26,8 @@ CREATE TABLE IF NOT EXISTS cards (
     set_code        TEXT,
     released_at     DATE,
     edhrec_rank     INTEGER,
-    tags            TEXT[] NOT NULL DEFAULT '{}',
-    hub_tags        TEXT[] NOT NULL DEFAULT '{}',
-    mtgjson_tags     TEXT[] NOT NULL DEFAULT '{}',
-    traits          TEXT[] NOT NULL DEFAULT '{}',
     card_types      TEXT[] NOT NULL DEFAULT '{}',
     subtypes        TEXT[] NOT NULL DEFAULT '{}',
-    token_types     TEXT[] NOT NULL DEFAULT '{}',
     border_color    TEXT,
     security_stamp  TEXT,
     game_changer    BOOLEAN NOT NULL DEFAULT false,
@@ -64,221 +59,9 @@ CREATE INDEX IF NOT EXISTS idx_cards_legalities
 -- Mana value range queries
 CREATE INDEX IF NOT EXISTS idx_cards_cmc ON cards (cmc);
 
--- Tag-based filtering (hybrid retrieval)
-CREATE INDEX IF NOT EXISTS idx_cards_tags ON cards USING GIN (tags);
-
--- Combined tag expression used by the assistant's theme fallback/supplement
--- and by required_tags / excluded_tags filters.
-CREATE INDEX IF NOT EXISTS idx_cards_all_tags_gin
-    ON cards USING GIN ((tags || hub_tags || mtgjson_tags));
-
--- Mechanical trait filtering (etb, activated, evasion)
-CREATE INDEX IF NOT EXISTS idx_cards_traits ON cards USING GIN (traits);
-
 -- Type/subtype filtering (soft boosting)
 CREATE INDEX IF NOT EXISTS idx_cards_card_types ON cards USING GIN (card_types);
 CREATE INDEX IF NOT EXISTS idx_cards_subtypes ON cards USING GIN (subtypes);
-CREATE INDEX IF NOT EXISTS idx_cards_token_types ON cards USING GIN (token_types);
-
--- ============================================================
--- MTGJSON CARD METADATA (sidecar enrichment + diff source)
--- ============================================================
-CREATE TABLE IF NOT EXISTS mtgjson_card_metadata (
-    scryfall_id       UUID PRIMARY KEY,
-    mtgjson_uuid      UUID NOT NULL,
-    name              TEXT NOT NULL,
-    keywords          TEXT[] NOT NULL DEFAULT '{}',
-    types             TEXT[] NOT NULL DEFAULT '{}',
-    supertypes        TEXT[] NOT NULL DEFAULT '{}',
-    subtypes          TEXT[] NOT NULL DEFAULT '{}',
-    edhrec_saltiness  NUMERIC,
-    is_funny          BOOLEAN NOT NULL DEFAULT false,
-    is_online_only    BOOLEAN NOT NULL DEFAULT false,
-    is_rebalanced     BOOLEAN NOT NULL DEFAULT false,
-    is_game_changer   BOOLEAN NOT NULL DEFAULT false,
-    leadership_skills JSONB NOT NULL DEFAULT '{}',
-    related_cards     JSONB NOT NULL DEFAULT '{}',
-    raw_identifiers   JSONB NOT NULL DEFAULT '{}',
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_keywords
-    ON mtgjson_card_metadata USING GIN (keywords);
-CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_types
-    ON mtgjson_card_metadata USING GIN (types);
-CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_supertypes
-    ON mtgjson_card_metadata USING GIN (supertypes);
-CREATE INDEX IF NOT EXISTS idx_mtgjson_card_metadata_subtypes
-    ON mtgjson_card_metadata USING GIN (subtypes);
-
--- ============================================================
--- MTGJSON OFFICIAL KEYWORD CATALOG
--- ============================================================
-CREATE TABLE IF NOT EXISTS mtgjson_keywords (
-    keyword         TEXT PRIMARY KEY,
-    tag             TEXT UNIQUE NOT NULL,
-    label           TEXT NOT NULL,
-    category        TEXT NOT NULL CHECK (category IN (
-        'ability_word', 'keyword_ability', 'keyword_action'
-    )),
-    mtgjson_version TEXT,
-    mtgjson_date    DATE,
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_mtgjson_keywords_category
-    ON mtgjson_keywords (category, label);
-
--- ============================================================
--- MOXFIELD HUB CATALOG + CARD MEMBERSHIP
--- ============================================================
-CREATE TABLE IF NOT EXISTS moxfield_hubs (
-    id                INTEGER PRIMARY KEY,
-    slug              TEXT UNIQUE NOT NULL,
-    tag               TEXT UNIQUE NOT NULL,
-    name              TEXT NOT NULL,
-    description       TEXT,
-    shows_in_decklist BOOLEAN NOT NULL DEFAULT false,
-    active            BOOLEAN NOT NULL DEFAULT true,
-    enabled           BOOLEAN NOT NULL DEFAULT true,
-    first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    synced_at         TIMESTAMPTZ,
-    last_card_sync_at TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_moxfield_hubs_active_name
-    ON moxfield_hubs (active, name);
-
-CREATE TABLE IF NOT EXISTS moxfield_hub_card_stats (
-    hub_id               INTEGER NOT NULL REFERENCES moxfield_hubs(id) ON DELETE CASCADE,
-    card_id              UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-    hub_deck_count       INTEGER NOT NULL,
-    baseline_deck_count  INTEGER NOT NULL,
-    hub_deck_pct         REAL NOT NULL,
-    baseline_deck_pct    REAL NOT NULL,
-    synergy_score        REAL NOT NULL,
-    hub_sample_size      INTEGER NOT NULL,
-    baseline_sample_size INTEGER NOT NULL,
-    fetched_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (hub_id, card_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_moxfield_hub_card_stats_card
-    ON moxfield_hub_card_stats (card_id);
-CREATE INDEX IF NOT EXISTS idx_moxfield_hub_card_stats_hub_score
-    ON moxfield_hub_card_stats (hub_id, synergy_score DESC);
-
--- ============================================================
--- ARCHIDEKT TAG CATALOG + CARD MEMBERSHIP
--- ============================================================
-CREATE TABLE IF NOT EXISTS archidekt_tags (
-    id                BIGSERIAL PRIMARY KEY,
-    slug              TEXT UNIQUE NOT NULL,
-    tag               TEXT UNIQUE NOT NULL,
-    name              TEXT NOT NULL,
-    description       TEXT,
-    active            BOOLEAN NOT NULL DEFAULT true,
-    enabled           BOOLEAN NOT NULL DEFAULT true,
-    first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    synced_at         TIMESTAMPTZ,
-    last_card_sync_at TIMESTAMPTZ,
-    last_error        TEXT,
-    last_error_at     TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_archidekt_tags_active_name
-    ON archidekt_tags (active, enabled, name);
-
-CREATE TABLE IF NOT EXISTS archidekt_tag_card_stats (
-    tag_id                BIGINT NOT NULL REFERENCES archidekt_tags(id) ON DELETE CASCADE,
-    card_id               UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-    tag_deck_count        INTEGER NOT NULL,
-    baseline_deck_count   INTEGER NOT NULL,
-    tag_deck_pct          REAL NOT NULL,
-    baseline_deck_pct     REAL NOT NULL,
-    synergy_score         REAL NOT NULL,
-    tag_sample_size       INTEGER NOT NULL,
-    baseline_sample_size  INTEGER NOT NULL,
-    fetched_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (tag_id, card_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_archidekt_tag_card_stats_card
-    ON archidekt_tag_card_stats (card_id);
-CREATE INDEX IF NOT EXISTS idx_archidekt_tag_card_stats_score
-    ON archidekt_tag_card_stats (tag_id, synergy_score DESC);
-
--- ============================================================
--- SHARED, ADMIN-CURATED THEME GROUPS
--- ============================================================
-CREATE TABLE IF NOT EXISTS theme_groups (
-    id          BIGSERIAL PRIMARY KEY,
-    slug        TEXT UNIQUE NOT NULL,
-    label       TEXT NOT NULL,
-    description TEXT,
-    aliases     TEXT[] NOT NULL DEFAULT '{}',
-    sort_order  INTEGER NOT NULL DEFAULT 0,
-    enabled     BOOLEAN NOT NULL DEFAULT true,
-    deleted_at  TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE theme_groups ADD COLUMN IF NOT EXISTS aliases TEXT[] NOT NULL DEFAULT '{}';
-
-CREATE TABLE IF NOT EXISTS theme_group_members (
-    id                BIGSERIAL PRIMARY KEY,
-    group_id          BIGINT NOT NULL REFERENCES theme_groups(id) ON DELETE CASCADE,
-    source            TEXT NOT NULL CHECK (source IN ('moxfield', 'archidekt')),
-    moxfield_hub_id   INTEGER REFERENCES moxfield_hubs(id) ON DELETE CASCADE,
-    archidekt_tag_id  BIGINT REFERENCES archidekt_tags(id) ON DELETE CASCADE,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CHECK (
-        (source = 'moxfield' AND moxfield_hub_id IS NOT NULL AND archidekt_tag_id IS NULL)
-        OR
-        (source = 'archidekt' AND archidekt_tag_id IS NOT NULL AND moxfield_hub_id IS NULL)
-    )
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_member_moxfield_unique
-    ON theme_group_members (moxfield_hub_id) WHERE moxfield_hub_id IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_member_archidekt_unique
-    ON theme_group_members (archidekt_tag_id) WHERE archidekt_tag_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_theme_groups_visible
-    ON theme_groups (enabled, deleted_at, sort_order, label);
-
--- ============================================================
--- ADMIN-CURATED THEME GROUP SUGGESTIONS (LLM drafts, human approves)
--- ============================================================
-CREATE TABLE IF NOT EXISTS theme_group_suggestions (
-    id                    BIGSERIAL PRIMARY KEY,
-    source                TEXT NOT NULL CHECK (source IN ('moxfield', 'archidekt')),
-    source_id             BIGINT NOT NULL,
-    group_id              BIGINT REFERENCES theme_groups(id) ON DELETE SET NULL,
-    new_group_slug        TEXT,
-    new_group_label       TEXT,
-    new_group_description TEXT,
-    new_group_aliases     TEXT[] NOT NULL DEFAULT '{}',
-    confidence            REAL NOT NULL DEFAULT 0,
-    rationale             TEXT,
-    status                TEXT NOT NULL DEFAULT 'pending'
-                          CHECK (status IN ('pending', 'approved', 'rejected')),
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    reviewed_at           TIMESTAMPTZ,
-    CHECK (
-        (group_id IS NOT NULL AND new_group_slug IS NULL)
-        OR (group_id IS NULL AND new_group_slug IS NOT NULL)
-    )
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_group_suggestions_source_unique
-    ON theme_group_suggestions (source, source_id)
-    WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_theme_group_suggestions_status
-    ON theme_group_suggestions (status, created_at);
 
 -- ============================================================
 -- ACCOUNTS
@@ -558,18 +341,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_cards_one_canonical_oracle
     WHERE is_canonical AND oracle_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_cards_canonical_name
     ON cards (is_canonical, name);
-ALTER TABLE cards ADD COLUMN IF NOT EXISTS hub_tags TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE cards DROP COLUMN IF EXISTS edhrec_tags;
-ALTER TABLE cards ADD COLUMN IF NOT EXISTS mtgjson_tags TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE moxfield_hubs ADD COLUMN IF NOT EXISTS last_card_sync_at TIMESTAMPTZ;
-ALTER TABLE moxfield_hubs ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
-UPDATE cards
-SET mtgjson_tags = tags
-WHERE cardinality(mtgjson_tags) = 0
-  AND cardinality(hub_tags) = 0
-  AND cardinality(tags) > 0;
-CREATE INDEX IF NOT EXISTS idx_cards_hub_tags ON cards USING GIN (hub_tags);
-CREATE INDEX IF NOT EXISTS idx_cards_mtgjson_tags ON cards USING GIN (mtgjson_tags);
 ALTER TABLE decks ADD COLUMN IF NOT EXISTS stage_targets JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE deck_snapshots DROP CONSTRAINT IF EXISTS deck_snapshots_source_check;
 ALTER TABLE deck_snapshots ADD CONSTRAINT deck_snapshots_source_check
@@ -765,9 +536,7 @@ SELECT
     c.color_identity,
     c.image_uri,
     c.rarity,
-    c.tags,
-    c.hub_tags,
-    c.mtgjson_tags,
+    c.keywords,
     CASE
         WHEN (c.prices->>'eur') IS NULL THEN NULL
         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer
@@ -989,8 +758,10 @@ CREATE TABLE IF NOT EXISTS recommendation_feedback (
     PRIMARY KEY (run_id, oracle_id)
 );
 
--- Recreate after source tables so deck reads expose direct Scryfall identities
--- without changing the legacy columns until the reviewed cutover migration.
+-- Recreate after source tables so deck reads expose direct Scryfall identities.
+-- A view's output columns cannot be reordered by CREATE OR REPLACE, so remove
+-- the retired projection before defining the source-only contract.
+DROP VIEW IF EXISTS deck_detail_view;
 CREATE OR REPLACE VIEW deck_detail_view AS
 SELECT
     dc.deck_id,
@@ -1010,9 +781,7 @@ SELECT
     c.color_identity,
     c.image_uri,
     c.rarity,
-    c.tags,
-    c.hub_tags,
-    c.mtgjson_tags,
+    c.keywords,
     COALESCE((
         SELECT jsonb_agg(jsonb_build_object(
             'id', t.id, 'slug', t.slug, 'label', t.metadata->>'label'

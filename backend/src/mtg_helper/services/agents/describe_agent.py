@@ -25,14 +25,6 @@ from mtg_helper.services.agents._usage import log_run_usage
 
 _MAX_OUTPUT_TOKENS = 2048
 
-# Known strategy tags the retrieval system recognizes — injected into the
-# agent prompt so synthesized descriptions align with the retrieval vocabulary.
-_STRATEGY_TAGS = (
-    "ramp, token, tokens, voltron, aristocrats, graveyard, blink, stax, mill, "
-    "tribal, sacrifice, lifegain, counters, equipment, interaction, tutor, "
-    "extra turn, group hug, fast mana, draw, reanimator"
-)
-
 
 class CommanderNotFoundError(LookupError):
     """The requested commander card is not in the database."""
@@ -96,11 +88,8 @@ def _build_system_prompt(deps: DescribeDeps) -> str:
         "- theme has no fixed target — fills remaining slots",
         "",
         "DESCRIPTION FORMAT:",
-        "The description MUST naturally include relevant strategy keywords so the retrieval",
-        "system can find thematically matching cards. Use words from this vocabulary when",
-        f"appropriate: {_STRATEGY_TAGS}",
-        "Example: 'graveyard aristocrats deck that sacrifices tokens to trigger death effects",
-        "and drain opponents with lifegain. Focuses on recursive threats.'",
+        "The description MUST state the player's goals in ordinary prose.",
+        "Do not invent or enumerate card labels for downstream retrieval.",
     ]
     if deps.at_history_limit:
         parts += ["", FORCE_FINALIZE_HINT]

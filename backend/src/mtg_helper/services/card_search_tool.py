@@ -6,6 +6,8 @@ escape it. Reads from the ``cards`` table directly and routes text queries
 through ``retrieval_service.retrieve_candidates``.
 """
 
+from uuid import UUID
+
 import asyncpg
 
 from mtg_helper.models.ai import CardSearchHit, CardSearchInput
@@ -78,7 +80,6 @@ def _apply_optional_filters(inp: CardSearchInput, where: list[str], args: list[o
 
     filters: tuple[tuple[bool, str, object], ...] = (
         (bool(inp.types), "type_line ILIKE ALL($$N::text[])", [f"%{t}%" for t in inp.types]),
-        (bool(inp.tags), "tags && $$N::text[]", list(inp.tags)),
         (inp.min_cmc is not None, "cmc >= $$N", inp.min_cmc),
         (inp.max_cmc is not None, "cmc <= $$N", inp.max_cmc),
         (
@@ -90,6 +91,17 @@ def _apply_optional_filters(inp: CardSearchInput, where: list[str], args: list[o
     for active, clause, value in filters:
         if active:
             _add(clause, value)
+    if inp.tags:
+        try:
+            source_ids = [UUID(tag) for tag in inp.tags]
+        except ValueError as exc:
+            raise ValueError("Card-search tags must be Scryfall Oracle-tag UUIDs") from exc
+        _add(
+            "EXISTS (SELECT 1 FROM scryfall_tag_memberships membership "
+            "WHERE membership.oracle_id = cards.oracle_id "
+            "AND membership.tag_id = ANY($$N::uuid[]))",
+            source_ids,
+        )
     _apply_text_filter(inp.text_query, where, args)
 
 
@@ -129,7 +141,8 @@ async def search_cards(
     limit = min(inp.limit, _MAX_LIMIT)
     where, args = _build_filters(inp, deck_color_identity, exclude_names)
     sql = (
-        "SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text, color_identity, tags, "
+        "SELECT scryfall_id, name, mana_cost, cmc, type_line, oracle_text, "
+        "color_identity, keywords, "
         "ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents "
         f"FROM cards WHERE {' AND '.join(where)} "
         "ORDER BY COALESCE(edhrec_rank, 999999) ASC NULLS LAST "
@@ -146,7 +159,7 @@ async def search_cards(
             type_line=row["type_line"],
             oracle_text=row["oracle_text"],
             color_identity=list(row["color_identity"] or []),
-            tags=list(row["tags"] or []),
+            tags=list(row["keywords"] or []),
             price_eur_cents=row["price_eur_cents"],
         )
         for row in rows

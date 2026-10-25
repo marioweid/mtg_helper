@@ -23,6 +23,15 @@ async def load_keyword_prompt_catalog(pool: asyncpg.Pool) -> str:
     return "\n".join(f"- {keyword}" for keyword in sorted(await load_keyword_tags(pool)))
 
 
+async def load_oracle_tag_prompt_catalog(pool: asyncpg.Pool) -> str:
+    """Return Oracle-tag UUIDs and labels from the current source publication."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, metadata->>'label' AS label FROM scryfall_tags ORDER BY slug"
+        )
+    return "\n".join(f"- {row['id']}: {row['label']}" for row in rows)
+
+
 async def sanitize_commander_intent(
     pool: asyncpg.Pool, intent: CommanderSuggestIntent
 ) -> CommanderSuggestIntent:

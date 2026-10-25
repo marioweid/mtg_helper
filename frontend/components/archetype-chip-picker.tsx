@@ -10,7 +10,7 @@ interface Props {
   onChange: (next: string[]) => void;
   suggested?: string[];
   onMechanicTagsLoaded?: (tags: string[]) => void;
-  onHubTagsLoaded?: (tags: string[]) => void;
+  onOracleTagsLoaded?: (tags: string[]) => void;
 }
 
 export function ArchetypeChipPicker({
@@ -18,7 +18,7 @@ export function ArchetypeChipPicker({
   onChange,
   suggested,
   onMechanicTagsLoaded,
-  onHubTagsLoaded,
+  onOracleTagsLoaded,
 }: Props) {
   const [tags, setTags] = useState<SourceTagChip[] | null>(null);
   const [keywords, setKeywords] = useState<PrintedKeywordChip[] | null>(null);
@@ -34,7 +34,7 @@ export function ArchetypeChipPicker({
         if (cancelled) return;
         setTags(sourceTags);
         setKeywords(sourceKeywords);
-        onHubTagsLoaded?.(sourceTags.map((tag) => tag.id));
+        onOracleTagsLoaded?.(sourceTags.map((tag) => tag.id));
         onMechanicTagsLoaded?.(sourceKeywords.map((keyword) => keyword.keyword));
       })
       .catch((reason: unknown) => {
@@ -44,7 +44,7 @@ export function ArchetypeChipPicker({
     return () => {
       cancelled = true;
     };
-  }, [onHubTagsLoaded, onMechanicTagsLoaded]);
+  }, [onOracleTagsLoaded, onMechanicTagsLoaded]);
 
   const normalized = query.trim().toLocaleLowerCase();
   const visibleTags = (tags ?? []).filter((tag) =>

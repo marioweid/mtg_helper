@@ -220,9 +220,7 @@ def _rank_swappable_lands(deck: DeckDetailResponse) -> list[DeckCardItem]:
     return [land for _, land in scored]
 
 
-def _candidate_to_card_item(
-    cand: CardSuggestion, source: DeckCardItem, source_stages: list[str]
-) -> DeckCardItem:
+def _candidate_to_card_item(cand: CardSuggestion, source: DeckCardItem) -> DeckCardItem:
     """Build an in-memory ``DeckCardItem`` for the replacement so the variant
     deck can be simulated without touching the DB. Identifiers are fresh
     placeholders; persistence happens in the apply step via the real
@@ -248,8 +246,7 @@ def _candidate_to_card_item(
         categories=list(source.categories or []),
         added_by="ai",
         ai_reasoning="optimizer swap",
-        qualifying_stages=list(cand.qualifying_stages or source_stages),
-        tags=[],
+        keywords=[],
         power=None,
         price_eur_cents=cand.price_eur_cents,
     )
@@ -359,7 +356,7 @@ async def _best_land_swap(
                 cand, max_price_cents
             ):
                 continue
-            replacement = _candidate_to_card_item(cand, out_land, [])
+            replacement = _candidate_to_card_item(cand, out_land)
             variant = _apply_swap_in_memory(state.variant_deck, out_land, replacement)
             stats = await prog.sim(variant, search_sim)
             delta = _health_score(stats) - state.current_score
@@ -453,7 +450,7 @@ async def _try_swap(
     for cand in swap_resp.candidates:
         if cand.scryfall_id in state.excluded_scryfall_ids:
             continue
-        replacement = _candidate_to_card_item(cand, weak.card, weak.card.qualifying_stages or [])
+        replacement = _candidate_to_card_item(cand, weak.card)
         variant = _apply_swap_in_memory(state.variant_deck, weak.card, replacement)
         stats = await prog.sim(variant, search_sim)
         delta = _health_score(stats) - state.current_score

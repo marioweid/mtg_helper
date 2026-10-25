@@ -124,6 +124,11 @@ async def create_deck(
         deck = await deck_service.create_deck(request.app.state.db_pool, body, email)
     except CardNotFoundError as e:
         raise HTTPException(status_code=422, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_SOURCE_SELECTION", "message": str(e)},
+        ) from e
     return DataResponse(data=deck)
 
 
@@ -292,7 +297,13 @@ async def update_deck(
 ) -> DataResponse[DeckResponse]:
     """Update deck metadata."""
     email = _require_email(account)
-    deck = await deck_service.update_deck(request.app.state.db_pool, deck_id, body, email)
+    try:
+        deck = await deck_service.update_deck(request.app.state.db_pool, deck_id, body, email)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_SOURCE_SELECTION", "message": str(e)},
+        ) from e
     if deck is None:
         raise _not_found(deck_id)
     return DataResponse(data=deck)
@@ -544,7 +555,7 @@ async def update_card_categories(
     """Replace a card's category tag set within the deck.
 
     A card may belong to multiple categories (e.g. ramp + draw). An empty list
-    clears all manual categories — auto-bucketing via qualifying_stages still
+    clears all manual categories. Personal category selection remains explicit.
     applies in the wizard view.
     """
     email = _require_email(account)

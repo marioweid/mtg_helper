@@ -22,16 +22,9 @@ interface Props {
 
 const CATEGORY_OPTIONS = CATEGORY_ORDER;
 
-function roleReasonTitle(card: DeckCardItem, role: string, auto: boolean): string | undefined {
-  if (!auto) return undefined;
-  const reasons = card.role_reasons?.[role] ?? [];
-  if (reasons.length === 0) return "Auto-counted for this builder role";
-  return `Auto-counted because of: ${reasons.join(", ")}`;
-}
-
 /**
  * Shared detail surface for a deck card — image, type line, oracle text,
- * category chip editor (manual + auto-tagged states), and remove button.
+ * category chip editor and remove button.
  *
  * The modal owns opening and closing; this surface keeps card actions beside
  * their details. ``showImage`` controls whether it also renders the card art.
@@ -95,47 +88,26 @@ export function CardDetailPanel({
             <p className="mb-1.5 text-xs uppercase tracking-wide text-gray-500">
               Categories
               <span className="ml-2 normal-case tracking-normal text-gray-600">
-                {card.categories.length > 0
-                  ? "(explicit picks override auto tags — clear all to revert)"
-                  : "(dotted = auto from card text — click to override)"}
+                (personal deck choices)
               </span>
             </p>
             <div className="flex flex-wrap gap-1.5">
               {CATEGORY_OPTIONS.map((opt) => {
                 const active = card.categories.includes(opt);
-                const hasExplicit = card.categories.length > 0;
-                const auto = !active && !hasExplicit && card.qualifying_stages.includes(opt);
                 const cls = active
                   ? "border-indigo-500 bg-indigo-900/40 text-indigo-300"
-                  : auto
-                    ? "border-dashed border-gray-600 bg-white/5 text-gray-400 hover:border-gray-400"
-                    : "border-white/10 bg-white/5 text-gray-500 hover:border-white/20 hover:text-gray-300";
+                  : "border-white/10 bg-white/5 text-gray-500 hover:border-white/20 hover:text-gray-300";
                 return (
                   <button
                     key={opt}
                     onClick={() => toggleCategory(opt)}
                     className={`rounded border px-2 py-0.5 text-xs transition-colors ${cls}`}
-                    title={auto ? "Auto-tagged from card text — click to make explicit" : undefined}
                   >
                     {STAGE_LABELS[opt] ?? opt}
-                    {auto ? <span className="ml-1 text-[10px] text-gray-500">auto</span> : null}
                   </button>
                 );
               })}
             </div>
-            {card.categories.length === 0 && Object.keys(card.role_reasons ?? {}).length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {Object.entries(card.role_reasons).map(([role, reasons]) => (
-                  <span
-                    key={role}
-                    className="rounded bg-white/5 px-2 py-0.5 text-[10px] text-gray-400"
-                    title={roleReasonTitle(card, role, true)}
-                  >
-                    {STAGE_LABELS[role] ?? role}: {reasons[0] ?? "auto"}
-                  </span>
-                ))}
-              </div>
-            ) : null}
           </div>
         ) : null}
 

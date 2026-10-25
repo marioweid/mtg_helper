@@ -15,13 +15,14 @@ from mtg_helper.services.agents._prompts import (
     SANDBOX_RULES,
 )
 from mtg_helper.services.agents._usage import log_run_usage
-from mtg_helper.services.agents.extract_agent import KEYWORD_EXAMPLES
 from mtg_helper.services.commander_suggestor_service import (
     build_response,
     parse_intent_fallback,
 )
-from mtg_helper.services.keyword_catalog_service import load_keyword_prompt_catalog
-from mtg_helper.services.theme_service import load_theme_prompt_catalog
+from mtg_helper.services.keyword_catalog_service import (
+    load_keyword_prompt_catalog,
+    load_oracle_tag_prompt_catalog,
+)
 
 _MAX_OUTPUT_TOKENS = 1536
 _log = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class CommanderSuggestDeps:
 
     previous_intent: CommanderSuggestIntent | None
     at_history_limit: bool
-    hub_catalog: str
+    oracle_tag_catalog: str
     keyword_catalog: str
 
 
@@ -59,32 +60,24 @@ def _build_system_prompt(deps: CommanderSuggestDeps) -> str:
         "",
         f"Previous intent JSON: {previous}",
         "",
-        "Emit shared deck theme tags in `archetype_tags`.",
-        "Every `archetype_tags` item must appear in the local theme catalog below.",
+        "Emit Scryfall Oracle-tag UUIDs in `archetype_tags`.",
+        "Every `archetype_tags` item must appear in the source catalog below.",
         "",
-        "Available local shared theme catalog:",
-        deps.hub_catalog,
+        "Available Scryfall Oracle-tag catalog:",
+        deps.oracle_tag_catalog,
         "",
-        "Emit official MTGJSON keyword tags only in `mechanic_tags` for exact printed",
-        "mechanics like convoke, dredge, cascade, surveil, or flashback.",
-        "Use snake_case tag names such as:",
-        ", ".join(KEYWORD_EXAMPLES),
+        "Emit exact printed Scryfall keywords only in `mechanic_tags`.",
         "Every `mechanic_tags` item must appear in the local catalog below.",
         "",
-        "Available local MTGJSON keyword catalog:",
+        "Available printed-keyword catalog:",
         deps.keyword_catalog,
         "",
-        "Prefer hub archetype_tags for broad plans like graveyard, blink, reanimator,",
-        "aristocrats, voltron, pingers, +1/+1 counters, spellslinger, or tribal decks.",
-        "Do not invent compound tags such as etb_ping, graveyard_value, or token_draw.",
+        "Do not invent Oracle tags or printed keywords.",
         "",
-        "When a player asks for a concept that is not an MTGJSON keyword, express it as",
-        "`traits`, `oracle_terms`, and `required_phrases` instead of fake keywords.",
-        "Example: ETB ping should use traits=['etb'], oracle_terms=['enters', 'damage'],",
-        "and required_phrases=['enters', 'damage'].",
-        "",
-        "Traits you may emit: etb, activated, evasion.",
-        "Token types may be common token nouns such as treasure, food, clue, zombie, squirrel.",
+        "When a player asks for a concept that is not a printed keyword, express it with",
+        "`oracle_terms` and `required_phrases` rather than inventing a label.",
+        "Example: ETB ping uses oracle_terms=['enters', 'damage'] and",
+        "required_phrases=['enters', 'damage'].",
         "Color identity means colors the commander must include, or null if the player has no",
         "preference. Set exact_color_identity=true only when the player asks for exactly those",
         "colors and no others.",
@@ -143,7 +136,7 @@ async def suggest_turn(
     deps = CommanderSuggestDeps(
         previous_intent=previous_intent,
         at_history_limit=len(history) >= MAX_HISTORY_TURNS,
-        hub_catalog=await load_theme_prompt_catalog(pool),
+        oracle_tag_catalog=await load_oracle_tag_prompt_catalog(pool),
         keyword_catalog=await load_keyword_prompt_catalog(pool),
     )
     try:
@@ -182,7 +175,7 @@ def _fallback_reply(intent: CommanderSuggestIntent) -> str:
         return (
             "Do you want self-mill value, sacrifice loops, or cards you can reuse from graveyard?"
         )
-    if "blink" in tags or "etb" in tags or "exile" in tags or "etb" in intent.traits:
+    if "exile" in tags:
         return "Do you want ETB value, toolbox creatures, or token-copy effects?"
     if intent.color_identity is None:
         return "Do you have a color identity in mind, or any colors you want to avoid?"

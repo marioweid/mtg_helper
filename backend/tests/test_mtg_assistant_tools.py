@@ -12,7 +12,6 @@ from mtg_helper.models.decks import CommanderCardSummary, DeckCardItem, DeckDeta
 from mtg_helper.services.mtg_assistant_tools import (
     _compose_mana_base_analysis,
     _structural_issues,
-    _theme_match_score,
     check_bracket,
     check_game_changers,
 )
@@ -111,24 +110,6 @@ def _deck(cards: list[DeckCardItem], *, bracket: int = 3) -> DeckDetailResponse:
         updated_at=now,
         cards=cards,
     )
-
-
-class _ThemeRow(dict[str, object]):
-    def __getitem__(self, key: str) -> object:
-        return super().__getitem__(key)
-
-
-def test_theme_match_uses_aliases_and_description() -> None:
-    row = _ThemeRow(
-        tag="x_spells",
-        label="X Spells",
-        description="Variable-cost spells and scalable mana payoffs.",
-        aliases=["big x spells", "variable mana"],
-        source="group",
-    )
-
-    assert _theme_match_score("big x spells", row) == 1.0
-    assert _theme_match_score("scalable mana", row) > 0.0
 
 
 def test_structural_legality_rejects_wrong_size_and_duplicates() -> None:

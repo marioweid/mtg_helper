@@ -51,8 +51,7 @@ function countStage(cards: DeckCardItem[], stage: string): number {
   }
   return cards.reduce((sum, card) => {
     if (isLand(card)) return sum;
-    const stages = card.categories.length > 0 ? card.categories : card.qualifying_stages;
-    return stages.includes(stage) ? sum + card.quantity : sum;
+    return card.categories.includes(stage) ? sum + card.quantity : sum;
   }, 0);
 }
 
@@ -100,7 +99,7 @@ function CardRow({
   onRemove: (scryfallId: string) => void | Promise<void>;
   onSetQuantity: (scryfallId: string, quantity: number) => void | Promise<void>;
 }) {
-  const chips = (card.categories.length > 0 ? card.categories : card.qualifying_stages).slice(0, 3);
+  const chips = card.categories.slice(0, 3);
 
   return (
     <li className="group rounded-lg border border-white/10 bg-white/[0.025] p-2.5">

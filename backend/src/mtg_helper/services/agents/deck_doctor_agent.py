@@ -19,7 +19,6 @@ from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
 from mtg_helper.services.agents._model import make_openai_model, openai_model_settings
 from mtg_helper.services.agents._usage import log_run_usage
 from mtg_helper.services.card_search_tool import search_cards
-from mtg_helper.services.retrieval_service import card_qualifying_stages
 
 _log = logging.getLogger(__name__)
 
@@ -159,28 +158,14 @@ def _deck_colors(deck: DeckDetailResponse) -> list[str]:
     return [c for c in (deck.commander_color_identity or []) if c in {"W", "U", "B", "R", "G"}]
 
 
-def _card_tags(card: DeckCardItem) -> set[str]:
-    return set(card.tags or []) | set(card.categories or []) | set(card.qualifying_stages or [])
-
-
 def _protected_tag_set(deck: DeckDetailResponse) -> set[str]:
-    tags = set(deck.archetype_tags or [])
-    protected: set[str] = set(tags)
-    if "food_matters" in tags:
-        protected.update({"food_matters", "food", "token", "sacrifice"})
-    if "squirrel_tribal" in tags:
-        protected.update({"squirrel", "token", "anthem"})
-    if "aristocrats" in tags or "sacrifice" in tags:
-        protected.update({"aristocrats", "sacrifice", "token", "graveyard"})
-    if "treasure_matters" in tags:
-        protected.update({"treasure_matters", "treasure", "token", "ramp"})
-    if "clue_matters" in tags:
-        protected.update({"clue_matters", "clue", "token", "draw"})
-    return protected
+    """Return the deck's explicitly selected Oracle-tag UUIDs."""
+    return set(deck.archetype_tags or [])
 
 
 def _protection_reason(card: DeckCardItem, deck: DeckDetailResponse) -> str | None:
-    overlap = _card_tags(card) & _protected_tag_set(deck)
+    card_tags = {tag["id"] for tag in card.oracle_tags if "id" in tag}
+    overlap = card_tags & _protected_tag_set(deck)
     if not overlap:
         return None
     return "theme engine: " + ", ".join(sorted(overlap)[:4])
@@ -192,9 +177,9 @@ def _weak_card_rows(deck: DeckDetailResponse, limit: int) -> list[dict[str, Any]
     for card in deck.cards:
         if "Land" in (card.type_line or ""):
             continue
-        tags = _card_tags(card)
-        role_count = len(card_qualifying_stages(list(card.tags or []), card.type_line))
-        theme_overlap = len(tags & deck_tags)
+        card_tags = {tag["id"] for tag in card.oracle_tags if "id" in tag}
+        role_count = len(card.categories or [])
+        theme_overlap = len(card_tags & deck_tags)
         added_penalty = 1 if card.added_by == "user" else 0
         score = theme_overlap * 3 + role_count + added_penalty
         row = _card_row(card, deck, theme_overlap=theme_overlap, role_count=role_count)
@@ -232,7 +217,7 @@ def _card_row(
         "oracle_text": _snippet(card.oracle_text),
         "quantity": card.quantity,
         "categories": list(card.categories or []),
-        "tags": list(card.tags or [])[:8],
+        "tags": list(card.keywords or [])[:8],
         "theme_overlap": theme_overlap,
         "role_count": role_count,
         "added_by": card.added_by,
@@ -243,8 +228,7 @@ def _card_row(
 def _role_counts(deck: DeckDetailResponse) -> dict[str, int]:
     counts: dict[str, int] = {}
     for card in deck.cards:
-        stages = card.categories or card.qualifying_stages or []
-        for stage in stages:
+        for stage in card.categories:
             counts[stage] = counts.get(stage, 0) + (card.quantity or 1)
     return counts
 

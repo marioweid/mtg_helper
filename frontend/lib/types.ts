@@ -128,11 +128,8 @@ export interface DeckCardItem {
   categories: string[];
   added_by: string;
   ai_reasoning: string | null;
-  qualifying_stages: string[];
-  role_reasons: Record<string, string[]>;
-  tags: string[];
-  hub_tags: string[];
-  mtgjson_tags: string[];
+  oracle_tags: SourceTagChip[];
+  keywords: string[];
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
   game_changer: boolean;
@@ -165,9 +162,8 @@ export interface CommanderCardSummary {
   oracle_text: string | null;
   image_uri: string | null;
   color_identity: string[];
-  tags?: string[];
-  hub_tags?: string[];
-  mtgjson_tags?: string[];
+  oracle_tags: SourceTagChip[];
+  keywords: string[];
   game_changer: boolean;
 }
 
@@ -301,7 +297,6 @@ export interface CardSuggestion {
   highlight_reasons: string[] | null;
   price_eur_cents: number | null;
   owned_in: CollectionMembership[];
-  qualifying_stages: string[];
   sources: string[];
   game_changer: boolean;
 }
@@ -361,8 +356,6 @@ export interface KeywordExtractResponse {
 export interface CommanderSuggestIntent {
   archetype_tags: string[];
   mechanic_tags: string[];
-  traits: string[];
-  token_types: string[];
   color_identity: string[] | null;
   exact_color_identity: boolean;
   excluded_colors: string[];
@@ -387,8 +380,6 @@ export interface CommanderSuggestion {
   score: number;
   score_reasons: string[];
   matched_tags: string[];
-  matched_traits: string[];
-  matched_token_types: string[];
   card_advantage_reasons: string[];
 }
 
@@ -442,22 +433,17 @@ export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknow
 }
 
 /**
- * Buckets a deck card belongs to. Explicit `categories` fully override the
- * auto-derived `qualifying_stages` — set any category and the auto tags are
- * suppressed. Clear categories to revert to auto. Cards with neither fall
- * into "untagged".
+ * Buckets a deck card belongs to. Categories are personal deck choices; cards
+ * without one remain untagged rather than receiving an inferred global label.
  */
 export function bucketsFor(card: DeckCardItem): string[] {
-  const source = card.categories.length > 0 ? card.categories : card.qualifying_stages;
-  if (source.length === 0) return ["untagged"];
-  return [...new Set(source)];
+  if (card.categories.length === 0) return ["untagged"];
+  return [...new Set(card.categories)];
 }
 
 export function bucketReason(card: DeckCardItem, bucket: string): string | undefined {
   if (card.categories.includes(bucket)) return "Manual deck role override";
-  const reasons = card.role_reasons?.[bucket] ?? [];
-  if (reasons.length === 0) return undefined;
-  return `Auto-counted because of: ${reasons.join(", ")}`;
+  return undefined;
 }
 
 // Combos (Commander Spellbook)

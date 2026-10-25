@@ -30,7 +30,7 @@ def _arguments() -> argparse.Namespace:
 
 def _is_safe_target(database_url: str, production_approval: str | None = None) -> bool:
     """Accept only an isolated rehearsal target or an explicit approval match."""
-    if database_url == os.environ.get("DATABASE_URL"):
+    if _target_identity(database_url) == _target_identity(os.environ.get("DATABASE_URL", "")):
         return False
     target = urlparse(database_url)
     database = target.path.removeprefix("/")
@@ -39,6 +39,15 @@ def _is_safe_target(database_url: str, production_approval: str | None = None) -
     return production_approval == os.environ.get("CUTOVER_PRODUCTION_APPROVAL") and bool(
         production_approval
     )
+
+
+def _target_identity(database_url: str) -> tuple[str, int, str, str] | None:
+    """Normalize local DSNs so localhost aliases cannot bypass the app-target guard."""
+    target = urlparse(database_url)
+    if not target.hostname or not target.path:
+        return None
+    host = "loopback" if target.hostname in _LOCAL_HOSTS else target.hostname.lower()
+    return host, target.port or 5432, target.path.removeprefix("/"), target.username or ""
 
 
 def _private_report_path(report: Path) -> Path:
@@ -119,8 +128,51 @@ def _write_report(report: Path, unresolved: list[dict[str, str]]) -> None:
 
 
 async def _apply(conn: asyncpg.Connection, updates: dict[UUID, list[str]]) -> None:
+    """Apply source selections and remove retired global-label storage atomically."""
     for deck_id, tags in updates.items():
         await conn.execute("UPDATE decks SET archetype_tags = $2 WHERE id = $1", deck_id, tags)
+    await conn.execute(_LEGACY_DROP_SQL)
+
+
+_LEGACY_DROP_SQL = """
+DROP VIEW IF EXISTS deck_detail_view;
+DROP TABLE IF EXISTS theme_group_suggestions CASCADE;
+DROP TABLE IF EXISTS theme_group_members CASCADE;
+DROP TABLE IF EXISTS theme_groups CASCADE;
+DROP TABLE IF EXISTS archidekt_tag_card_stats CASCADE;
+DROP TABLE IF EXISTS archidekt_tags CASCADE;
+DROP TABLE IF EXISTS moxfield_hub_card_stats CASCADE;
+DROP TABLE IF EXISTS moxfield_hubs CASCADE;
+DROP TABLE IF EXISTS mtgjson_keywords CASCADE;
+DROP TABLE IF EXISTS mtgjson_card_metadata CASCADE;
+DROP INDEX IF EXISTS idx_cards_tags;
+DROP INDEX IF EXISTS idx_cards_all_tags_gin;
+DROP INDEX IF EXISTS idx_cards_traits;
+DROP INDEX IF EXISTS idx_cards_hub_tags;
+DROP INDEX IF EXISTS idx_cards_mtgjson_tags;
+ALTER TABLE cards DROP COLUMN IF EXISTS tags;
+ALTER TABLE cards DROP COLUMN IF EXISTS hub_tags;
+ALTER TABLE cards DROP COLUMN IF EXISTS mtgjson_tags;
+ALTER TABLE cards DROP COLUMN IF EXISTS traits;
+ALTER TABLE cards DROP COLUMN IF EXISTS token_types;
+CREATE VIEW deck_detail_view AS
+SELECT
+    dc.deck_id, dc.id AS deck_card_id, dc.quantity, dc.categories, dc.added_by, dc.ai_reasoning,
+    c.id AS card_id, c.scryfall_id, c.oracle_id, c.name, c.mana_cost, c.cmc, c.type_line,
+    c.oracle_text, c.color_identity, c.image_uri, c.rarity, c.keywords,
+    COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+            'id', t.id, 'slug', t.slug, 'label', t.metadata->>'label'
+        ) ORDER BY t.slug)
+        FROM scryfall_tag_memberships m
+        JOIN scryfall_tags t ON t.id = m.tag_id
+        WHERE m.oracle_id = c.oracle_id
+    ), '[]'::jsonb) AS oracle_tags,
+    CASE WHEN (c.prices->>'eur') IS NULL THEN NULL
+         ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer END AS price_eur_cents,
+    c.power, c.game_changer
+FROM deck_cards dc JOIN cards c ON dc.card_id = c.id;
+"""
 
 
 async def main() -> None:
