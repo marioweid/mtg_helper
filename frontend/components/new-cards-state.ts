@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api";
-import type { NewCardPick, NewCardsResponse } from "@/lib/types";
+import type { NewCardMatch, NewCardsResponse } from "@/lib/types";
 
 interface Dismissal {
   oracleId: string;
@@ -30,7 +30,6 @@ export class NewCardsController {
     planRefreshError: null,
   };
   private listeners = new Set<() => void>();
-  private timer: ReturnType<typeof setTimeout> | undefined;
   private sequence = 0;
   private active = false;
 
@@ -46,7 +45,7 @@ export class NewCardsController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts a read-only status load; this panel never starts AI work. */
+  /** Starts the read-only source-match load. */
   start() {
     this.active = true;
     void this.refresh();
@@ -56,13 +55,12 @@ export class NewCardsController {
   stop() {
     this.active = false;
     this.sequence += 1;
-    clearTimeout(this.timer);
     this.patch({ busy: false, loading: false });
   }
 
-  refresh = () => this.run("Refresh New Cards", () => apiClient.getNewCards(this.deckId));
+  refresh = () => this.run("Load New Cards", () => apiClient.getNewCards(this.deckId));
 
-  dismiss = (pick: NewCardPick) =>
+  dismiss = (pick: NewCardMatch) =>
     this.run(
       `Dismiss ${pick.name}`,
       () => apiClient.dismissNewCard(this.deckId, pick.oracle_id),
@@ -81,7 +79,7 @@ export class NewCardsController {
     );
   };
 
-  plan = (pick: NewCardPick) =>
+  plan = (pick: NewCardMatch) =>
     this.run(
       `Plan addition of ${pick.name}`,
       () => apiClient.planNewCard(this.deckId, pick.oracle_id),
@@ -92,12 +90,10 @@ export class NewCardsController {
   retryPlanRefresh = async () => {
     if (!this.active || this.state.busy) return;
     const token = ++this.sequence;
-    clearTimeout(this.timer);
     this.patch({ busy: true, planRefreshError: null });
     await this.refreshParent();
     if (this.isCurrent(token)) {
       this.patch({ busy: false });
-      this.schedulePoll();
     }
   };
 
@@ -134,7 +130,6 @@ export class NewCardsController {
   ) {
     if (!this.active || this.state.busy) return;
     const token = ++this.sequence;
-    clearTimeout(this.timer);
     this.patch({ loading: !mutation, busy: mutation });
     try {
       const result = await request();
@@ -148,14 +143,7 @@ export class NewCardsController {
     } finally {
       if (this.isCurrent(token)) {
         this.patch({ loading: false, busy: false });
-        this.schedulePoll();
       }
-    }
-  }
-
-  private schedulePoll() {
-    if (this.state.result?.status === "running" || this.state.result?.status === "waiting") {
-      this.timer = setTimeout(() => void this.refresh(), 3000);
     }
   }
 }

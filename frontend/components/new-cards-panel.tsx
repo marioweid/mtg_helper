@@ -4,7 +4,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { ManaCost } from "@/components/mana-cost";
 import { NewCardsController, type NewCardsState } from "@/components/new-cards-state";
-import type { NewCardFace, NewCardPick, NewCardsResponse } from "@/lib/types";
+import type { NewCardFace, NewCardMatch, NewCardsResponse, TagMatch } from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -47,166 +47,44 @@ export function NewCardsPanel({ deckId, onPlanChanged }: Props) {
     controller.start();
     return () => controller.stop();
   }, [controller]);
-
   return (
     <section aria-label="New Cards" className="space-y-4">
-      <PilotWarning />
-      <NewCardsControls state={state} controller={controller} />
-      <NewCardsErrors state={state} controller={controller} />
-      <NewCardsProgress state={state} controller={controller} />
-      {state.result && (
-        <NewCardsResults result={state.result} busy={state.busy} controller={controller} />
-      )}
-    </section>
-  );
-}
-
-interface StateProps {
-  state: NewCardsState;
-  controller: NewCardsController;
-}
-
-function NewCardsControls({ state, controller }: StateProps) {
-  return (
-    <div className={`${BOX} space-y-3`}>
-      <NewCardsCoverage result={state.result} />
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={state.busy || state.loading}
-          onClick={() => void controller.refresh()}
-        >
-          Refresh status
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function NewCardsErrors({ state, controller }: StateProps) {
-  return (
-    <>
-      {state.error && <RequestError message={state.error} />}
-      {state.planRefreshError && (
-        <RequestError message={state.planRefreshError}>
-          <button
-            type="button"
-            className="mt-2 underline"
-            disabled={state.busy}
-            onClick={() => void controller.retryPlanRefresh()}
-          >
-            Retry deck refresh
-          </button>
-        </RequestError>
-      )}
-      {state.error && state.result && (
-        <p className="text-sm text-amber-300">Showing the last usable result; it may be stale.</p>
-      )}
-    </>
-  );
-}
-
-function NewCardsProgress({ state, controller }: StateProps) {
-  return (
-    <>
-      {state.loading && <p role="status">Loading New Cards status…</p>}
-      {state.busy && <p role="status">Updating New Cards…</p>}
+      <SourceSummary state={state} />
+      {state.error && <p role="alert">{state.error}</p>}
       {state.lastDismissal && (
-        <p className="text-sm text-gray-300">
+        <p>
           Dismissed {state.lastDismissal.name}.{" "}
-          <button
-            type="button"
-            className="underline"
-            disabled={state.busy}
-            onClick={() => void controller.undo()}
-          >
+          <button type="button" className="underline" onClick={() => void controller.undo()}>
             Undo latest dismissal
           </button>
         </p>
       )}
-    </>
+      {state.result && <Results result={state.result} busy={state.busy} controller={controller} />}
+    </section>
   );
 }
 
-function PilotWarning() {
+function SourceSummary({ state }: { state: NewCardsState }) {
+  const result = state.result;
+  if (state.loading) return <p role="status">Loading Scryfall tag matches…</p>;
+  if (!result) return <p>Waiting for Scryfall source status.</p>;
   return (
-    <div className={`${BOX} space-y-2 text-sm text-gray-300`}>
-      <h2 className="font-semibold text-white">New Cards · Experimental pilot</h2>
-      <p className="text-amber-300">
-        AI advice is unverified. Check source rules and supporting cards before planning an
-        addition.
+    <div className={`${BOX} space-y-1 text-sm text-gray-300`}>
+      <h2 className="font-semibold text-white">New Cards from Scryfall tags</h2>
+      <p>
+        Card source updated {utcDate(result.catalog_updated_at)} UTC · Tag source updated{" "}
+        {utcDate(result.tag_updated_at)} UTC.
       </p>
       <p>
-        Released, Commander-legal paper cards only. No previews, unknown-release products or
-        promo-only originals. Scryfall discovery uses conservative normal-product and historical
-        origin filters; special-product coverage is incomplete. No community sources are used.
+        Released, Commander-legal paper cards only. Matches use Commander-Konstellation source tags,
+        not deck strategy or rules-interaction claims.
       </p>
-      <p>
-        Catalog refresh and Commander-Konstellation checks are admin-controlled. Opening this tab,
-        refreshing status, and planning never start analysis or source sync. Advice only considers
-        the Commander-Konstellation, not this deck's strategy or contents; you decide whether a card
-        fits your actual deck. Planning adds one pending addition, not a physical deck edit.
-      </p>
+      {result.status !== "ready" && <p className="text-amber-300">{result.error}</p>}
     </div>
   );
 }
 
-function RequestError({ message, children }: { message: string; children?: React.ReactNode }) {
-  return (
-    <div role="alert" className="rounded-lg border border-red-500/30 p-3 text-sm text-red-300">
-      <p>{message}</p>
-      {children}
-    </div>
-  );
-}
-
-function NewCardsCoverage({ result }: { result: NewCardsResponse | null }) {
-  if (!result) return <p className="text-sm text-gray-400">Waiting for source status.</p>;
-  return (
-    <div className="space-y-1 text-sm text-gray-300" aria-live="polite">
-      <p>
-        Dates in UTC · Today {utcDate(new Date().toISOString())} · Scryfall catalog updated{" "}
-        {utcDate(result.catalog_updated_at)} · Analyzed {utcDate(result.analyzed_at)}
-      </p>
-      <p>
-        Coverage: {result.assessed_count} of {result.eligible_count} currently eligible cards
-        assessed
-        {" · "}
-        {result.remaining_count} remaining · {result.dismissed_count} dismissed. Rejected cards
-        count as assessed.
-      </p>
-      {result.stale && (
-        <p className="text-amber-300">
-          Source data is stale. Ask an admin to sync it; this is not a no-match result.
-        </p>
-      )}
-      {result.remaining_count > 0 && (
-        <p>
-          Waiting for a complete Commander-Konstellation check. Unassessed cards are not evidence of
-          no matches.
-        </p>
-      )}
-      {result.status === "running" && (
-        <p role="status">Analysis running; status updates automatically.</p>
-      )}
-      {result.status === "unavailable" && (
-        <p>
-          Not ready. Source catalog or deck context is unavailable; ask an admin to sync if needed.
-        </p>
-      )}
-      {result.status === "source_stale" && (
-        <p className="text-amber-300">Sources are too old for a current complete result.</p>
-      )}
-      {result.status === "error" && (
-        <p className="text-red-300">Analysis failed. Ask an admin to start a new global run.</p>
-      )}
-      {result.error && <RequestError message={result.error} />}
-    </div>
-  );
-}
-
-function NewCardsResults({
+function Results({
   result,
   busy,
   controller,
@@ -215,50 +93,14 @@ function NewCardsResults({
   busy: boolean;
   controller: NewCardsController;
 }) {
-  if (result.status === "source_stale") return <EmptyResults result={result} />;
-  const groups = [
-    { label: "strong", title: "Strong fits" },
-    { label: "worth_testing", title: "Worth testing" },
-  ] as const;
-  if (!result.picks.length) return <EmptyResults result={result} />;
+  if (result.status !== "ready") return null;
+  if (!result.matches.length) return <p>No current Scryfall tag matches for this deck.</p>;
   return (
-    <div className="space-y-4">
-      {groups.map((group) => {
-        const picks = result.picks.filter((pick) => pick.label === group.label);
-        if (!picks.length) return null;
-        return (
-          <section key={group.label} aria-label={group.title} className="space-y-2">
-            <h3 className="font-semibold text-white">{group.title}</h3>
-            <div className="grid gap-3 xl:grid-cols-2">
-              {picks.map((pick) => (
-                <NewCardTile key={pick.oracle_id} pick={pick} busy={busy} controller={controller} />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+    <div className="grid gap-3 xl:grid-cols-2">
+      {result.matches.map((match) => (
+        <NewCardTile key={match.oracle_id} match={match} busy={busy} controller={controller} />
+      ))}
     </div>
-  );
-}
-
-function EmptyResults({ result }: { result: NewCardsResponse }) {
-  if (result.status === "unavailable") return null;
-  if (result.status === "source_stale")
-    return <p>No current picks. Sources are too old, not a no-match result.</p>;
-  if (result.status === "running" || result.status === "waiting")
-    return <p>No picks yet; the Commander-Konstellation check is still pending.</p>;
-  if (result.status === "error")
-    return <p>No usable picks; analysis failed, not a no-match result.</p>;
-  if (result.stale)
-    return <p>No current picks. Source or analysis is stale, not a no-match result.</p>;
-  if (result.remaining_count > 0)
-    return <p>No picks yet. The Commander-Konstellation check is waiting for admin processing.</p>;
-  if (result.eligible_count === 0)
-    return <p>No released cards currently meet the pilot filters.</p>;
-  if (result.dismissed_count > 0)
-    return <p>No further matching cards are visible for this deck.</p>;
-  return (
-    <p>No strong fits or cards worth testing in the assessed eligible pool. No filler picks.</p>
   );
 }
 
@@ -278,83 +120,51 @@ function SourceRules({ face }: { face: NewCardFace }) {
   );
 }
 
-function GeneratedAdvice({ pick }: { pick: NewCardPick }) {
+function TagExplanation({ match }: { match: TagMatch }) {
+  const relation = match.relation === "direct" ? "direct" : "descendant";
   return (
-    <div className="space-y-2 border-t border-white/10 pt-3 text-sm text-gray-300">
-      <h4 className="font-semibold text-amber-300">Generated advice · Unverified</h4>
-      <p>Reason: {pick.reason}</p>
-      <p>Caveat: {pick.caveat}</p>
-      <h5 className="font-medium">Supporting changes (not planned automatically)</h5>
-      {pick.required_changes.length > 0 ? (
-        <ul className="list-inside list-disc">
-          {pick.required_changes.map((change, index) => (
-            <li key={index}>{change}</li>
-          ))}
-        </ul>
-      ) : (
-        <p>No supporting changes reported; this is not a guarantee of fit.</p>
-      )}
-      <h5 className="font-medium">Source evidence: candidate and commander</h5>
-      {pick.evidence.length > 0 ? (
-        <ul className="space-y-1">
-          {pick.evidence.map((item, index) => (
-            <li key={index}>
-              {item.name}: <q>{item.quote}</q>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>No supporting evidence returned.</p>
-      )}
-      <p className="text-xs text-gray-400">
-        Evidence and hypothetical supporting-change suggestions are model claims, not verified
-        rules. This does not claim that the deck already contains needed support.
-      </p>
-    </div>
+    <li>
+      Commander tag “{match.commander_tag_label}” matches {relation} candidate tag “
+      {match.candidate_tag_label}”.
+    </li>
   );
 }
 
 function NewCardTile({
-  pick,
+  match,
   busy,
   controller,
 }: {
-  pick: NewCardPick;
+  match: NewCardMatch;
   busy: boolean;
   controller: NewCardsController;
 }) {
-  const link = sourceLink(pick.scryfall_uri);
+  const link = sourceLink(match.scryfall_uri);
   return (
     <article className={`${BOX} space-y-3`}>
-      <h4 className="font-semibold text-white">{pick.name}</h4>
-      <div className="space-y-2 text-sm text-gray-300">
-        <h4 className="font-semibold">Source rules · Scryfall</h4>
-        {(pick.faces.length ? pick.faces : [pick]).map((face, index) => (
-          <SourceRules key={index} face={face} />
+      <h3 className="font-semibold text-white">{match.name}</h3>
+      {(match.faces.length ? match.faces : [match]).map((face, index) => (
+        <SourceRules key={index} face={face} />
+      ))}
+      <p>{match.matching_tag_count} matching Commander tag(s).</p>
+      <ul className="list-inside list-disc">
+        {match.tag_matches.map((item) => (
+          <TagExplanation key={`${item.commander_tag_id}-${item.candidate_tag_id}`} match={item} />
         ))}
-        <p>
-          Released {utcDate(pick.released_at)} UTC · Eligible until {utcDate(pick.expires_at)} UTC
-        </p>
-        <p>
-          {pick.price_eur_cents === null
-            ? "Price unavailable"
-            : `€${(pick.price_eur_cents / 100).toFixed(2)}`}
-        </p>
-        {link ? (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
-            Verify on Scryfall
-          </a>
-        ) : (
-          <p>Source link unavailable or unsafe.</p>
-        )}
-      </div>
-      <GeneratedAdvice pick={pick} />
-      <div className="flex flex-wrap gap-2">
+      </ul>
+      {link ? (
+        <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
+          View on Scryfall
+        </a>
+      ) : (
+        <p>Source link unavailable or unsafe.</p>
+      )}
+      <div className="flex gap-2">
         <button
           type="button"
           className={BUTTON}
           disabled={busy}
-          onClick={() => void controller.plan(pick)}
+          onClick={() => void controller.plan(match)}
         >
           Plan addition
         </button>
@@ -362,7 +172,7 @@ function NewCardTile({
           type="button"
           className={BUTTON}
           disabled={busy}
-          onClick={() => void controller.dismiss(pick)}
+          onClick={() => void controller.dismiss(match)}
         >
           Dismiss
         </button>

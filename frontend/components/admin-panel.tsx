@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminDiscoverPanel } from "@/components/admin-discover-panel";
-import { AdminNewCardsPanel } from "@/components/admin-new-cards-panel";
 import { ScryfallPublication, type ScryfallSourceStatus } from "@/components/scryfall-publication";
 import { ThemeManager } from "@/components/theme-manager";
 
@@ -122,7 +121,7 @@ export function AdminPanel() {
       const body = (await res.json()) as StatusResponse;
       setStatus(body);
     } catch {
-      // Transient — next poll will retry.
+      // Transient â€” next poll will retry.
     }
   }, []);
 
@@ -263,7 +262,6 @@ export function AdminPanel() {
     <div className="space-y-4">
       <AdminDiscoverPanel />
       <ScryfallPublication source={status.scryfall_sources} />
-      <AdminNewCardsPanel />
       {JOBS.map(({ id, label, path, description }) => {
         const snapshot = status[SLOT_BY_ID[id]];
         const running = snapshot.status === "running";
@@ -285,7 +283,7 @@ export function AdminPanel() {
                 disabled={running}
                 className="flex-shrink-0 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {running ? "Running…" : "Run"}
+                {running ? "Runningâ€¦" : "Run"}
               </button>
             </div>
 
@@ -300,7 +298,7 @@ export function AdminPanel() {
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>
                     {snapshot.phase || "starting"}
-                    {percent !== null ? ` — ${percent}%` : ""}
+                    {percent !== null ? ` â€” ${percent}%` : ""}
                   </span>
                   <span>
                     {snapshot.current.toLocaleString()} / {snapshot.total.toLocaleString()}
@@ -339,7 +337,7 @@ export function AdminPanel() {
               disabled={status.tag.status === "running"}
               className="flex-shrink-0 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {status.tag.status === "running" ? "Running…" : "Run"}
+              {status.tag.status === "running" ? "Runningâ€¦" : "Run"}
             </button>
           </div>
 

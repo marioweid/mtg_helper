@@ -1,4 +1,4 @@
-"""Public experimental discovery responses and source-grounded card facts."""
+"""Transparent, source-grounded New Cards response models."""
 
 from datetime import date, datetime
 from typing import Literal
@@ -27,12 +27,17 @@ class CardFacts(NewCardFace):
     game_changer: bool = False
 
 
-class NewCardEvidence(BaseModel):
-    name: str
-    quote: str
+class TagMatch(BaseModel):
+    """One direct or descendant Scryfall tag explanation."""
+
+    commander_tag_id: UUID
+    commander_tag_label: str
+    candidate_tag_id: UUID
+    candidate_tag_label: str
+    relation: Literal["direct", "descendant"]
 
 
-class NewCardPick(NewCardFace):
+class NewCardMatch(NewCardFace):
     oracle_id: UUID
     card_id: UUID
     scryfall_id: UUID
@@ -42,21 +47,18 @@ class NewCardPick(NewCardFace):
     released_at: date
     expires_at: date
     price_eur_cents: int | None
-    label: Literal["strong", "worth_testing"]
-    reason: str
-    caveat: str
-    required_changes: list[str]
-    evidence: list[NewCardEvidence]
+    matching_tag_count: int
+    tag_matches: list[TagMatch]
 
 
 class NewCardsResponse(BaseModel):
-    status: Literal["unavailable", "idle", "waiting", "running", "source_stale", "error"] = "idle"
+    """Read-only local Scryfall tag matches for one Commander-Konstellation."""
+
+    status: Literal["ready", "unavailable", "source_stale", "source_mismatched"] = "ready"
     catalog_updated_at: datetime | None = None
-    analyzed_at: datetime | None = None
+    tag_updated_at: datetime | None = None
     stale: bool = False
     eligible_count: int = 0
-    assessed_count: int = 0
-    remaining_count: int = 0
     dismissed_count: int = 0
     error: str | None = None
-    picks: list[NewCardPick] = Field(default_factory=list)
+    matches: list[NewCardMatch] = Field(default_factory=list)

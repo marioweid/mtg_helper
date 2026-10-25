@@ -47,9 +47,6 @@ class Settings(BaseSettings):
     # hundreds of CPU-bound simulations, too heavy for the small prod VM to
     # serve concurrently. See services/feature_flag_service.py.
     enable_optimizer: bool = False
-    # Paid New Cards evaluations require this process-level opt-in in addition
-    # to a persisted admin action. Local and live Compose keep it explicitly off.
-    enable_new_cards_worker: bool = False
 
     @field_validator("admin_emails", mode="before")
     @classmethod

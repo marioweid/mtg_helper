@@ -41,18 +41,16 @@ export interface CardResponse {
   game_changer: boolean;
 }
 
-// Experimental released-card pilot
+// Local Scryfall source-tag matches
 export interface NewCardsResponse {
-  status: "unavailable" | "idle" | "waiting" | "running" | "source_stale" | "error";
+  status: "ready" | "unavailable" | "source_stale" | "source_mismatched";
   catalog_updated_at: string | null;
-  analyzed_at: string | null;
+  tag_updated_at: string | null;
   stale: boolean;
   eligible_count: number;
-  assessed_count: number;
-  remaining_count: number;
   dismissed_count: number;
   error: string | null;
-  picks: NewCardPick[];
+  matches: NewCardMatch[];
 }
 
 export interface NewCardFace {
@@ -64,7 +62,15 @@ export interface NewCardFace {
   toughness: string | null;
 }
 
-export interface NewCardPick extends NewCardFace {
+export interface TagMatch {
+  commander_tag_id: string;
+  commander_tag_label: string;
+  candidate_tag_id: string;
+  candidate_tag_label: string;
+  relation: "direct" | "descendant";
+}
+
+export interface NewCardMatch extends NewCardFace {
   oracle_id: string;
   card_id: string;
   scryfall_id: string;
@@ -74,13 +80,9 @@ export interface NewCardPick extends NewCardFace {
   released_at: string;
   expires_at: string;
   price_eur_cents: number | null;
-  label: "strong" | "worth_testing";
-  reason: string;
-  caveat: string;
-  required_changes: string[];
-  evidence: { name: string; quote: string }[];
+  matching_tag_count: number;
+  tag_matches: TagMatch[];
 }
-
 // Decks
 export interface DeckSummary {
   id: string;
@@ -425,7 +427,7 @@ export function totalCardCount(cards: DeckCardItem[]): number {
  * Full deck size including the commander. Every Commander deck has exactly
  * one commander that counts toward the 100-card total, so an empty deck
  * with just a commander reads as 1/100 and a complete deck as 100/100.
- * Partner commanders are ignored — only the primary counts.
+ * Partner commanders are ignored â€” only the primary counts.
  */
 export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknown }): number {
   return totalCardCount(deck.cards) + (deck.commander_card ? 1 : 0);
@@ -433,7 +435,7 @@ export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknow
 
 /**
  * Buckets a deck card belongs to. Explicit `categories` fully override the
- * auto-derived `qualifying_stages` — set any category and the auto tags are
+ * auto-derived `qualifying_stages` â€” set any category and the auto tags are
  * suppressed. Clear categories to revert to auto. Cards with neither fall
  * into "untagged".
  */

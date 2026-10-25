@@ -1,4 +1,4 @@
-"""Owner-authorized experimental New Cards read and explicit planning endpoints."""
+"""Owner-authorized New Cards tag-match and explicit planning endpoints."""
 
 from typing import Annotated
 from uuid import UUID
@@ -6,11 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 
 from mtg_helper.auth import get_current_account
-from mtg_helper.config import settings
 from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.common import DataResponse
 from mtg_helper.models.new_cards import NewCardsResponse
-from mtg_helper.services.new_cards.evaluator import NewCardEvaluator
 from mtg_helper.services.new_cards.repository import NewCardsError, Owner
 from mtg_helper.services.new_cards.service import NewCardsService
 
@@ -25,9 +23,7 @@ def _owner(account: AccountResponse) -> Owner:
 
 
 def _service(request: Request) -> NewCardsService:
-    return NewCardsService(
-        request.app.state.db_pool, NewCardEvaluator(settings.openai_api_key.get_secret_value())
-    )
+    return NewCardsService(request.app.state.db_pool)
 
 
 @router.get("")
@@ -39,10 +35,7 @@ async def get_cards(
 
 @router.post("/{oracle_id}/dismiss")
 async def dismiss(
-    deck_id: UUID,
-    oracle_id: UUID,
-    request: Request,
-    account: Account,
+    deck_id: UUID, oracle_id: UUID, request: Request, account: Account
 ) -> DataResponse[NewCardsResponse]:
     service = _service(request)
     owner = _owner(account)
@@ -52,10 +45,7 @@ async def dismiss(
 
 @router.delete("/{oracle_id}/dismiss")
 async def undo_dismiss(
-    deck_id: UUID,
-    oracle_id: UUID,
-    request: Request,
-    account: Account,
+    deck_id: UUID, oracle_id: UUID, request: Request, account: Account
 ) -> DataResponse[NewCardsResponse]:
     service = _service(request)
     owner = _owner(account)
@@ -65,10 +55,7 @@ async def undo_dismiss(
 
 @router.post("/{oracle_id}/plan")
 async def plan(
-    deck_id: UUID,
-    oracle_id: UUID,
-    request: Request,
-    account: Account,
+    deck_id: UUID, oracle_id: UUID, request: Request, account: Account
 ) -> DataResponse[NewCardsResponse]:
     service = _service(request)
     owner = _owner(account)

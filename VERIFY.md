@@ -178,3 +178,33 @@ If testing inside live-mode containers, use the same Compose override on `run`/`
 Use `docker compose down` (include the override when operating live mode) to stop local
 containers. Do not use `down -v` as routine cleanup: it deletes local database volumes.
 Neither mode's stop command changes homeserver containers. Never reset shared data.
+
+## Local copied New Cards run
+
+Only after `uv run pytest -q -W error tests/test_copy_new_cards_local.py` passes, create an
+empty dedicated loopback database (not `mtg_helper`, `mtg_helper_test`, or a live database) and
+set `LOCAL_NEW_CARDS_DATABASE_URL` in the existing ignored environment. Do not put either DSN on a
+command line. The source `DATABASE_URL` and exactly one approved `ADMIN_EMAILS` entry must already
+be present in the process environment.
+
+```powershell
+cd backend
+uv run python scripts/copy_new_cards_local.py
+$env:DATABASE_URL = $env:LOCAL_NEW_CARDS_DATABASE_URL
+$env:RUN_STARTUP_MAINTENANCE = "false"
+$env:OPENAI_API_KEY = "local-disabled"
+uv run uvicorn mtg_helper.main:app --host 127.0.0.1 --port 8000
+```
+
+In a second terminal, preserve the existing root `.env` Google/Auth.js settings and run:
+
+```powershell
+cd frontend
+$env:BACKEND_ORIGIN = "http://localhost:8000"
+pnpm dev
+```
+
+Check `curl.exe -s http://localhost:8000/health`, then use the existing session or normal Google
+login at `http://localhost:3000`. Select a copied deck and open New Cards. It must show Scryfall tag
+matches or a source status without model calls. Leave both processes running for local inspection;
+stop them with `Ctrl+C` in each terminal. The exporter prints aggregate counts only.

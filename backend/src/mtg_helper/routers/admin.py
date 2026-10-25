@@ -14,11 +14,9 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from mtg_helper.config import settings
 from mtg_helper.db import apply_schema
-from mtg_helper.models.common import DataResponse
 from mtg_helper.services import (
     archidekt_tag_service,
     feature_flag_service,
@@ -37,59 +35,11 @@ from mtg_helper.services.admin_jobs import (
     make_progress_cb,
     start,
 )
-from mtg_helper.services.new_cards.evaluator import NewCardEvaluator
-from mtg_helper.services.new_cards.service import NewCardsService
 from mtg_helper.services.tag_service import run_batch_tag
 
 router = APIRouter(tags=["admin"])
 
 _log = logging.getLogger(__name__)
-
-
-def _new_cards(request: Request) -> NewCardsService:
-    """Build the single global New Cards control module for an admin request."""
-    return NewCardsService(
-        request.app.state.db_pool, NewCardEvaluator(settings.openai_api_key.get_secret_value())
-    )
-
-
-class NewCardsControlUpdate(BaseModel):
-    """Optional global automation change."""
-
-    model_config = ConfigDict(extra="forbid")
-    automatic_enabled: bool | None = None
-
-
-@router.get("/admin/new-cards")
-async def new_cards_status(request: Request) -> DataResponse[dict[str, object]]:
-    """Read global New Cards control state without starting work."""
-    return DataResponse(data=await _new_cards(request).control_status())
-
-
-@router.put("/admin/new-cards")
-async def configure_new_cards(
-    body: NewCardsControlUpdate, request: Request
-) -> DataResponse[dict[str, object]]:
-    """Store global automation settings."""
-    service = _new_cards(request)
-    await service.configure(body.automatic_enabled)
-    return DataResponse(data=await service.control_status())
-
-
-@router.post("/admin/new-cards/start", status_code=202)
-async def start_new_cards(request: Request) -> DataResponse[dict[str, object]]:
-    """Request a shared manual run; process policy still gates provider work."""
-    service = _new_cards(request)
-    await service.start_manual()
-    return DataResponse(data=await service.control_status())
-
-
-@router.post("/admin/new-cards/cancel")
-async def cancel_new_cards(request: Request) -> DataResponse[dict[str, object]]:
-    """Cancel future global New Cards packages."""
-    service = _new_cards(request)
-    await service.cancel()
-    return DataResponse(data=await service.control_status())
 
 
 def _registry(request: Request) -> JobRegistry:
