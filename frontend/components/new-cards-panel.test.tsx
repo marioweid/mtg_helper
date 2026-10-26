@@ -38,7 +38,7 @@ const match: NewCardMatch = {
   power: "2",
   toughness: "3",
   faces: [],
-  image_uri: null,
+  image_uri: "https://cards.scryfall.io/normal/front/a/b/new-card.jpg",
   scryfall_uri: "https://scryfall.com/search?q=oracleid%3Aoracle-1",
   released_at: "2026-10-20",
   expires_at: "2026-12-19",
@@ -95,6 +95,56 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("New Cards tag-match panel", () => {
+  it("shows card artwork in the shared grid without duplicating printed rules", async () => {
+    render();
+    await flush();
+    const markup = renderToStaticMarkup(
+      <NewCardsPanel deckId="deck-1" onPlanChanged={onPlanChanged} />,
+    );
+
+    expect(markup).toContain(`src="${match.image_uri}"`);
+    expect(markup).toContain(`alt="${match.name}"`);
+    expect(markup).toContain('loading="lazy"');
+    expect(markup).not.toContain(match.oracle_text);
+    expect(markup).not.toContain("Power / toughness");
+    expect(markup).toContain("Plan addition");
+    expect(markup).toContain("Dismiss");
+    expect(markup).toContain("View on Scryfall");
+  });
+
+  it("keeps tag explanations in hidden tooltips attached to focusable chips", async () => {
+    render();
+    await flush();
+    const markup = renderToStaticMarkup(
+      <NewCardsPanel deckId="deck-1" onPlanChanged={onPlanChanged} />,
+    );
+
+    expect(markup).toMatch(/<button[^>]*aria-describedby="([^"]+)"[^>]*>Squirrel<\/button>/);
+    expect(markup).toMatch(/role="tooltip"[^>]*hidden=""/);
+    const descriptionId = markup.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(descriptionId).toBeTruthy();
+    expect(markup).toContain(`id="${descriptionId}"`);
+    expect(markup).toContain("descendant candidate tag");
+  });
+
+  it("keeps the name and actions usable when artwork is missing", async () => {
+    fetchMock.mockResolvedValueOnce(
+      response({ ...ready, matches: [{ ...match, image_uri: null }] }),
+    );
+    render();
+    await flush();
+    const markup = renderToStaticMarkup(
+      <NewCardsPanel deckId="deck-1" onPlanChanged={onPlanChanged} />,
+    );
+
+    expect(markup).not.toContain("<img");
+    expect(markup).toContain(match.name);
+    expect(markup).toContain("Squirrel");
+    expect(markup).not.toContain(match.oracle_text);
+    expect(markup).toContain("Plan addition");
+    expect(markup).toContain("Dismiss");
+  });
+
   it("renders source-tag provenance from the authenticated New Cards response", async () => {
     render();
     await flush();

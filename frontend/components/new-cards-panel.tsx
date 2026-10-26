@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
 
-import { ManaCost } from "@/components/mana-cost";
 import { NewCardsController, type NewCardsState } from "@/components/new-cards-state";
-import type { NewCardFace, NewCardMatch, NewCardsResponse, TagMatch } from "@/lib/types";
+import { VisualCardGrid, VisualCardTile } from "@/components/visual-card-grid";
+import type { NewCardMatch, NewCardsResponse, TagMatch } from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -96,36 +96,52 @@ function Results({
   if (result.status !== "ready") return null;
   if (!result.matches.length) return <p>No current Scryfall tag matches for this deck.</p>;
   return (
-    <div className="grid gap-3 xl:grid-cols-2">
+    <VisualCardGrid>
       {result.matches.map((match) => (
         <NewCardTile key={match.oracle_id} match={match} busy={busy} controller={controller} />
       ))}
-    </div>
-  );
-}
-
-function SourceRules({ face }: { face: NewCardFace }) {
-  return (
-    <div className="space-y-1">
-      <h5 className="font-medium">{face.name}</h5>
-      {face.mana_cost && <ManaCost cost={face.mana_cost} />}
-      <p>{face.type_line}</p>
-      <p className="whitespace-pre-wrap">{face.oracle_text}</p>
-      {(face.power !== null || face.toughness !== null) && (
-        <p>
-          Power / toughness: {face.power ?? "—"} / {face.toughness ?? "—"}
-        </p>
-      )}
-    </div>
+    </VisualCardGrid>
   );
 }
 
 function TagExplanation({ match }: { match: TagMatch }) {
+  const descriptionId = useId();
+  const [open, setOpen] = useState(false);
   const relation = match.relation === "direct" ? "direct" : "descendant";
   return (
-    <li>
-      Commander tag “{match.commander_tag_label}” matches {relation} candidate tag “
-      {match.candidate_tag_label}”.
+    <li
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        aria-describedby={descriptionId}
+        onClick={() => setOpen(true)}
+        className={
+          "cursor-help rounded-full bg-violet-500/15 px-2 py-1 text-[11px] font-medium " +
+          "text-violet-200 hover:bg-violet-500/25 focus-visible:outline-none " +
+          "focus-visible:ring-2 focus-visible:ring-violet-400"
+        }
+      >
+        {match.candidate_tag_label}
+      </button>
+      <span
+        id={descriptionId}
+        role="tooltip"
+        hidden={!open}
+        className={
+          "absolute inset-x-0 bottom-full z-10 rounded-lg border border-white/15 " +
+          "bg-zinc-950 p-3 text-xs text-gray-200 shadow-xl"
+        }
+      >
+        Commander tag “{match.commander_tag_label}” matches {relation} candidate tag “
+        {match.candidate_tag_label}”.
+      </span>
     </li>
   );
 }
@@ -141,42 +157,55 @@ function NewCardTile({
 }) {
   const link = sourceLink(match.scryfall_uri);
   return (
-    <article className={`${BOX} space-y-3`}>
-      <h3 className="font-semibold text-white">{match.name}</h3>
-      {(match.faces.length ? match.faces : [match]).map((face, index) => (
-        <SourceRules key={index} face={face} />
-      ))}
-      <p>{match.matching_tag_count} matching Commander tag(s).</p>
-      <ul className="list-inside list-disc">
-        {match.tag_matches.map((item) => (
-          <TagExplanation key={`${item.commander_tag_id}-${item.candidate_tag_id}`} match={item} />
-        ))}
-      </ul>
-      {link ? (
-        <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
-          View on Scryfall
-        </a>
-      ) : (
-        <p>Source link unavailable or unsafe.</p>
-      )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={busy}
-          onClick={() => void controller.plan(match)}
-        >
-          Plan addition
-        </button>
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={busy}
-          onClick={() => void controller.dismiss(match)}
-        >
-          Dismiss
-        </button>
-      </div>
-    </article>
+    <VisualCardTile
+      name={match.name}
+      imageUri={match.image_uri}
+      footer={
+        <article className="space-y-2">
+          <h3 className="text-sm font-semibold text-white">{match.name}</h3>
+          <p className="text-xs text-gray-400">
+            {match.matching_tag_count} matching Commander tag(s).
+          </p>
+          <ul aria-label="Matching source tags" className="relative flex flex-wrap gap-1">
+            {match.tag_matches.map((item) => (
+              <TagExplanation
+                key={`${item.commander_tag_id}-${item.candidate_tag_id}`}
+                match={item}
+              />
+            ))}
+          </ul>
+          {link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-400 underline hover:text-white"
+            >
+              View on Scryfall
+            </a>
+          ) : (
+            <p className="text-xs text-gray-400">Source link unavailable or unsafe.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={BUTTON}
+              disabled={busy}
+              onClick={() => void controller.plan(match)}
+            >
+              Plan addition
+            </button>
+            <button
+              type="button"
+              className={BUTTON}
+              disabled={busy}
+              onClick={() => void controller.dismiss(match)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </article>
+      }
+    />
   );
 }
