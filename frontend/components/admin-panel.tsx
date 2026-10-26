@@ -121,7 +121,7 @@ export function AdminPanel() {
       const body = (await res.json()) as StatusResponse;
       setStatus(body);
     } catch {
-      // Transient â€” next poll will retry.
+      // Transient — next poll will retry.
     }
   }, []);
 
@@ -283,7 +283,7 @@ export function AdminPanel() {
                 disabled={running}
                 className="flex-shrink-0 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {running ? "Runningâ€¦" : "Run"}
+                {running ? "Running…" : "Run"}
               </button>
             </div>
 
@@ -298,7 +298,7 @@ export function AdminPanel() {
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>
                     {snapshot.phase || "starting"}
-                    {percent !== null ? ` â€” ${percent}%` : ""}
+                    {percent !== null ? ` — ${percent}%` : ""}
                   </span>
                   <span>
                     {snapshot.current.toLocaleString()} / {snapshot.total.toLocaleString()}
@@ -337,7 +337,7 @@ export function AdminPanel() {
               disabled={status.tag.status === "running"}
               className="flex-shrink-0 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {status.tag.status === "running" ? "Runningâ€¦" : "Run"}
+              {status.tag.status === "running" ? "Running…" : "Run"}
             </button>
           </div>
 

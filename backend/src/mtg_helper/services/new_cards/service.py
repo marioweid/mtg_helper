@@ -54,12 +54,6 @@ class NewCardsService:
         """Idempotently save a currently visible match as a pending addition."""
         async with self.pool.acquire() as conn, conn.transaction():
             deck = await repository.owned_deck(conn, owner, deck_id, lock=True)
-            state = await repository.load(conn, owner, deck)
-            candidate = next(
-                (item for item in state.candidates if item.oracle_id == oracle_id), None
-            )
-            if state.status != "ready" or candidate is None:
-                raise NewCardsError("Tag match is no longer current. Refresh New Cards.", 409)
             planned = await conn.fetchval(
                 "SELECT EXISTS(SELECT 1 FROM deck_card_plans p JOIN cards c ON c.id = p.card_id "
                 "WHERE p.deck_id = $1 AND p.direction = 'addition' AND c.oracle_id = $2)",
@@ -68,6 +62,12 @@ class NewCardsService:
             )
             if planned:
                 return
+            state = await repository.load(conn, owner, deck)
+            candidate = next(
+                (item for item in state.candidates if item.oracle_id == oracle_id), None
+            )
+            if state.status != "ready" or candidate is None:
+                raise NewCardsError("Tag match is no longer current. Refresh New Cards.", 409)
             try:
                 await validate_addition(conn, deck_id, candidate.row["id"], 1)
             except InvalidPlanError as exc:

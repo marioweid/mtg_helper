@@ -427,7 +427,7 @@ export function totalCardCount(cards: DeckCardItem[]): number {
  * Full deck size including the commander. Every Commander deck has exactly
  * one commander that counts toward the 100-card total, so an empty deck
  * with just a commander reads as 1/100 and a complete deck as 100/100.
- * Partner commanders are ignored â€” only the primary counts.
+ * Partner commanders are ignored — only the primary counts.
  */
 export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknown }): number {
   return totalCardCount(deck.cards) + (deck.commander_card ? 1 : 0);
@@ -435,7 +435,7 @@ export function deckTotal(deck: { cards: DeckCardItem[]; commander_card?: unknow
 
 /**
  * Buckets a deck card belongs to. Explicit `categories` fully override the
- * auto-derived `qualifying_stages` â€” set any category and the auto tags are
+ * auto-derived `qualifying_stages` — set any category and the auto tags are
  * suppressed. Clear categories to revert to auto. Cards with neither fall
  * into "untagged".
  */

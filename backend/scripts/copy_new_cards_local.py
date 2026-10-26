@@ -29,7 +29,7 @@ _PUBLIC_TABLES = (
 
 def _identity(dsn: str) -> tuple[str, int, str]:
     parts = urlsplit(dsn)
-    host = (parts.hostname or "").lower()
+    host = unquote(parts.hostname or "").lower()
     if host in _LOCAL_HOSTS:
         host = "loopback"
     return (host, parts.port or 5432, unquote(parts.path).lstrip("/"))
@@ -38,7 +38,10 @@ def _identity(dsn: str) -> tuple[str, int, str]:
 def validate_target(source_dsn: str, target_dsn: str) -> None:
     """Reject a source-equivalent, remote, or malformed local target before connecting."""
     source = _identity(source_dsn)
+    target_parts = urlsplit(target_dsn)
     target = _identity(target_dsn)
+    if target_parts.query or target_parts.fragment:
+        raise ValueError("Local copy target must not contain query parameters or fragments.")
     if target[0] != "loopback":
         raise ValueError("Local copy target must use a loopback PostgreSQL host.")
     if not target[2]:
@@ -48,14 +51,21 @@ def validate_target(source_dsn: str, target_dsn: str) -> None:
 
 
 async def _require_empty_target(conn: asyncpg.Connection) -> None:
-    exists = await conn.fetchval("SELECT to_regclass('public.cards') IS NOT NULL")
-    if exists and await conn.fetchval("SELECT EXISTS (SELECT 1 FROM cards)"):
+    exists = await conn.fetchval(
+        "SELECT EXISTS ("
+        "SELECT 1 FROM pg_namespace "
+        "WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast', 'public') "
+        "UNION ALL "
+        "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')"
+        ")"
+    )
+    if exists:
         raise ValueError("Local copy target is not empty; create a new dedicated database.")
 
 
 async def _apply_schema(conn: asyncpg.Connection) -> None:
-    if not await conn.fetchval("SELECT to_regclass('public.cards') IS NOT NULL"):
-        await conn.execute(_SCHEMA.read_text(encoding="utf-8"))
+    await conn.execute(_SCHEMA.read_text(encoding="utf-8"))
 
 
 async def _copy_rows(
@@ -87,8 +97,8 @@ async def copy_local(source_dsn: str, target_dsn: str, approved_email: str) -> d
     try:
         await _require_empty_target(target)
         await _apply_schema(target)
-        await _require_empty_target(target)
         async with source.transaction(isolation="repeatable_read", readonly=True):
+            await _require_matching_source_generations(source)
             owner = await source.fetchrow(
                 "SELECT * FROM accounts WHERE lower(email) = lower($1)", approved_email
             )
@@ -112,6 +122,12 @@ async def copy_local(source_dsn: str, target_dsn: str, approved_email: str) -> d
                 counts["deck_cards"] = await _copy_deck_rows(
                     source, target, "deck_cards", approved_email
                 )
+                counts["collections"] = await _copy_plan_collections(
+                    source, target, "collections", approved_email
+                )
+                counts["collection_cards"] = await _copy_plan_collection_cards(
+                    source, target, approved_email
+                )
                 counts["deck_card_plans"] = await _copy_deck_rows(
                     source, target, "deck_card_plans", approved_email
                 )
@@ -134,6 +150,36 @@ async def _copy_deck_rows(
         table,
         f"SELECT child.* FROM {table} child JOIN decks d ON d.id = child.deck_id "  # noqa: S608
         "WHERE lower(d.owner_email) = lower($1)",
+        email,
+    )
+
+
+async def _copy_plan_collections(
+    source: asyncpg.Connection, target: asyncpg.Connection, table: str, email: str
+) -> int:
+    return await _copy_rows(
+        source,
+        target,
+        table,
+        "SELECT DISTINCT collection.* FROM collections collection "
+        "JOIN deck_card_plans plan ON plan.collection_id = collection.id "
+        "JOIN decks deck ON deck.id = plan.deck_id "
+        "WHERE lower(deck.owner_email) = lower($1)",
+        email,
+    )
+
+
+async def _copy_plan_collection_cards(
+    source: asyncpg.Connection, target: asyncpg.Connection, email: str
+) -> int:
+    return await _copy_rows(
+        source,
+        target,
+        "collection_cards",
+        "SELECT DISTINCT card.* FROM collection_cards card "
+        "JOIN deck_card_plans plan ON plan.collection_id = card.collection_id "
+        "JOIN decks deck ON deck.id = plan.deck_id "
+        "WHERE lower(deck.owner_email) = lower($1)",
         email,
     )
 
@@ -164,11 +210,38 @@ async def _verify_target(target: asyncpg.Connection, owner_id: object, email: st
     if account != owner_id:
         raise ValueError("Local copy profile verification failed.")
     broken = await target.fetchval(
-        "SELECT EXISTS (SELECT 1 FROM deck_cards dc LEFT JOIN decks d ON d.id = dc.deck_id "
-        "WHERE d.id IS NULL)"
+        "SELECT EXISTS (SELECT 1 FROM deck_cards dc "
+        "LEFT JOIN decks d ON d.id = dc.deck_id LEFT JOIN cards c ON c.id = dc.card_id "
+        "WHERE d.id IS NULL OR c.id IS NULL)"
     )
     if broken:
         raise ValueError("Local copy reference verification failed.")
+    plans = await target.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM deck_card_plans p LEFT JOIN decks d ON d.id = p.deck_id "
+        "LEFT JOIN cards c ON c.id = p.card_id LEFT JOIN collections cl ON cl.id = p.collection_id "
+        "WHERE d.id IS NULL OR c.id IS NULL OR (p.collection_id IS NOT NULL AND cl.id IS NULL))"
+    )
+    collection_cards = await target.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM collection_cards cc "
+        "LEFT JOIN collections cl ON cl.id = cc.collection_id "
+        "LEFT JOIN cards c ON c.id = cc.card_id WHERE cl.id IS NULL OR c.id IS NULL)"
+    )
+    dismissals = await target.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM new_card_dismissals n LEFT JOIN decks d ON d.id = n.deck_id "
+        "LEFT JOIN accounts a ON a.id = n.account_id WHERE d.id IS NULL OR a.id IS NULL)"
+    )
+    if plans or collection_cards or dismissals:
+        raise ValueError("Local copy reference verification failed.")
+    await _require_matching_source_generations(target)
+
+
+async def _require_matching_source_generations(conn: asyncpg.Connection) -> None:
+    matches = await conn.fetchval(
+        "SELECT c.source_sha256 = t.source_sha256 FROM new_card_catalog_state c "
+        "CROSS JOIN scryfall_tag_state t"
+    )
+    if matches is not True:
+        raise ValueError("Scryfall card and tag sources must have matching generations.")
 
 
 def _approved_admin() -> str:
