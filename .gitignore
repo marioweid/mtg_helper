@@ -246,6 +246,7 @@ __marimo__/
 
 # Local agent specifications, reports, and run artifacts
 /.agent/
+/.codegraph/
 /.codex/
 /.superpowers/
 /docs/superpowers/
