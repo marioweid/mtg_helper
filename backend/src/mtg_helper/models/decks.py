@@ -88,11 +88,8 @@ class DeckCardItem(BaseModel):
     categories: list[str] = Field(default_factory=list)
     added_by: str
     ai_reasoning: str | None
-    qualifying_stages: list[str] = Field(default_factory=list)
-    role_reasons: dict[str, list[str]] = Field(default_factory=dict)
-    tags: list[str] = Field(default_factory=list)
-    hub_tags: list[str] = Field(default_factory=list)
-    mtgjson_tags: list[str] = Field(default_factory=list)
+    oracle_tags: list[dict[str, str]] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
     power: int | None = None
     price_eur_cents: int | None = None
     owned_in: list[CollectionMembership] = Field(default_factory=list)
@@ -106,7 +103,7 @@ class DeckCardItem(BaseModel):
 
 class CommanderCardSummary(BaseModel):
     """Minimal commander/partner card fields needed for the detail-page preview
-    and the goldfish sim. ``cmc``, ``power``, and ``tags`` are sim inputs.
+    and the goldfish sim. ``cmc`` and ``power`` are sim inputs.
     """
 
     id: UUID
@@ -118,9 +115,8 @@ class CommanderCardSummary(BaseModel):
     image_uri: str | None = None
     color_identity: list[str] = Field(default_factory=list)
     power: int | None = None
-    tags: list[str] = Field(default_factory=list)
-    hub_tags: list[str] = Field(default_factory=list)
-    mtgjson_tags: list[str] = Field(default_factory=list)
+    oracle_tags: list[dict[str, str]] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
     game_changer: bool = False
 
 

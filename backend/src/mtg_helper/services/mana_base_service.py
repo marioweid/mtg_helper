@@ -27,8 +27,6 @@ from mtg_helper.services.retrieval_service import PriceFilter, RetrievedCard, re
 _COLORS: tuple[str, ...] = ("W", "U", "B", "R", "G")
 _SYMBOL_RE = re.compile(r"\{([^}]+)\}")
 _LAND_SUGGEST_LIMIT = 12
-_RAMP_TAGS: frozenset[str] = frozenset({"ramp", "fast_mana"})
-_DRAW_TAGS: frozenset[str] = frozenset({"draw", "card_draw"})
 _RISKY_PER_COLOR_CAP = 5
 _LAND_REC_MIN = 32
 _LAND_REC_MAX = 40
@@ -139,16 +137,13 @@ def _karsten_requirement(turn: int, pip_count: int) -> int:
     return _KARSTEN_99.get((turn_c, pip_c), 0)
 
 
-def _recommend_land_count(avg_cmc: float, ramp_count: int, draw_count: int = 0) -> int:
+def _recommend_land_count(avg_cmc: float) -> int:
     """Total-land recommendation, clamped to [32, 40].
 
-    Formula: ``28.42 + 3.13 * avg_cmc - 0.28 * ramp_count - 0.25 * draw_count``.
-    Karsten-inspired, retuned so a midrange deck (avg CMC ~3.0) with no
-    ramp or draw tags lands at 38; ramp and draw reduce the recommendation.
-    Clamped: even very low-CMC ramp-heavy decks should run at least 32, and
-    even very high-CMC ramp-light decks rarely benefit beyond 40.
+    Formula: ``28.42 + 3.13 * avg_cmc``. This uses only card facts available
+    on the deck projection and avoids assigning functional card labels.
     """
-    raw = 28.42 + 3.13 * avg_cmc - 0.28 * ramp_count - 0.25 * draw_count
+    raw = 28.42 + 3.13 * avg_cmc
     return max(_LAND_REC_MIN, min(_LAND_REC_MAX, round(raw)))
 
 
@@ -165,34 +160,6 @@ def _avg_nonland_cmc(deck: DeckDetailResponse) -> float:
     if total_qty == 0:
         return 0.0
     return total_cmc / total_qty
-
-
-def _ramp_count(deck: DeckDetailResponse, card_tags: dict[UUID, list[str]] | None) -> int:
-    """Sum of quantities of cards tagged ramp/fast_mana (lands excluded)."""
-    if not card_tags:
-        return 0
-    count = 0
-    for card in deck.cards:
-        if _is_land(card):
-            continue
-        tags = set(card_tags.get(card.card_id, []))
-        if tags & _RAMP_TAGS:
-            count += max(1, card.quantity)
-    return count
-
-
-def _draw_count(deck: DeckDetailResponse, card_tags: dict[UUID, list[str]] | None) -> int:
-    """Sum of quantities of cards tagged draw/card_draw (lands excluded)."""
-    if not card_tags:
-        return 0
-    count = 0
-    for card in deck.cards:
-        if _is_land(card):
-            continue
-        tags = set(card_tags.get(card.card_id, []))
-        if tags & _DRAW_TAGS:
-            count += max(1, card.quantity)
-    return count
 
 
 def _collect_risky_cards(
@@ -243,8 +210,6 @@ def _collect_risky_cards(
 
 def analyze_mana_base(
     deck: DeckDetailResponse,
-    *,
-    card_tags: dict[UUID, list[str]] | None = None,
 ) -> ManaBaseReport:
     """Analyze the deck's mana base and report deficits per color.
 
@@ -254,14 +219,9 @@ def analyze_mana_base(
 
     Args:
         deck: Deck to analyze.
-        card_tags: Optional map ``card_id -> tag list``. When provided, enables
-            ramp/draw-count detection and the land-count recommendation. Absent
-            ⇒ ``ramp_count=draw_count=0`` and the recommendation reflects
-            avg CMC only.
-
     Returns:
         ManaBaseReport with per-color status plus aggregate land
-        recommendation and CMC/ramp signals.
+        recommendation and CMC signals.
     """
     color_identity = deck.commander_color_identity
     pips_by_color: dict[str, float] = {c: 0.0 for c in _COLORS}
@@ -304,15 +264,13 @@ def analyze_mana_base(
         )
 
     avg_cmc = _avg_nonland_cmc(deck)
-    ramp = _ramp_count(deck, card_tags)
-    draw = _draw_count(deck, card_tags)
-    recommended = _recommend_land_count(avg_cmc, ramp, draw)
+    recommended = _recommend_land_count(avg_cmc)
     return ManaBaseReport(
         total_lands=total_lands,
         total_colored_pips=round(total_pips, 2),
         colors=statuses,
         avg_cmc=round(avg_cmc, 2),
-        ramp_count=ramp,
+        ramp_count=0,
         recommended_lands=recommended,
         land_delta=recommended - total_lands,
     )
@@ -368,15 +326,6 @@ def _pick_lands_for_deficits(
     return _round_robin_pick(buckets, deficient, _LAND_SUGGEST_LIMIT)
 
 
-async def _fetch_card_tags(pool: asyncpg.Pool, card_ids: list[UUID]) -> dict[UUID, list[str]]:
-    """Fetch the ``tags`` arrays for a batch of card UUIDs."""
-    if not card_ids:
-        return {}
-    async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT id, tags FROM cards WHERE id = ANY($1::uuid[])", card_ids)
-    return {row["id"]: list(row["tags"] or []) for row in rows}
-
-
 async def suggest_mana_fix(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
@@ -397,8 +346,7 @@ async def suggest_mana_fix(
         max_price_cents: When set, excludes candidate lands above this EUR
             cap. ``None`` ⇒ no price ceiling.
     """
-    card_tags = await _fetch_card_tags(pool, [c.card_id for c in deck.cards])
-    report = analyze_mana_base(deck, card_tags=card_tags)
+    report = analyze_mana_base(deck)
     deficient = [c.color for c in report.colors if c.deficit > 0]
     if not deficient:
         return ManaFixResponse(report=report, suggestions=[], unresolved=[])
@@ -411,7 +359,7 @@ async def suggest_mana_fix(
     candidates = await retrieve_candidates(
         pool,
         query_text="mana fixing lands color sources",
-        query_tags=["lands"],
+        query_tags=[],
         commander_color_identity=deck.commander_color_identity,
         deck_card_ids=excluded,
         limit=40,
@@ -426,7 +374,7 @@ async def suggest_mana_fix(
     ownership_map = await collection_service.build_ownership_map(
         pool, account_id, [c.scryfall_id for c in picked]
     )
-    suggestions = [card_from_retrieved(c, "lands", ["lands"], ownership_map) for c in picked]
+    suggestions = [card_from_retrieved(c, "lands", [], ownership_map) for c in picked]
     return ManaFixResponse(report=report, suggestions=suggestions, unresolved=[])
 
 
@@ -462,7 +410,7 @@ async def candidate_lands(
     candidates = await retrieve_candidates(
         pool,
         query_text="mana fixing dual lands color sources",
-        query_tags=["lands"],
+        query_tags=[],
         commander_color_identity=deck.commander_color_identity,
         deck_card_ids=excluded,
         limit=limit,
@@ -475,4 +423,4 @@ async def candidate_lands(
     ownership_map = await collection_service.build_ownership_map(
         pool, account_id=None, scryfall_ids=[c.scryfall_id for c in lands]
     )
-    return [card_from_retrieved(c, "lands", ["lands"], ownership_map) for c in lands]
+    return [card_from_retrieved(c, "lands", [], ownership_map) for c in lands]

@@ -9,7 +9,6 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
-from mtg_helper.services.theme_service import score_themes
 
 _DEFAULT_TARGETS = {"ramp": 12, "draw": 12, "interaction": 12, "lands": 38}
 _SOURCE_SCORE_CEILING = 0.35
@@ -40,8 +39,8 @@ async def enrich_deck_fit(
     deck: DeckDetailResponse,
 ) -> None:
     """Attach current source-backed fit evidence to every card in a loaded deck."""
-    scores = await score_themes(pool, deck.archetype_tags, deck.commander_color_identity)
-    score_deck_cards(deck, scores)
+    del pool
+    score_deck_cards(deck, {})
 
 
 def score_deck_cards(
@@ -53,12 +52,12 @@ def score_deck_cards(
     role_targets = _DEFAULT_TARGETS | deck.stage_targets
     commander_words = _commander_words(deck)
     commander_ids = {card_id for card_id in (deck.commander_id, deck.partner_id) if card_id}
-    deck_tags = {_normalize_tag(tag) for tag in deck.archetype_tags}
+    deck_tags = set(deck.archetype_tags)
 
     for card in deck.cards:
         reasons: list[str] = []
         score = _base_score(card, source_scores, reasons)
-        card_tags = {_normalize_tag(tag) for tag in card.tags}
+        card_tags = {tag["id"] for tag in card.oracle_tags if "id" in tag}
         if deck_tags & card_tags:
             score += 15
             reasons.append("Matches a selected deck theme")
@@ -106,7 +105,7 @@ def _base_score(
         reasons.append("Local deck evidence only")
         return 25.0
     normalized = min(1.0, max(0.0, raw_score) / _SOURCE_SCORE_CEILING)
-    reasons.append("Supported by Moxfield/Archidekt theme data")
+    reasons.append("Supported by source evidence")
     return 30.0 + normalized * 50.0
 
 
@@ -121,7 +120,7 @@ def _band(score: int) -> Literal["strong", "solid", "weak"]:
 def _role_counts(cards: list[DeckCardItem]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for card in cards:
-        for role in card.categories or card.qualifying_stages:
+        for role in card.categories:
             counts[role] = counts.get(role, 0) + max(1, card.quantity)
     return counts
 
@@ -131,7 +130,7 @@ def _needed_roles(
     counts: Mapping[str, int],
     targets: Mapping[str, int],
 ) -> list[str]:
-    roles = card.categories or card.qualifying_stages
+    roles = card.categories
     return sorted(
         {role for role in roles if role in targets and counts.get(role, 0) < targets[role]}
     )
@@ -147,9 +146,6 @@ def _protection_reasons(
         reasons.append("Protected as a commander")
     if "Land" in (card.type_line or ""):
         reasons.append("Protected from ordinary cuts: land")
-    normalized_tags = {_normalize_tag(tag) for tag in [*card.tags, *card.mtgjson_tags]}
-    if normalized_tags & {"combo", "combo_piece", "combo_pieces"}:
-        reasons.append("Protected as a known combo piece")
     if needed_roles:
         reasons.append("Protected because it fills an under-target role")
     return reasons
@@ -175,7 +171,3 @@ def _words(value: str) -> set[str]:
 
 def _word_overlap(left: set[str], right: set[str]) -> bool:
     return bool(left & right)
-
-
-def _normalize_tag(value: str) -> str:
-    return value.split(":", maxsplit=1)[-1].replace("-", "_").casefold()

@@ -167,7 +167,12 @@ async def _load_source(pool: asyncpg.Pool, card_id: UUID) -> _SourceCard:
     if "Basic Land" in type_line:
         raise SwapError("Cannot find swaps for basic lands")
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT tags FROM cards WHERE id = $1", card_id)
+        row = await conn.fetchrow(
+            "SELECT COALESCE((SELECT array_agg(tag_id::text ORDER BY tag_id) "
+            "FROM scryfall_tag_memberships WHERE oracle_id = cards.oracle_id), '{}') AS tags "
+            "FROM cards WHERE id = $1",
+            card_id,
+        )
     tags = tuple(row["tags"] or []) if row else ()
     eur_str = (card.prices or {}).get("eur")
     price_cents: int | None = None
@@ -241,7 +246,6 @@ def _to_swap_candidate(
         highlight_reasons=base.highlight_reasons,
         price_eur_cents=base.price_eur_cents,
         owned_in=base.owned_in,
-        qualifying_stages=base.qualifying_stages,
         sources=base.sources,
         game_changer=base.game_changer,
         price_delta_cents=delta,

@@ -8,7 +8,10 @@ describe("AdminPanel", () => {
     const markup = renderToStaticMarkup(<AdminPanel />);
 
     expect(markup).toContain("Sync Scryfall");
-    expect(markup).toContain("Publish card facts, printing history, and Oracle tags together.");
+    expect(markup).toContain("Scryfall catalog");
+    expect(markup).toContain("Publish card facts, printed keywords, and Oracle tags");
+    expect(markup).not.toContain("MTGJSON");
+    expect(markup).not.toContain("Moxfield hub");
     expect(markup).not.toContain("New Cards analysis");
     expect(markup).not.toContain("Analyze next");
     expect(markup).not.toContain("Load more");

@@ -11,12 +11,14 @@ from mtg_helper.services.deck_fit_service import score_deck_cards, weak_card_evi
 
 pytestmark = pytest.mark.no_db
 
+SOURCE_TAG_ID = "10000000-0000-0000-0000-000000000010"
+
 
 def _card(
     name: str,
     *,
-    tags: list[str] | None = None,
-    stages: list[str] | None = None,
+    source_tag_ids: list[str] | None = None,
+    categories: list[str] | None = None,
     type_line: str = "Creature",
 ) -> DeckCardItem:
     return DeckCardItem(
@@ -32,11 +34,10 @@ def _card(
         image_uri=None,
         rarity="rare",
         quantity=1,
-        categories=[],
+        categories=categories or [],
         added_by="user",
         ai_reasoning=None,
-        qualifying_stages=stages or [],
-        tags=tags or [],
+        oracle_tags=[{"id": tag_id, "label": "Source tag"} for tag_id in source_tag_ids or []],
     )
 
 
@@ -62,14 +63,14 @@ def _deck(cards: list[DeckCardItem]) -> DeckDetailResponse:
         created_at=now,
         updated_at=now,
         stage_targets={"draw": 2},
-        archetype_tags=["food_matters"],
+        archetype_tags=[SOURCE_TAG_ID],
         cards=cards,
     )
 
 
 def test_source_synergy_ranks_a_card_above_an_unconnected_card() -> None:
-    strong = _card("Strong Engine", tags=["food_matters"])
-    weak = _card("Unconnected Body", tags=["vanilla"])
+    strong = _card("Strong Engine", source_tag_ids=[SOURCE_TAG_ID])
+    weak = _card("Unconnected Body")
     deck = _deck([strong, weak])
 
     score_deck_cards(deck, {strong.card_id: 0.35})
@@ -82,7 +83,7 @@ def test_source_synergy_ranks_a_card_above_an_unconnected_card() -> None:
 
 
 def test_local_fallback_is_labeled_when_source_statistics_are_missing() -> None:
-    card = _card("Local Food Card", tags=["food_matters"])
+    card = _card("Local Food Card", source_tag_ids=[SOURCE_TAG_ID])
     deck = _deck([card])
 
     score_deck_cards(deck, {})
@@ -92,9 +93,9 @@ def test_local_fallback_is_labeled_when_source_statistics_are_missing() -> None:
 
 
 def test_underfilled_roles_remain_protected_without_pet_card_protection() -> None:
-    role_card = _card("Needed Draw", tags=["draw"], stages=["draw"])
-    pet_card = _card("Favorite Card", tags=["vanilla"])
-    ordinary = _card("Ordinary Weak Card", tags=["vanilla"])
+    role_card = _card("Needed Draw", categories=["draw"])
+    pet_card = _card("Favorite Card")
+    ordinary = _card("Ordinary Weak Card")
     land = _card("Forest", type_line="Basic Land — Forest")
     deck = _deck([role_card, pet_card, ordinary, land])
 
@@ -108,8 +109,8 @@ def test_underfilled_roles_remain_protected_without_pet_card_protection() -> Non
 
 
 def test_weak_card_order_is_deterministic() -> None:
-    first = _card("Alpha", tags=["vanilla"])
-    second = _card("Beta", tags=["vanilla"])
+    first = _card("Alpha")
+    second = _card("Beta")
     deck = _deck([second, first])
 
     score_deck_cards(deck, {})
@@ -117,20 +118,20 @@ def test_weak_card_order_is_deterministic() -> None:
     assert [item.name for item in weak_card_evidence(deck, limit=8)] == ["Alpha", "Beta"]
 
 
-def test_known_combo_tags_protect_a_card_from_ordinary_cuts() -> None:
-    combo = _card("Combo Piece", tags=["combo_piece"])
-    ordinary = _card("Ordinary Card", tags=["vanilla"])
+def test_legacy_combo_tag_does_not_protect_a_card_from_ordinary_cuts() -> None:
+    combo = _card("Combo Piece")
+    ordinary = _card("Ordinary Card")
     deck = _deck([combo, ordinary])
 
     score_deck_cards(deck, {})
 
-    assert combo.deck_fit_protected
-    assert [item.name for item in weak_card_evidence(deck)] == ["Ordinary Card"]
+    assert not combo.deck_fit_protected
+    assert [item.name for item in weak_card_evidence(deck)] == ["Combo Piece", "Ordinary Card"]
 
 
 def test_commander_is_never_an_ordinary_cut_candidate() -> None:
-    commander = _card("Food Commander", tags=["food_matters"])
-    ordinary = _card("Ordinary Card", tags=["vanilla"])
+    commander = _card("Food Commander", source_tag_ids=[SOURCE_TAG_ID])
+    ordinary = _card("Ordinary Card")
     deck = _deck([commander, ordinary])
     deck.commander_id = commander.card_id
 
@@ -141,7 +142,7 @@ def test_commander_is_never_an_ordinary_cut_candidate() -> None:
 
 
 def test_unknown_source_ids_do_not_affect_deck_cards() -> None:
-    card = _card("Known Card", tags=["food_matters"])
+    card = _card("Known Card", source_tag_ids=[SOURCE_TAG_ID])
     deck = _deck([card])
     scores: dict[UUID, float] = {uuid4(): 1.0}
 

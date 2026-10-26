@@ -134,9 +134,7 @@ async def quickstart(
         email,
     )
 
-    # Shared running counts mirror the wizard's `computeStageCounts` view
-    # (cards with overlapping qualifying_stages count toward each stage). This
-    # keeps "X / target" displays honest after quickstart.
+    # Shared running counts mirror the wizard's personal category view.
     stage_counts: dict[str, int] = dict.fromkeys(QUICKSTART_STAGE_ORDER, 0)
     results: list[QuickstartStageResult] = []
     for stage in QUICKSTART_STAGE_ORDER:
@@ -297,11 +295,8 @@ async def _build_and_accept_stage(
 ) -> QuickstartStageResult:
     """Run one stage of build_stage and accept cards until ``target`` is met.
 
-    Acceptance respects each suggestion's ``qualifying_stages`` and the shared
-    ``stage_counts`` map, so cards that fill multiple stages are not greedily
-    counted against this stage's quota when those stages are already met. This
-    mirrors how the build wizard's ``computeStageCounts`` view will display
-    counts after quickstart returns.
+    Accepted suggestions receive the active stage as their personal category,
+    keeping the running counts aligned with the build wizard.
     """
     response = await ai_service.build_stage(
         pool,
@@ -336,10 +331,5 @@ async def _build_and_accept_stage(
             )
             continue
         accepted += 1
-        # A card with no qualifying_stages falls back to its assigned category
-        # in the wizard view — mirror that here so counts stay aligned.
-        contributing = list(suggestion.qualifying_stages) or [stage]
-        for s in contributing:
-            if s in stage_counts:
-                stage_counts[s] += 1
+        stage_counts[stage] += 1
     return QuickstartStageResult(stage=stage, target=target, accepted=accepted)

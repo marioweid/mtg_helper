@@ -50,7 +50,6 @@ def _make_card(
         categories=[],
         added_by="ai",
         ai_reasoning=None,
-        qualifying_stages=[],
         price_eur_cents=None,
     )
 
@@ -211,23 +210,20 @@ class TestAnalyzeManaBase:
 
 
 class TestRecommendLandCount:
-    def test_low_cmc_heavy_ramp_clamped_to_min(self):
-        assert _recommend_land_count(avg_cmc=0.0, ramp_count=10) == 32
+    def test_low_cmc_clamped_to_min(self):
+        assert _recommend_land_count(avg_cmc=0.0) == 32
 
-    def test_high_cmc_no_ramp_clamped_to_max(self):
-        assert _recommend_land_count(avg_cmc=5.0, ramp_count=0) == 40
+    def test_high_cmc_clamped_to_max(self):
+        assert _recommend_land_count(avg_cmc=5.0) == 40
 
     def test_typical_midrange_value(self):
-        # 28.42 + 3.13*3.0 - 0.28*8 - 0.25*0 = 28.42 + 9.39 - 2.24 = 35.57 → 36
-        assert _recommend_land_count(avg_cmc=3.0, ramp_count=8) == 36
+        assert _recommend_land_count(avg_cmc=2.5) == 36
 
     def test_base_sits_at_thirty_eight(self):
-        # No ramp/draw data: a typical midrange curve recommends 38, not 40+.
-        assert _recommend_land_count(avg_cmc=3.0, ramp_count=0) == 38
+        assert _recommend_land_count(avg_cmc=3.0) == 38
 
-    def test_strong_draw_pulls_to_thirty_four(self):
-        # 28.42 + 3.13*3.0 - 0.25*16 = 28.42 + 9.39 - 4.00 = 33.81 → 34
-        assert _recommend_land_count(avg_cmc=3.0, ramp_count=0, draw_count=16) == 34
+    def test_low_curve_recommends_thirty_four(self):
+        assert _recommend_land_count(avg_cmc=1.8) == 34
 
 
 class TestKarstenRequirement:
@@ -297,15 +293,13 @@ class TestAggregateRecommendations:
             _make_card("Forest", type_line="Basic Land — Forest", color_identity=["G"])
             for _ in range(30)
         ]
-        # Pass empty card_tags to enable land recommendation path
-        report = analyze_mana_base(_make_deck(cards, ["G"]), card_tags={})
-        # avg_cmc = 2.0, ramp/draw = 0 → 28.42 + 6.26 = 34.68 → 35, no clamp
+        report = analyze_mana_base(_make_deck(cards, ["G"]))
         assert report.recommended_lands == 35
         assert report.land_delta == 35 - 30
         assert report.avg_cmc == 2.0
         assert report.ramp_count == 0
 
-    def test_draw_tagged_cards_lower_recommendation(self):
+    def test_draw_card_names_do_not_infer_a_land_discount(self):
         draw_card = _make_card("Phyrexian Arena", mana_cost="{2}{B}", cmc=3.0, quantity=8)
         draw_card2 = _make_card("Concentrate", mana_cost="{2}{U}{U}", cmc=3.0, quantity=8)
         cards = [
@@ -315,24 +309,20 @@ class TestAggregateRecommendations:
             _make_card("Forest", type_line="Basic Land — Forest", color_identity=["G"])
             for _ in range(20)
         ]
-        plain = analyze_mana_base(_make_deck(cards, ["G"]), card_tags={})
-        # avg_cmc = 3.0, no tags → 38.
-        assert plain.recommended_lands == 38
-        tags = {draw_card.card_id: ["draw"], draw_card2.card_id: ["card_draw"]}
-        report = analyze_mana_base(_make_deck(cards, ["G"]), card_tags=tags)
-        # 16 draw pieces across both aliases pull the recommendation to 34.
+        report = analyze_mana_base(_make_deck(cards, ["G"]))
         assert report.ramp_count == 0
-        assert report.recommended_lands == 34
+        assert report.recommended_lands == 38
 
-    def test_draw_tagged_land_does_not_lower_recommendation(self):
+    def test_personal_land_category_does_not_lower_recommendation(self):
         land = _make_card("Forest", type_line="Basic Land — Forest", color_identity=["G"])
         spell = _make_card("Spell", mana_cost="{2}{G}", cmc=3.0)
         deck = _make_deck([land, spell], ["G"])
-        plain = analyze_mana_base(deck, card_tags={})
-        tagged = analyze_mana_base(deck, card_tags={land.card_id: ["draw"]})
+        plain = analyze_mana_base(deck)
+        categorized_land = land.model_copy(update={"categories": ["draw"]})
+        tagged = analyze_mana_base(_make_deck([categorized_land, spell], ["G"]))
         assert tagged.recommended_lands == plain.recommended_lands == 38
 
-    def test_ramp_count_uses_tags(self):
+    def test_ramp_count_is_not_inferred_from_card_names(self):
         ramp_card = _make_card("Llanowar Elves", mana_cost="{G}", cmc=1.0)
         cards = [
             ramp_card,
@@ -341,9 +331,8 @@ class TestAggregateRecommendations:
             _make_card("Forest", type_line="Basic Land — Forest", color_identity=["G"])
             for _ in range(20)
         ]
-        tags = {ramp_card.card_id: ["ramp"]}
-        report = analyze_mana_base(_make_deck(cards, ["G"]), card_tags=tags)
-        assert report.ramp_count == 1
+        report = analyze_mana_base(_make_deck(cards, ["G"]))
+        assert report.ramp_count == 0
 
 
 class TestCandidateLands:

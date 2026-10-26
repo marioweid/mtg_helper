@@ -231,13 +231,10 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
                 new_card_catalog, new_card_catalog_state, new_card_assessment_history,
                 scryfall_tag_state, scryfall_tag_memberships,
                 scryfall_tag_descendants, scryfall_tags,
-                feature_flags, moxfield_commander_recs, moxfield_hub_card_stats,
-                moxfield_hubs,
+                feature_flags, moxfield_commander_recs,
                 collection_cards, collections, account_ranking_weights,
                 deck_snapshot_cards, deck_snapshots, deck_coach_memory,
-                deck_feedback, preferences, deck_cards, decks, accounts,
-                theme_group_suggestions, theme_group_members, theme_groups,
-                archidekt_tag_card_stats, archidekt_tags CASCADE
+                deck_feedback, preferences, deck_cards, decks, accounts CASCADE
             """
         )
         await conn.execute(
@@ -253,7 +250,6 @@ async def _reset_db(request: pytest.FixtureRequest, _init_db: None) -> None:
             """,
             [str(card["scryfall_id"]) for card in _TEST_CARDS],
         )
-        await conn.execute("UPDATE cards SET tags = ARRAY[]::text[], hub_tags = ARRAY[]::text[]")
     finally:
         await conn.close()
 
@@ -292,13 +288,7 @@ async def client(
         require_admin_or_internal,
     )
     from mtg_helper.models.accounts import AccountResponse
-    from mtg_helper.services import deck_service
     from mtg_helper.services.admin_jobs import JobRegistry
-
-    async def _skip_recommendation_refresh(*_args: object) -> None:
-        return None
-
-    monkeypatch.setattr(deck_service, "_safe_moxfield_refresh", _skip_recommendation_refresh)
 
     app.state.db_pool = db_pool
     app.state.admin_jobs = JobRegistry()
@@ -395,6 +385,7 @@ async def create_test_deck(
     *,
     name: str = "Test Deck",
     owner_id: str | None = None,  # noqa: ARG001 — kept for backwards-compat with callers
+    archetype_tags: list[str] | None = None,
 ) -> str:
     """Helper: create a deck owned by the current authenticated account.
 
@@ -407,6 +398,8 @@ async def create_test_deck(
         "commander_scryfall_id": str(HAZEL_SCRYFALL_ID),
         "name": name,
     }
+    if archetype_tags is not None:
+        payload["archetype_tags"] = archetype_tags
     resp = await client.post("/api/v1/decks", json=payload)
     assert resp.status_code == 201
     return resp.json()["data"]["id"]

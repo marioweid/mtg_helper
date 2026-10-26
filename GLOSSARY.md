@@ -32,3 +32,21 @@ _Avoid_: Globale Ablehnung
 Der aktuelle, übereinstimmende Scryfall-Karten- und Tag-Stand. Fehlende, veraltete oder
 unterschiedliche Generationen sind kein Ergebnis ohne Treffer.
 _Avoid_: Keine passenden Karten
+
+## Kartenlabels
+
+**Oracle-Tag**:
+Ein von Scryfall bereitgestelltes globales Kartenlabel mit eigener Identität und Zuordnungen zu
+Oracle-Karten. Übergeordnete Tags können untergeordnete Tags einschließen, ohne die direkte
+Zuordnung einer Karte zu verändern.
+_Avoid_: Regeltag, MTGJSON-Tag, Hub-Tag
+
+**Gedrucktes Keyword**:
+Eine von Scryfall als Kartenfakt bereitgestellte benannte Fähigkeit oder Mechanik.
+Es ist kein aus Regeltext oder einer fremden Keyword-Liste nachträglich abgeleitetes Label.
+_Avoid_: Erkanntes MTGJSON-Keyword
+
+**Persönliche Kategorie**:
+Eine vom Nutzer für sein Deck gewählte Einordnung, unabhängig von globalen Oracle-Tags.
+Sie ist Nutzerabsicht, keine Tatsachenbehauptung über die globale Kartenklassifikation.
+_Avoid_: Globales Kartenlabel

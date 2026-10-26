@@ -1,87 +1,66 @@
-# Experimental New Cards pilot — implementation contract
+# New Cards — Scryfall tag-matching contract
 
-User approved implementation and explicitly chose **released, Commander-legal cards first**.
-Previews, unknown-release products, and promo-only originals are excluded and disclosed, not
-asserted future-legal. The pilot does not implement preview discovery.
-No automatic physical deck changes. Model output is advisory and labeled unverified.
+New Cards returns deterministic source-tag matches, not generated advice. No AI worker,
+analysis queue, budget, daily run, or worker-permission setting is used.
 
 ## HTTP contract
 
 All routes require the current account and deck ownership. Base `/api/v1/decks/{deck_id}`.
-All successful responses below use the existing `{data: ...}` envelope.
+All successful responses use the existing `{data: ...}` envelope.
 
-- `GET /new-cards` → `NewCardsResponse`. Read-only; never starts AI or catalog sync.
-- `POST /new-cards/{oracle_id}/dismiss` → `NewCardsResponse`.
-- `DELETE /new-cards/{oracle_id}/dismiss` → `NewCardsResponse` (undo).
-- `POST /new-cards/{oracle_id}/plan` → `NewCardsResponse`. Plan one addition only, idempotently;
-  recheck live eligibility under the deck lock. No auto-completion, no supporting swaps.
+- `GET /new-cards` reads current matches without starting model work or source refresh.
+- `POST /new-cards/{oracle_id}/dismiss` hides a match in this deck only.
+- `DELETE /new-cards/{oracle_id}/dismiss` undoes a dismissal.
+- `POST /new-cards/{oracle_id}/plan` idempotently plans one addition after rechecking eligibility
+  under the deck lock. It does not edit the physical deck or plan supporting swaps.
 
-`NewCardsResponse`:
+Each action returns `NewCardsResponse`. There are no New Cards admin-analysis endpoints.
+Existing Admin Scryfall sync publishes the card and Oracle-tag inputs together.
 
 ```ts
 interface NewCardsResponse {
-  status: "unavailable" | "idle" | "waiting" | "running" | "source_stale" | "error";
+  status: "ready" | "unavailable" | "source_stale" | "source_mismatched";
   catalog_updated_at: string | null;
-  analyzed_at: string | null;
+  tag_updated_at: string | null;
   stale: boolean;
   eligible_count: number;
-  assessed_count: number;
-  remaining_count: number;
   dismissed_count: number;
   error: string | null;
-  picks: NewCardPick[];
+  matches: NewCardMatch[];
 }
-interface NewCardFace {
-  name: string;
-  mana_cost: string | null;
-  type_line: string | null;
-  oracle_text: string;
-  power: string | null;
-  toughness: string | null;
-}
-interface NewCardPick {
-  oracle_id: string;
-  card_id: string;
-  scryfall_id: string;
-  name: string;
-  mana_cost: string | null;
-  type_line: string | null;
-  oracle_text: string;
-  power: string | null;
-  toughness: string | null;
-  faces: NewCardFace[];
-  image_uri: string | null;
-  scryfall_uri: string;
-  released_at: string;
-  expires_at: string;
-  price_eur_cents: number | null;
-  label: "strong" | "worth_testing";
-  reason: string;
-  caveat: string;
-  required_changes: string[];
-  evidence: { name: string; quote: string }[];
+
+interface TagMatch {
+  commander_tag_id: string;
+  commander_tag_label: string;
+  candidate_tag_id: string;
+  candidate_tag_label: string;
+  relation: "direct" | "descendant";
 }
 ```
 
-GET only reads the shared Commander-Konstellation result; it never starts model work. Candidates and
-cache identity use Commander Oracle IDs/facts, card facts, release date and evaluator version — never
-deck content, account identity, strategy, plans, preferences, goals, bracket or memory. Dismissal and
-planning remain deck-local. Coverage refers to the current shared candidate pool; rejects count as
-assessed, but incomplete or stale work never publishes picks or a no-match result.
+`NewCardMatch` includes Oracle, internal-card and printing identities; source facts; `image_uri`;
+`scryfall_uri`; release and expiry dates; optional EUR price; `matching_tag_count`; and `tag_matches`.
+The backend models in `backend/src/mtg_helper/models/new_cards.py` define the full response.
 
-Global admin routes are `GET`/`PUT /api/v1/admin/new-cards`, `POST /admin/new-cards/start`, and
-`POST /admin/new-cards/cancel`. They require both admin authorization and the process-level
-`ENABLE_NEW_CARDS_WORKER=true` opt-in; Compose explicitly keeps this disabled. There is no budget,
-quota, reset or per-account override: an active run serially processes its Prüfdeltas.
+## Matching and source boundaries
 
-## Pilot boundaries
+- Match the Commander and optional partner only, never deck strategy or other deck contents.
+- Union their directly assigned Oracle-tags. A candidate must have the identical tag or one of
+  its descendants directly assigned. Count each matching Commander tag once.
+- Preserve the 60-UTC-day window, Commander legality, paper-release filters, and color identity.
+  Previews, reprints of older cards, unknown origins, and promo-only originals are not eligible.
+- Rank by matching-tag count descending, release date descending, then stable name/Oracle identity.
+- Hide physical cards, planned additions, and dismissals only for the current deck.
+- Missing Commander or partner tags, stale inputs, and mismatched source generations are source
+  problems, not complete no-match results. A new request reads the current published sources.
+- A shared source tag is not proof of synergy, rules interaction, or suitability for the deck.
 
-- Shared discovery integrates atomically into Scryfall sync; full printing history establishes
-  earliest regular eligible paper release, not representative printing dates or early promos.
-- Conservative normal-product allowlist plus unknown historical-origin exclusions; no claim of
-  complete preview/special-product coverage. Daily production refresh; Admin sync for bootstrap.
-- No external community scraping, new dependencies, or broad changes to manual/Rule 0 behavior.
-- Pilot-origin planned additions receive transactional legality/color/copy revalidation at both
-  single and batch physical completion. Age expiry alone does not invalidate a saved plan.
-- Test through a feature branch and PR, not a direct main push. No deployment or live model call
-  is needed to verify the implementation locally; production sync occurs only after deployment.
+## Presentation and planning
+
+Cards use the shared artwork-first grid. Their printed rules are not duplicated below the image.
+Small tag chips expose the exact source relationship on hover, focus, or tap; Escape closes the
+explanation. Missing artwork retains the card name, source link, and explicit deck actions.
+
+Pilot-origin planned additions retain transactional legality, color and copy validation on physical
+completion. Age expiry alone does not invalidate a saved plan. No action automatically changes the
+physical deck.

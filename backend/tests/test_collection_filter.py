@@ -3,31 +3,44 @@
 from uuid import UUID
 
 import asyncpg
-import pytest_asyncio
 from httpx import AsyncClient
 
 from mtg_helper.services import collection_service
 from tests.conftest import (
+    DOUBLING_SEASON_ORACLE_ID,
     DOUBLING_SEASON_SCRYFALL_ID,
+    SOL_RING_ORACLE_ID,
     SOL_RING_SCRYFALL_ID,
     create_test_account,
     create_test_deck,
 )
+
+SOURCE_TAG_ID = UUID("10000000-0000-0000-0000-000000000010")
+
+
+async def _seed_source_membership(pool: asyncpg.Pool) -> None:
+    """Give the two suggestion fixtures one Scryfall Oracle-tag membership."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO scryfall_tags (id, slug, metadata) VALUES ($1, 'test-source', $2)",
+            SOURCE_TAG_ID,
+            '{"label":"Test source"}',
+        )
+        await conn.execute(
+            "INSERT INTO scryfall_tag_descendants (ancestor_id, descendant_id) VALUES ($1, $1)",
+            SOURCE_TAG_ID,
+        )
+        await conn.executemany(
+            "INSERT INTO scryfall_tag_memberships "
+            "(tag_id, oracle_id, details) VALUES ($1, $2, '{}')",
+            [(SOURCE_TAG_ID, SOL_RING_ORACLE_ID), (SOURCE_TAG_ID, DOUBLING_SEASON_ORACLE_ID)],
+        )
 
 
 async def _get_card_id(pool: asyncpg.Pool, scryfall_id: UUID) -> UUID:
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT id FROM cards WHERE scryfall_id = $1", scryfall_id)
     return row["id"]
-
-
-async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE cards SET tags = $1::text[] WHERE scryfall_id = $2",
-            tags,
-            scryfall_id,
-        )
 
 
 async def _insert_alternate_printing(
@@ -42,10 +55,10 @@ async def _insert_alternate_printing(
             """
             INSERT INTO cards (
                 scryfall_id, oracle_id, name, color_identity, oracle_text, type_line,
-                cmc, mana_cost, rarity, set_code, legalities, prices, tags
+                cmc, mana_cost, rarity, set_code, legalities, prices, keywords
             )
             SELECT $1, $2, name, color_identity, oracle_text, type_line,
-                   cmc, mana_cost, rarity, 'alt', legalities, prices, tags
+                    cmc, mana_cost, rarity, 'alt', legalities, prices, keywords
             FROM cards
             WHERE scryfall_id = $3
             ON CONFLICT (scryfall_id) DO NOTHING
@@ -80,13 +93,6 @@ async def _create_collection(client: AsyncClient, label: str) -> tuple[str, str]
     create = await client.post("/api/v1/me/collections", json={"name": f"{label} Collection"})
     assert create.status_code == 201
     return account_id, create.json()["data"]["id"]
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def _reset_card_tags(db_pool: asyncpg.Pool):
-    async with db_pool.acquire() as conn:
-        await conn.execute("UPDATE cards SET tags = ARRAY[]::text[]")
-    yield
 
 
 # ── get_owned_card_ids* ─────────────────────────────────────────────────────
@@ -148,13 +154,13 @@ async def test_get_owned_card_ids_for_collections_empty_list(
 async def test_suggest_with_collection_filters_to_owned(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
+    await _seed_source_membership(db_pool)
     _, cid = await _create_collection(client, "Filter")
     await _add_to_collection(client, cid, SOL_RING_SCRYFALL_ID, "c19", "255")
 
-    deck_id = await create_test_deck(client, name="Filter Deck")
+    deck_id = await create_test_deck(
+        client, name="Filter Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -168,10 +174,10 @@ async def test_suggest_with_collection_filters_to_owned(
 async def test_suggest_without_collection_returns_unfiltered(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Unfiltered Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Unfiltered Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -185,8 +191,11 @@ async def test_suggest_without_collection_returns_unfiltered(
 async def test_empty_collection_returns_no_suggestions(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
+    await _seed_source_membership(db_pool)
     _, cid = await _create_collection(client, "EmptyFilter")
-    deck_id = await create_test_deck(client, name="Empty Filter Deck")
+    deck_id = await create_test_deck(
+        client, name="Empty Filter Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -202,13 +211,13 @@ async def test_empty_collection_returns_no_suggestions(
 async def test_build_with_collection_ids_filters_stage(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
+    await _seed_source_membership(db_pool)
     _, cid = await _create_collection(client, "Build")
     await _add_to_collection(client, cid, SOL_RING_SCRYFALL_ID, "c19", "255")
 
-    deck_id = await create_test_deck(client, name="Build Filter Deck")
+    deck_id = await create_test_deck(
+        client, name="Build Filter Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/build",
@@ -225,7 +234,6 @@ async def test_build_excludes_alternate_printing_already_in_deck(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
     alternate_sol_ring = UUID("33333333-36f5-40e7-91de-9c8c1b44da67")
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
     await _insert_alternate_printing(
         db_pool,
         scryfall_id=alternate_sol_ring,

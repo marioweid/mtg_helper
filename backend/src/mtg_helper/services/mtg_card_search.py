@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mtg_helper.models.ai import CardSearchHit
 from mtg_helper.models.decks import DeckDetailResponse
+from mtg_helper.services.scryfall_tag_repository import require_tag_ids
 
 _MAX_RESULTS = 20
 _SEARCH_POOL_SIZE = 250
@@ -18,7 +19,6 @@ _MANA_SYMBOL_RE = re.compile(
     r"^\{(?:[0-9]+|[WUBRGCSXYZ]|[WUBRG]/[WUBRGP]|2/[WUBRG])\}$",
     re.IGNORECASE,
 )
-_TAG_RE = re.compile(r"^(?:(?:moxfield|archidekt):)?[a-z0-9_]+$")
 
 
 class CardSearchRanking(StrEnum):
@@ -34,9 +34,8 @@ class CardSearchRanking(StrEnum):
 class CardEvidenceSource(StrEnum):
     """Candidate-pool provenance exposed to the assistant."""
 
-    HUB_STATS = "hub_stats"
-    GLOBAL_FALLBACK = "global_fallback"
     GLOBAL_SEARCH = "global_search"
+    GLOBAL_FALLBACK = "global_fallback"
     NONE = "none"
 
 
@@ -46,12 +45,12 @@ class AssistantCardSearchInput(BaseModel):
     theme_hints: list[str] = Field(
         default_factory=list,
         max_length=5,
-        description="Natural strategy phrases; unresolved hints use legal global search.",
+        description="Natural strategy phrases used only as ordinary text context.",
     )
     theme_tags: list[str] = Field(
         default_factory=list,
         max_length=5,
-        description="Known administrator theme slugs or qualified source IDs.",
+        description="Scryfall Oracle-tag UUIDs from the source catalog.",
     )
     mana_cost_symbols: list[str] = Field(
         default_factory=list,
@@ -87,12 +86,12 @@ class AssistantCardSearchInput(BaseModel):
     required_tags: list[str] = Field(
         default_factory=list,
         max_length=12,
-        description="Every local hub or MTGJSON tag that the card must have.",
+        description="Every required Scryfall Oracle-tag UUID.",
     )
     excluded_tags: list[str] = Field(
         default_factory=list,
         max_length=12,
-        description="Local hub or MTGJSON tags that the card must not have.",
+        description="Scryfall Oracle-tag UUIDs that the card must not have.",
     )
     exclude_game_changers: bool = Field(
         default=False,
@@ -121,32 +120,14 @@ class AssistantCardSearchInput(BaseModel):
     )
     limit: int = Field(default=12, ge=1, le=_MAX_RESULTS, description="Maximum returned cards.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _move_natural_theme_tags_to_hints(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        tags = value.get("theme_tags")
-        if not isinstance(tags, list):
-            return value
-        normalized = [str(tag).strip().lower() for tag in tags]
-        known_tags = [tag for tag in normalized if _TAG_RE.fullmatch(tag)]
-        natural_hints = [tag for tag in tags if not _TAG_RE.fullmatch(str(tag).strip().lower())]
-        if not natural_hints:
-            return value
-        updated = dict(value)
-        updated["theme_tags"] = known_tags
-        updated["theme_hints"] = [*value.get("theme_hints", []), *natural_hints]
-        return updated
-
-    @field_validator("theme_tags")
+    @field_validator("theme_tags", "required_tags", "excluded_tags")
     @classmethod
     def _validate_theme_tags(cls, value: list[str]) -> list[str]:
         tags = _normalize_list(value)
-        invalid = [tag for tag in tags if not _TAG_RE.fullmatch(tag)]
-        if invalid:
-            raise ValueError(f"invalid theme tag: {invalid[0]}")
-        return tags
+        try:
+            return [str(UUID(tag)) for tag in tags]
+        except ValueError as exc:
+            raise ValueError("source tag filters must be Scryfall UUIDs") from exc
 
     @field_validator("theme_hints")
     @classmethod
@@ -177,11 +158,6 @@ class AssistantCardSearchInput(BaseModel):
         if any(any(char in term for char in ("%", "_", "\\")) for term in terms):
             raise ValueError("oracle text filters cannot contain SQL wildcard characters")
         return terms
-
-    @field_validator("required_tags", "excluded_tags")
-    @classmethod
-    def _normalize_tags(cls, value: list[str]) -> list[str]:
-        return _normalize_list(value)
 
     @model_validator(mode="after")
     def _validate_ranges(self) -> Self:
@@ -238,25 +214,19 @@ async def search_cards(
         owned_card_ids: Optional canonical card ids owned by the account. When
             provided, results are restricted to these cards (collection-only).
     """
-    resolved_tags = await _resolve_discovery_themes(pool, filters)
+    selected_tags = list(dict.fromkeys([*filters.theme_tags, *filters.required_tags]))
+    await require_tag_ids(pool, [UUID(tag) for tag in selected_tags])
+    filters = filters.model_copy(update={"required_tags": selected_tags})
+    resolved_tags = list(filters.theme_tags)
     evidence: dict[UUID, _ThemeEvidence] = {}
-    requested_theme = bool(filters.theme_tags or filters.theme_hints)
-    if resolved_tags:
-        evidence = await _load_theme_evidence(pool, resolved_tags)
-    if evidence:
-        source = CardEvidenceSource.HUB_STATS
-    elif requested_theme:
-        source = CardEvidenceSource.GLOBAL_FALLBACK
-    else:
-        source = CardEvidenceSource.GLOBAL_SEARCH
-    fallback_tags = _fallback_tags(resolved_tags) if requested_theme else []
+    source = CardEvidenceSource.GLOBAL_SEARCH
     candidates, actual_source = await _query_candidates(
         pool,
         deck,
         filters,
         source,
         evidence,
-        fallback_tags=fallback_tags,
+        fallback_tags=[],
         owned_card_ids=owned_card_ids,
     )
     return CardSearchResult(
@@ -267,50 +237,10 @@ async def search_cards(
     )
 
 
-def _fallback_tags(resolved_tags: list[str]) -> list[str]:
-    """Strip source qualifiers for local-tag fallback when hub stats are absent."""
-    return sorted({tag.split(":", maxsplit=1)[-1] for tag in resolved_tags})
-
-
 async def _resolve_discovery_themes(
     pool: asyncpg.Pool, filters: AssistantCardSearchInput
 ) -> list[str]:
-    resolved = await _resolve_theme_tags(pool, filters.theme_tags) if filters.theme_tags else []
-    if not filters.theme_hints:
-        return resolved
-    from mtg_helper.services.mtg_assistant_tools import search_themes
-
-    queries = list(filters.theme_hints)
-    queries.extend(
-        word for hint in filters.theme_hints for word in _normalize(hint).split() if len(word) >= 4
-    )
-    hint_tags: list[str] = []
-    for query in dict.fromkeys(queries):
-        matches = await search_themes(pool, query)
-        hint_tags.extend(match.tag for match in matches[:2])
-    if hint_tags:
-        resolved.extend(await _resolve_theme_tags(pool, list(dict.fromkeys(hint_tags))))
-    return list(dict.fromkeys(resolved))
-
-
-async def _resolve_theme_tags(pool: asyncpg.Pool, tags: list[str]) -> list[str]:
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(_RESOLVE_THEME_SQL, tags)
-    return [row["tag"] for row in rows]
-
-
-async def _load_theme_evidence(
-    pool: asyncpg.Pool, resolved_tags: list[str]
-) -> dict[UUID, _ThemeEvidence]:
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(_THEME_EVIDENCE_SQL, resolved_tags)
-    return {
-        row["card_id"]: _ThemeEvidence(
-            score=float(row["score"] or 0.0),
-            tags=tuple(row["matched_tags"] or []),
-        )
-        for row in rows
-    }
+    return list(filters.theme_tags)
 
 
 async def _query_candidates(
@@ -404,8 +334,6 @@ def _build_filters(
     args: list[object] = [list(deck.commander_color_identity)]
     if filters.exclude_deck_cards:
         _add_filter(where, args, "NOT (id = ANY($N::uuid[]))", _deck_card_ids(deck))
-    if fallback_tags:
-        _add_filter(where, args, "(tags || hub_tags || mtgjson_tags) && $N::text[]", fallback_tags)
     if owned_card_ids is not None:
         _add_filter(where, args, "id = ANY($N::uuid[])", list(owned_card_ids))
     _add_optional_filters(where, args, filters)
@@ -438,16 +366,6 @@ def _add_optional_filters(
             _patterns(filters.oracle_text_any),
         ),
         (
-            bool(filters.required_tags),
-            "(tags || hub_tags || mtgjson_tags) @> $N::text[]",
-            filters.required_tags,
-        ),
-        (
-            bool(filters.excluded_tags),
-            "NOT ((tags || hub_tags || mtgjson_tags) && $N::text[])",
-            filters.excluded_tags,
-        ),
-        (
             filters.min_price_eur_cents is not None,
             _PRICE_SQL + " >= $N",
             filters.min_price_eur_cents,
@@ -461,6 +379,23 @@ def _add_optional_filters(
     for active, clause, value in values:
         if active:
             _add_filter(where, args, clause, value)
+    if filters.required_tags:
+        _add_filter(
+            where,
+            args,
+            "(SELECT count(DISTINCT tag_id) FROM scryfall_tag_memberships "
+            "WHERE oracle_id = cards.oracle_id AND tag_id = ANY($N::uuid[])) = $M",
+            [UUID(tag) for tag in filters.required_tags],
+        )
+        where[-1] = where[-1].replace("$M", str(len(filters.required_tags)))
+    if filters.excluded_tags:
+        _add_filter(
+            where,
+            args,
+            "NOT EXISTS (SELECT 1 FROM scryfall_tag_memberships WHERE oracle_id = cards.oracle_id "
+            "AND tag_id = ANY($N::uuid[]))",
+            [UUID(tag) for tag in filters.excluded_tags],
+        )
 
 
 def _build_order(
@@ -596,58 +531,13 @@ def _matched_filter_names(filters: AssistantCardSearchInput) -> list[str]:
 _PRICE_SQL = "ROUND((prices->>'eur')::numeric * 100)::integer"
 _COMMANDER_MATCH_SQL = """(
     SELECT count(*) FROM unnest($N::text[]) term
-    WHERE lower(concat_ws(' ', name, type_line, oracle_text, array_to_string(tags, ' ')))
+    WHERE lower(concat_ws(' ', name, type_line, oracle_text, array_to_string(keywords, ' ')))
           LIKE '%' || term || '%'
 )"""
 
 _CARD_SELECT = """
 SELECT id, scryfall_id, name, mana_cost, cmc, type_line, oracle_text, color_identity,
-       tags || hub_tags || mtgjson_tags AS all_tags, game_changer, edhrec_rank,
+        keywords AS all_tags, game_changer, edhrec_rank,
        ROUND((prices->>'eur')::numeric * 100)::integer AS price_eur_cents
 FROM cards
-"""
-
-_RESOLVE_THEME_SQL = """
-WITH selected AS (
-    SELECT 'moxfield:' || h.tag AS tag
-    FROM moxfield_hubs h
-    LEFT JOIN theme_group_members m ON m.moxfield_hub_id = h.id
-    LEFT JOIN theme_groups g ON g.id = m.group_id
-    WHERE h.active AND h.enabled AND (
-        h.tag = ANY($1::text[]) OR 'moxfield:' || h.tag = ANY($1::text[])
-        OR (g.slug = ANY($1::text[]) AND g.enabled AND g.deleted_at IS NULL)
-    )
-    UNION
-    SELECT 'archidekt:' || t.tag
-    FROM archidekt_tags t
-    LEFT JOIN theme_group_members m ON m.archidekt_tag_id = t.id
-    LEFT JOIN theme_groups g ON g.id = m.group_id
-    WHERE t.active AND t.enabled AND (
-        'archidekt:' || t.tag = ANY($1::text[])
-        OR (g.slug = ANY($1::text[]) AND g.enabled AND g.deleted_at IS NULL)
-    )
-)
-SELECT tag FROM selected ORDER BY tag
-"""
-
-_THEME_EVIDENCE_SQL = """
-WITH scores AS (
-    SELECT s.card_id, 'moxfield:' || h.tag AS tag, s.synergy_score AS score
-    FROM moxfield_hub_card_stats s
-    JOIN moxfield_hubs h ON h.id = s.hub_id
-    WHERE 'moxfield:' || h.tag = ANY($1::text[]) AND h.active AND h.enabled
-    UNION ALL
-    SELECT s.card_id, 'archidekt:' || t.tag, s.synergy_score
-    FROM archidekt_tag_card_stats s
-    JOIN archidekt_tags t ON t.id = s.tag_id
-    WHERE 'archidekt:' || t.tag = ANY($1::text[]) AND t.active AND t.enabled
-)
-SELECT canonical.id AS card_id, max(scores.score) AS score,
-       array_agg(DISTINCT scores.tag ORDER BY scores.tag) AS matched_tags
-FROM scores
-JOIN cards source ON source.id = scores.card_id
-JOIN cards canonical
-  ON COALESCE(canonical.oracle_id, canonical.id) = COALESCE(source.oracle_id, source.id)
- AND canonical.is_canonical
-GROUP BY canonical.id
 """

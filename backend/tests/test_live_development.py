@@ -23,7 +23,6 @@ async def test_startup_maintenance_is_explicit(
     close = AsyncMock()
     schema = AsyncMock()
     repair = AsyncMock()
-    catalogs = AsyncMock()
     monkeypatch.setattr(
         main,
         "settings",
@@ -33,14 +32,12 @@ async def test_startup_maintenance_is_explicit(
     monkeypatch.setattr(main, "close_pool", close)
     monkeypatch.setattr(main, "apply_schema", schema)
     monkeypatch.setattr(main.oracle_duplicate_repair_service, "repair_active_decks", repair)
-    monkeypatch.setattr(main, "_ensure_theme_catalogs", catalogs)
 
     async with main._application_lifespan(FastAPI()) as _:
         create.assert_awaited_once_with("unused")
         assert schema.await_count == int(maintenance)
         assert repair.await_count == int(maintenance)
-        assert catalogs.await_count == int(maintenance)
-        assert pool.fetchval.await_count == (2 if maintenance else 0)
+        assert pool.fetchval.await_count == int(maintenance)
         close.assert_not_awaited()
     close.assert_awaited_once_with(pool)
 

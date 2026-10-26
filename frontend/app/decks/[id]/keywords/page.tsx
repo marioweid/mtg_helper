@@ -113,8 +113,8 @@ export default function DeckKeywordsPage() {
         title={fromImport ? "Set keywords for your imported deck" : "Edit deck keywords"}
         subtitle={
           fromImport
-            ? "We pre-selected the most common Moxfield hub themes from your imported cards. Adjust the chips so future suggestions stay on-theme."
-            : "Adjust the Moxfield hub themes that drive AI card suggestions for this deck."
+            ? "Review the Scryfall source selections from your imported cards."
+            : "Adjust the Scryfall Oracle tags and printed keywords for this deck."
         }
       />
 

@@ -209,13 +209,19 @@ async def suggest_commanders(
     _enforce_rate_limit(account, "suggest_commanders", _DESCRIBE_LIMIT)
     pool = request.app.state.db_pool
     if body.intent_override is not None and not body.message.strip():
-        result = await commander_suggestor_service.build_response(
-            pool,
-            reply="I updated the commander board with your current filters.",
-            done=False,
-            intent=body.intent_override,
-            limit=body.limit,
-        )
+        try:
+            result = await commander_suggestor_service.build_response(
+                pool,
+                reply="I updated the commander board with your current filters.",
+                done=False,
+                intent=body.intent_override,
+                limit=body.limit,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "INVALID_SOURCE_SELECTION", "message": str(exc)},
+            ) from exc
     else:
         result = await agents.suggest_turn(
             pool,
@@ -549,8 +555,8 @@ async def extract_keywords(
 ) -> DataResponse[KeywordExtractResponse]:
     """Run one turn of the keyword-extracting deck agent.
 
-    The agent converges on structured Moxfield hub theme tags instead of writing
-    prose. Used by the ``/decks/new/agent`` flow.
+    The agent selects concrete Scryfall Oracle-tag UUIDs. Used by the
+    ``/decks/new/agent`` flow.
     """
     _enforce_rate_limit(account, "extract_keywords", _DESCRIBE_LIMIT)
     try:
@@ -564,6 +570,11 @@ async def extract_keywords(
         )
     except CommanderNotFoundError as e:
         raise HTTPException(status_code=404, detail={"code": "CARD_NOT_FOUND", "message": str(e)})
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_SOURCE_SELECTION", "message": str(e)},
+        ) from e
     return DataResponse(data=result)
 
 

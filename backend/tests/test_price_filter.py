@@ -3,32 +3,41 @@
 from uuid import UUID
 
 import asyncpg
-import pytest_asyncio
 from httpx import AsyncClient
 
 from tests.conftest import (
-    DOCKSIDE_SCRYFALL_ID,
-    DOUBLING_SEASON_SCRYFALL_ID,
-    RHYSTIC_STUDY_SCRYFALL_ID,
-    SOL_RING_SCRYFALL_ID,
+    DOCKSIDE_ORACLE_ID,
+    DOUBLING_SEASON_ORACLE_ID,
+    RHYSTIC_STUDY_ORACLE_ID,
+    SOL_RING_ORACLE_ID,
     create_test_deck,
 )
 
+SOURCE_TAG_ID = UUID("10000000-0000-0000-0000-000000000012")
 
-async def _set_tags(pool: asyncpg.Pool, scryfall_id: UUID, tags: list[str]) -> None:
+
+async def _seed_source_membership(pool: asyncpg.Pool) -> None:
+    """Give price-filter fixtures a direct shared Scryfall source membership."""
     async with pool.acquire() as conn:
         await conn.execute(
-            "UPDATE cards SET tags = $1::text[] WHERE scryfall_id = $2",
-            tags,
-            scryfall_id,
+            "INSERT INTO scryfall_tags (id, slug, metadata) VALUES ($1, 'price-test', $2)",
+            SOURCE_TAG_ID,
+            '{"label":"Price test"}',
         )
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def _reset_card_tags(db_pool: asyncpg.Pool):
-    async with db_pool.acquire() as conn:
-        await conn.execute("UPDATE cards SET tags = ARRAY[]::text[]")
-    yield
+        await conn.execute(
+            "INSERT INTO scryfall_tag_descendants (ancestor_id, descendant_id) VALUES ($1, $1)",
+            SOURCE_TAG_ID,
+        )
+        await conn.executemany(
+            "INSERT INTO scryfall_tag_memberships "
+            "(tag_id, oracle_id, details) VALUES ($1, $2, '{}')",
+            [
+                (SOURCE_TAG_ID, SOL_RING_ORACLE_ID),
+                (SOURCE_TAG_ID, RHYSTIC_STUDY_ORACLE_ID),
+                (SOURCE_TAG_ID, DOUBLING_SEASON_ORACLE_ID),
+                (SOURCE_TAG_ID, DOCKSIDE_ORACLE_ID),
+            ],
+        )
 
 
 # ── /suggest price cap ──────────────────────────────────────────────────────
@@ -42,12 +51,10 @@ async def test_suggest_with_price_cap_excludes_expensive(
     Sol Ring (€0.20) passes. Rhystic Study (€12), Doubling Season (€45),
     Dockside (no EUR price) are excluded.
     """
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, RHYSTIC_STUDY_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOCKSIDE_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Price Cap Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Price Cap Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -65,9 +72,10 @@ async def test_suggest_null_eur_price_excluded_when_cap_active(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
     """Cards with no EUR price must be excluded — safe default."""
-    await _set_tags(db_pool, DOCKSIDE_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Null Price Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Null Price Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -80,10 +88,10 @@ async def test_suggest_null_eur_price_excluded_when_cap_active(
 
 async def test_suggest_without_cap_includes_all(client: AsyncClient, db_pool: asyncpg.Pool) -> None:
     """No cap → expensive cards allowed (color-identity still applies)."""
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Uncapped Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Uncapped Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -100,10 +108,10 @@ async def test_suggest_without_cap_includes_all(client: AsyncClient, db_pool: as
 async def test_build_honors_request_override_cap(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Build Price Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Build Price Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/build",
@@ -126,11 +134,10 @@ async def test_suggest_with_price_floor_excludes_cheap(
 
     Dockside (no EUR price) is also excluded — safe default for null prices.
     """
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOCKSIDE_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Price Floor Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Price Floor Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -147,10 +154,10 @@ async def test_suggest_price_range_bounds_both_sides(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
     """Range €0.10 – €1.00 keeps Sol Ring (€0.20) and excludes Doubling Season (€45)."""
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Price Range Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Price Range Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/suggest",
@@ -173,10 +180,10 @@ async def test_suggest_price_range_bounds_both_sides(
 async def test_build_honors_request_override_floor(
     client: AsyncClient, db_pool: asyncpg.Pool
 ) -> None:
-    await _set_tags(db_pool, SOL_RING_SCRYFALL_ID, ["ramp"])
-    await _set_tags(db_pool, DOUBLING_SEASON_SCRYFALL_ID, ["ramp"])
-
-    deck_id = await create_test_deck(client, name="Build Floor Deck")
+    await _seed_source_membership(db_pool)
+    deck_id = await create_test_deck(
+        client, name="Build Floor Deck", archetype_tags=[str(SOURCE_TAG_ID)]
+    )
 
     resp = await client.post(
         f"/api/v1/decks/{deck_id}/build",

@@ -24,7 +24,6 @@ from mtg_helper.services.retrieval_service import (
     PriceFilter,
     RetrievedCard,
     TypeFilter,
-    card_qualifying_stages,
     parse_query_tags,
     parse_query_types,
     retrieve_candidates,
@@ -46,19 +45,12 @@ _SIGNAL_LABELS: dict[str, str] = {
 _SOURCE_LABELS: dict[str, str] = {
     "tag": "Tags",
     "fts": "Text",
-    "hub": "Moxfield Hub",
-    "top_commander_pick": "Top Commander Pick",
     "type": "Type",
 }
 
 # Threshold for highlighting top picks (new scoring is [0, 1])
 _BANGER_SCORE_THRESHOLD = 0.6
 _BANGER_MIN_SIGNALS = 2
-
-# Inclusion-weight thresholds that promote a card to the "hot" set even when
-# it doesn't meet the multi-signal banger rule.
-_HOT_HUB_THRESHOLD = 0.7
-_HOT_MOXFIELD_THRESHOLD = 0.5
 
 
 class DeckNotFoundError(ValueError):
@@ -70,9 +62,6 @@ def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
 
     Triggers (any one is enough):
       * Multi-signal top hit: ≥2 retrieval signals AND composite score ≥ 0.6.
-      * Strong Moxfield hub fit: inclusion weight >= ``_HOT_HUB_THRESHOLD``.
-      * In majority of top Moxfield decks: weight ≥ ``_HOT_MOXFIELD_THRESHOLD``
-        — appears in at least half of the cached top-liked Moxfield decks.
 
     Args:
         candidate: Retrieved card with score, signals, and inclusion weights.
@@ -85,11 +74,6 @@ def _compute_highlight_reasons(candidate: RetrievedCard) -> list[str] | None:
     enough_signals = len(candidate.signals) >= _BANGER_MIN_SIGNALS
     if enough_signals and candidate.score >= _BANGER_SCORE_THRESHOLD:
         reasons.extend(_SIGNAL_LABELS[s] for s in candidate.signals if s in _SIGNAL_LABELS)
-
-    if candidate.hub_weight >= _HOT_HUB_THRESHOLD:
-        reasons.append("Strong Moxfield hub fit")
-    if candidate.moxfield_weight >= _HOT_MOXFIELD_THRESHOLD:
-        reasons.append("In majority of top Moxfield decks")
 
     if not reasons:
         return None
@@ -144,10 +128,6 @@ def card_from_retrieved(
 
     cmc_float: float | None = float(card.cmc) if card.cmc is not None else None
     owned_in = (ownership_map or {}).get(card.scryfall_id, [])
-    qualifying_stages = card_qualifying_stages(card.tags, card.type_line)
-    if stage not in qualifying_stages:
-        qualifying_stages.append(stage)
-
     return CardSuggestion(
         scryfall_id=card.scryfall_id,
         oracle_id=card.oracle_id,
@@ -167,7 +147,6 @@ def card_from_retrieved(
         highlight_reasons=_compute_highlight_reasons(card),
         price_eur_cents=card.price_eur_cents,
         owned_in=owned_in,
-        qualifying_stages=qualifying_stages,
         sources=_sources_for(card),
         game_changer=card.game_changer,
     )
@@ -339,8 +318,6 @@ def _merge_type_filters(
         card_types=_union(primary.card_types, secondary.card_types),
         subtypes=_union(primary.subtypes, secondary.subtypes),
         keywords=_union(primary.keywords, secondary.keywords),
-        traits=_union(primary.traits, secondary.traits),
-        token_types=_union(primary.token_types, secondary.token_types),
         strict=primary.strict or secondary.strict,
         match_all_categories=primary.match_all_categories or secondary.match_all_categories,
     )
@@ -358,11 +335,14 @@ def _resolve_price_filter(max_cents: int | None, min_cents: int | None) -> Price
     return PriceFilter(max_cents=cap, min_cents=floor)
 
 
-def _normalize_hub_tag(tag: str | None) -> str | None:
-    """Normalize a selected Moxfield hub tag id without aliases."""
+def _normalize_source_tag(tag: str | None) -> str | None:
+    """Normalize a selected Oracle-tag UUID without aliases."""
     if not tag:
         return None
-    return tag.strip().lower().replace("-", "_")
+    try:
+        return str(UUID(tag.strip()))
+    except ValueError:
+        return None
 
 
 def _resolve_stage_query(
@@ -372,31 +352,47 @@ def _resolve_stage_query(
     theme_tag: str | None,
 ) -> tuple[str, list[str], bool, str | None, frozenset[str] | None] | None:
     query_text, base_tags = stage_retrieval_query(stage, description)
-    required_hub_tag: str | None = None
-    excluded_hub_tags: frozenset[str] | None = None
+    required_source_tag: str | None = None
+    excluded_source_tags: frozenset[str] | None = None
     if stage == "theme" and archetype_tags:
-        normalized_theme_tag = _normalize_hub_tag(theme_tag) if theme_tag else None
+        normalized_theme_tag = _normalize_source_tag(theme_tag) if theme_tag else None
         if theme_tag == _THEME_ETC_TAG:
-            query_tags = base_tags
-            excluded_hub_tags = frozenset(archetype_tags)
+            query_tags = _source_tag_ids(base_tags)
+            excluded_source_tags = frozenset(_source_tag_ids(archetype_tags))
             query_text = f"{query_text} commander staples support"
         else:
-            if normalized_theme_tag not in archetype_tags:
+            if normalized_theme_tag not in _source_tag_ids(archetype_tags):
                 return None
             query_tags = [normalized_theme_tag]
-            required_hub_tag = normalized_theme_tag
+            required_source_tag = normalized_theme_tag
             query_text = f"{query_text} {normalized_theme_tag.replace('_', ' ')}"
         prefer_keywords = True
     elif archetype_tags:
         seen: set[str] = set()
         query_tags = [
-            tag for tag in (*archetype_tags, *base_tags) if not (tag in seen or seen.add(tag))
+            tag
+            for tag in _source_tag_ids([*archetype_tags, *base_tags])
+            if not (tag in seen or seen.add(tag))
         ]
         prefer_keywords = True
     else:
-        query_tags = base_tags
+        query_tags = _source_tag_ids(base_tags)
         prefer_keywords = False
-    return query_text, query_tags, prefer_keywords, required_hub_tag, excluded_hub_tags
+    return query_text, query_tags, prefer_keywords, required_source_tag, excluded_source_tags
+
+
+def _source_tag_ids(values: list[str]) -> list[str]:
+    """Keep only canonical Oracle-tag UUIDs from mixed user source selections."""
+    parsed: list[str] = []
+    for value in values:
+        try:
+            source_id = UUID(value)
+        except ValueError:
+            continue
+        normalized = str(source_id)
+        if normalized not in parsed:
+            parsed.append(normalized)
+    return parsed
 
 
 async def _stage_excluded_ids(
@@ -427,7 +423,7 @@ async def _build_stage_suggestions(
     card_types: list[str] | None,
     subtypes: list[str] | None,
 ) -> list[CardSuggestion]:
-    query_text, query_tags, prefer_keywords, required_hub_tag, excluded_hub_tags = stage_query
+    query_text, query_tags, prefer_keywords, required_source_tag, excluded_source_tags = stage_query
     candidates = await retrieve_candidates(
         pool,
         query_text,
@@ -444,8 +440,8 @@ async def _build_stage_suggestions(
         bracket=deck.bracket,
         type_filter=_resolve_structured_type_filter(card_types, subtypes),
         prefer_keywords=prefer_keywords,
-        required_hub_tag=required_hub_tag,
-        excluded_hub_tags=excluded_hub_tags,
+        required_source_tag=required_source_tag,
+        excluded_source_tags=excluded_source_tags,
     )
     _log.debug("Stage %s: retrieved %d candidates", resolved_stage, len(candidates))
     if resolved_stage == "lands":

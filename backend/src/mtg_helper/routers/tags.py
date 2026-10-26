@@ -1,71 +1,43 @@
-"""Tag catalog endpoints for shared themes and MTGJSON mechanics."""
+"""Scryfall Oracle-tag and printed-keyword catalog endpoints."""
+
+from uuid import UUID
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from mtg_helper.models.common import DataResponse
-from mtg_helper.services import theme_service
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
 
-class KeywordChip(BaseModel):
-    """An official MTGJSON keyword exposed as a selectable tag chip."""
+class SourceTagChip(BaseModel):
+    """A selectable source identity, never a locally invented label."""
 
-    tag: str
+    id: UUID
+    slug: str
     label: str
-    deck_count: int | None = None
 
 
-class KeywordGroup(BaseModel):
-    """Selectable tag group for the frontend picker."""
+class PrintedKeywordChip(BaseModel):
+    """One exact printed Scryfall keyword."""
 
-    category: str
-    display_name: str
-    keywords: list[KeywordChip]
+    keyword: str
 
 
-_CATEGORY_LABELS = {
-    "ability_word": "Ability words",
-    "keyword_ability": "Keyword abilities",
-    "keyword_action": "Keyword actions",
-}
-
-
-@router.get("/keywords", response_model=DataResponse[list[KeywordGroup]])
-async def list_official_keywords(request: Request) -> DataResponse[list[KeywordGroup]]:
-    """Return the locally synced MTGJSON official keyword catalog."""
-    pool = request.app.state.db_pool
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT tag, label, category
-            FROM mtgjson_keywords
-            ORDER BY category ASC, label ASC
-            """
-        )
-
-    by_category: dict[str, list[KeywordChip]] = {key: [] for key in _CATEGORY_LABELS}
-    for row in rows:
-        category = row["category"]
-        if category in by_category:
-            by_category[category].append(KeywordChip(tag=row["tag"], label=row["label"]))
-    return DataResponse(
-        data=[
-            KeywordGroup(
-                category=category,
-                display_name=label,
-                keywords=by_category[category],
-            )
-            for category, label in _CATEGORY_LABELS.items()
-            if by_category[category]
-        ]
+@router.get("/oracle", response_model=DataResponse[list[SourceTagChip]])
+async def list_oracle_tags(request: Request) -> DataResponse[list[SourceTagChip]]:
+    """Return source Oracle tags from the current complete Scryfall publication."""
+    rows = await request.app.state.db_pool.fetch(
+        "SELECT id, slug, metadata->>'label' AS label FROM scryfall_tags ORDER BY slug"
     )
+    return DataResponse(data=[SourceTagChip(**dict(row)) for row in rows])
 
 
-@router.get("/hubs", response_model=DataResponse[list[KeywordGroup]])
-async def list_moxfield_hubs(request: Request) -> DataResponse[list[KeywordGroup]]:
-    """Return shared theme groups through the legacy hubs route."""
-    pool = request.app.state.db_pool
-    groups = await theme_service.list_theme_catalog(pool)
-    return DataResponse(data=[KeywordGroup(**group) for group in groups])
+@router.get("/keywords", response_model=DataResponse[list[PrintedKeywordChip]])
+async def list_printed_keywords(request: Request) -> DataResponse[list[PrintedKeywordChip]]:
+    """Return exact printed keywords from Scryfall card facts."""
+    rows = await request.app.state.db_pool.fetch(
+        "SELECT DISTINCT keyword FROM cards CROSS JOIN unnest(keywords) AS keyword "
+        "WHERE is_canonical ORDER BY keyword"
+    )
+    return DataResponse(data=[PrintedKeywordChip(keyword=row["keyword"]) for row in rows])

@@ -1,5 +1,7 @@
-"""Tests for hybrid retrieval pure functions: scoring, signal map, and query parsing."""
+"""Pure retrieval checks for Oracle identities, printed facts, and deterministic ranking."""
 
+from copy import deepcopy
+from dataclasses import fields
 from decimal import Decimal
 from typing import cast
 from uuid import UUID
@@ -12,14 +14,12 @@ from mtg_helper.services.retrieval_service import (
     RepresentationQuery,
     TypeFilter,
     _annotate_representation_signals,
-    _apply_trusted_quota,
     _build_signal_map,
     _compute_weighted_scores,
     _curve_fit_score,
-    _fetch_excluded_theme_ids,
-    _filter_inclusion_by_stage,
+    _fetch_excluded_source_card_ids,
     _filter_rows_by_stage,
-    _filter_theme_rows,
+    _filter_source_rows,
     _representation_match_score,
     _search_tags,
     _type_match_score,
@@ -29,1214 +29,293 @@ from mtg_helper.services.retrieval_service import (
     stage_retrieval_query,
 )
 
-# Stable test UUIDs
+pytestmark = pytest.mark.no_db
 _A = UUID("aaaaaaaa-0000-0000-0000-000000000000")
 _B = UUID("bbbbbbbb-0000-0000-0000-000000000000")
 _C = UUID("cccccccc-0000-0000-0000-000000000000")
-_D = UUID("dddddddd-0000-0000-0000-000000000000")
 
 
-def _record(values: object) -> asyncpg.Record:
-    return cast(asyncpg.Record, values)
-
-
-# ── _build_signal_map ─────────────────────────────────────────────────────────
-
-
-def test_build_signal_map_all_signals() -> None:
-    tag_overlaps, fts_set, signal_map = _build_signal_map([(_B, 2)], [_C])
-    assert signal_map[_B] == ["tag"]
-    assert signal_map[_C] == ["fts"]
-
-
-def test_build_signal_map_card_in_multiple_signals() -> None:
-    _, _, signal_map = _build_signal_map([(_A, 2)], [_A])
-    assert "tag" in signal_map[_A]
-    assert len(signal_map[_A]) == 2
-
-
-def test_build_signal_map_empty_inputs() -> None:
-    tag_overlaps, fts_set, signal_map = _build_signal_map([], [])
-    assert tag_overlaps == {}
-    assert fts_set == set()
-    assert signal_map == {}
-
-
-def test_build_signal_map_skips_empty_lists() -> None:
-    _, _, signal_map = _build_signal_map([], [_C])
-    assert _C in signal_map
-    assert _B not in signal_map
-
-
-def test_build_signal_map_tag_overlaps_captured() -> None:
-    tag_overlaps, _, _ = _build_signal_map([(_A, 3), (_B, 1)], [])
-    assert tag_overlaps[_A] == 3
-    assert tag_overlaps[_B] == 1
-
-
-# ── _curve_fit_score ──────────────────────────────────────────────────────────
-
-
-def test_curve_fit_no_deck_data_returns_neutral() -> None:
-    assert _curve_fit_score(Decimal("3"), None) == 0.5
-
-
-def test_curve_fit_no_cmc_returns_neutral() -> None:
-    assert _curve_fit_score(None, {2: 5}) == 0.5
-
-
-def test_curve_fit_underrepresented_cmc_scores_higher() -> None:
-    # Deck has nothing at CMC 2, target is ~22% — should score well above 0.5
-    score = _curve_fit_score(Decimal("2"), {3: 10, 4: 10})
-    assert score > 0.5
-
-
-def test_curve_fit_overrepresented_cmc_scores_lower() -> None:
-    # Deck is heavy on CMC 3 (target 25%, actual ~67%)
-    score = _curve_fit_score(Decimal("3"), {3: 20, 2: 5, 4: 5})
-    assert score < 0.5
-
-
-def test_curve_fit_cmc_capped_at_6() -> None:
-    # CMC 8 and CMC 6 should map to same bucket
-    score_6 = _curve_fit_score(Decimal("6"), {})
-    score_8 = _curve_fit_score(Decimal("8"), {})
-    assert abs(score_6 - score_8) < 1e-9
-
-
-# ── _compute_weighted_scores ──────────────────────────────────────────────────
-
-
-def _make_row(
-    uid: UUID,
-    *,
-    edhrec_rank: int | None = 100,
-    cmc: float = 2.0,
-    color_identity: list[str] | None = None,
-    hub_tags: list[str] | None = None,
-    card_types: list[str] | None = None,
-    traits: list[str] | None = None,
-    type_line: str = "Creature",
-) -> asyncpg.Record:
-    return _record(
+def _row(uid: UUID = _A, **values: object) -> asyncpg.Record:
+    return cast(
+        asyncpg.Record,
         {
             "id": uid,
-            "edhrec_rank": edhrec_rank,
-            "cmc": Decimal(str(cmc)),
-            "color_identity": color_identity or ["G", "B"],
-            "type_line": type_line,
-            "tags": [],
-            "hub_tags": hub_tags or [],
-            "card_types": card_types or [],
-            "subtypes": [],
-            "keywords": [],
-            "traits": traits or [],
-            "token_types": [],
-        }
-    )
-
-
-def test_stage_filter_uses_functional_tags_not_theme_tags() -> None:
-    role_card = _record({**_make_row(_A, hub_tags=["artifacts"]), "tags": ["ramp"]})
-    theme_only = _record({**_make_row(_B, hub_tags=["ramp"]), "tags": []})
-
-    filtered = _filter_inclusion_by_stage(  # type: ignore[arg-type]
-        {_A: 0.4, _B: 0.9}, {_A: role_card, _B: theme_only}, "ramp"
-    )
-
-    assert filtered == {_A: 0.4}
-
-
-def test_stage_gate_removes_fts_and_theme_cards_without_role() -> None:
-    role_card = _record({**_make_row(_A, hub_tags=["artifacts"]), "tags": ["draw"]})
-    theme_only = _record({**_make_row(_B, hub_tags=["draw"]), "tags": []})
-
-    filtered = _filter_rows_by_stage(  # type: ignore[arg-type]
-        [role_card, theme_only], "draw"
-    )
-
-    assert [row["id"] for row in filtered] == [_A]
-
-
-def test_stage_gate_does_not_filter_theme_results() -> None:
-    theme_card = _record({**_make_row(_A, hub_tags=["artifacts"]), "tags": []})
-
-    filtered = _filter_rows_by_stage([theme_card], "theme")  # type: ignore[arg-type]
-
-    assert filtered == [theme_card]
-
-
-def test_draw_stage_rejects_card_selection_without_draw() -> None:
-    selection_only = _record({**_make_row(_A), "tags": ["card_selection"]})
-
-    filtered = _filter_rows_by_stage([selection_only], "draw")  # type: ignore[arg-type]
-
-    assert filtered == []
-
-
-@pytest.mark.asyncio
-async def test_tag_search_uses_local_role_tags_not_theme_tags(db_pool: asyncpg.Pool) -> None:
-    async with db_pool.acquire() as conn:
-        role_id = await conn.fetchval("SELECT id FROM cards WHERE name = 'Doubling Season'")
-        theme_id = await conn.fetchval("SELECT id FROM cards WHERE name = 'Rhystic Study'")
-        await conn.execute(
-            """UPDATE cards
-               SET tags = ARRAY['ramp'], hub_tags = '{}', mtgjson_tags = '{}'
-               WHERE id = $1""",
-            role_id,
-        )
-        await conn.execute(
-            """UPDATE cards
-               SET tags = '{}', hub_tags = ARRAY['ramp'], mtgjson_tags = '{}'
-               WHERE id = $1""",
-            theme_id,
-        )
-
-    results = await _search_tags(db_pool, ["ramp"], ["G", "U"], [], limit=10)
-
-    assert role_id in {card_id for card_id, _overlap in results}
-    assert theme_id not in {card_id for card_id, _overlap in results}
-
-
-def test_theme_rows_allow_hub_tag_membership() -> None:
-    rows = [
-        _make_row(_A, hub_tags=["artifacts"]),
-        _make_row(_B, hub_tags=["etb"]),
-        _make_row(_C, hub_tags=[]),
-    ]
-
-    filtered = _filter_theme_rows(rows, required_hub_tag="artifacts")  # type: ignore[arg-type]
-
-    assert [row["id"] for row in filtered] == [_A]
-
-
-def test_theme_rows_requires_exact_hub_membership() -> None:
-    rows = [
-        _make_row(_A, hub_tags=["card_draw"]),
-        _make_row(_B, hub_tags=["draw"]),
-    ]
-
-    filtered = _filter_theme_rows(rows, required_hub_tag="card_draw")  # type: ignore[arg-type]
-
-    assert [row["id"] for row in filtered] == [_A]
-
-
-def test_theme_rows_allow_hub_stats_card() -> None:
-    rows = [
-        _make_row(_A, hub_tags=[]),
-        _make_row(_B, hub_tags=["etb"]),
-    ]
-
-    filtered = _filter_theme_rows(
-        rows,  # type: ignore[arg-type]
-        required_hub_tag="artifacts",
-        allowed_theme_ids=frozenset({_A}),
-    )
-
-    assert [row["id"] for row in filtered] == [_A]
-
-
-def test_theme_rows_etc_excludes_normalized_selected_card_tags() -> None:
-    rows = [
-        _make_row(_A, hub_tags=["artifacts"]),
-        _make_row(_B, hub_tags=["etb"]),
-        _make_row(_C, hub_tags=["lifegain"]),
-        _make_row(_D, hub_tags=[]),
-    ]
-
-    filtered = _filter_theme_rows(
-        rows,  # type: ignore[arg-type]
-        excluded_hub_tags=frozenset({"artifacts", "etb"}),
-    )
-
-    assert [row["id"] for row in filtered] == [_C, _D]
-
-
-def test_theme_rows_etc_excludes_selected_theme_page_ids() -> None:
-    rows = [
-        _make_row(_A, hub_tags=[]),
-        _make_row(_B, hub_tags=[]),
-    ]
-
-    filtered = _filter_theme_rows(
-        rows,  # type: ignore[arg-type]
-        excluded_hub_tags=frozenset({"artifacts"}),
-        excluded_theme_ids=frozenset({_A}),
-    )
-
-    assert [row["id"] for row in filtered] == [_B]
-
-
-@pytest.mark.asyncio
-@pytest.mark.no_db
-async def test_excluded_theme_lookup_failure_falls_back_to_local_tags(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def fail_lookup(*_args: object) -> dict[UUID, float]:
-        raise RuntimeError("theme source unavailable")
-
-    monkeypatch.setattr(
-        "mtg_helper.services.retrieval_service.theme_service.score_themes",
-        fail_lookup,
-    )
-
-    result = await _fetch_excluded_theme_ids(
-        cast(asyncpg.Pool, object()), frozenset({"artifacts"}), ["G"]
-    )
-
-    assert result is None
-
-
-def test_representation_match_score_full_match() -> None:
-    row = _record(
-        {
-            **_make_row(_A),
-            "tags": ["ramp", "token"],
-            "card_types": ["Artifact"],
-            "subtypes": ["Equipment"],
-            "keywords": ["Flying"],
-            "traits": ["activated"],
-            "token_types": ["treasure"],
-        }
-    )
-    query = RepresentationQuery(
-        tags=["ramp"],
-        card_types=["Artifact"],
-        keywords=["flying"],
-        traits=["activated"],
-        token_types=["treasure"],
-    )
-
-    assert _representation_match_score(row, query) == 1.0  # type: ignore[arg-type]
-
-
-def test_representation_match_score_partial_match() -> None:
-    row = _record(
-        {
-            **_make_row(_A),
-            "tags": ["ramp"],
-            "card_types": ["Artifact"],
-        }
-    )
-    query = RepresentationQuery(tags=["ramp"], card_types=["Creature"])
-
-    assert _representation_match_score(row, query) == 0.5  # type: ignore[arg-type]
-
-
-@pytest.mark.parametrize("include_null_key", [False, True])
-@pytest.mark.no_db
-def test_representation_match_score_treats_missing_optional_tags_as_empty(
-    include_null_key: bool,
-) -> None:
-    row = dict(_make_row(_A))
-    if include_null_key:
-        row["mtgjson_tags"] = None
-    query = RepresentationQuery(mtgjson_tags=["ramp"])
-
-    assert _representation_match_score(cast(asyncpg.Record, row), query) == 0.0
-
-
-def test_representation_signal_annotation() -> None:
-    rows = {
-        _A: _record({**_make_row(_A), "tags": ["draw"]}),
-        _B: _record({**_make_row(_B), "tags": ["ramp"]}),
-    }
-    signal_map: dict[UUID, list[str]] = {}
-
-    _annotate_representation_signals(
-        signal_map,
-        rows,  # type: ignore[arg-type]
-        RepresentationQuery(tags=["ramp"]),
-    )
-
-    assert "representation" not in signal_map.get(_A, [])
-    assert signal_map[_B] == ["representation"]
-
-
-def test_weighted_score_higher_composite_wins() -> None:
-    rows = {_A: _make_row(_A, edhrec_rank=10), _B: _make_row(_B, edhrec_rank=100)}
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-    )
-    assert scores[_A] > scores[_B]
-
-
-def test_weighted_score_fts_boosts_synergy() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
-    # Same base score; _A is also in FTS.
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set={_A},
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-    )
-    assert scores[_A] > scores[_B]
-
-
-def test_weighted_score_representation_boosts_matching_card() -> None:
-    rows = {
-        _A: _record({**_make_row(_A), "tags": ["ramp"]}),
-        _B: _record({**_make_row(_B), "tags": ["draw"]}),
-    }
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,  # type: ignore[arg-type]
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        representation_query=RepresentationQuery(tags=["ramp"]),
-    )
-
-    assert scores[_A] > scores[_B]
-
-
-def test_weighted_score_skips_missing_rows() -> None:
-    rows = {_A: _make_row(_A)}
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-    )
-    assert _A in scores
-    assert _B not in scores
-
-
-def test_weighted_score_hub_inclusion_boosts_card() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        hub_inclusion={_A: 1.0},
-    )
-    assert scores[_A] > scores[_B]
-
-
-def test_weighted_score_moxfield_inclusion_boosts_card() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        moxfield_inclusion={_A: 1.0},
-    )
-    assert scores[_A] > scores[_B]
-
-
-def test_weighted_score_hub_inclusion_none_is_noop() -> None:
-    rows = {_A: _make_row(_A), _B: _make_row(_B)}
-    base = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-    )
-    explicit_none = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        hub_inclusion=None,
-    )
-    assert base == explicit_none
-
-
-@pytest.mark.no_db
-def test_weighted_scoring_does_not_mutate_caller_inputs() -> None:
-    rows = {_A: _make_row(_A, edhrec_rank=10), _B: _make_row(_B, edhrec_rank=100)}
-    all_ids = [_A, _B]
-    tag_overlaps = {_A: 2, _B: 1}
-    fts_ids = {_B}
-    hub_inclusion = {_A: 0.8}
-    moxfield_inclusion = {_B: 0.4}
-
-    _compute_weighted_scores(
-        all_ids,
-        tag_overlaps=tag_overlaps,
-        fts_set=fts_ids,
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        hub_inclusion=hub_inclusion,
-        moxfield_inclusion=moxfield_inclusion,
-    )
-
-    assert all_ids == [_A, _B]
-    assert tag_overlaps == {_A: 2, _B: 1}
-    assert fts_ids == {_B}
-    assert hub_inclusion == {_A: 0.8}
-    assert moxfield_inclusion == {_B: 0.4}
-
-
-@pytest.mark.asyncio
-@pytest.mark.no_db
-async def test_retrieve_candidates_empty_collection_uses_public_call_shape_without_io() -> None:
-    result = await retrieve_candidates(
-        cast(asyncpg.Pool, object()),
-        "ramp",
-        ["ramp"],
-        ["G"],
-        [],
-        limit=5,
-        collection_filter=CollectionFilter(owned_card_ids=frozenset()),
-    )
-
-    assert result == []
-
-
-# ── _apply_trusted_quota ──────────────────────────────────────────────────────
-
-
-def _ids(prefix: str, count: int) -> list[UUID]:
-    return [UUID(f"{prefix}{i:04x}-0000-0000-0000-000000000000") for i in range(count)]
-
-
-def _id_rows(ids: list[UUID]) -> dict[UUID, asyncpg.Record]:
-    return {uid: _record({"id": uid}) for uid in ids}
-
-
-def test_trusted_quota_reserves_low_scoring_hub_cards() -> None:
-    semantic = _ids("aaaa", 30)
-    trusted = _ids("bbbb", 8)
-    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
-    scores.update({uid: 0.30 + i * 0.001 for i, uid in enumerate(trusted)})
-    cards_by_id = _id_rows([*semantic, *trusted])
-    hub = {uid: 0.9 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=20)
-
-    assert len(top) == 20
-    assert set(trusted).issubset(set(top)), "all trusted cards must survive truncation"
-
-
-def test_trusted_quota_fills_with_trusted_first_then_composite() -> None:
-    """Every trusted card lands ahead of composite fill, capped only by limit."""
-    semantic = _ids("aaaa", 20)
-    trusted = _ids("bbbb", 15)
-    # Composite sort puts semantic above trusted, so without the all-trusted-first
-    # rule the slice would prefer semantic.
-    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
-    scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
-    cards_by_id = _id_rows([*semantic, *trusted])
-    moxfield = {uid: 0.8 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
-
-    assert len(top) == 10
-    # All 10 returned slots must come from trusted, since trusted (15) > limit (10).
-    assert set(top).issubset(set(trusted))
-
-
-def test_trusted_quota_overflow_trusted_truncated_at_limit() -> None:
-    """When trusted exceeds limit, return is exactly limit items, all trusted."""
-    trusted = _ids("bbbb", 50)
-    scores = {uid: 0.5 for uid in trusted}
-    cards_by_id = _id_rows(trusted)
-    moxfield = {uid: 0.9 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10)
-
-    assert len(top) == 10
-    assert set(top).issubset(set(trusted))
-
-
-def test_trusted_quota_composite_fills_remainder() -> None:
-    """When trusted < limit, composite fills the remainder."""
-    trusted = _ids("bbbb", 3)
-    semantic = _ids("aaaa", 10)
-    scores = {uid: 0.5 for uid in trusted}
-    scores.update({uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)})
-    cards_by_id = _id_rows([*trusted, *semantic])
-    hub = {uid: 0.7 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=8)
-
-    assert len(top) == 8
-    assert set(trusted).issubset(set(top))
-    composite_count = sum(1 for uid in top if uid in set(semantic))
-    assert composite_count == 5
-
-
-def test_trusted_quota_skips_zero_score_cards() -> None:
-    """Strict type filter zeros non-matching cards; quota must not reserve them."""
-    semantic = _ids("aaaa", 5)
-    trusted = _ids("bbbb", 3)
-    scores = {uid: 0.5 for uid in semantic}
-    scores.update({uid: 0.0 for uid in trusted})  # zeroed by strict type filter
-    cards_by_id = _id_rows([*semantic, *trusted])
-    hub = {uid: 0.9 for uid in trusted}
-
-    # limit=5 forces composite truncation: zeroed trusted cards rank last and
-    # are dropped because the quota pass excludes score==0 entries.
-    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=5)
-
-    assert set(top) == set(semantic), "zeroed trusted cards must not survive"
-
-
-def test_trusted_quota_no_signals_falls_through() -> None:
-    semantic = _ids("aaaa", 5)
-    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
-    cards_by_id = _id_rows(semantic)
-
-    top = _apply_trusted_quota(scores, {}, {}, cards_by_id, limit=3)
-
-    assert top == sorted(scores, key=lambda u: scores[u], reverse=True)[:3]
-
-
-def test_trusted_quota_picks_highest_inclusion_first() -> None:
-    trusted = _ids("bbbb", 4)
-    scores = {uid: 0.1 for uid in trusted}
-    cards_by_id = _id_rows(trusted)
-    hub = {trusted[0]: 0.2, trusted[1]: 0.9, trusted[2]: 0.5, trusted[3]: 0.7}
-
-    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=4)
-
-    # quota = 4 // 2 = 2; should pick trusted[1] (0.9) and trusted[3] (0.7) first
-    assert top[:2] == [trusted[1], trusted[3]]
-
-
-def test_trusted_quota_limit_zero_returns_empty() -> None:
-    trusted = _ids("bbbb", 3)
-    scores = {uid: 0.5 for uid in trusted}
-    cards_by_id = _id_rows(trusted)
-    hub = {uid: 0.9 for uid in trusted}
-
-    assert _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=0) == []
-
-
-def test_trusted_quota_half_split_reserves_half_for_composite() -> None:
-    """quota=0.5 splits page 50/50 between trusted and composite winners."""
-    semantic = _ids("aaaa", 20)
-    trusted = _ids("bbbb", 15)
-    # Composite ordering puts semantic well above trusted, so without the quota
-    # cap the trusted reservation would still eat the whole page (15 > 10).
-    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
-    scores.update({uid: 0.10 + i * 0.001 for i, uid in enumerate(trusted)})
-    cards_by_id = _id_rows([*semantic, *trusted])
-    moxfield = {uid: 0.8 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=10, quota=0.5)
-
-    assert len(top) == 10
-    trusted_in_top = [uid for uid in top if uid in set(trusted)]
-    composite_in_top = [uid for uid in top if uid in set(semantic)]
-    assert len(trusted_in_top) == 5, "half the page should be reserved for trusted"
-    assert len(composite_in_top) == 5, "the other half should fill with composite winners"
-    # Trusted slots come before composite fill in the ordering.
-    assert top[:5] == trusted_in_top
-
-
-def test_trusted_quota_zero_drops_all_trusted_reservations() -> None:
-    """quota=0.0 hands the whole page to the composite ranker."""
-    semantic = _ids("aaaa", 8)
-    trusted = _ids("bbbb", 5)
-    scores = {uid: 0.9 - i * 0.01 for i, uid in enumerate(semantic)}
-    scores.update({uid: 0.5 for uid in trusted})
-    cards_by_id = _id_rows([*semantic, *trusted])
-    moxfield = {uid: 0.9 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, {}, moxfield, cards_by_id, limit=6, quota=0.0)
-
-    # Composite ordering is purely score-desc; semantic scores dominate.
-    assert top == sorted(scores, key=lambda u: scores[u], reverse=True)[:6]
-
-
-def test_trusted_quota_skips_cards_missing_from_db() -> None:
-    """Trusted card filtered out by _fetch_candidates is also skipped from quota."""
-    semantic = _ids("aaaa", 5)
-    trusted = _ids("bbbb", 2)
-    # In real flow `_compute_weighted_scores` skips uids missing from cards_by_id,
-    # so neither scores nor cards_by_id have entries for the filtered-out trusted.
-    scores = {uid: 0.5 for uid in semantic}
-    cards_by_id = _id_rows(semantic)
-    hub = {uid: 0.9 for uid in trusted}
-
-    top = _apply_trusted_quota(scores, hub, {}, cards_by_id, limit=10)
-
-    assert set(top) == set(semantic)
-
-
-# ── _compute_weighted_scores: range ───────────────────────────────────────────
-
-
-def test_weighted_score_range_zero_to_one() -> None:
-    rows = {_A: _make_row(_A, edhrec_rank=1), _B: _make_row(_B, edhrec_rank=10000)}
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={_A: 3, _B: 0},
-        fts_set={_A},
-        cards_by_id=rows,
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts={2: 5},
-    )
-    for score in scores.values():
-        assert 0.0 <= score <= 1.0
-
-
-# ── parse_query_tags ──────────────────────────────────────────────────────────
-
-
-def test_parse_query_tags_single_term() -> None:
-    assert "ramp" in parse_query_tags("I want ramp spells")
-
-
-def test_parse_query_tags_multi_word_key_before_single_word() -> None:
-    tags = parse_query_tags("board wipe effects")
-    assert "interaction" in tags
-
-
-def test_parse_query_tags_interaction_expands() -> None:
-    tags = parse_query_tags("interaction spells")
-    assert tags == ["interaction"]
-
-
-def test_parse_query_tags_deduplicates() -> None:
-    tags = parse_query_tags("removal kill effects")
-    assert tags.count("interaction") == 1
-
-
-def test_parse_query_tags_case_insensitive() -> None:
-    assert "ramp" in parse_query_tags("RAMP spells")
-
-
-def test_parse_query_tags_unknown_query_returns_empty() -> None:
-    assert parse_query_tags("goblin tribal commander") == ["tribal"]
-
-
-def test_parse_query_tags_empty_string() -> None:
-    assert parse_query_tags("") == []
-
-
-def test_parse_query_tags_voltron_includes_equipment() -> None:
-    tags = parse_query_tags("voltron strategy")
-    assert "voltron" in tags
-    assert "equipment" in tags
-
-
-# ── stage_retrieval_query ─────────────────────────────────────────────────────
-
-
-def test_stage_retrieval_query_known_stages() -> None:
-    for stage in ("ramp", "draw", "interaction", "lands"):
-        text, tags = stage_retrieval_query(stage, None)
-        assert isinstance(text, str) and len(text) > 0
-        assert isinstance(tags, list)
-
-
-def test_stage_retrieval_query_ramp_tags() -> None:
-    _, tags = stage_retrieval_query("ramp", None)
-    assert "ramp" in tags
-
-
-def test_stage_retrieval_query_interaction_tags() -> None:
-    _, tags = stage_retrieval_query("interaction", None)
-    assert "interaction" in tags
-
-
-def test_stage_retrieval_query_theme_uses_description() -> None:
-    text, _ = stage_retrieval_query("theme", "voltron equipment")
-    assert "voltron" in text.lower() or "equipment" in text.lower()
-
-
-def test_stage_retrieval_query_theme_no_description_fallback() -> None:
-    text, _ = stage_retrieval_query("theme", None)
-    assert "synergy" in text.lower() or "theme" in text.lower()
-
-
-def test_stage_retrieval_query_unknown_stage_returns_stage_name() -> None:
-    text, tags = stage_retrieval_query("nonexistent_stage", None)
-    assert text == "nonexistent_stage"
-    assert tags == []
-
-
-def test_stage_retrieval_query_ramp_with_description() -> None:
-    text, tags = stage_retrieval_query("ramp", "Squirrels and +1/+1 Counters")
-    assert "Squirrels" in text
-    assert "+1/+1 Counters" in text
-    assert tags == ["ramp", "fast_mana"]
-
-
-def test_stage_retrieval_query_draw_with_description() -> None:
-    text, tags = stage_retrieval_query("draw", "sacrifice aristocrats")
-    assert "sacrifice" in text.lower()
-    assert tags == ["draw"]
-
-
-def test_stage_retrieval_query_description_does_not_affect_tags() -> None:
-    # Deck description keywords must never pollute non-theme stage tags
-    _, tags = stage_retrieval_query("ramp", "elf tribal with card draw and sacrifice")
-    assert tags == ["ramp", "fast_mana"]
-
-
-def test_stage_retrieval_query_no_description_unchanged() -> None:
-    text_none, tags_none = stage_retrieval_query("ramp", None)
-    text_empty, tags_empty = stage_retrieval_query("ramp", "")
-    # Both should return the base ramp query without description appended
-    assert text_none == text_empty
-    assert tags_none == tags_empty
-
-
-# ── parse_query_types ─────────────────────────────────────────────────────────
-
-
-def test_parse_query_types_no_types_returns_none() -> None:
-    assert parse_query_types("I want ramp spells") is None
-
-
-def test_parse_query_types_detects_card_type() -> None:
-    result = parse_query_types("artifact ramp please")
-    assert result is not None
-    assert "Artifact" in result.card_types
-    assert result.subtypes == []
-
-
-def test_parse_query_types_detects_subtype() -> None:
-    result = parse_query_types("elf mana dorks")
-    assert result is not None
-    assert "Elf" in result.subtypes
-    assert result.card_types == []
-
-
-def test_parse_query_types_detects_multiple_subtypes() -> None:
-    result = parse_query_types("monk human ramp")
-    assert result is not None
-    assert "Monk" in result.subtypes
-    assert "Human" in result.subtypes
-
-
-def test_parse_query_types_case_insensitive() -> None:
-    result = parse_query_types("ARTIFACT removal")
-    assert result is not None
-    assert "Artifact" in result.card_types
-
-
-def test_parse_query_types_mixed_type_and_subtype() -> None:
-    result = parse_query_types("artifact creature goblin")
-    assert result is not None
-    assert "Artifact" in result.card_types
-    assert "Creature" in result.card_types
-    assert "Goblin" in result.subtypes
-
-
-def test_parse_query_types_elves_normalized() -> None:
-    result = parse_query_types("elves ramp")
-    assert result is not None
-    assert "Elf" in result.subtypes
-
-
-def test_parse_query_types_empty_string_returns_none() -> None:
-    assert parse_query_types("") is None
-
-
-# ── _type_match_score ─────────────────────────────────────────────────────────
-
-
-def _make_type_row(
-    card_types: list[str],
-    subtypes: list[str],
-    keywords: list[str] | None = None,
-    traits: list[str] | None = None,
-    token_types: list[str] | None = None,
-) -> asyncpg.Record:
-    return _record(
-        {
-            "id": _A,
             "edhrec_rank": 100,
             "cmc": Decimal("2"),
             "color_identity": ["G", "B"],
-            "card_types": card_types,
-            "subtypes": subtypes,
-            "keywords": keywords or [],
-            "traits": traits or [],
-            "token_types": token_types or [],
+            "type_line": "Creature",
             "tags": [],
-        }
+            "card_types": ["Creature"],
+            "subtypes": [],
+            "keywords": [],
+            **values,
+        },
     )
 
 
-def test_type_match_score_full_match() -> None:
-    row = _make_type_row(["Artifact"], [])
-    tf = TypeFilter(card_types=["Artifact"], subtypes=[])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+def test_signal_map_preserves_overlap_and_combines_unique_signals() -> None:
+    overlaps, fts, signals = _build_signal_map([(_A, 3), (_B, 1)], [_B, _C, _C])
+    assert overlaps == {_A: 3, _B: 1}
+    assert fts == {_B, _C}
+    assert signals == {_A: ["tag"], _B: ["tag", "fts"], _C: ["fts"]}
 
 
-def test_type_match_score_no_match() -> None:
-    row = _make_type_row(["Creature"], ["Human"])
-    tf = TypeFilter(card_types=["Artifact"], subtypes=[])
-    assert _type_match_score(row, tf) == 0.0  # type: ignore[arg-type]
+def test_signal_map_handles_empty_inputs() -> None:
+    assert _build_signal_map([], []) == ({}, set(), {})
+    assert _build_signal_map([], [_C])[2] == {_C: ["fts"]}
 
 
-def test_type_match_score_partial_match() -> None:
-    row = _make_type_row(["Creature"], ["Human"])
-    tf = TypeFilter(card_types=[], subtypes=["Human", "Monk"])
-    score = _type_match_score(row, tf)  # type: ignore[arg-type]
-    assert score == 0.5
+@pytest.mark.parametrize("cmc,counts", [(Decimal("3"), None), (None, {2: 5})])
+def test_curve_fit_without_complete_data_is_neutral(cmc, counts) -> None:
+    assert _curve_fit_score(cmc, counts) == 0.5
 
 
-def test_type_match_score_subtype_match() -> None:
-    row = _make_type_row(["Creature"], ["Elf", "Druid"])
-    tf = TypeFilter(card_types=[], subtypes=["Elf"])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+def test_curve_fit_rewards_missing_buckets_and_caps_expensive_spells() -> None:
+    assert _curve_fit_score(Decimal("2"), {3: 10, 4: 10}) > 0.5
+    assert _curve_fit_score(Decimal("3"), {3: 20, 2: 5, 4: 5}) < 0.5
+    assert _curve_fit_score(Decimal("8"), {}) == _curve_fit_score(Decimal("6"), {})
 
 
-def test_type_match_score_match_all_categories_excludes_partial() -> None:
-    """Match-all-categories: Creature + Equipment requires both categories to hit."""
-    creature_only = _make_type_row(["Creature"], ["Human"])
-    artifact_equipment = _make_type_row(["Artifact"], ["Equipment"])
-    creature_equipment = _make_type_row(["Artifact", "Creature"], ["Equipment"])
-    tf = TypeFilter(
-        card_types=["Creature"],
-        subtypes=["Equipment"],
-        match_all_categories=True,
+def test_source_filter_uses_exact_oracle_identity_and_excluded_card_ids() -> None:
+    rows = [_row(_A, tags=[str(_A)]), _row(_B, tags=[str(_B)]), _row(_C)]
+    assert _filter_source_rows(rows, str(_A), None) == [rows[0]]
+    assert _filter_source_rows(rows, None, frozenset({_A})) == rows[1:]
+    assert _filter_source_rows(rows, str(_A), frozenset({_A})) == []
+    assert _filter_source_rows(rows, None, None) == rows
+
+
+@pytest.mark.parametrize("stage", [None, "theme", "ramp", "draw", "interaction"])
+def test_nonland_stages_do_not_infer_functional_roles(stage: str | None) -> None:
+    rows = [_row(_A, tags=[str(_A)]), _row(_B)]
+    assert _filter_rows_by_stage(rows, stage) == rows
+
+
+def test_land_stage_requires_a_printed_land_type() -> None:
+    land = _row(_A, type_line="Basic Land — Forest")
+    assert _filter_rows_by_stage([land, _row(_B)], "lands") == [land]
+
+
+def test_representation_scores_source_tags_types_subtypes_and_printed_keywords() -> None:
+    row = _row(tags=[str(_A)], card_types=["Artifact"], subtypes=["Equipment"], keywords=["Flying"])
+    query = RepresentationQuery(
+        tags=[str(_A)], card_types=["Artifact"], subtypes=["Equipment"], keywords=["flying"]
     )
-    assert _type_match_score(creature_only, tf) == 0.0  # type: ignore[arg-type]
-    assert _type_match_score(artifact_equipment, tf) == 0.0  # type: ignore[arg-type]
-    assert _type_match_score(creature_equipment, tf) == 1.0  # type: ignore[arg-type]
+    assert _representation_match_score(row, query) == 1.0
+    assert _representation_match_score(row, RepresentationQuery()) == 0.0
+    partial = RepresentationQuery(tags=[str(_A)], card_types=["Creature"])
+    assert _representation_match_score(row, partial) == 0.5
 
 
-def test_type_match_score_match_all_or_within_category() -> None:
-    """Multiple subtypes act as OR within the subtypes category."""
-    row_equipment = _make_type_row(["Artifact"], ["Equipment"])
-    row_aura = _make_type_row(["Enchantment"], ["Aura"])
-    row_neither = _make_type_row(["Creature"], ["Human"])
-    tf = TypeFilter(
-        card_types=[],
-        subtypes=["Equipment", "Aura"],
-        match_all_categories=True,
+def test_representation_signals_are_idempotent_and_do_not_include_nonmatches() -> None:
+    rows = {_A: _row(_A, tags=[str(_A)]), _B: _row(_B, tags=[str(_B)])}
+    signals: dict[UUID, list[str]] = {}
+    query = RepresentationQuery(tags=[str(_A)])
+    _annotate_representation_signals(signals, rows, query)
+    _annotate_representation_signals(signals, rows, query)
+    assert signals == {_A: ["representation"]}
+
+
+@pytest.mark.parametrize("model", [TypeFilter, RepresentationQuery])
+def test_query_models_have_no_retired_global_label_dimensions(model) -> None:
+    names = {field.name for field in fields(model)}
+    assert not names & {"hub_tags", "mtgjson_tags", "traits", "token_types"}
+
+
+def test_weighted_scoring_rewards_popularity_without_mutating_inputs() -> None:
+    rows = {_A: _row(_A, edhrec_rank=10), _B: _row(_B, edhrec_rank=100)}
+    ids = [_A, _B, _C]
+    overlaps = {_A: 1, _B: 1}
+    fts = {_B}
+    before = deepcopy((ids, overlaps, fts, rows))
+    scores = _compute_weighted_scores(
+        ids,
+        tag_overlaps=overlaps,
+        fts_set=fts,
+        cards_by_id=rows,
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
     )
-    assert _type_match_score(row_equipment, tf) > 0  # type: ignore[arg-type]
-    assert _type_match_score(row_aura, tf) > 0  # type: ignore[arg-type]
-    assert _type_match_score(row_neither, tf) == 0.0  # type: ignore[arg-type]
+    assert _C not in scores
+    assert all(0 <= score <= 1 for score in scores.values())
+    assert (ids, overlaps, fts, rows) == before
+    popular = _compute_weighted_scores(
+        ids,
+        tag_overlaps={},
+        fts_set=set(),
+        cards_by_id=rows,
+        commander_color_identity=["G", "B"],
+        deck_cmc_counts=None,
+    )
+    assert popular[_A] > popular[_B]
 
 
-def test_type_match_score_match_all_off_keeps_or_semantics() -> None:
-    """Default match_all_categories=False preserves additive across-category scoring."""
-    row = _make_type_row(["Creature"], ["Human"])
-    tf = TypeFilter(card_types=["Artifact"], subtypes=["Human"])
-    # 1 match (Human) of 2 requested categories' terms = 0.5; survives without strict.
-    assert _type_match_score(row, tf) == 0.5  # type: ignore[arg-type]
-
-
-# ── _compute_weighted_scores with type_filter ─────────────────────────────────
-
-
-def test_weighted_score_type_filter_boosts_matching_card() -> None:
-    rows = {
-        _A: _record({**_make_type_row(["Artifact"], []), "id": _A}),
-        _B: _record({**_make_type_row(["Creature"], ["Human"]), "id": _B}),
-    }
-    tf = TypeFilter(card_types=["Artifact"], subtypes=[])
+@pytest.mark.parametrize("signal", ["fts", "representation", "type"])
+def test_weighted_scoring_rewards_matching_source_facts(signal: str) -> None:
+    rows = {_A: _row(_A, tags=[str(_A)]), _B: _row(_B)}
+    if signal == "type":
+        rows[_A] = _row(_A, card_types=["Artifact"])
     scores = _compute_weighted_scores(
         [_A, _B],
         tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,  # type: ignore[arg-type]
+        fts_set={_A} if signal == "fts" else set(),
+        cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        type_filter=tf,
+        representation_query=RepresentationQuery(tags=[str(_A)])
+        if signal == "representation"
+        else None,
+        type_filter=TypeFilter(card_types=["Artifact"], subtypes=[]) if signal == "type" else None,
     )
     assert scores[_A] > scores[_B]
 
 
-def test_weighted_score_no_type_filter_unchanged_weights() -> None:
-    rows = {_A: _make_row(_A, edhrec_rank=10), _B: _make_row(_B, edhrec_rank=100)}
-    scores_no_filter = _compute_weighted_scores(
+@pytest.mark.parametrize("strict,expected_zero", [(True, True), (False, False)])
+def test_strict_type_filter_zeroes_only_nonmatching_cards(
+    strict: bool, expected_zero: bool
+) -> None:
+    rows = {_A: _row(_A, keywords=["Flying"]), _B: _row(_B, card_types=["Enchantment"])}
+    scores = _compute_weighted_scores(
         [_A, _B],
         tag_overlaps={},
         fts_set=set(),
         cards_by_id=rows,
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        type_filter=None,
+        type_filter=TypeFilter(
+            card_types=["Creature"], subtypes=[], keywords=["Flying"], strict=strict
+        ),
     )
-    assert scores_no_filter[_A] > scores_no_filter[_B]
+    assert scores[_A] > 0
+    assert (scores[_B] == 0) is expected_zero
 
 
-# ── _type_match_score with keywords + traits ──────────────────────────────────
-
-
-def test_type_match_score_keyword_match() -> None:
-    row = _make_type_row(["Creature"], [], keywords=["Flying", "Vigilance"])
-    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying"])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
-
-
-def test_type_match_score_keyword_no_match() -> None:
-    row = _make_type_row(["Creature"], [], keywords=["Vigilance"])
-    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying"])
-    assert _type_match_score(row, tf) == 0.0  # type: ignore[arg-type]
-
-
-def test_type_match_score_trait_match() -> None:
-    row = _make_type_row(["Creature"], [], traits=["etb", "evasion"])
-    tf = TypeFilter(card_types=[], subtypes=[], traits=["etb"])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
-
-
-def test_type_match_score_keyword_case_insensitive() -> None:
-    row = _make_type_row(["Creature"], [], keywords=["Flying"])
-    tf = TypeFilter(card_types=[], subtypes=[], keywords=["flying"])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
-
-
-def test_type_match_score_mixed_partial() -> None:
-    # Request: flying + deathtouch; card has only flying → 0.5
-    row = _make_type_row(["Creature"], [], keywords=["Flying"])
-    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"])
-    assert _type_match_score(row, tf) == 0.5  # type: ignore[arg-type]
-
-
-# ── parse_query_types: keywords + traits + strict ─────────────────────────────
-
-
-def test_parse_query_types_detects_keyword() -> None:
-    result = parse_query_types("flying creatures")
-    assert result is not None
-    assert "Flying" in result.keywords
-    assert "Creature" in result.card_types
-
-
-def test_parse_query_types_flying_deathtouch_strict() -> None:
-    result = parse_query_types("flying deathtouch creatures")
-    assert result is not None
-    assert "Flying" in result.keywords
-    assert "Deathtouch" in result.keywords
-    assert "Creature" in result.card_types
-    assert result.strict is True
-
-
-def test_parse_query_types_artifact_ramp_not_strict() -> None:
-    # Only 1 filter dimension (card_types) → not strict
-    result = parse_query_types("artifact ramp")
-    assert result is not None
-    assert "Artifact" in result.card_types
-    assert result.strict is False
-
-
-def test_parse_query_types_detects_etb_trait() -> None:
-    result = parse_query_types("etb creatures")
-    assert result is not None
-    assert "etb" in result.traits
-    assert "Creature" in result.card_types
-
-
-def test_parse_query_types_etb_creature_strict() -> None:
-    result = parse_query_types("etb creatures")
-    assert result is not None
-    assert result.strict is True
-
-
-def test_parse_query_types_evasion_trait() -> None:
-    result = parse_query_types("evasive threats")
-    assert result is not None
-    assert "evasion" in result.traits
-
-
-def test_parse_query_types_first_strike_phrase() -> None:
-    result = parse_query_types("first strike creatures")
-    assert result is not None
-    assert "First Strike" in result.keywords
-
-
-def test_parse_query_types_double_strike_phrase() -> None:
-    result = parse_query_types("double strike warriors")
-    assert result is not None
-    assert "Double Strike" in result.keywords
-    assert "Warrior" in result.subtypes
-    assert result.strict is True
-
-
-# ── strict mode filtering ─────────────────────────────────────────────────────
-
-
-def test_strict_mode_zeroes_out_zero_match_cards() -> None:
-    rows = {
-        _A: _record({**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A}),
-        _B: _record({**_make_type_row(["Enchantment"], []), "id": _B}),  # zero match
-    }
-    tf = TypeFilter(card_types=["Creature"], subtypes=[], keywords=["Flying"], strict=True)
-    scores = _compute_weighted_scores(
-        [_A, _B],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,  # type: ignore[arg-type]
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        type_filter=tf,
-    )
-    assert scores[_B] == 0.0
-    assert scores[_A] > 0.0
-
-
-def test_strict_mode_partial_match_not_zeroed() -> None:
-    # Flying creature but no deathtouch — partial match, not zeroed
-    rows = {
-        _A: _record({**_make_type_row(["Creature"], [], keywords=["Flying"]), "id": _A}),
-    }
-    tf = TypeFilter(card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"], strict=True)
+def test_strict_type_filter_keeps_partial_matches() -> None:
     scores = _compute_weighted_scores(
         [_A],
         tag_overlaps={},
         fts_set=set(),
-        cards_by_id=rows,  # type: ignore[arg-type]
+        cards_by_id={_A: _row(keywords=["Flying"])},
         commander_color_identity=["G", "B"],
         deck_cmc_counts=None,
-        type_filter=tf,
+        type_filter=TypeFilter(
+            card_types=[], subtypes=[], keywords=["Flying", "Deathtouch"], strict=True
+        ),
     )
-    assert scores[_A] > 0.0
+    assert scores[_A] > 0
 
 
-def test_non_strict_mode_zero_match_not_zeroed() -> None:
-    rows = {
-        _A: _record({**_make_type_row(["Enchantment"], []), "id": _A}),
-    }
-    tf = TypeFilter(card_types=["Creature"], subtypes=[], strict=False)
-    scores = _compute_weighted_scores(
-        [_A],
-        tag_overlaps={},
-        fts_set=set(),
-        cards_by_id=rows,  # type: ignore[arg-type]
-        commander_color_identity=["G", "B"],
-        deck_cmc_counts=None,
-        type_filter=tf,
+@pytest.mark.parametrize(
+    "query", ["", "ramp", "board wipe", "interaction", "voltron", "goblin tribal"]
+)
+def test_query_tags_do_not_infer_source_identities(query: str) -> None:
+    assert parse_query_tags(query) == []
+
+
+def test_query_tags_normalize_and_deduplicate_explicit_uuids() -> None:
+    assert parse_query_tags(f"{str(_A).upper()}, {str(_B)} {_A} ramp") == [str(_A), str(_B)]
+
+
+@pytest.mark.parametrize("stage", ["ramp", "draw", "interaction", "lands", "nonexistent_stage"])
+def test_stages_keep_query_text_but_do_not_infer_oracle_tags(stage: str) -> None:
+    text, tags = stage_retrieval_query(stage, "Squirrels and card draw")
+    assert "Squirrels and card draw" in text
+    assert tags == []
+    assert stage_retrieval_query(stage, None) == stage_retrieval_query(stage, "")
+
+
+def test_theme_stage_uses_only_explicit_source_tag_ids_from_description() -> None:
+    text, tags = stage_retrieval_query("theme", f"voltron equipment {_A}")
+    assert "voltron equipment" in text
+    assert tags == [str(_A)]
+    assert stage_retrieval_query("theme", None)[1] == []
+
+
+@pytest.mark.parametrize(
+    "query,types,subtypes,keywords,strict",
+    [
+        ("artifact ramp", ["Artifact"], [], [], False),
+        ("ARTIFACT removal", ["Artifact"], [], [], False),
+        ("elf mana dorks", [], ["Elf"], [], False),
+        ("elves ramp", [], ["Elf"], [], False),
+        ("artifact creature goblin", ["Artifact", "Creature"], ["Goblin"], [], True),
+        ("flying deathtouch creatures", ["Creature"], [], ["Flying", "Deathtouch"], True),
+        ("first strike creatures", ["Creature"], [], ["First Strike"], True),
+        ("double strike warriors", [], ["Warrior"], ["Double Strike"], True),
+        ("etb creatures", ["Creature"], [], [], False),
+        ("treasure artifact", ["Artifact"], ["Treasure"], [], True),
+        ("food token synergy", [], ["Food"], [], False),
+        ("clue investigate", [], ["Clue"], ["Investigate"], True),
+        ("treasure treasure synergy", [], ["Treasure"], [], False),
+        ("map token explore", [], [], ["Explore"], False),
+        ("scry", [], [], ["Scry"], False),
+        ("surveil", [], [], ["Surveil"], False),
+        ("discover", [], [], ["Discover"], False),
+        ("flashback", [], [], ["Flashback"], False),
+        ("proliferate", [], [], ["Proliferate"], False),
+    ],
+)
+def test_query_types_use_printed_types_subtypes_and_keywords(
+    query: str, types: list[str], subtypes: list[str], keywords: list[str], strict: bool
+) -> None:
+    result = parse_query_types(query)
+    assert result == TypeFilter(types, subtypes, keywords, strict)
+
+
+@pytest.mark.parametrize(
+    "query", ["", "ramp spells", "evasive threats", "blood", "powerstone", "incubator"]
+)
+def test_query_types_do_not_recreate_retired_traits_or_token_labels(query: str) -> None:
+    assert parse_query_types(query) is None
+
+
+@pytest.mark.parametrize(
+    "types,subtypes,keywords,query,expected",
+    [
+        (["Artifact"], [], [], TypeFilter(["Artifact"], []), 1.0),
+        (["Creature"], ["Human"], [], TypeFilter(["Artifact"], []), 0.0),
+        (["Creature"], ["Human"], [], TypeFilter([], ["Human", "Monk"]), 0.5),
+        (["Creature"], ["Elf", "Druid"], [], TypeFilter([], ["Elf"]), 1.0),
+        (["Creature"], [], ["Flying"], TypeFilter([], [], ["flying"]), 1.0),
+        (["Creature"], [], ["Flying"], TypeFilter([], [], ["Flying", "Deathtouch"]), 0.5),
+        (["Creature"], ["Human"], [], TypeFilter(["Artifact"], ["Human"]), 0.5),
+        (["Artifact"], [], [], TypeFilter([], []), 0.0),
+    ],
+)
+def test_type_match_scores_fraction_of_requested_printed_facts(
+    types: list[str], subtypes: list[str], keywords: list[str], query: TypeFilter, expected: float
+) -> None:
+    assert (
+        _type_match_score(_row(card_types=types, subtypes=subtypes, keywords=keywords), query)
+        == expected
     )
-    assert scores[_A] > 0.0
 
 
-# ── parse_query_types: token_types ────────────────────────────────────────────
+def test_match_all_categories_requires_every_dimension_but_allows_or_within_one() -> None:
+    query = TypeFilter(["Creature"], ["Equipment"], match_all_categories=True)
+    assert _type_match_score(_row(), query) == 0.0
+    assert _type_match_score(_row(card_types=["Artifact"], subtypes=["Equipment"]), query) == 0.0
+    hybrid = _row(card_types=["Artifact", "Creature"], subtypes=["Equipment"])
+    assert _type_match_score(hybrid, query) == 1.0
+    either = TypeFilter([], ["Equipment", "Aura"], match_all_categories=True)
+    assert _type_match_score(hybrid, either) > 0
+    assert _type_match_score(_row(subtypes=["Aura"]), either) > 0
+    assert _type_match_score(_row(), either) == 0.0
 
 
-def test_parse_query_types_detects_treasure() -> None:
-    result = parse_query_types("treasure producers")
-    assert result is not None
-    assert "treasure" in result.token_types
+async def test_empty_collection_short_circuits_without_database_io() -> None:
+    result = await retrieve_candidates(
+        cast(asyncpg.Pool, object()),
+        "ramp",
+        [],
+        ["G"],
+        [],
+        collection_filter=CollectionFilter(owned_card_ids=frozenset()),
+    )
+    assert result == []
 
 
-def test_parse_query_types_detects_food() -> None:
-    result = parse_query_types("food token synergy")
-    assert result is not None
-    assert "food" in result.token_types
-
-
-def test_parse_query_types_detects_clue() -> None:
-    result = parse_query_types("clue investigate")
-    assert result is not None
-    assert "clue" in result.token_types
-
-
-def test_parse_query_types_detects_blood() -> None:
-    result = parse_query_types("blood token cards")
-    assert result is not None
-    assert "blood" in result.token_types
-
-
-def test_parse_query_types_detects_powerstone() -> None:
-    result = parse_query_types("powerstone ramp")
-    assert result is not None
-    assert "powerstone" in result.token_types
-
-
-def test_parse_query_types_detects_map() -> None:
-    result = parse_query_types("map token explore")
-    assert result is not None
-    assert "map" in result.token_types
-
-
-def test_parse_query_types_detects_incubator() -> None:
-    result = parse_query_types("incubator transform")
-    assert result is not None
-    assert "incubator" in result.token_types
-
-
-def test_parse_query_types_token_type_strict_with_card_type() -> None:
-    result = parse_query_types("treasure artifact")
-    assert result is not None
-    assert "treasure" in result.token_types
-    assert result.strict is True
-
-
-def test_parse_query_types_token_type_no_duplicates() -> None:
-    result = parse_query_types("treasure treasure synergy")
-    assert result is not None
-    assert result.token_types.count("treasure") == 1
-
-
-# ── parse_query_types: extended keywords ──────────────────────────────────────
-
-
-def test_parse_query_types_scry() -> None:
-    result = parse_query_types("cards with scry")
-    assert result is not None
-    assert "Scry" in result.keywords
-
-
-def test_parse_query_types_surveil() -> None:
-    result = parse_query_types("surveil cards")
-    assert result is not None
-    assert "Surveil" in result.keywords
-
-
-def test_parse_query_types_discover() -> None:
-    result = parse_query_types("discover synergy")
-    assert result is not None
-    assert "Discover" in result.keywords
-
-
-def test_parse_query_types_flashback() -> None:
-    result = parse_query_types("flashback spells")
-    assert result is not None
-    assert "Flashback" in result.keywords
-
-
-def test_parse_query_types_proliferate() -> None:
-    result = parse_query_types("proliferate counters")
-    assert result is not None
-    assert "Proliferate" in result.keywords
-
-
-# ── _type_match_score with token_types ────────────────────────────────────────
-
-
-def test_type_match_score_token_type_full_match() -> None:
-    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
-    tf = TypeFilter(card_types=[], subtypes=[], token_types=["treasure"])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
-
-
-def test_type_match_score_token_type_no_match() -> None:
-    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
-    tf = TypeFilter(card_types=[], subtypes=[], token_types=["food"])
-    assert _type_match_score(row, tf) == 0.0  # type: ignore[arg-type]
-
-
-def test_type_match_score_token_type_partial() -> None:
-    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
-    tf = TypeFilter(card_types=[], subtypes=[], token_types=["treasure", "food"])
-    assert _type_match_score(row, tf) == 0.5  # type: ignore[arg-type]
-
-
-def test_type_match_score_token_type_with_card_type() -> None:
-    row = _make_type_row(["Artifact"], [], token_types=["treasure"])
-    tf = TypeFilter(card_types=["Artifact"], subtypes=[], token_types=["treasure"])
-    assert _type_match_score(row, tf) == 1.0  # type: ignore[arg-type]
+async def test_missing_or_invalid_source_tag_queries_do_not_access_the_database() -> None:
+    pool = cast(asyncpg.Pool, object())
+    assert await _search_tags(pool, [], ["G"], []) == []
+    assert await _search_tags(pool, ["ramp"], ["G"], []) == []
+    assert await _fetch_excluded_source_card_ids(pool, frozenset(), ["G"]) is None

@@ -312,18 +312,6 @@ async def import_parsed_entries(
     )
 
 
-# Stage-default tags from old databases that appear in nearly every deck.
-# Exclude them from import suggestions; new batch tagging emits MTGJSON tags.
-_GENERIC_STAGE_TAGS: frozenset[str] = frozenset(
-    {
-        "ramp",
-        "draw",
-        "interaction",
-        "tutor",
-        "card_selection",
-        "fast_mana",
-    }
-)
 _MAX_SUGGESTED_KEYWORD_TAGS = 6
 _MIN_TAG_SUPPORT = 2
 
@@ -332,10 +320,9 @@ async def _aggregate_keyword_tags(
     pool: asyncpg.Pool,
     resolved_cards: list[tuple[str, int, str | None]],
 ) -> list[str]:
-    """Compute the top Moxfield hub theme tags across an imported deck's cards.
+    """Compute direct Scryfall Oracle-tag UUIDs across imported cards.
 
-    Counts tag frequencies on the imported cards, drops old generic stage tags,
-    and returns the top ``_MAX_SUGGESTED_KEYWORD_TAGS``.
+    Counts direct source memberships and returns the most common identities.
 
     Args:
         pool: asyncpg connection pool.
@@ -343,7 +330,7 @@ async def _aggregate_keyword_tags(
             produced by ``_resolve_non_commanders``.
 
     Returns:
-        Up to ``_MAX_SUGGESTED_KEYWORD_TAGS`` hub tag names sorted by
+        Up to ``_MAX_SUGGESTED_KEYWORD_TAGS`` source UUIDs sorted by
         frequency descending.
     """
     if not resolved_cards:
@@ -352,19 +339,18 @@ async def _aggregate_keyword_tags(
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT tag, count(*)::int AS cnt
-            FROM cards, unnest(hub_tags) AS tag
+            SELECT membership.tag_id::text AS tag, count(*)::int AS cnt
+            FROM cards
+            JOIN scryfall_tag_memberships membership ON membership.oracle_id = cards.oracle_id
             WHERE scryfall_id = ANY($1::uuid[])
-            GROUP BY tag
+            GROUP BY membership.tag_id
             HAVING count(*) >= $2
             ORDER BY cnt DESC, tag ASC
             """,
             scryfall_ids,
             _MIN_TAG_SUPPORT,
         )
-    return [r["tag"] for r in rows if r["tag"] not in _GENERIC_STAGE_TAGS][
-        :_MAX_SUGGESTED_KEYWORD_TAGS
-    ]
+    return [r["tag"] for r in rows][:_MAX_SUGGESTED_KEYWORD_TAGS]
 
 
 def _aggregate_resolved_cards(

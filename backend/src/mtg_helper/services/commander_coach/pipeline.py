@@ -10,7 +10,7 @@ from mtg_helper.models.ai import (
     CoachSynergyPackage,
     CoachSynergyReport,
 )
-from mtg_helper.models.decks import DeckCardItem, DeckDetailResponse
+from mtg_helper.models.decks import DeckDetailResponse
 from mtg_helper.services import mana_base_service, mana_curve_service
 
 
@@ -90,22 +90,23 @@ def analyze_role_budget(deck: DeckDetailResponse) -> CoachRoleBudgetReport:
 
 
 def analyze_synergy(deck: DeckDetailResponse) -> CoachSynergyReport:
-    """Build deterministic package density for common Commander archetypes."""
-    packages = _package_specs(deck)
-    reports = [_package_report(deck, name, terms, target) for name, terms, target in packages]
+    """Report direct membership in the deck's selected Oracle tags."""
+    reports = _selected_tag_reports(deck)
     weak = [item.package for item in reports if item.status == "low"]
     summary = "; ".join(f"{item.package}={item.count}" for item in reports)
     return CoachSynergyReport(summary=summary, packages=reports, weak_packages=weak)
 
 
 def _role_budget_counts(deck: DeckDetailResponse) -> dict[str, int]:
+    """Count explicitly assigned personal categories without classifying cards."""
     counts = {"ramp": 0, "draw": 0, "interaction": 0, "protection": 0, "engines": 0, "payoffs": 0}
     for card in deck.cards:
         if "Land" in (card.type_line or ""):
             continue
-        text = _search_blob(card)
         qty = max(1, card.quantity)
-        for role in _roles_for_text(text):
+        for role in set(card.categories):
+            if role not in counts:
+                continue
             counts[role] += qty
     return counts
 
@@ -128,76 +129,40 @@ def _role_status(role: str, count: int, bounds: tuple[int, int]) -> CoachRoleSta
     )
 
 
-def _roles_for_text(text: str) -> set[str]:
-    roles: set[str] = set()
-    if _has_any(text, ("ramp", "add {", "add one mana", "search your library for a land")):
-        roles.add("ramp")
-    if _has_any(text, ("draw", "return target", "from your graveyard", "regrowth")):
-        roles.add("draw")
-    if _has_any(text, ("destroy", "exile", "counter target", "fight", "-x/-x")):
-        roles.add("interaction")
-    if _has_any(text, ("hexproof", "indestructible", "protection", "phase out")):
-        roles.add("protection")
-    if _has_any(text, ("whenever", "token", "tokens", "sacrifice", "x spell", "hydra")):
-        roles.add("engines")
-    if _has_any(text, ("double", "drain", "loses", "trample", "can't be blocked", "win")):
-        roles.add("payoffs")
-    return roles
+def _selected_tag_reports(deck: DeckDetailResponse) -> list[CoachSynergyPackage]:
+    """Count cards directly assigned to each selected Oracle tag."""
+    selected = set(deck.archetype_tags)
+    if not selected:
+        return []
+    labels = {
+        tag["id"]: tag.get("label", tag["id"])
+        for card in deck.cards
+        for tag in card.oracle_tags
+        if "id" in tag
+    }
+    return [
+        _selected_tag_report(deck, tag_id, labels.get(tag_id, tag_id))
+        for tag_id in sorted(selected)
+    ]
 
 
-def _package_specs(deck: DeckDetailResponse) -> list[tuple[str, tuple[str, ...], int]]:
-    blob = " ".join(deck.archetype_tags or []).lower()
-    if "food" in blob or "squirrel" in blob:
-        return [
-            ("food_generation", ("food",), 8),
-            ("squirrel_generation", ("squirrel",), 6),
-            ("sacrifice", ("sacrifice",), 6),
-            ("death_payoffs", ("dies", "loses life", "drain"), 5),
-            ("token_payoffs", ("token", "tokens", "creatures you control"), 5),
-        ]
-    if "hydra" in blob or "x_spells" in blob:
-        return [
-            ("x_spells", ("{x}", "x spell", "mana value x"), 10),
-            ("hydras", ("hydra",), 6),
-            ("counter_scaling", ("+1/+1 counter", "counters"), 5),
-            ("card_advantage", ("draw", "return", "graveyard"), 7),
-            ("interaction", ("destroy", "exile", "counter target"), 7),
-        ]
-    return [("theme_cards", tuple(deck.archetype_tags or []), 12)]
-
-
-def _package_report(
+def _selected_tag_report(
     deck: DeckDetailResponse,
-    name: str,
-    terms: tuple[str, ...],
-    target: int,
+    tag_id: str,
+    label: str,
 ) -> CoachSynergyPackage:
+    """Build one direct Oracle-tag membership report."""
     examples: list[str] = []
     count = 0
     for card in deck.cards:
         if "Land" in (card.type_line or ""):
             continue
-        if _has_any(_search_blob(card), terms):
+        card_tag_ids = {tag["id"] for tag in card.oracle_tags if "id" in tag}
+        if tag_id in card_tag_ids:
             count += max(1, card.quantity)
             examples.append(card.name)
-    status = "low" if count < target else "high" if count > target * 2 else "ok"
-    return CoachSynergyPackage(package=name, count=count, examples=examples[:5], status=status)
-
-
-def _search_blob(card: DeckCardItem) -> str:
-    return " ".join(
-        [
-            card.name,
-            card.type_line or "",
-            card.oracle_text or "",
-            " ".join(card.tags or []),
-            " ".join(card.categories or []),
-        ]
-    ).lower()
-
-
-def _has_any(text: str, terms: tuple[str, ...]) -> bool:
-    return any(term and term.lower() in text for term in terms)
+    status = "low" if count == 0 else "ok"
+    return CoachSynergyPackage(package=label, count=count, examples=examples[:5], status=status)
 
 
 def _color_issue(color: Any) -> str:
@@ -235,9 +200,6 @@ def _early_ramp_count(deck: DeckDetailResponse) -> int:
     for card in deck.cards:
         if "Land" in (card.type_line or "") or float(card.cmc or 0) > 2:
             continue
-        tags = set(card.tags or []) | set(card.categories or []) | set(card.qualifying_stages or [])
-        text = (card.oracle_text or "").lower()
-        finds_land = "search your library for a basic land" in text
-        if "ramp" in tags or "add one mana" in text or finds_land:
+        if "ramp" in set(card.categories or []):
             count += max(1, card.quantity)
     return count

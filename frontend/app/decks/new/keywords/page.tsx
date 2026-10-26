@@ -54,7 +54,7 @@ export default function KeywordMenuPage() {
       </button>
       <PageHeader
         title="Pick keywords"
-        subtitle="Pick the Moxfield hub themes your deck cares about. Suggestions in the build wizard will favour cards that share these tags."
+        subtitle="Pick Scryfall Oracle tags and printed keywords your deck cares about."
       />
 
       <div className="flex flex-col gap-6">
@@ -102,7 +102,7 @@ export default function KeywordMenuPage() {
         </section>
 
         <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="mb-3 font-semibold text-white">Moxfield hub themes</h2>
+          <h2 className="mb-3 font-semibold text-white">Scryfall source selections</h2>
           <ArchetypeChipPicker value={archetypeTags} onChange={setArchetypeTags} />
         </section>
 

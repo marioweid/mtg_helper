@@ -29,12 +29,8 @@ from mtg_helper.routers import (
     tags,
 )
 from mtg_helper.services import (
-    archidekt_tag_service,
-    moxfield_hub_service,
-    mtgjson,
     oracle_duplicate_repair_service,
     scryfall,
-    theme_service,
 )
 from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.new_cards.repository import NewCardsError
@@ -87,37 +83,6 @@ async def _run_startup_maintenance(app: FastAPI) -> None:
         await oracle_duplicate_repair_service.repair_active_decks(app.state.db_pool)
     except Exception:
         _log.exception("Oracle card identity repair failed; it will retry on next startup")
-
-    keyword_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM mtgjson_keywords")
-    if keyword_count == 0:
-        _log.info("MTGJSON keyword catalog is empty - running initial keyword sync")
-        try:
-            result = await mtgjson.sync_keywords(app.state.db_pool)
-            _log.info("MTGJSON keyword sync complete: %s", result)
-        except Exception:
-            _log.exception("MTGJSON keyword sync failed on startup; continuing with fallback data")
-
-    await _ensure_theme_catalogs(app)
-
-
-async def _ensure_theme_catalogs(app: FastAPI) -> None:
-    """Populate empty source catalogs and seed conservative shared groups."""
-    hub_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM moxfield_hubs")
-    if hub_count == 0:
-        _log.info("Moxfield hub catalog is empty - running initial hub sync")
-        try:
-            await moxfield_hub_service.sync_hubs(app.state.db_pool)
-        except Exception:
-            _log.exception("Moxfield hub sync failed on startup; continuing without hub data")
-
-    archidekt_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM archidekt_tags")
-    if archidekt_count == 0:
-        _log.info("Archidekt tag catalog is empty - running initial catalog sync")
-        try:
-            await archidekt_tag_service.sync_tags(app.state.db_pool)
-        except Exception:
-            _log.exception("Archidekt tag sync failed on startup; continuing without tag data")
-    await theme_service.seed_groups(app.state.db_pool)
 
 
 app = FastAPI(title="MTG Helper API", version="0.1.0", lifespan=lifespan)

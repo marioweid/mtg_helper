@@ -122,7 +122,7 @@ async def _value(value: object) -> object:
 
 async def _invoke_suggest(monkeypatch: pytest.MonkeyPatch) -> object:
     monkeypatch.setattr(
-        commander_suggestor_agent, "load_theme_prompt_catalog", lambda _: _value("")
+        commander_suggestor_agent, "load_oracle_tag_prompt_catalog", lambda _: _value("")
     )
     monkeypatch.setattr(
         commander_suggestor_agent, "load_keyword_prompt_catalog", lambda _: _value("")
@@ -163,8 +163,8 @@ async def _invoke_describe(monkeypatch: pytest.MonkeyPatch) -> object:
 
 async def _invoke_extract(monkeypatch: pytest.MonkeyPatch) -> object:
     _patch_card_lookup(monkeypatch, extract_agent)
-    monkeypatch.setattr(extract_agent, "load_theme_prompt_catalog", lambda _: _value(""))
-    monkeypatch.setattr(extract_agent, "load_theme_tags", lambda _: _value(set()))
+    monkeypatch.setattr(extract_agent, "load_oracle_tag_prompt_catalog", lambda _: _value(""))
+    monkeypatch.setattr(extract_agent, "require_tag_ids", lambda *_: _value(None))
     return await extract_agent.extract_turn(
         cast(asyncpg.Pool, None), uuid4(), None, 3, [], message="brew"
     )

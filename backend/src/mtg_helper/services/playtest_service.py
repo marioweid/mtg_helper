@@ -77,9 +77,6 @@ _CONDITIONAL_UNTAPPED_RE = re.compile(
 )
 _ALL_COLORS_NON_C: tuple[str, ...] = ("W", "U", "B", "R", "G")
 
-_INTERACTION_TAGS: frozenset[str] = frozenset({"interaction"})
-_SELECTION_TAG = "card_selection"
-_TUTOR_TAG = "tutor"
 
 # Mana-producer detection: parse "Add ..." clauses from non-land oracle text.
 # Captures pure mana-symbol additions (Sol Ring, Llanowar) and any-color
@@ -295,10 +292,10 @@ def parse_cost(mana_cost: str | None) -> ParsedCost:
 
 def _parse_draw_count(oracle_text: str | None) -> int:
     if not oracle_text:
-        return 1
+        return 0
     match = _DRAW_RE.search(oracle_text)
     if not match:
-        return 1
+        return 0
     token = match.group(1).lower()
     if token.isdigit():
         return min(int(token), _DRAW_MAX)
@@ -372,8 +369,6 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
     produces = _land_produces(card) if is_land else ()
     cost = None if is_land else parse_cost(card.mana_cost)
     cmc = int(card.cmc) if card.cmc is not None else 0
-    stages = card.qualifying_stages or []
-    tags = set(card.tags or [])
     is_creature = not is_land and "Creature" in type_line
     production = None if is_land else _parse_mana_production(card)
     if production is not None:
@@ -382,15 +377,15 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
         mana_colors = production.colors
         ramp_produces: tuple[str, ...] = ()
     else:
-        is_ramp = not is_land and "ramp" in stages
+        is_ramp = False
         mana_count = 0
         mana_colors = ()
         ramp_produces = _ramp_produces_for(card) if is_ramp else ()
-    is_draw = not is_land and "draw" in stages
-    draw_count = _parse_draw_count(card.oracle_text) if is_draw else 0
-    is_interaction = not is_land and bool(tags & _INTERACTION_TAGS)
-    is_selection = not is_land and _SELECTION_TAG in tags
-    is_tutor = not is_land and _TUTOR_TAG in tags
+    draw_count = _parse_draw_count(card.oracle_text) if not is_land else 0
+    is_draw = draw_count > 0
+    is_interaction = False
+    is_selection = False
+    is_tutor = False
     enters_tapped = is_land and _is_enters_tapped(card)
     return SimCard(
         name=card.name,
@@ -414,16 +409,15 @@ def _to_sim_card(card: DeckCardItem) -> SimCard:
 
 def _summary_to_sim_card(summary: CommanderCardSummary) -> SimCard:
     """Build a sim card from a ``CommanderCardSummary``. Mirrors ``_to_sim_card``
-    but reads tags directly from the summary (no ``qualifying_stages`` plumbing).
+    from its Scryfall card facts.
     """
     type_line = summary.type_line or ""
     is_land = "Land" in type_line
     cost = None if is_land else parse_cost(summary.mana_cost)
     cmc = int(summary.cmc) if summary.cmc is not None else 0
-    tags = set(summary.tags or [])
     is_creature = not is_land and "Creature" in type_line
-    is_draw = not is_land and "draw" in tags
-    draw_count = _parse_draw_count(summary.oracle_text) if is_draw else 0
+    draw_count = _parse_draw_count(summary.oracle_text) if not is_land else 0
+    is_draw = draw_count > 0
     identity = tuple(c for c in (summary.color_identity or []) if c in _COLORS)
     production = None if is_land else _parse_mana_production_from(summary.oracle_text, type_line)
     if production is not None:
@@ -432,13 +426,13 @@ def _summary_to_sim_card(summary: CommanderCardSummary) -> SimCard:
         mana_colors = production.colors
         ramp_produces: tuple[str, ...] = ()
     else:
-        is_ramp = not is_land and "ramp" in tags
+        is_ramp = False
         mana_count = 0
         mana_colors = ()
         ramp_produces = (identity if identity else ("C",)) if is_ramp else ()
-    is_interaction = not is_land and bool(tags & _INTERACTION_TAGS)
-    is_selection = not is_land and _SELECTION_TAG in tags
-    is_tutor = not is_land and _TUTOR_TAG in tags
+    is_interaction = False
+    is_selection = False
+    is_tutor = False
     return SimCard(
         name=summary.name,
         cmc=cmc,
