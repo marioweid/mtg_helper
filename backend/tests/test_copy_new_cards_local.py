@@ -79,6 +79,11 @@ def test_rejects_encoded_or_routed_copy_targets() -> None:
             "postgresql://user:secret@localhost:5432/source",
             "postgresql://user:secret@localhost:5432/local_copy?options=-c%20search_path%3Dpublic",
         )
+    with pytest.raises(ValueError, match="must not identify"):
+        validate_target(
+            "postgresql://user:secret@localhost.:5432/source",
+            "postgresql://user:secret@127.0.0.1:5432/source",
+        )
 
 
 @pytest.mark.asyncio
@@ -146,15 +151,15 @@ async def test_copy_is_read_only_and_keeps_only_linked_owner_data(client, db_poo
         copied = await asyncpg.connect(target)
         try:
             assert counts["decks"] == 1
-            assert counts["collections"] == 1
-            assert counts["collection_cards"] == 1
             assert await copied.fetchval("SELECT count(*) FROM accounts") == 1
             assert await copied.fetchval("SELECT count(*) FROM decks") == 1
             assert await copied.fetchval("SELECT categories FROM deck_cards") == ["Mana"]
             assert await copied.fetchval("SELECT quantity FROM deck_card_plans") == 3
             assert await copied.fetchval("SELECT categories FROM deck_card_plans") == ["Ramp"]
-            assert await copied.fetchval("SELECT count(*) FROM collections") == 1
-            assert await copied.fetchval("SELECT count(*) FROM collection_cards") == 1
+            assert await copied.fetchval("SELECT count(*) FROM collections") == 0
+            assert await copied.fetchval("SELECT count(*) FROM collection_cards") == 0
+            assert await copied.fetchval("SELECT collection_id FROM deck_card_plans") is None
+            assert await copied.fetchval("SELECT suggestion_collection_ids FROM decks") == []
             assert await copied.fetchval("SELECT count(*) FROM new_card_assessments") == 0
             assert (
                 await copied.fetchval("SELECT last_error FROM new_card_runs WHERE singleton")
@@ -171,6 +176,46 @@ async def test_copy_is_read_only_and_keeps_only_linked_owner_data(client, db_poo
             == source_before
         )
     finally:
+        await _drop_target(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "ddl",
+    [
+        "CREATE FUNCTION marker() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+        "CREATE TYPE marker AS ENUM ('reserved')",
+    ],
+)
+async def test_copy_rejects_function_or_type_only_targets(client, db_pool, ddl) -> None:
+    await _seed_matching_generations(db_pool)
+    database, target = await _new_target()
+    conn = await asyncpg.connect(target)
+    try:
+        await conn.execute(ddl)
+        with pytest.raises(ValueError, match="empty"):
+            await copy_local(TEST_DB_URL, target, "default@test.local")
+        assert await conn.fetchval("SELECT to_regclass('public.accounts')") is None
+    finally:
+        await conn.close()
+        await _drop_target(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("routed", [False, True])
+async def test_alias_never_mutates_an_empty_source(routed) -> None:
+    database, target = await _new_target()
+    parts = urlsplit(target)
+    source = urlunsplit(parts._replace(netloc=parts.netloc.replace("127.0.0.1", "localhost.")))
+    if routed:
+        source = urlunsplit(parts._replace(path="", query=f"database={database}"))
+    conn = await asyncpg.connect(target)
+    try:
+        with pytest.raises(ValueError, match="source database"):
+            await copy_local(source, target, "default@test.local")
+        assert await conn.fetchval("SELECT to_regclass('public.accounts')") is None
+    finally:
+        await conn.close()
         await _drop_target(database)
 
 

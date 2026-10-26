@@ -334,6 +334,19 @@ async def test_ac03_completion_rechecks_new_card_guards(client, db_pool, batch, 
     )
 
 
+async def test_ac04_missing_partner_tags_is_not_a_complete_empty_result(client, db_pool) -> None:
+    deck_id = await _deck_with_sources(client, db_pool, partner=True)
+    await db_pool.execute(
+        "DELETE FROM scryfall_tag_memberships WHERE oracle_id = $1", DOCKSIDE_ORACLE_ID
+    )
+    response = await client.get(f"/api/v1/decks/{deck_id}/new-cards")
+    assert response.status_code == 200
+    result = response.json()["data"]
+    assert result["status"] == "unavailable"
+    assert result["matches"] == []
+    assert "tags" in result["error"].lower()
+
+
 async def test_ac04_next_read_uses_current_tags_and_reports_bad_source_state(
     client, db_pool
 ) -> None:

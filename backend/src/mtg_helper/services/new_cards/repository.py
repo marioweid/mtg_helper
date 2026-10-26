@@ -175,10 +175,12 @@ async def _commander_oracles(conn: asyncpg.Connection, ids: list[UUID]) -> list[
 
 async def _commander_tags(conn: asyncpg.Connection, oracles: list[UUID]) -> list[UUID]:
     rows = await conn.fetch(
-        "SELECT DISTINCT tag_id FROM scryfall_tag_memberships WHERE oracle_id = ANY($1::uuid[])",
+        "SELECT oracle_id, tag_id FROM scryfall_tag_memberships WHERE oracle_id = ANY($1::uuid[])",
         oracles,
     )
-    return [row["tag_id"] for row in rows]
+    if {row["oracle_id"] for row in rows} != set(oracles):
+        return []
+    return sorted({row["tag_id"] for row in rows})
 
 
 async def _matching_candidates(

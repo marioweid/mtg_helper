@@ -29,7 +29,7 @@ _PUBLIC_TABLES = (
 
 def _identity(dsn: str) -> tuple[str, int, str]:
     parts = urlsplit(dsn)
-    host = unquote(parts.hostname or "").lower()
+    host = unquote(parts.hostname or "").lower().rstrip(".")
     if host in _LOCAL_HOSTS:
         host = "loopback"
     return (host, parts.port or 5432, unquote(parts.path).lstrip("/"))
@@ -57,7 +57,11 @@ async def _require_empty_target(conn: asyncpg.Connection) -> None:
         "WHERE nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast', 'public') "
         "UNION ALL "
         "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
-        "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')"
+        "WHERE n.nspname = 'public' "
+        "UNION ALL SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+        "WHERE n.nspname = 'public' "
+        "UNION ALL SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace "
+        "WHERE n.nspname = 'public'"
         ")"
     )
     if exists:
@@ -79,11 +83,17 @@ async def _copy_rows(
     if not rows:
         return 0
     columns = tuple(rows[0].keys())
+    records = [dict(row) for row in rows]
+    for record in records:
+        if table == "decks":
+            record["suggestion_collection_ids"] = []
+        elif table == "deck_card_plans":
+            record["collection_id"] = None
     placeholders = ", ".join(f"${index}" for index in range(1, len(columns) + 1))
     quoted = ", ".join(columns)
     await target.executemany(
         f"INSERT INTO {table} ({quoted}) VALUES ({placeholders})",  # noqa: S608
-        [tuple(row[column] for column in columns) for row in rows],
+        [tuple(row[column] for column in columns) for row in records],
     )
     return len(rows)
 
@@ -91,13 +101,17 @@ async def _copy_rows(
 async def copy_local(source_dsn: str, target_dsn: str, approved_email: str) -> dict[str, int]:
     """Perform a read-only, owner-filtered source export and verify target references."""
     validate_target(source_dsn, target_dsn)
-    source = await asyncpg.connect(source_dsn)
-    target = await asyncpg.connect(target_dsn)
+    source = await asyncpg.connect(
+        source_dsn, server_settings={"default_transaction_read_only": "on"}
+    )
+    target = None
     counts: dict[str, int] = {}
     try:
-        await _require_empty_target(target)
-        await _apply_schema(target)
         async with source.transaction(isolation="repeatable_read", readonly=True):
+            target = await asyncpg.connect(target_dsn)
+            await _require_distinct_database(source, target)
+            await _require_empty_target(target)
+            await _apply_schema(target)
             await _require_matching_source_generations(source)
             owner = await source.fetchrow(
                 "SELECT * FROM accounts WHERE lower(email) = lower($1)", approved_email
@@ -122,12 +136,6 @@ async def copy_local(source_dsn: str, target_dsn: str, approved_email: str) -> d
                 counts["deck_cards"] = await _copy_deck_rows(
                     source, target, "deck_cards", approved_email
                 )
-                counts["collections"] = await _copy_plan_collections(
-                    source, target, "collections", approved_email
-                )
-                counts["collection_cards"] = await _copy_plan_collection_cards(
-                    source, target, approved_email
-                )
                 counts["deck_card_plans"] = await _copy_deck_rows(
                     source, target, "deck_card_plans", approved_email
                 )
@@ -138,7 +146,8 @@ async def copy_local(source_dsn: str, target_dsn: str, approved_email: str) -> d
         return counts
     finally:
         await source.close()
-        await target.close()
+        if target is not None:
+            await target.close()
 
 
 async def _copy_deck_rows(
@@ -154,34 +163,16 @@ async def _copy_deck_rows(
     )
 
 
-async def _copy_plan_collections(
-    source: asyncpg.Connection, target: asyncpg.Connection, table: str, email: str
-) -> int:
-    return await _copy_rows(
-        source,
-        target,
-        table,
-        "SELECT DISTINCT collection.* FROM collections collection "
-        "JOIN deck_card_plans plan ON plan.collection_id = collection.id "
-        "JOIN decks deck ON deck.id = plan.deck_id "
-        "WHERE lower(deck.owner_email) = lower($1)",
-        email,
+async def _require_distinct_database(
+    source: asyncpg.Connection, target: asyncpg.Connection
+) -> None:
+    query = (
+        "SELECT current_database(), oid, pg_postmaster_start_time() "
+        "FROM pg_database WHERE datname = current_database()"
     )
-
-
-async def _copy_plan_collection_cards(
-    source: asyncpg.Connection, target: asyncpg.Connection, email: str
-) -> int:
-    return await _copy_rows(
-        source,
-        target,
-        "collection_cards",
-        "SELECT DISTINCT card.* FROM collection_cards card "
-        "JOIN deck_card_plans plan ON plan.collection_id = card.collection_id "
-        "JOIN decks deck ON deck.id = plan.deck_id "
-        "WHERE lower(deck.owner_email) = lower($1)",
-        email,
-    )
+    # Compare the connected cluster, not DNS spelling or proxy routing, before any target write.
+    if await source.fetchrow(query) == await target.fetchrow(query):
+        raise ValueError("Local copy target must not identify the source database.")
 
 
 async def _copy_dismissals(
