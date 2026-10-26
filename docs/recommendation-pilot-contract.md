@@ -53,23 +53,11 @@ spending account is needed. A draft cannot authorize recommendation-origin addit
 original private trace/accounting. They are stale/nonselectable, not adapted into invented choices
 or resumed with new bounds. Unknown holds from any profile still block spending.
 
-Preserved offline suite:
+Offline suite, including the preserved research checks:
 
 ```bash
 cd backend
-uv run --no-sync pytest -q -W error \
-  tests/test_recommendation_core.py \
-  tests/test_recommendation_strategy.py \
-  tests/test_recommendation_artwork.py \
-  tests/test_commander_discovery_luna_refined.py \
-  tests/test_commander_discovery_refinement.py \
-  tests/test_commander_discovery_sol_assessment.py \
-  tests/test_commander_discovery_sol.py \
-  tests/test_commander_discovery_run.py \
-  tests/test_commander_discovery_check.py \
-  tests/test_deck_recovery_check.py \
-  tests/test_assistant_quality_eval.py \
-  tests/test_new_cards_evidence.py
+uv run --no-sync pytest -q -W error -m no_db
 ```
 
 `.github/workflows/recommendation-core.yml` runs these offline checks without secrets, a database,

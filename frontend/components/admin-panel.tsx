@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { AdminDiscoverPanel } from "@/components/admin-discover-panel";
-import { AdminNewCardsPanel } from "@/components/admin-new-cards-panel";
 import { ScryfallPublication, type ScryfallSourceStatus } from "@/components/scryfall-publication";
 
 type Job = { status: "idle" | "running" | "ok" | "error"; error: string | null };
@@ -42,7 +41,6 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-4">
-      <AdminNewCardsPanel />
       <AdminDiscoverPanel />
       <ScryfallPublication source={status.scryfall_sources} />
       <section className="rounded border border-white/10 bg-black/30 p-4">

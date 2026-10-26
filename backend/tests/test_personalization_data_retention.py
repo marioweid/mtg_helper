@@ -6,7 +6,6 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.services.new_cards import repository
-from mtg_helper.services.new_cards.evaluator import NewCardEvaluator
 from mtg_helper.services.new_cards.service import NewCardsService
 from tests.conftest import SCHEMA_PATH, create_test_deck
 
@@ -119,9 +118,7 @@ async def test_schema_reapply_retains_legacy_and_unrelated_rows(
         assert await _snapshot(conn, deck_id, account_id) == before
 
         owner = repository.Owner(account_id, "default@test.local")
-        service = NewCardsService(
-            cast(asyncpg.Pool, GuardedPool(db_pool)), NewCardEvaluator("test")
-        )
+        service = NewCardsService(cast(asyncpg.Pool, GuardedPool(db_pool)))
         assert (await service.view(owner, deck_id)).eligible_count == 0
         assert (await service.view(owner, deck_id)).eligible_count == 0
 

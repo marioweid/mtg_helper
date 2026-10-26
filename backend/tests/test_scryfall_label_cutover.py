@@ -1,6 +1,7 @@
 """Application-route checks for the Scryfall-only label cutover."""
 
 import json
+from hashlib import sha256
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from uuid import UUID
@@ -129,8 +130,8 @@ async def test_ac08_apply_removes_retired_storage_and_is_idempotent(
 ) -> None:
     """A populated rehearsal keeps source selections while dropping retired storage."""
     migration = _migration_module()
-    source_hash = "a" * 64
-    tag_hash = "b" * 64
+    source_hash = sha256(b"scryfall-label-cutover-cards").hexdigest()
+    tag_hash = sha256(b"scryfall-label-cutover-tags").hexdigest()
     async with db_pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO recommendation_sources (sha256, kind, payload) VALUES "

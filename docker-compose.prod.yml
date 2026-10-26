@@ -40,7 +40,6 @@ services:
       ASSAY_API_KEY: ${ASSAY_API_KEY:-}
       ASSAY_APPLICATION: ${ASSAY_APPLICATION:-}
       ENABLE_OPTIMIZER: ${ENABLE_OPTIMIZER:-false}
-      ENABLE_NEW_CARDS_WORKER: ${ENABLE_NEW_CARDS_WORKER:-true}
     networks:
       - default
       - shared_database

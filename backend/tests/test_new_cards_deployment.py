@@ -1,38 +1,24 @@
-"""Deployment contracts for New Cards execution permissions."""
+"""Deployment templates must not reintroduce the retired New Cards AI worker."""
 
-import json
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 
-pytestmark = [
-    pytest.mark.no_db,
-    pytest.mark.skipif(shutil.which("docker") is None, reason="Docker Compose CLI is unavailable"),
-]
+from mtg_helper.config import Settings
 
+pytestmark = pytest.mark.no_db
 ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.parametrize(
-    ("compose_files", "expected"),
+    "template",
     [
-        (["docker-compose.prod.yml"], "${ENABLE_NEW_CARDS_WORKER:-true}"),
-        (["docker-compose.yml"], "false"),
-        (["docker-compose.yml", "docker-compose.live.yml"], "false"),
+        "docker-compose.prod.yml",
+        "docker-compose.yml",
+        "docker-compose.live.yml",
+        "portainer.env.example",
     ],
 )
-def test_worker_permission_is_forwarded_only_in_production(
-    compose_files: list[str], expected: str
-) -> None:
-    command = ["docker", "compose"]
-    for path in compose_files:
-        command.extend(["-f", path])
-    command.extend(["config", "--no-interpolate", "--format", "json"])
-    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=True)
-    backend_environment = json.loads(result.stdout)["services"]["backend"]["environment"]
-    if isinstance(backend_environment, list):
-        backend_environment = dict(value.split("=", 1) for value in backend_environment)
-
-    assert backend_environment.get("ENABLE_NEW_CARDS_WORKER") == expected
+def test_deployment_has_no_retired_worker_permission(template: str) -> None:
+    assert "ENABLE_NEW_CARDS_WORKER" not in (ROOT / template).read_text(encoding="utf-8")
+    assert "enable_new_cards_worker" not in Settings.model_fields

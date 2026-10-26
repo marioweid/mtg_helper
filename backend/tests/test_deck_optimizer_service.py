@@ -412,7 +412,7 @@ class TestCandidateToCardItem:
         out = _card("Out")
         out_with_cats = out.model_copy(update={"categories": ["lands", "ramp"]})
         cand = _candidate("New")
-        item = deck_optimizer_service._candidate_to_card_item(cand, out_with_cats, [])
+        item = deck_optimizer_service._candidate_to_card_item(cand, out_with_cats)
         assert item.categories == ["lands", "ramp"]
         assert item.scryfall_id == cand.scryfall_id
         assert item.cmc == Decimal("2.0")
