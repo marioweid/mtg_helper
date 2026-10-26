@@ -41,21 +41,5 @@ jobs:
           uv run --no-sync ruff check src/mtg_helper/services/recommendations
           uv run --no-sync ruff format --check src/mtg_helper/services/recommendations
           uv run --no-sync ty check src/mtg_helper/services/recommendations
-      - name: Run preserved research and new app protocol checks without secrets or source caches
-        run: |
-          uv run --no-sync pytest -q -W error \
-            tests/test_recommendation_core.py \
-            tests/test_recommendation_strategy.py \
-            tests/test_recommendation_artwork.py \
-            tests/test_commander_discovery_luna_refined.py \
-            tests/test_commander_discovery_refinement.py \
-            tests/test_commander_discovery_sol_assessment.py \
-            tests/test_commander_discovery_sol.py \
-            tests/test_commander_discovery_run.py \
-            tests/test_commander_discovery_check.py \
-            tests/test_deck_recovery_check.py \
-            tests/test_assistant_quality_eval.py \
-            tests/test_new_cards_evidence.py \
-            tests/test_scryfall_exports.py \
-            tests/test_scryfall_tags.py \
-            tests/test_scryfall_history_bounds.py
+      - name: Run offline checks without secrets or source caches
+        run: uv run --no-sync pytest -q -W error -m no_db
