@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 
+import { ComparisonPlanningSummary } from "@/components/comparison-planning-summary";
 import type { ComparisonPlannedChange } from "@/lib/comparison";
 import type {
   ComparisonSideMeta,
@@ -70,6 +71,7 @@ export function ComparisonPlanDialog({ title, changes, decks, defaultDeck, onClo
         will not change. Common cards and commander changes are not included.
       </p>
       <PlanningTarget state={state} choices={choices} deckId={deckId} onChange={setDeckId} />
+      <ComparisonPlanningSummary changes={changes} />
       <ComparisonPlanningPreview
         changes={changes}
         plans={state.target.deck?.planned_changes ?? []}
