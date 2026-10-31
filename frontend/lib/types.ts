@@ -276,6 +276,17 @@ export interface PlannedDeckChangeUpdate {
   collection_id?: string | null;
 }
 
+export interface PlannedChangeBatchItem {
+  card_scryfall_id: string;
+  status: "planned" | "unchanged" | "failed";
+  message: string;
+  pending_quantity: number | null;
+}
+
+export interface PlannedChangesBatchResult {
+  items: PlannedChangeBatchItem[];
+}
+
 export interface ExportCard {
   card_id: string;
   quantity: number;

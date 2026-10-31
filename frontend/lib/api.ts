@@ -56,6 +56,7 @@ import type {
   PlannedDeckChange,
   PlannedDeckChangeCreate,
   PlannedDeckChangeUpdate,
+  PlannedChangesBatchResult,
   SimulationAnalysisResponse,
   QuickstartRequest,
   QuickstartResponse,
@@ -326,6 +327,12 @@ export const apiClient = {
 
   listPlannedChanges: (deckId: string) =>
     request<PlannedDeckChange[]>(`/decks/${deckId}/planned-changes`),
+
+  planComparedChanges: (deckId: string, changes: PlannedDeckChangeCreate[]) =>
+    request<PlannedChangesBatchResult>(`/decks/${deckId}/planned-changes/batch`, {
+      method: "POST",
+      body: JSON.stringify({ changes }),
+    }),
 
   previewCardExport: (cards: ExportCard[], collectionIds: string[]) =>
     request<CardExportPreview>("/card-exports/preview", {

@@ -4,12 +4,19 @@ import { useState } from "react";
 
 import { CardExportDialog } from "@/components/card-export-dialog";
 import { CardHover } from "@/components/card-hover";
+import { ComparisonPlanningActions } from "@/components/comparison-planning-actions";
 import { DeckTypeBreakdown } from "@/components/deck-type-breakdown";
 import { ManaCost } from "@/components/mana-cost";
 import { ManaCurve } from "@/components/mana-curve";
 import { OwnedBadge } from "@/components/owned-badge";
 import { comparisonExportCards, type ExportScope } from "@/lib/comparison";
-import type { ComparisonSideMeta, DeckCompareResponse, DeckDiff, DiffEntry } from "@/lib/types";
+import type {
+  ComparisonSideMeta,
+  DeckCompareResponse,
+  DeckDiff,
+  DeckSummary,
+  DiffEntry,
+} from "@/lib/types";
 
 const SCOPE_LABELS: Record<ExportScope, string> = {
   incoming: "Export incoming cards (left → right)",
@@ -18,7 +25,15 @@ const SCOPE_LABELS: Record<ExportScope, string> = {
   selected: "Export selected cards",
 };
 
-export function CompareResults({ result }: { result: DeckCompareResponse }) {
+export function CompareResults({
+  result,
+  decks,
+  onPlanned,
+}: {
+  result: DeckCompareResponse;
+  decks: DeckSummary[];
+  onPlanned: () => void;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [scope, setScope] = useState<ExportScope | null>(null);
   const entries = [...result.diff.added, ...result.diff.removed, ...result.diff.quantity_changed];
@@ -43,6 +58,15 @@ export function CompareResults({ result }: { result: DeckCompareResponse }) {
         onExport={setScope}
         onSelectAll={() => setSelected(new Set(entries.map((entry) => entry.card.card_id)))}
         onClear={() => setSelected(new Set())}
+      />
+      <ComparisonPlanningActions
+        result={result}
+        decks={decks}
+        selected={selected}
+        onPlanned={() => {
+          setSelected(new Set());
+          onPlanned();
+        }}
       />
       <section className="grid gap-6 md:grid-cols-2">
         <DiffGroup
@@ -261,7 +285,7 @@ function DiffRow({
         type="checkbox"
         checked={selected}
         onChange={onToggle}
-        aria-label={`Select ${entry.card.name} for export`}
+        aria-label={`Select ${entry.card.name} for export or planning`}
         className="accent-indigo-500"
       />
       {entry.card.image_uri && (

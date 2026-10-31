@@ -61,7 +61,12 @@ function CompareWorkspace() {
         </p>
       )}
       {comparison.result && (
-        <CompareResults key={JSON.stringify(comparison.result)} result={comparison.result} />
+        <CompareResults
+          key={JSON.stringify(comparison.result)}
+          result={comparison.result}
+          decks={comparison.decks}
+          onPlanned={comparison.retry}
+        />
       )}
     </main>
   );

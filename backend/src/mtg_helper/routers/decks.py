@@ -23,6 +23,8 @@ from mtg_helper.models.decks import (
     DeckSummary,
     DeckUpdate,
     DeckUrlImportRequest,
+    PlannedChangesBatchCreate,
+    PlannedChangesBatchResult,
     PlannedDeckChange,
     PlannedDeckChangeComplete,
     PlannedDeckChangeCreate,
@@ -368,6 +370,23 @@ async def create_planned_change(
     except (PlanNotFoundError, InvalidPlanError) as exc:
         raise _planned_change_error(exc) from exc
     return DataResponse(data=plan)
+
+
+@router.post("/{deck_id}/planned-changes/batch")
+async def ensure_planned_changes(
+    deck_id: UUID,
+    body: PlannedChangesBatchCreate,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[PlannedChangesBatchResult]:
+    """Queue comparison selections without duplicating matching pending quantities."""
+    try:
+        result = await planned_change_service.ensure_plans(
+            request.app.state.db_pool, deck_id, body.changes, _require_email(account)
+        )
+    except PlanNotFoundError as exc:
+        raise _planned_change_error(exc) from exc
+    return DataResponse(data=result)
 
 
 @router.post("/{deck_id}/planned-changes/shopping-list")

@@ -41,17 +41,23 @@ const comparison: DeckCompareResponse = {
 
 describe("comparison results", () => {
   it("offers incoming, full-side and selected exports with quantity-aware counts", () => {
-    const html = renderToStaticMarkup(<CompareResults result={comparison} />);
+    const html = renderToStaticMarkup(
+      <CompareResults result={comparison} decks={[]} onPlanned={() => undefined} />,
+    );
     expect(html).toContain("3 incoming copies");
     expect(html).toContain("Export full left deck");
     expect(html).toContain("Export full right deck");
     expect(html).toContain("Export selected cards");
-    expect(html).toContain('aria-label="Select Forest for export"');
+    expect(html).toContain('aria-label="Select Forest for export or planning"');
+    expect(html).toContain("Plan selected additions");
+    expect(html).toContain("Plan selected changes");
     expect(html).toContain("2 → 5");
   });
 
   it("labels the planned deck and warns about its total including commanders", () => {
-    const html = renderToStaticMarkup(<CompareResults result={comparison} />);
+    const html = renderToStaticMarkup(
+      <CompareResults result={comparison} decks={[]} onPlanned={() => undefined} />,
+    );
     expect(html).toContain("Planned deck");
     expect(html).toContain("4 cuts still needed");
     expect(html).toContain("104 cards including commanders");
@@ -59,7 +65,11 @@ describe("comparison results", () => {
 
   it("does not imply that historical snapshots froze the commander configuration", () => {
     const html = renderToStaticMarkup(
-      <CompareResults result={{ ...comparison, left: { ...comparison.left, kind: "snapshot" } }} />,
+      <CompareResults
+        result={{ ...comparison, left: { ...comparison.left, kind: "snapshot" } }}
+        decks={[]}
+        onPlanned={() => undefined}
+      />,
     );
     expect(html).toContain("Saved main deck; commanders use the deck");
     expect(html).toContain("current configuration");

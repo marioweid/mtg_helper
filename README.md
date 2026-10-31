@@ -53,6 +53,13 @@ applying them. Either comparison side can be physical, planned, or a snapshot; u
 to reverse the delta. Planned deck totals include commanders. Existing snapshots saved main-deck
 cards only, so their commander configuration still comes from the current deck.
 
+Select changed rows and use **Plan selected additions** to queue incoming cards, or **Plan selected
+changes** to include cuts and quantity decreases. Choose a target deck, review the preview and
+confirm. Matching pending quantities are not duplicated, larger matching plans are preserved, and
+opposite-direction plans are reported as conflicts rather than overwritten. Each card gets its own
+result; failed cards can be retried without re-queuing successful ones. Common cards and commander
+changes are excluded. This queues plans only; it never changes physical cards or binder inventory.
+
 Export incoming delta quantities (including increases), selected rows, or either full deck from
 Compare. Planned changes also supports all or selected additions. Choose **MTGO text** or
 **Cardmarket buy list**, then copy the list or download a TXT with one `quantity card name` per line.
