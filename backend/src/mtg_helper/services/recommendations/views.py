@@ -62,7 +62,7 @@ def run_view(
         held_microusd=row["held_microusd"],
         stale=(
             source_hash != row["source_hash"]
-            or row["profile"] not in {budget.VERSION, budget.STRATEGY_VERSION}
+            or row["profile"] != budget.STRATEGY_VERSION
             or context["commander"]["oracle_id"] != commander_id
         ),
     )

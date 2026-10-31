@@ -35,8 +35,9 @@ async def owned_deck(
     *,
     lock: bool = False,
 ) -> asyncpg.Record:
-    sql = "SELECT d.*, c.oracle_id AS commander_oracle_id FROM decks d "
-    sql += "JOIN cards c ON c.id = d.commander_id WHERE d.id = $1 AND lower(d.owner_email) = $2"
+    sql = "SELECT d.*, c.oracle_id AS commander_oracle_id, p.oracle_id AS partner_oracle_id "
+    sql += "FROM decks d JOIN cards c ON c.id = d.commander_id "
+    sql += "LEFT JOIN cards p ON p.id=d.partner_id WHERE d.id = $1 AND lower(d.owner_email) = $2"
     if lock:
         sql += " FOR UPDATE OF d"
     row = await conn.fetchrow(sql, deck_id, owner.email.strip().lower())

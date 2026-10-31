@@ -1,0 +1,107 @@
+{
+  "started_at": "2026-10-29T07:19:06.329436+00:00",
+  "protocol_sha256": "9685d870cef11a885e7cdbc127681d4e373c740e978975d95d6c50aadba2af09",
+  "attempts": [
+    {
+      "deck": "yuna",
+      "arm": "baseline",
+      "state": "returned",
+      "response_id": "resp_0b82af97dda7d3fa016ae2f36b84d087d1bf097d2101ab8c4a",
+      "request_id": "req_6a602e501bd440499d05cdf054b99f49",
+      "status": "completed",
+      "output": "{\"oracle_tag_ids\":[\"9a3f1038-140e-447a-ba5d-020893c49977\",\"b504c445-169d-4145-abc4-65270686c208\",\"15372c12-7e27-4b5a-bdb3-f641b7ac4272\",\"68264ee3-cc65-471a-a9e7-8fe85ee3aa97\",\"2f3e4ad7-5e60-41b4-bdbc-653f16869cf6\",\"b117578c-1254-488c-81b8-ba98eaf9f626\",\"3cedb165-a457-47a6-9b4e-bd62fda9ee9d\"],\"printed_keywords\":[]}",
+      "model": "gpt-5.6-luna",
+      "service_tier": "default",
+      "usage": {
+        "input_tokens": 4280,
+        "input_tokens_details": {
+          "cache_write_tokens": 4277,
+          "cached_tokens": 0
+        },
+        "output_tokens": 304,
+        "output_tokens_details": {
+          "reasoning_tokens": 123
+        },
+        "total_tokens": 4584
+      },
+      "seconds": 5.577786275000108,
+      "estimated_cost_microusd": 1435
+    },
+    {
+      "deck": "yuna",
+      "arm": "roles",
+      "state": "returned",
+      "response_id": "resp_03aa4734795f4a82016ae2f36ffeb487d194f7928bf006ca6d",
+      "request_id": "req_85c8428384d44ac5b030ce1c6cf13ae4",
+      "status": "completed",
+      "output": "{\"lanes\":[{\"purpose\":\"Creature-based acceleration to develop mana while supporting a creature-heavy board.\",\"groups\":[{\"oracle_tag_ids\":[\"bb6c0ff7-302d-48ff-aee9-5cfefd44e351\",\"5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\"]},{\"purpose\":\"Repeatable +1/+1 counter growth across the creature board.\",\"groups\":[{\"oracle_tag_ids\":[\"9a3f1038-140e-447a-ba5d-020893c49977\",\"c1100c9e-08bf-4845-9263-1a5f86b9005f\"],\"printed_keywords\":[]}],\"card_types_any\":[]},{\"purpose\":\"Counter distribution and scaling that turns counters on permanents into additional growth.\",\"groups\":[{\"oracle_tag_ids\":[\"15372c12-7e27-4b5a-bdb3-f641b7ac4272\",\"9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0\"],\"printed_keywords\":[]}],\"card_types_any\":[]},{\"purpose\":\"Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.\",\"groups\":[{\"oracle_tag_ids\":[\"df701b09-a6c7-499b-ae14-3ddf41c0d5b6\",\"3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\"]}]}",
+      "model": "gpt-5.6-luna",
+      "service_tier": "default",
+      "usage": {
+        "input_tokens": 15959,
+        "input_tokens_details": {
+          "cache_write_tokens": 15956,
+          "cached_tokens": 0
+        },
+        "output_tokens": 474,
+        "output_tokens_details": {
+          "reasoning_tokens": 117
+        },
+        "total_tokens": 16433
+      },
+      "seconds": 6.015697781000199,
+      "estimated_cost_microusd": 4559
+    },
+    {
+      "deck": "meren",
+      "arm": "roles",
+      "state": "returned",
+      "response_id": "resp_0024e7022e3a8f6c016ae2f37608c887d195b9cbcf0c6cc774",
+      "request_id": "req_f216b95690bb444589180187f58e1ceb",
+      "status": "completed",
+      "output": "{\"lanes\":[{\"purpose\":\"Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.\",\"groups\":[{\"oracle_tag_ids\":[\"d5dcbcc6-d49b-4d76-9272-35a062bcb656\",\"aa20ca6b-5548-48ac-92f3-8abb069273de\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\"]},{\"purpose\":\"Creature recursion that reuses creatures from the graveyard as recurring resources.\",\"groups\":[{\"oracle_tag_ids\":[\"c05a300c-2ec4-446a-a399-b3c314497de7\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\"]},{\"purpose\":\"Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.\",\"groups\":[{\"oracle_tag_ids\":[\"3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2\",\"00dd108a-d034-45a8-92e1-02c8fc59980d\",\"0025ee30-ee96-4c59-8561-74988efd384c\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\",\"Enchantment\",\"Artifact\"]},{\"purpose\":\"Creatures whose enter-or-leave patterns reward repeatedly reanimating and sacrificing them.\",\"groups\":[{\"oracle_tag_ids\":[\"bad44322-e38a-4ec9-9d19-dec53d46c76b\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\"]},{\"purpose\":\"Creature-based mana acceleration that can also become sacrifice fodder for the recursion engine.\",\"groups\":[{\"oracle_tag_ids\":[\"0bd507bc-e6e9-404e-b8d9-5ba2cb7ad509\"],\"printed_keywords\":[]}],\"card_types_any\":[\"Creature\"]}]}",
+      "model": "gpt-5.6-luna",
+      "service_tier": "default",
+      "usage": {
+        "input_tokens": 16639,
+        "input_tokens_details": {
+          "cache_write_tokens": 16636,
+          "cached_tokens": 0
+        },
+        "output_tokens": 856,
+        "output_tokens_details": {
+          "reasoning_tokens": 458
+        },
+        "total_tokens": 17495
+      },
+      "seconds": 9.750783830000273,
+      "estimated_cost_microusd": 5187
+    },
+    {
+      "deck": "meren",
+      "arm": "baseline",
+      "state": "returned",
+      "response_id": "resp_0de32a1376393370016ae2f37fb9d887d1a362bb19535e3cc9",
+      "request_id": "req_ba7466a429c9470ebb56019bf043d99f",
+      "status": "completed",
+      "output": "{\"oracle_tag_ids\":[\"a72183e8-512d-4be2-8eef-65e43db6cad0\",\"d5dcbcc6-d49b-4d76-9272-35a062bcb656\",\"c05a300c-2ec4-446a-a399-b3c314497de7\",\"bad44322-e38a-4ec9-9d19-dec53d46c76b\",\"56d2e796-52d9-46e4-9df8-711b20e8661c\",\"50ca3b86-4bbb-405c-baf3-40a87f941e2a\",\"d6de9944-a728-48ae-aed0-0932e07ccfa2\"],\"printed_keywords\":[\"Recover\"]}",
+      "model": "gpt-5.6-luna",
+      "service_tier": "default",
+      "usage": {
+        "input_tokens": 4158,
+        "input_tokens_details": {
+          "cache_write_tokens": 4155,
+          "cached_tokens": 0
+        },
+        "output_tokens": 336,
+        "output_tokens_details": {
+          "reasoning_tokens": 150
+        },
+        "total_tokens": 4494
+      },
+      "seconds": 4.14368496499992,
+      "estimated_cost_microusd": 1443
+    }
+  ],
+  "reserved_microusd": 54949
+}

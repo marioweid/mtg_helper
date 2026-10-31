@@ -2,28 +2,21 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DiscoverController, type DiscoverState } from "@/components/discover-state";
-import { CommanderStrategyPanel } from "@/components/commander-strategy-panel";
 import { ManaCost } from "@/components/mana-cost";
 import { VisualCardGrid, VisualCardTile } from "@/components/visual-card-grid";
-import type {
-  DiscoverCandidate,
-  DiscoverFace,
-  DiscoverQuery,
-  DiscoverRun,
-} from "@/lib/discovery-types";
+import type { CommanderStrategyChoice, StrategyMatch, StrategyTerm } from "@/lib/discovery-types";
 
-const BOX = "rounded-xl border border-white/10 bg-white/5 p-4 space-y-3";
-const BUTTON = "rounded bg-indigo-600 px-3 py-2 text-sm disabled:opacity-40";
-const INPUT = "rounded border border-white/20 bg-gray-950 p-2 text-sm";
+const BOX = "min-w-0 rounded-2xl border border-white/10 bg-white/[0.025] p-5 sm:p-6";
+const FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950";
+const BUTTON = `min-h-11 touch-manipulation rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-50 ${FOCUS}`;
+const SECONDARY = `min-h-11 touch-manipulation rounded-lg px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50 ${FOCUS}`;
 
 interface Props {
   deckId: string;
   onPlanChanged: () => void | Promise<void>;
 }
-interface StateProps {
-  state: DiscoverState;
-  controller: DiscoverController;
-}
+type ViewProps = { state: DiscoverState; controller: DiscoverController };
 
 export function DiscoverPanel({ deckId, onPlanChanged }: Props) {
   const controller = useMemo(
@@ -35,479 +28,517 @@ export function DiscoverPanel({ deckId, onPlanChanged }: Props) {
     controller.getSnapshot,
     controller.getSnapshot,
   );
-  const [view, setView] = useState<"results" | "trace">("results");
   useEffect(() => {
-    controller.start();
+    void controller.start();
     return () => controller.stop();
   }, [controller]);
+  return <DiscoverView state={state} controller={controller} />;
+}
+
+export function DiscoverView({ state, controller }: ViewProps) {
+  const saved = state.status?.strategy;
   return (
-    <section aria-label="Discover" className="space-y-4">
-      <PilotBanner />
-      <CommanderStrategyPanel
-        state={state}
-        controller={controller}
-        onInspect={() => {
-          setView("trace");
-          void controller.inspect(true);
-        }}
-      />
-      <DiscoverControls state={state} controller={controller} />
+    <section aria-label="Discover" className="min-w-0 space-y-5">
+      <header className="space-y-1">
+        <h2 className="text-2xl font-semibold tracking-tight text-white">Discover</h2>
+        <p className="text-sm leading-6 text-gray-400">
+          Choose a direction for your deck. We’ll find the cards.
+        </p>
+      </header>
+      {saved && <ActiveStrategy state={state} controller={controller} />}
+      {state.editing && <StrategyChooser state={state} controller={controller} />}
       {state.error && (
-        <p role="alert" className="text-red-300">
+        <p
+          role="alert"
+          className="rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm leading-6 text-red-200"
+        >
           {state.error}
         </p>
       )}
-      <DiscoverProgress state={state} />
-      <div role="tablist" aria-label="Discover views" className="flex gap-2">
-        <button
-          className={BUTTON}
-          role="tab"
-          aria-selected={view === "results"}
-          onClick={() => setView("results")}
-        >
-          Results
-        </button>
-        <button
-          className={BUTTON}
-          role="tab"
-          aria-selected={view === "trace"}
-          onClick={() => {
-            setView("trace");
-            void controller.inspect();
-          }}
-        >
-          Plan &amp; Searches
-        </button>
-      </div>
-      {view === "results" ? (
-        <DiscoverResults state={state} controller={controller} />
-      ) : (
-        <DiscoverTrace state={state} controller={controller} />
+      {state.progress && (
+        <p role="status" className="text-sm text-indigo-200">
+          {state.progress}
+        </p>
       )}
+      {state.loading && !state.status && (
+        <p role="status" className="text-sm text-gray-400">
+          Loading your strategy…
+        </p>
+      )}
+      {state.status?.source.warning && (
+        <p role="status" className="text-sm leading-6 text-amber-200">
+          {state.status.source.warning}
+        </p>
+      )}
+      <AdvancedSearch state={state} controller={controller} />
+      {state.dismissedOracleId && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm text-gray-300"
+        >
+          Card dismissed from this deck.
+          <button
+            className={SECONDARY}
+            disabled={!!state.dismissing}
+            onClick={() => void controller.undoDismissal()}
+          >
+            Undo dismissal
+          </button>
+        </div>
+      )}
+      <Matches state={state} controller={controller} />
     </section>
   );
 }
 
-function PilotBanner() {
+function ActiveStrategy({ state, controller }: ViewProps) {
+  const saved = state.status?.strategy;
+  if (!saved) return null;
   return (
-    <div className={BOX}>
-      <h2 className="font-semibold">Discover · Experimental</h2>
-      <p className="text-amber-300">Commander-only, nonland experiment. AI advice is unverified.</p>
-      <p className="text-sm text-gray-300">
-        This does not assess your physical deck's balance or interactions. Physical cards and
-        planned additions are exclusions, not support. No community rankings are used. Only explicit
-        card exclusions and literal filters are enforced; no bracket, price or combo guarantees.
-        Partner decks and collection scopes are not yet supported.
-      </p>
-      <p className="text-sm text-gray-300">
-        Opening, searching and refreshing are free of model calls. Draft strategy explicitly starts
-        one separate Luna call; Generate cards starts at most three. Planning creates a pending
-        addition, never a physical edit. AI can take several minutes; source browsing stays usable.
-      </p>
-    </div>
-  );
-}
-
-function DiscoverControls({ state, controller }: StateProps) {
-  const [name, setName] = useState("");
-  const [text, setText] = useState("");
-  const [type, setType] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [minimum, setMinimum] = useState("");
-  const [maximum, setMaximum] = useState("");
-  const constraint: DiscoverQuery | null = [text, type, keyword, minimum, maximum].some(Boolean)
-    ? {
-        purpose: "Explicit user source filters",
-        oracle_text_all: text ? [text] : [],
-        oracle_text_any: [],
-        type_line_any: type ? [type] : [],
-        keywords_any: keyword ? [keyword] : [],
-        mana_cost_all: [],
-        mana_value_min: minimum ? Number(minimum) : null,
-        mana_value_max: maximum ? Number(maximum) : null,
-      }
-    : null;
-  const running =
-    state.status?.run?.status === "running" || state.status?.strategy_run?.status === "running";
-  return (
-    <div className={BOX}>
-      <label className="block">
-        Commander-only goal (editable)
-        <textarea
-          className={`${INPUT} mt-1 w-full`}
-          maxLength={1000}
-          value={state.goal}
-          onChange={(event) => controller.setGoal(event.target.value)}
-        />
-      </label>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        <Filter label="Name (browse only)" value={name} onChange={setName} />
-        <Filter label="Oracle text contains (literal)" value={text} onChange={setText} />
-        <Filter label="Type contains (literal)" value={type} onChange={setType} />
-        <Filter label="Keyword (exact source name)" value={keyword} onChange={setKeyword} />
-        <Filter label="Minimum mana value" value={minimum} onChange={setMinimum} numeric />
-        <Filter label="Maximum mana value" value={maximum} onChange={setMaximum} numeric />
-      </div>
-      <p className="text-xs text-gray-400">
-        Source filters also constrain the next Generate run. Changing filters never automatically
-        starts analysis. Name filters browsing only.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <button
-          className={BUTTON}
-          disabled={!state.status?.ready || state.browsing}
-          onClick={() => void controller.search({ name, query: constraint })}
-        >
-          Browse source cards
-        </button>
-        <button
-          className={BUTTON}
-          disabled={!state.status?.ready || state.generating || state.drafting || running}
-          onClick={() => void controller.generate(constraint)}
-        >
-          Generate · up to ${((state.status?.run_cap_microusd ?? 100000) / 1e6).toFixed(2)}
-        </button>
-        <button
-          className={BUTTON}
-          disabled={state.loading}
-          onClick={() => void controller.refresh()}
-        >
-          Refresh status
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Filter({
-  label,
-  value,
-  onChange,
-  numeric = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  numeric?: boolean;
-}) {
-  return (
-    <label className="text-sm">
-      {label}
-      <input
-        className={`${INPUT} mt-1 w-full`}
-        type={numeric ? "number" : "text"}
-        step={numeric ? "any" : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function DiscoverProgress({ state }: { state: DiscoverState }) {
-  const run = state.status?.run;
-  return (
-    <div aria-live="polite" className="text-sm text-gray-300 space-y-1">
-      {state.loading && <p role="status">Loading discovery status…</p>}
-      {state.generating && <p role="status">Starting an explicitly budgeted run…</p>}
-      {state.browsing && <p role="status">Searching local source facts…</p>}
-      {state.status && !state.status.ready && <p>{state.status.reason ?? "Source not ready"}</p>}
-      {run && (
-        <>
-          <p>
-            Run {run.status} · {run.phase} · {run.candidates.length} shortlisted candidates
-          </p>
-          <p>
-            Known estimate ${(run.known_cost_microusd / 1e6).toFixed(5)} · held reservation $
-            {(run.held_microusd / 1e6).toFixed(5)}. Estimates, not provider-enforced caps.
-          </p>
-          <p>Goal: {run.goal}</p>
-          {run.error && (
-            <p role="alert" className="text-red-300">
-              {run.error}
-            </p>
-          )}
-          {run.stale && (
-            <p className="text-amber-300">
-              Older strategy/source snapshot. Inspect it or explicitly generate a fresh run;
-              automatic regeneration is disabled.
-            </p>
-          )}
-          {run.status === "running" && (
-            <p role="status">Analysis running; browsing does not wait.</p>
-          )}
-        </>
-      )}
-      <p>
-        Catalog: {state.status?.catalog_updated_at ?? "unavailable"} · new-engine daily ceiling $
-        {((state.status?.daily_cap_microusd ?? 1000000) / 1e6).toFixed(2)}. Existing New Cards
-        analysis uses a separate quota.
-      </p>
-    </div>
-  );
-}
-
-export function DiscoverResults({ state, controller }: StateProps) {
-  const run = state.status?.run;
-  return (
-    <div className="space-y-4">
-      <div className={BOX}>
-        <h3 className="font-medium">AI-assessed independent shortlist</h3>
-        <p className="text-sm text-gray-400">
-          At most 32 candidates, not exhaustive catalog coverage. Unassessed/failed/uncertain
-          matches are not proof of no useful cards.
-        </p>
-        {!run?.candidates.length && (
-          <p>No shortlist available. Browse source cards independently.</p>
-        )}
-        <VisualCardGrid>
-          {run?.candidates.map((card) => (
-            <Candidate
-              key={card.oracle_id}
-              card={card}
-              run={run}
-              state={state}
-              controller={controller}
-            />
-          ))}
-        </VisualCardGrid>
-      </div>
-      <div className={BOX}>
-        <h3 className="font-medium">Local matches · not fit recommendations</h3>
-        {state.page && (
-          <p>
-            {state.page.total} source matches; showing {state.page.cards.length}. Snapshot{" "}
-            {state.page.snapshot_hash.slice(0, 12)}
-          </p>
-        )}
-        <VisualCardGrid>
-          {state.page?.cards.map((card) => (
-            <Candidate
-              key={card.oracle_id}
-              card={card}
-              run={null}
-              state={state}
-              controller={controller}
-            />
-          ))}
-        </VisualCardGrid>
-        {state.page?.next_cursor && (
-          <button
-            className={BUTTON}
-            disabled={state.browsing}
-            onClick={() => void controller.search({}, true)}
-          >
-            Next source page
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface CandidateProps extends StateProps {
-  card: DiscoverCandidate;
-  run: DiscoverRun | null;
-}
-
-function Candidate(props: CandidateProps) {
-  return (
-    <VisualCardTile
-      name={props.card.facts.name}
-      imageUri={props.card.image_uri ?? null}
-      footer={<CandidateDetails {...props} />}
-    />
-  );
-}
-
-function CandidateDetails({ card, run, state, controller }: CandidateProps) {
-  const canRecommend = !!run && card.recommended && !run.stale && !card.excluded;
-  return (
-    <article className="space-y-2">
-      <h4 className="font-semibold">
-        {card.facts.name} <ManaCost cost={card.facts.mana_cost} />
-      </h4>
-      <p className="text-xs text-gray-400">
-        Artwork: current catalog printing. Source facts and advice below retain their pinned
-        snapshot.
-      </p>
-      <details>
-        <summary className="cursor-pointer text-sm">Authoritative source facts</summary>
-        <SourceFacts face={card.facts} />
-        {card.facts.faces.map((face, index) => (
-          <SourceFacts key={index} face={face} />
-        ))}
-        <p className="text-sm">
-          Mana value {card.facts.mana_value ?? "unknown"} · layout
-          {card.facts.layout ?? "unknown"} · keywords{" "}
-          {card.facts.keywords?.join(", ") || "none supplied"}
-        </p>
-        <a
-          className="text-sm underline"
-          target="_blank"
-          rel="noreferrer"
-          href={`https://scryfall.com/search?q=oracleid%3A${encodeURIComponent(card.oracle_id)}`}
-        >
-          View on Scryfall
-        </a>
-      </details>
-      <p className="text-sm">
-        {card.state}
-        {card.assessment ? ` · ${card.assessment.fit}` : ""}
-        {card.recommended ? " · ranked recommendation (unverified)" : ""}
-      </p>
-      {card.assessment && (
-        <div className="text-sm text-gray-300 space-y-1">
-          <p>AI advice: {card.assessment.reason}</p>
-          <p>Caveat: {card.assessment.caveat}</p>
-          {card.assessment.evidence.map((e, i) => (
-            <blockquote key={i}>
-              {e.key}: “{e.quote}”
-            </blockquote>
-          ))}
+    <article
+      aria-label="Your strategy"
+      className="min-w-0 rounded-2xl border border-indigo-400/30 bg-gradient-to-br from-indigo-500/10 to-transparent p-5 sm:p-6"
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold text-white">Your strategy</h3>
+          <span className="rounded-full bg-indigo-400/10 px-2.5 py-1 text-xs font-medium text-indigo-200">
+            Active
+          </span>
         </div>
-      )}
-      {card.evidence_errors.length > 0 && (
-        <p className="text-amber-300 text-sm">
-          Failed grounding: {card.evidence_errors.join(", ")}. Advice not offered as a
-          recommendation.
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {run && (
-          <button
-            className={BUTTON}
-            disabled={!canRecommend || !!state.planning}
-            onClick={() => void controller.plan(card.oracle_id, run.id)}
-          >
-            Plan recommendation
-          </button>
-        )}
-        <button
-          className={BUTTON}
-          disabled={card.excluded || !!state.planning}
-          onClick={() => void controller.plan(card.oracle_id, null)}
-        >
-          Manual source addition
-        </button>
-        {run && (
-          <button
-            className={BUTTON}
-            onClick={() => void controller.feedback(card.oracle_id, "incorrect")}
-          >
-            Report incorrect
+        {!state.editing && (
+          <button className={SECONDARY} onClick={() => void controller.changeStrategy()}>
+            Change strategy
           </button>
         )}
       </div>
-      {card.excluded && (
-        <p className="text-xs text-gray-400">Already physical/planned or explicitly avoided.</p>
+      <p className="whitespace-pre-wrap break-words text-base leading-8 text-gray-100">
+        {saved.prose}
+      </p>
+      {state.editing && (
+        <p className="mt-4 text-xs text-gray-400">
+          This stays active until your new strategy is ready.
+        </p>
       )}
     </article>
   );
 }
 
-function SourceFacts({ face }: { face: DiscoverFace }) {
+function StrategyChooser({ state, controller }: ViewProps) {
+  const choices =
+    state.draft?.status === "completed" && !state.draft.stale ? (state.draft.strategies ?? []) : [];
   return (
-    <div className="mt-2 text-sm">
-      <p>
-        {face.name} <ManaCost cost={face.mana_cost} /> · {face.type_line ?? "unknown type"}
-      </p>
-      <p className="whitespace-pre-wrap">
-        {face.oracle_text ?? "No top-level text supplied; inspect faces."}
-      </p>
-      {(face.power || face.toughness) && (
-        <p>
-          Power/toughness {face.power ?? "?"}/{face.toughness ?? "?"}
+    <form
+      className={`${BOX} space-y-5`}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void controller.findCards();
+      }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Choose your direction</h3>
+          <p className="mt-1 text-sm leading-6 text-gray-400">
+            Pick a strategy, or describe the deck you want to play.
+          </p>
+        </div>
+        {state.status?.strategy && (
+          <button
+            type="button"
+            className={SECONDARY}
+            disabled={state.busy}
+            onClick={() => controller.cancelEditing()}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      {state.drafting && (
+        <p role="status" className="rounded-xl bg-indigo-400/5 p-4 text-sm text-indigo-200">
+          Preparing strategy ideas for your commander…
         </p>
       )}
-      {face.loyalty && <p>Loyalty {face.loyalty}</p>}
-      {face.defense && <p>Defense {face.defense}</p>}
-    </div>
+      {state.draftError && (
+        <p role="alert" className="text-sm leading-6 text-amber-200">
+          {state.draftError}
+        </p>
+      )}
+      {!!choices.length && (
+        <fieldset disabled={state.busy}>
+          <legend className="sr-only">Strategy options</legend>
+          <div className="grid gap-3 xl:grid-cols-3">
+            {choices.map((choice, index) => (
+              <StrategyOption
+                key={choice.title}
+                choice={choice}
+                selected={state.selected === index && !state.manual}
+                onSelect={() => controller.selectDraft(index)}
+              />
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div className="flex flex-wrap gap-1">
+        <button
+          type="button"
+          className={SECONDARY}
+          disabled={state.busy}
+          onClick={() => controller.writeOwn()}
+        >
+          Write my own strategy
+        </button>
+        <button
+          type="button"
+          className={SECONDARY}
+          disabled={state.drafting || state.busy}
+          onClick={() => void controller.tryOtherStrategies()}
+        >
+          Try other strategies
+        </button>
+      </div>
+      {state.manual && <ManualStrategy state={state} controller={controller} />}
+      <div className="flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
+        <button type="submit" className={BUTTON} disabled={state.busy}>
+          {state.busy ? "Finding cards…" : "Find cards"}
+          <span aria-hidden="true" className="ml-2">
+            →
+          </span>
+        </button>
+        <p className="text-xs leading-5 text-gray-400">
+          Search terms and saving are handled for you.
+        </p>
+      </div>
+    </form>
   );
 }
 
-function RulesBrowser({ state, controller }: StateProps) {
-  const [term, setTerm] = useState("");
-  const rules = state.rulesPage?.rule_results;
+function ManualStrategy({ state, controller }: ViewProps) {
   return (
-    <div className={BOX}>
-      <h3>Browse complete rules · no model call</h3>
-      <Filter label="Rule text contains (literal)" value={term} onChange={setTerm} />
-      <button
-        className={BUTTON}
-        disabled={!term.trim() || state.browsing || !state.status?.ready}
-        onClick={() => void controller.searchRules(term)}
+    <label className="block space-y-2 text-sm font-medium text-gray-200">
+      Your strategy
+      <textarea
+        name="discover-strategy"
+        autoComplete="off"
+        rows={7}
+        maxLength={2000}
+        value={state.prose}
+        disabled={state.busy}
+        placeholder="For example: Build a counter engine, then turn large creatures into pressure…"
+        onChange={(event) => controller.setProse(event.target.value)}
+        className={`block w-full resize-y rounded-xl border border-white/15 bg-gray-950/60 p-4 text-base font-normal leading-7 text-white ${FOCUS}`}
+      />
+    </label>
+  );
+}
+
+function StrategyOption({
+  choice,
+  selected,
+  onSelect,
+}: {
+  choice: CommanderStrategyChoice;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={`relative flex min-w-0 cursor-pointer flex-col gap-4 rounded-xl border p-4 transition-colors focus-within:ring-2 focus-within:ring-indigo-400 ${selected ? "border-indigo-400 bg-indigo-400/10" : "border-white/10 bg-gray-950/30 hover:border-white/30"}`}
+    >
+      <div className="flex items-start gap-3">
+        <input
+          type="radio"
+          name="discover-direction"
+          aria-label={choice.title}
+          checked={selected}
+          onChange={onSelect}
+          className="mt-1 h-4 w-4 shrink-0 accent-indigo-400"
+        />
+        <div className="min-w-0">
+          <h4 className="break-words text-base font-semibold leading-6 text-white">
+            {choice.title}
+          </h4>
+          <p className="mt-1 break-words text-xs leading-5 text-indigo-200">{choice.pace}</p>
+        </div>
+      </div>
+      <p className="break-words text-sm leading-6 text-gray-300">{choice.explanation}</p>
+      <dl className="space-y-3 text-sm leading-6">
+        {[
+          ["Early game", choice.early_game],
+          ["Engine", choice.engine],
+          ["Payoff", choice.payoff],
+        ].map(([label, text]) => (
+          <div key={label}>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
+            <dd className="break-words text-gray-200">{text}</dd>
+          </div>
+        ))}
+      </dl>
+      {!!choice.uncertainties.length && (
+        <p className="mt-auto break-words border-t border-white/10 pt-3 text-xs leading-5 text-gray-400">
+          Worth checking: {choice.uncertainties.join(" ")}
+        </p>
+      )}
+    </label>
+  );
+}
+
+function AdvancedSearch({ state, controller }: ViewProps) {
+  const count = state.tagIds.length + state.keywords.length;
+  return (
+    <details
+      className="min-w-0 rounded-xl border border-white/10 px-4 text-sm"
+      open={state.advanced}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== state.advanced)
+          void controller.setAdvanced(event.currentTarget.open);
+      }}
+    >
+      <summary
+        className={`min-h-11 cursor-pointer py-3 text-gray-400 hover:text-gray-200 ${FOCUS}`}
       >
-        Search rules
-      </button>
-      {rules && (
-        <>
-          <p>
-            {rules.matching_count} literal matches; showing {rules.selected.length} complete
-            entries. Snapshot {rules.rules_hash.slice(0, 12)}. Ordering is not strategic relevance.
+        Advanced search details{count ? ` · ${count} selected terms` : ""}
+      </summary>
+      {state.advanced && (
+        <div className="space-y-5 pb-5 pt-2">
+          <p className="text-xs leading-5 text-gray-400">
+            Optional: adjust the Scryfall terms used to find cards. Your choices override automatic
+            filters with one unscoped search using any selected term.
           </p>
-          {rules.selected.map((entry) => (
-            <details key={entry.key}>
-              <summary>{entry.key}</summary>
-              <p className="whitespace-pre-wrap text-sm">{entry.text}</p>
-            </details>
-          ))}
-          {rules.next_cursor && (
-            <button
-              className={BUTTON}
-              disabled={state.browsing}
-              onClick={() => void controller.searchRules("", true)}
-            >
-              Next rules page (same query)
-            </button>
+          {!!state.queries.length && <SearchFilters state={state} />}
+          {state.terms ? (
+            <>
+              <TermPicker
+                title="Oracle-Tags"
+                values={state.terms.oracle_tags}
+                selected={state.tagIds}
+                onToggle={(id) => controller.toggleTag(id)}
+                disabled={state.busy}
+              />
+              <TermPicker
+                title="Printed keywords"
+                values={state.terms.printed_keywords.map((label) => ({
+                  id: label,
+                  slug: label,
+                  label,
+                }))}
+                selected={state.keywords}
+                onToggle={(id) => controller.toggleKeyword(id)}
+                disabled={state.busy}
+              />
+            </>
+          ) : (
+            <p role="status" className="text-gray-400">
+              Loading search terms…
+            </p>
           )}
-        </>
+        </div>
       )}
-    </div>
+    </details>
   );
 }
 
-export function DiscoverTrace({ state, controller }: StateProps) {
-  const profile = state.trace?.["profile"];
-  const strategy = typeof profile === "string" && profile.startsWith("app-strategy-");
+function SearchFilters({ state }: { state: DiscoverState }) {
+  const labels = new Map(state.terms?.oracle_tags.map((term) => [term.id, term.label]) ?? []);
   return (
-    <div className={BOX}>
-      <RulesBrowser state={state} controller={controller} />
-      <h3>{strategy ? "Private commander strategy trace" : "Private plan/search trace"}</h3>
-      <p className="text-sm text-gray-400">
-        Private source context, raw answers, attempts and usage. Card runs also include initial and
-        replacement plans, actual queries/counts/errors and native rules pages. Dropped initial
-        discoveries are not silently retained. Exports may contain your goal; share deliberately.
+    <section aria-label="Saved search filters" className="space-y-3 rounded-lg bg-white/5 p-3">
+      <p className="text-xs text-gray-400">
+        Any search below may match. All groups within a search must match.
       </p>
-      <button
-        className={BUTTON}
-        disabled={strategy ? !state.status?.strategy_run : !state.status?.run}
-        onClick={() => void controller.inspect(strategy)}
-      >
-        Refresh trace (no model call)
-      </button>
-      {state.trace && (
-        <>
-          <button className={BUTTON} onClick={() => exportTrace(state.trace)}>
-            Export private trace
-          </button>
-          <pre className="max-h-[600px] overflow-auto whitespace-pre-wrap text-xs">
-            {JSON.stringify(state.trace, null, 2)}
-          </pre>
-        </>
-      )}
-    </div>
+      {state.queries.map((query, index) => (
+        <div key={index} className="space-y-1 text-xs leading-5 text-gray-300">
+          <p className="font-medium">{query.purpose}</p>
+          {query.groups.map((group, groupIndex) => (
+            <p key={groupIndex}>
+              {groupIndex ? "AND " : ""}
+              {[
+                ...group.oracle_tag_ids.map((id) => labels.get(id) ?? id),
+                ...group.printed_keywords,
+              ].join(" OR ")}
+            </p>
+          ))}
+          {!!query.card_types_any.length && (
+            <p>Front-face type: {query.card_types_any.join(" or ")}</p>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }
 
-function exportTrace(trace: Record<string, unknown> | null): void {
-  if (!trace) return;
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(trace, null, 2)], { type: "application/json" }),
+function TermPicker({
+  title,
+  values,
+  selected,
+  onToggle,
+  disabled,
+}: {
+  title: string;
+  values: StrategyTerm[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  disabled: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const selectedIds = new Set(selected);
+  const filtered = values.filter(
+    (term) => !selectedIds.has(term.id) && term.label.toLowerCase().includes(search.toLowerCase()),
   );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "discover-private-trace.json";
-  link.click();
-  URL.revokeObjectURL(url);
+  const labels = new Map(values.map((term) => [term.id, term.label]));
+  return (
+    <fieldset className="min-w-0 space-y-3" disabled={disabled}>
+      <legend className="font-medium text-gray-200">{title}</legend>
+      {!!selected.length && (
+        <div className="flex flex-wrap gap-2" aria-label={`Selected ${title}`}>
+          {selected.map((id) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed="true"
+              className={`min-h-11 max-w-full break-words rounded-lg bg-indigo-500/15 px-3 py-2 text-xs text-indigo-200 hover:bg-indigo-500/25 ${FOCUS}`}
+              onClick={() => onToggle(id)}
+            >
+              {labels.get(id) ?? `Unavailable term: ${id}`} <span aria-hidden="true">×</span>
+              <span className="sr-only"> — remove</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <input
+        aria-label={`Search ${title}`}
+        name={`discover-${title}-search`}
+        autoComplete="off"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Search terms…"
+        className={`min-h-11 w-full rounded-lg border border-white/15 bg-gray-950/50 px-3 py-2 ${FOCUS}`}
+      />
+      <div className="flex flex-wrap gap-2">
+        {filtered.slice(0, 20).map((term) => (
+          <button
+            key={term.id}
+            type="button"
+            aria-pressed="false"
+            className={`min-h-11 max-w-full break-words rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300 hover:border-indigo-400 hover:text-white ${FOCUS}`}
+            onClick={() => onToggle(term.id)}
+          >
+            {term.label}
+          </button>
+        ))}
+      </div>
+      {filtered.length > 20 && (
+        <p className="text-xs text-gray-500">
+          Showing 20 of {filtered.length.toLocaleString()} terms. Refine your search to see more.
+        </p>
+      )}
+      {!filtered.length && (
+        <p className="text-xs text-gray-400">No other terms match this search.</p>
+      )}
+    </fieldset>
+  );
+}
+
+function Matches({ state, controller }: ViewProps) {
+  const matches = state.matches;
+  if (!matches || matches.status === "setup_needed") return null;
+  if (["unavailable", "mismatched"].includes(matches.status))
+    return (
+      <p className={`${BOX} text-sm text-amber-200`}>
+        Card sources aren’t ready. Try again after the source sync finishes.
+      </p>
+    );
+  return (
+    <section aria-label="Matching cards" className="min-w-0 space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-lg font-semibold text-white">Cards for your strategy</h3>
+        <span className="text-sm tabular-nums text-gray-400">
+          {matches.total.toLocaleString()} matches
+        </span>
+      </div>
+      <p className="text-xs leading-5 text-gray-500">
+        Filtered by your Scryfall searches and ordered by global Commander popularity—not tag count
+        or verified synergy. Cards without popularity data remain available. Plan additions without
+        changing your deck.
+      </p>
+      {state.loading && (
+        <p role="status" className="text-sm text-gray-400">
+          Loading cards…
+        </p>
+      )}
+      {!matches.cards.length && (
+        <div className={`${BOX} text-sm leading-7 text-gray-400`}>
+          <h4 className="font-medium text-gray-200">No matching cards</h4>Try another direction or
+          adjust the terms in Advanced search details.
+        </div>
+      )}
+      <VisualCardGrid>
+        {matches.cards.map((card) => (
+          <VisualCardTile
+            key={card.oracle_id}
+            name={card.name}
+            imageUri={card.image_uri}
+            footer={<MatchDetails card={card} state={state} controller={controller} />}
+          />
+        ))}
+      </VisualCardGrid>
+      {matches.next_cursor && (
+        <button
+          className={SECONDARY}
+          disabled={state.loading}
+          onClick={() => void controller.next()}
+        >
+          Next page →
+        </button>
+      )}
+    </section>
+  );
+}
+
+function MatchDetails({ card, state, controller }: ViewProps & { card: StrategyMatch }) {
+  return (
+    <article className="space-y-3 text-sm">
+      <h4 className="font-semibold leading-6">
+        {card.name} <ManaCost cost={card.mana_cost} />
+      </h4>
+      <p className="text-xs text-gray-400">{card.type_line}</p>
+      <details>
+        <summary className={`min-h-11 cursor-pointer py-3 text-xs text-indigo-200 ${FOCUS}`}>
+          Why this card?
+        </summary>
+        <p className="whitespace-pre-wrap py-2 text-xs leading-6 text-gray-300">
+          {card.oracle_text}
+        </p>
+        {card.global_popularity_rank !== null && (
+          <p className="pb-2 text-xs text-gray-400">
+            Global popularity rank: #{card.global_popularity_rank.toLocaleString()}
+          </p>
+        )}
+        <ul className="space-y-1 pb-2 text-xs text-gray-400">
+          {card.evidence.map((evidence, index) => (
+            <li key={`${evidence.criterion_label}-${index}`}>
+              {evidence.query_purpose}: {evidence.criterion_label}
+              {evidence.matched_tag_label && evidence.matched_tag_label !== evidence.criterion_label
+                ? ` → ${evidence.matched_tag_label}`
+                : ""}
+            </li>
+          ))}
+        </ul>
+      </details>
+      <div className="flex flex-wrap gap-1">
+        <button
+          className={BUTTON}
+          disabled={!!state.planning}
+          onClick={() => void controller.plan(card.oracle_id)}
+        >
+          {state.planning === card.oracle_id ? "Planning…" : "Plan addition"}
+        </button>
+        <button
+          className={SECONDARY}
+          disabled={!!state.dismissing}
+          onClick={() => void controller.dismiss(card.oracle_id)}
+        >
+          Dismiss
+        </button>
+      </div>
+    </article>
+  );
 }

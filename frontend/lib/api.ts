@@ -69,11 +69,13 @@ import type {
 } from "@/lib/types";
 
 import type {
-  DiscoverGenerate,
-  DiscoverPage,
-  DiscoverPreview,
+  DiscoverTerms,
+  DiscoverSetup,
+  DiscoverStrategy,
+  StrategyQuery,
   DiscoverRun,
-  DiscoverStatus,
+  StrategyMatches,
+  TermSuggestionRun,
 } from "@/lib/discovery-types";
 
 const CLIENT_BASE =
@@ -134,43 +136,58 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
-  draftCommanderStrategy: (deckId: string, body: { request_key: string }) =>
+  draftCommanderStrategy: (deckId: string, body: { request_key: string; reuse_latest?: boolean }) =>
     request<DiscoverRun>(`/decks/${deckId}/recommendations/strategy-drafts`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  getDiscoverRun: (deckId: string, runId: string) =>
+    request<DiscoverRun>(`/decks/${deckId}/recommendations/runs/${runId}`),
+  suggestDiscoverTerms: (
+    deckId: string,
+    body: {
+      request_key: string;
+      prose: string;
+      strategy_revision: string | null;
+      reuse_latest?: boolean;
+    },
+  ) =>
+    request<TermSuggestionRun>(`/decks/${deckId}/recommendations/term-suggestions`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getDiscoverTermSuggestions: (deckId: string, runId: string) =>
+    request<TermSuggestionRun>(`/decks/${deckId}/recommendations/term-suggestions/${runId}`),
 
   getDiscoverStatus: (deckId: string) =>
-    request<DiscoverStatus>(`/decks/${deckId}/recommendations/status`),
-  previewDiscover: (deckId: string, body: DiscoverPreview) =>
-    request<DiscoverPage>(`/decks/${deckId}/recommendations/preview-query`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  generateDiscover: (deckId: string, body: DiscoverGenerate) =>
-    request<DiscoverRun>(`/decks/${deckId}/recommendations/runs`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  getDiscoverTrace: (deckId: string, runId: string) =>
-    request<Record<string, unknown>>(`/decks/${deckId}/recommendations/runs/${runId}/trace`),
-  planDiscover: (deckId: string, oracleId: string, runId: string | null) =>
-    request<boolean>(
-      runId
-        ? `/decks/${deckId}/recommendations/runs/${runId}/candidates/${oracleId}/plan`
-        : `/decks/${deckId}/recommendations/candidates/${oracleId}/plan`,
-      { method: "POST" },
-    ),
-  feedbackDiscover: (
+    request<StrategyMatches>(`/decks/${deckId}/recommendations/status`),
+  getDiscoverTerms: (deckId: string) =>
+    request<DiscoverTerms>(`/decks/${deckId}/recommendations/source-terms`),
+  getDiscoverSetup: (deckId: string) =>
+    request<DiscoverSetup>(`/decks/${deckId}/recommendations/setup`),
+  saveDiscoverStrategy: (
     deckId: string,
-    runId: string,
-    oracleId: string,
-    verdict: "useful" | "incorrect" | "uncertain",
-    note: string,
+    body: {
+      prose: string;
+      queries: StrategyQuery[];
+      revision: string | null;
+    },
   ) =>
-    request<boolean>(`/decks/${deckId}/recommendations/runs/${runId}/feedback`, {
+    request<DiscoverStrategy>(`/decks/${deckId}/recommendations/strategy`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getDiscoverMatches: (deckId: string, cursor?: string) =>
+    request<StrategyMatches>(
+      `/decks/${deckId}/recommendations/matches${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    ),
+  planDiscoverMatch: (deckId: string, oracleId: string) =>
+    request<boolean>(`/decks/${deckId}/recommendations/matches/${oracleId}/plan`, {
       method: "POST",
-      body: JSON.stringify({ oracle_id: oracleId, verdict, note }),
+    }),
+  dismissDiscoverMatch: (deckId: string, oracleId: string, undo = false) =>
+    request<boolean>(`/decks/${deckId}/recommendations/matches/${oracleId}/dismiss`, {
+      method: undo ? "DELETE" : "POST",
     }),
 
   // Cards

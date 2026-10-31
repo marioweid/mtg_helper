@@ -1,0 +1,1171 @@
+{
+  "source": {
+    "source_sha256": "36c8c87fb0da4ff633cc29a79f8c5221d66f393bcc4e3bf365bd3de2f9168211",
+    "tag_sha256": "1997cecccac98a5cdd4f1a3d861ec8bf6a3f5f658b9b2f6154b7521e8d432461",
+    "published_at": "2026-10-28 15:32:30.854610+00:00",
+    "ranking_fingerprint": "0dbc97b70852c8fe275249e8c4e8d29e"
+  },
+  "runs": [
+    {
+      "deck": "yuna",
+      "arm": "baseline",
+      "seconds": 9.302503099000205,
+      "estimated_cost_microusd": 4573,
+      "total": 1826,
+      "reference_hits_at_10": 2,
+      "reference_hits_at_50": 10,
+      "reference_hits_in_pool": 34,
+      "target_count": 65,
+      "reference_hits_at_20": 4,
+      "reference_ids_in_pool": [
+        "01dbf1bc-ca62-4fb6-959c-ef7c0dc03bb0",
+        "07e15387-f346-4fa0-b556-d1c52d4acc07",
+        "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+        "0d3a4db2-df79-4946-8f87-b174cf9c293c",
+        "13bf8103-3db3-4ee6-a6bb-441aabfd9e41",
+        "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+        "1f4743ed-4e91-4344-9409-c8ede5c4804d",
+        "2b0afb89-0944-4861-b9c3-e909e2ac215e",
+        "34428f42-03ac-4795-8286-6cbea796df2b",
+        "41fed659-237c-4d8e-ad31-d17fa0d3f764",
+        "4228dd75-1fdd-48dc-9259-b841b2e46c64",
+        "4b8736e2-fc41-4a25-bb6c-7351afc40981",
+        "50d6fd91-23d3-4d32-804f-6233e4386904",
+        "5ea3e672-ae14-49a4-badb-f713497dd126",
+        "611bfaa6-b098-48d9-9e49-1e7dc8687f15",
+        "678ef5e4-800d-4d3a-8761-2abaad70e0c9",
+        "72deedab-7c17-4505-aeca-4bc8596d80a5",
+        "83e78565-e61f-4bbc-b834-f47941f7e3ec",
+        "8d24c12a-a300-4199-b2a9-3d5ead8df617",
+        "8f5b71fd-469f-4370-a806-9bfefbae03a2",
+        "915b75d1-b5e3-4aca-a54c-beaccef0a2e4",
+        "92cda790-7907-47d1-8e5a-d3364c1e881f",
+        "93d0e129-e3b5-4aff-9e50-f34771ed00ff",
+        "98aa9424-5912-4bd6-9300-b3972a31d8af",
+        "99a3cea9-f4ab-4da3-a085-c09dc93fc8cb",
+        "9ee0d4a0-fd8d-43c4-a2aa-c4e6af5beecc",
+        "afeba4d7-b659-4fb1-84dd-27704fbb2621",
+        "c0891157-f3dd-4866-866f-fd13e9be9633",
+        "c81195d4-19c6-4cac-b312-7f5c33dff962",
+        "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+        "e3aa16cf-079b-4737-9ffd-7bfdffef0cb2",
+        "f122624f-f30d-444e-a62a-939829241045",
+        "f4770345-f15e-4e31-b6ef-4c2608df9644",
+        "fd6e1967-237a-41f6-bbf4-2c869f9447c8"
+      ],
+      "cards": [
+        {
+          "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+          "name": "Birds of Paradise",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Bird",
+          "oracle_text": "Flying\n{T}: Add one mana of any color.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Flying"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+          "name": "Llanowar Elves",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Add {G}.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
+          "name": "Elvish Mystic",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Add {G}.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f9d3b046-0b95-4103-a630-4b3fb88bb60b",
+          "name": "Delighted Halfling",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Halfling Citizen",
+          "oracle_text": "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "ab8d5f5c-1976-4f77-8ed2-8d28ee666741",
+          "name": "Tireless Provisioner",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Elf Scout",
+          "oracle_text": "Landfall — Whenever a land you control enters, create a Food token or a Treasure token. (Food is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\" Treasure is an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Treasure",
+            "Food",
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "df317532-7d36-40fd-938f-e972749c8792",
+          "name": "Fyndhorn Elves",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Add {G}.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3a940dfa-a026-4969-8981-ef90cdfbe9ef",
+          "name": "Ornithopter of Paradise",
+          "mana_cost": "{2}",
+          "type_line": "Artifact Creature — Thopter",
+          "oracle_text": "Flying\n{T}: Add one mana of any color.",
+          "color_identity": [],
+          "keywords": [
+            "Flying"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "78427103-9543-41fb-b6d4-72963fe87275",
+          "name": "The Great Henge",
+          "mana_cost": "{7}{G}{G}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "This spell costs {X} less to cast, where X is the greatest power among creatures you control.\n{T}: Add {G}{G}. You gain 2 life.\nWhenever a nontoken creature you control enters, put a +1/+1 counter on it and draw a card.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 9.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+          "name": "Bloom Tender",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "Vivid — {T}: For each color among permanents you control, add one mana of that color.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Vivid"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "4ba5b3f6-503b-43e6-b66e-4f8c55cffed7",
+          "name": "Avenger of Zendikar",
+          "mana_cost": "{5}{G}{G}",
+          "type_line": "Creature — Elemental",
+          "oracle_text": "When this creature enters, create a 0/1 green Plant creature token for each land you control.\nLandfall — Whenever a land you control enters, you may put a +1/+1 counter on each Plant creature you control.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": "5",
+          "toughness": "5",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 7.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+          "name": "The Ozolith",
+          "mana_cost": "{1}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on The Ozolith.\nAt the beginning of combat on your turn, if The Ozolith has counters on it, you may move all counters from The Ozolith onto target creature.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "8ad91f64-ccab-4edc-bd54-b2ee9267d614",
+          "name": "Lotus Cobra",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Snake",
+          "oracle_text": "Landfall — Whenever a land you control enters, add one mana of any color.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "2ef75cf3-30dc-4852-a6d1-1d6391fad022",
+          "name": "Forgotten Ancient",
+          "mana_cost": "{3}{G}",
+          "type_line": "Creature — Elemental",
+          "oracle_text": "Whenever a player casts a spell, you may put a +1/+1 counter on this creature.\nAt the beginning of your upkeep, you may move any number of +1/+1 counters from this creature onto other creatures.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f122624f-f30d-444e-a62a-939829241045",
+          "name": "Kami of Whispered Hopes",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Spirit",
+          "oracle_text": "If one or more +1/+1 counters would be put on a permanent you control, that many plus one +1/+1 counters are put on that permanent instead.\n{T}: Add X mana of any one color, where X is this creature's power.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "7973820b-fdaf-46ec-9e3e-d4c0e77b5067",
+          "name": "Fanatic of Rhonas",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Snake Druid",
+          "oracle_text": "{T}: Add {G}.\nFerocious — {T}: Add {G}{G}{G}{G}. Activate only if you control a creature with power 4 or greater.\nEternalize {2}{G}{G} ({2}{G}{G}, Exile this card from your graveyard: Create a token that's a copy of it, except it's a 4/4 black Zombie Snake Druid with no mana cost. Eternalize only as a sorcery.)",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Ferocious",
+            "Eternalize"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "4",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "1d725121-e50c-42f0-9128-56802f07c89e",
+          "name": "Selvala, Heart of the Wilds",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Legendary Creature — Elf Scout",
+          "oracle_text": "Whenever another creature enters, its controller may draw a card if its power is greater than each other creature's power.\n{G}, {T}: Add X mana in any combination of colors, where X is the greatest power among creatures you control.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "4b515bb0-f275-4400-8032-3173b799ab40",
+          "name": "Walking Ballista",
+          "mana_cost": "{X}{X}",
+          "type_line": "Artifact Creature — Construct",
+          "oracle_text": "This creature enters with X +1/+1 counters on it.\n{4}: Put a +1/+1 counter on this creature.\nRemove a +1/+1 counter from this creature: It deals 1 damage to any target.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "0",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 0.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+          "name": "Enduring Vitality",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Enchantment Creature — Elk Glimmer",
+          "oracle_text": "Vigilance\nCreatures you control have \"{T}: Add one mana of any color.\"\nWhen Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Vigilance"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "1e6a24be-8281-41c1-a5ba-b68f0ef1d7b8",
+          "name": "Snakeskin Veil",
+          "mana_cost": "{G}",
+          "type_line": "Instant",
+          "oracle_text": "Put a +1/+1 counter on target creature you control. It gains hexproof until end of turn. (It can't be the target of spells or abilities your opponents control.)",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "70a6f08e-854d-4e2f-9d8c-c45ec3231157",
+          "name": "Faeburrow Elder",
+          "mana_cost": "{1}{G}{W}",
+          "type_line": "Creature — Treefolk Druid",
+          "oracle_text": "Vigilance\nThis creature gets +1/+1 for each color among permanents you control.\n{T}: For each color among permanents you control, add one mana of that color.",
+          "color_identity": [
+            "G",
+            "W"
+          ],
+          "keywords": [
+            "Vigilance"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "0",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "069f6530-e65c-4d52-85f3-e0a2acd148c5",
+          "name": "Avacyn's Pilgrim",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Human Monk",
+          "oracle_text": "{T}: Add {W}.",
+          "color_identity": [
+            "G",
+            "W"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "16629f59-bae8-4c19-bf50-443eb0ed6856",
+          "name": "Felidar Retreat",
+          "mana_cost": "{3}{W}",
+          "type_line": "Enchantment",
+          "oracle_text": "Landfall — Whenever a land you control enters, choose one —\n• Create a 2/2 white Cat Beast creature token.\n• Put a +1/+1 counter on each creature you control. Those creatures gain vigilance until end of turn.",
+          "color_identity": [
+            "W"
+          ],
+          "keywords": [
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "cc65ac73-5bef-4ecb-ad8e-39199084c027",
+          "name": "Cathars' Crusade",
+          "mana_cost": "{3}{W}{W}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control enters, put a +1/+1 counter on each creature you control.",
+          "color_identity": [
+            "W"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 5.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "97435e03-2fff-4fe0-8fa9-69ab0a046a33",
+          "name": "Unbreakable Formation",
+          "mana_cost": "{2}{W}",
+          "type_line": "Instant",
+          "oracle_text": "Creatures you control gain indestructible until end of turn.\nAddendum — If you cast this spell during your main phase, put a +1/+1 counter on each of those creatures and they gain vigilance until end of turn.",
+          "color_identity": [
+            "W"
+          ],
+          "keywords": [
+            "Addendum"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "c549b0fd-1e08-4873-952e-a14dc45a0fd2",
+          "name": "Champion of Lambholt",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Creature — Human Warrior",
+          "oracle_text": "Creatures with power less than this creature's power can't block creatures you control.\nWhenever another creature you control enters, put a +1/+1 counter on this creature.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "4567a528-75f0-4ea6-b927-3a500caf76ac",
+          "name": "Arbor Elf",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Untap target Forest.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "72deedab-7c17-4505-aeca-4bc8596d80a5",
+          "name": "Tribute to the World Tree",
+          "mana_cost": "{G}{G}{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control enters, draw a card if its power is 3 or greater. Otherwise, put two +1/+1 counters on it.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "3c1ef404-e2c6-486d-a5a2-d5779c71d498",
+          "name": "Archdruid's Charm",
+          "mana_cost": "{G}{G}{G}",
+          "type_line": "Instant",
+          "oracle_text": "Choose one —\n• Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand. Then shuffle.\n• Put a +1/+1 counter on target creature you control. It deals damage equal to its power to target creature you don't control.\n• Exile target artifact or enchantment.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "36f68aa3-9955-46f1-bc87-497f16ef5222",
+          "name": "Wizard Class",
+          "mana_cost": "{U}",
+          "type_line": "Enchantment — Class",
+          "oracle_text": "(Gain the next level as a sorcery to add its ability.)\nYou have no maximum hand size.\n{2}{U}: Level 2\nWhen this Class becomes level 2, draw two cards.\n{4}{U}: Level 3\nWhenever you draw a card, put a +1/+1 counter on target creature you control.",
+          "color_identity": [
+            "U"
+          ],
+          "keywords": [],
+          "layout": "class",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "34428f42-03ac-4795-8286-6cbea796df2b",
+          "name": "Incubation Druid",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Add one mana of any type that a land you control could produce. If this creature has a +1/+1 counter on it, add three mana of that type instead.\n{3}{G}{G}: Adapt 3. (If this creature has no +1/+1 counters on it, put three +1/+1 counters on it.)",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Adapt"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "41fed659-237c-4d8e-ad31-d17fa0d3f764",
+          "name": "Ozolith, the Shattered Spire",
+          "mana_cost": "{1}{G}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "If one or more +1/+1 counters would be put on an artifact or creature you control, that many plus one +1/+1 counters are put on it instead.\n{1}{G}, {T}: Put a +1/+1 counter on target artifact or creature you control. Activate only as a sorcery.\nCycling {2} ({2}, Discard this card: Draw a card.)",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Cycling"
+          ],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "e6555cca-e608-4c87-b835-9cd47fd1f543",
+          "name": "Tireless Tracker",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Human Scout",
+          "oracle_text": "Landfall — Whenever a land you control enters, investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nWhenever you sacrifice a Clue, put a +1/+1 counter on this creature.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Investigate",
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": "3",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "5e7ef7fe-968b-4ada-9fe4-6fda0541aafc",
+          "name": "The Earth Crystal",
+          "mana_cost": "{2}{G}{G}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "Green spells you cast cost {1} less to cast.\nIf one or more +1/+1 counters would be put on a creature you control, twice that many +1/+1 counters are put on that creature instead.\n{4}{G}{G}, {T}: Distribute two +1/+1 counters among one or two target creatures you control.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "acfe7ec0-0606-4d5e-b1fa-25f0c7aeec47",
+          "name": "Sanctum Weaver",
+          "mana_cost": "{1}{G}",
+          "type_line": "Enchantment Creature — Dryad",
+          "oracle_text": "{T}: Add X mana of any one color, where X is the number of enchantments you control.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "915b75d1-b5e3-4aca-a54c-beaccef0a2e4",
+          "name": "Innkeeper's Talent",
+          "mana_cost": "{1}{G}",
+          "type_line": "Enchantment — Class",
+          "oracle_text": "(Gain the next level as a sorcery to add its ability.)\nAt the beginning of combat on your turn, put a +1/+1 counter on target creature you control.\n{G}: Level 2\nPermanents you control with counters on them have ward {1}.\n{3}{G}: Level 3\nIf you would put one or more counters on a permanent or player, put twice that many of each of those kinds of counters on that permanent or player instead.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "class",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "69facbc7-3859-4716-b627-5199571fb3cf",
+          "name": "Chasm Skulker",
+          "mana_cost": "{2}{U}",
+          "type_line": "Creature — Squid Horror",
+          "oracle_text": "Whenever you draw a card, put a +1/+1 counter on this creature.\nWhen this creature dies, create X 1/1 blue Squid creature tokens with islandwalk, where X is the number of +1/+1 counters on this creature. (They can't be blocked as long as defending player controls an Island.)",
+          "color_identity": [
+            "U"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "7b0767b8-b504-456e-93bd-218502f73b3d",
+          "name": "Palladium Myr",
+          "mana_cost": "{3}",
+          "type_line": "Artifact Creature — Myr",
+          "oracle_text": "{T}: Add {C}{C}.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "84122d81-9634-4d3f-85a5-f6cf4303691a",
+          "name": "Mossborn Hydra",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature — Elemental Hydra",
+          "oracle_text": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nThis creature enters with a +1/+1 counter on it.\nLandfall — Whenever a land you control enters, double the number of +1/+1 counters on this creature.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Trample",
+            "Double",
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "0",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3a198a16-17b9-481e-b516-5bc945c7e247",
+          "name": "Priest of Titania",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Add {G} for each Elf on the battlefield.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "98aa9424-5912-4bd6-9300-b3972a31d8af",
+          "name": "Noble Hierarch",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Human Druid",
+          "oracle_text": "Exalted (Whenever a creature you control attacks alone, that creature gets +1/+1 until end of turn.)\n{T}: Add {G}, {W}, or {U}.",
+          "color_identity": [
+            "G",
+            "U",
+            "W"
+          ],
+          "keywords": [
+            "Exalted"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "986ae327-f433-4c58-93dc-afc544b9bfcb",
+          "name": "Steel Overseer",
+          "mana_cost": "{2}",
+          "type_line": "Artifact Creature — Construct",
+          "oracle_text": "{T}: Put a +1/+1 counter on each artifact creature you control.",
+          "color_identity": [],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "1",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "e87906d2-db1a-4e19-b910-adb4eb339945",
+          "name": "Urza, Lord High Artificer",
+          "mana_cost": "{2}{U}{U}",
+          "type_line": "Legendary Creature — Human Artificer",
+          "oracle_text": "When Urza enters, create a 0/0 colorless Construct artifact creature token with \"This token gets +1/+1 for each artifact you control.\"\nTap an untapped artifact you control: Add {U}.\n{5}: Shuffle your library, then exile the top card. Until end of turn, you may play that card without paying its mana cost.",
+          "color_identity": [
+            "U"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "4",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 4.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f2f09757-1931-47c0-a5f0-39280445489d",
+          "name": "Gilded Goose",
+          "mana_cost": "{G}",
+          "type_line": "Creature — Bird",
+          "oracle_text": "Flying\nWhen this creature enters, create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\n{1}{G}, {T}: Create a Food token.\n{T}, Sacrifice a Food: Add one mana of any color.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Flying",
+            "Food"
+          ],
+          "layout": "normal",
+          "power": "0",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "e9117015-1050-44dd-a46b-e7ffe2085fae",
+          "name": "Ledger Shredder",
+          "mana_cost": "{1}{U}",
+          "type_line": "Creature — Bird Advisor",
+          "oracle_text": "Flying\nWhenever a player casts their second spell each turn, this creature connives. (Draw a card, then discard a card. If you discarded a nonland card, put a +1/+1 counter on this creature.)",
+          "color_identity": [
+            "U"
+          ],
+          "keywords": [
+            "Flying",
+            "Connive"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "3",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "e3aa16cf-079b-4737-9ffd-7bfdffef0cb2",
+          "name": "Gyre Sage",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)\n{T}: Add {G} for each +1/+1 counter on this creature.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Evolve"
+          ],
+          "layout": "normal",
+          "power": "1",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "6e2c2423-d854-4478-99e6-64f29851f026",
+          "name": "Elvish Archdruid",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "761021ce-4559-464e-aa03-85c2fe78e267",
+          "name": "Rishkar, Peema Renegade",
+          "mana_cost": "{2}{G}",
+          "type_line": "Legendary Creature — Elf Druid",
+          "oracle_text": "When Rishkar enters, put a +1/+1 counter on each of up to two target creatures.\nEach creature you control with a counter on it has \"{T}: Add {G}.\"",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 3.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "7fffbe7f-ad78-4bb6-a611-c37e495c6ee0",
+          "name": "Kappa Cannoneer",
+          "mana_cost": "{5}{U}",
+          "type_line": "Artifact Creature — Turtle Warrior",
+          "oracle_text": "Improvise (Your artifacts can help cast this spell. Each artifact you tap after you're done activating mana abilities pays for {1}.)\nWard {4}\nWhenever this creature or another artifact you control enters, put a +1/+1 counter on this creature. It can't be blocked this turn.",
+          "color_identity": [
+            "U"
+          ],
+          "keywords": [
+            "Improvise",
+            "Ward"
+          ],
+          "layout": "normal",
+          "power": "4",
+          "toughness": "4",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 6.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "64824ae5-efab-4b55-9d3c-b9c690bad857",
+          "name": "Essence Flux",
+          "mana_cost": "{U}",
+          "type_line": "Instant",
+          "oracle_text": "Exile target creature you control, then return that card to the battlefield under its owner's control. If it's a Spirit, put a +1/+1 counter on it.",
+          "color_identity": [
+            "U"
+          ],
+          "keywords": [],
+          "layout": "normal",
+          "power": null,
+          "toughness": null,
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 1.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "d3b2d8a2-d3bc-448c-9cf6-6bead6010c28",
+          "name": "Bristly Bill, Spine Sower",
+          "mana_cost": "{1}{G}",
+          "type_line": "Legendary Creature — Plant Druid",
+          "oracle_text": "Landfall — Whenever a land you control enters, put a +1/+1 counter on target creature.\n{3}{G}{G}: Double the number of +1/+1 counters on each creature you control.",
+          "color_identity": [
+            "G"
+          ],
+          "keywords": [
+            "Double",
+            "Landfall"
+          ],
+          "layout": "normal",
+          "power": "2",
+          "toughness": "2",
+          "loyalty": null,
+          "defense": null,
+          "mana_value": 2.0,
+          "faces": [],
+          "commander_legality": "legal",
+          "reference_hit": false
+        }
+      ],
+      "queries": [
+        {
+          "purpose": "Find repeatable +1/+1 counter engines and broad counter-placement support.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "9a3f1038-140e-447a-ba5d-020893c49977",
+                "c1100c9e-08bf-4845-9263-1a5f86b9005f"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature",
+            "Artifact",
+            "Enchantment",
+            "Instant",
+            "Sorcery"
+          ]
+        },
+        {
+          "purpose": "Find effects that preserve or redistribute counters when permanents leave the battlefield.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "df701b09-a6c7-499b-ae14-3ddf41c0d5b6",
+                "15372c12-7e27-4b5a-bdb3-f641b7ac4272"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature",
+            "Artifact",
+            "Enchantment",
+            "Instant",
+            "Sorcery"
+          ]
+        },
+        {
+          "purpose": "Find creature-based mana acceleration to support a counter-focused creature strategy.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+                "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        }
+      ]
+    },
+    {
+      "deck": "meren",
+      "arm": "baseline",
+      "seconds": 11.744577313000036,
+      "estimated_cost_microusd": 5074,
+      "error": "ValidationError"
+    }
+  ],
+  "attempts": 2,
+  "known_cost_microusd": 9647,
+  "has_unknown_cost": false
+}

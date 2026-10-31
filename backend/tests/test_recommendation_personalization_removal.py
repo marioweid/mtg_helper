@@ -17,6 +17,9 @@ from mtg_helper.services.recommendations.service import DiscoveryService
 from mtg_helper.services.recommendations.source_repository import SourceRepository
 from tests.conftest import create_test_deck
 
+RAMP_TAG = UUID("99000000-0000-4000-8000-000000000001")
+LAND_TAG = UUID("99000000-0000-4000-8000-000000000002")
+
 
 async def _card_ids(pool: asyncpg.Pool, names: list[str]) -> dict[str, UUID]:
     rows = await pool.fetch("SELECT id, name FROM cards WHERE name = ANY($1::text[])", names)
@@ -31,16 +34,17 @@ async def _insert_card(
     type_line: str = "Artifact",
     mana_cost: str = "{1}{G}",
     colors: list[str] | None = None,
-    tags: list[str] | None = None,
+    oracle_tags: list[UUID] | None = None,
+    oracle_text: str | None = None,
     price: str = "1.00",
     canonical: bool = True,
 ) -> UUID:
-    return await pool.fetchval(
+    card_id = await pool.fetchval(
         """
         INSERT INTO cards (scryfall_id, oracle_id, name, mana_cost, cmc, type_line, oracle_text,
-            color_identity, colors, legalities, prices, tags, card_types, is_canonical)
+            color_identity, colors, legalities, prices, card_types, is_canonical)
         VALUES ($1, $2, $3, $4, 2, $5, $6, $7, $7, '{"commander":"legal"}'::jsonb,
-            jsonb_build_object('eur', $8::text), $9, ARRAY[$10]::text[], $11)
+            jsonb_build_object('eur', $8::text), ARRAY[$9]::text[], $10)
         RETURNING id
         """,
         uuid4(),
@@ -48,13 +52,20 @@ async def _insert_card(
         name,
         mana_cost,
         type_line,
-        f"{name} supports the deck plan.",
+        oracle_text or f"{name} supports the deck plan.",
         colors or ["G"],
         price,
-        tags or [],
         type_line.split()[0],
         canonical,
     )
+    for tag in oracle_tags or []:
+        await pool.execute(
+            "INSERT INTO scryfall_tag_memberships (tag_id,oracle_id,details) "
+            "SELECT $1,oracle_id,'{}' FROM cards WHERE id=$2",
+            tag,
+            card_id,
+        )
+    return card_id
 
 
 async def _publish_sources(pool: asyncpg.Pool, recent: set[UUID]) -> None:
@@ -78,12 +89,28 @@ async def _publish_sources(pool: asyncpg.Pool, recent: set[UUID]) -> None:
     ]
     async with pool.acquire() as conn, conn.transaction():
         await catalog.publish(conn, sources, release_history(sources), now)
+        source_hash = await conn.fetchval("SELECT source_sha256 FROM new_card_catalog_state")
+        await conn.execute(
+            "INSERT INTO scryfall_tag_state (source_sha256,tag_sha256,archive_sha256,manifest,"
+            "started_at,published_at,tag_count,membership_count) "
+            "VALUES ($1,$1,$1,'{}',now(),now(),1000,1000)",
+            source_hash,
+        )
 
 
 async def _seed_retrieval_state(pool: asyncpg.Pool) -> dict[str, UUID]:
-    ramp_a = await _insert_card(pool, "Seeded Ramp A", tags=["ramp"])
+    await pool.executemany(
+        "INSERT INTO scryfall_tags (id,slug,metadata) "
+        "VALUES ($1,$2,jsonb_build_object('label',$2::text))",
+        [(RAMP_TAG, "ramp"), (LAND_TAG, "lands")],
+    )
+    await pool.executemany(
+        "INSERT INTO scryfall_tag_descendants (ancestor_id,descendant_id) VALUES ($1,$1)",
+        [(RAMP_TAG,), (LAND_TAG,)],
+    )
+    ramp_a = await _insert_card(pool, "Seeded Ramp A", oracle_tags=[RAMP_TAG])
     ramp_b = await _insert_card(
-        pool, "Seeded Ramp B", type_line="Enchantment", tags=["ramp"], price="2.00"
+        pool, "Seeded Ramp B", type_line="Enchantment", oracle_tags=[RAMP_TAG], price="2.00"
     )
     garden = await _insert_card(
         pool,
@@ -91,17 +118,23 @@ async def _seed_retrieval_state(pool: asyncpg.Pool) -> dict[str, UUID]:
         type_line="Land",
         mana_cost="",
         colors=["G", "W"],
-        tags=["lands"],
+        oracle_tags=[LAND_TAG],
+        oracle_text="Mana fixing for lands and color sources. {T}: Add {G} or {W}.",
     )
-    pet = await _insert_card(pool, "Legacy Pet", type_line="Creature", tags=[])
+    pet = await _insert_card(pool, "Legacy Pet", type_line="Creature")
     reprint = await _insert_card(
         pool, "Seeded Ramp A reprint", oracle_id=await _oracle(pool, ramp_a), canonical=False
     )
-    ids = await _card_ids(pool, ["Doubling Season", "Forest", "Plains"])
-    await pool.execute(
-        "UPDATE cards SET tags = ARRAY['ramp'] WHERE id = $1", ids["Doubling Season"]
+    ids = await _card_ids(pool, ["Doubling Season", "Forest", "Plains", "Hazel of the Rootbloom"])
+    await pool.executemany(
+        "INSERT INTO scryfall_tag_memberships (tag_id,oracle_id,details) "
+        "SELECT $1,oracle_id,'{}' FROM cards WHERE id=$2",
+        [
+            (RAMP_TAG, ids["Doubling Season"]),
+            (RAMP_TAG, ids["Hazel of the Rootbloom"]),
+            (LAND_TAG, ids["Forest"]),
+        ],
     )
-    await pool.execute("UPDATE cards SET tags = ARRAY['lands'] WHERE id = $1", ids["Forest"])
     return {
         "doubling_season": ids["Doubling Season"],
         "plains": ids["Plains"],
@@ -136,7 +169,7 @@ async def _outcomes(
         f"/api/v1/decks/{deck_id}/build", json={"stage": "ramp", "target": 10}
     )
     suggest = await client.post(
-        f"/api/v1/decks/{deck_id}/suggest", json={"prompt": "ramp", "count": 10}
+        f"/api/v1/decks/{deck_id}/suggest", json={"prompt": str(RAMP_TAG), "count": 10}
     )
     mana = await client.post(f"/api/v1/decks/{deck_id}/mana-fix")
     swap = await client.post(f"/api/v1/decks/{deck_id}/cards/{swap_id}/swap", json={"limit": 10})
@@ -145,6 +178,7 @@ async def _outcomes(
     async with pool.acquire() as conn:
         deck = await new_cards_repository.owned_deck(conn, owner, deck_id)
         state = await new_cards_repository.load(conn, owner, deck)
+        assert state.status == "ready", state.error
     discover = await DiscoveryService(pool, SourceRepository(pool), Provider("test")).preview(
         owner, deck_id, QueryPreview(limit=50)
     )
@@ -228,6 +262,9 @@ async def test_real_recommendation_outcomes_ignore_seeded_legacy_tastes(
     """Builder, New Cards, and Discover retain ordered source/deck outcomes after legacy seeds."""
     ids = await _seed_retrieval_state(db_pool)
     deck_id = UUID(await create_test_deck(client, name="Legacy-insensitive deck"))
+    await db_pool.execute(
+        "UPDATE decks SET archetype_tags=$2 WHERE id=$1", deck_id, [str(RAMP_TAG)]
+    )
     await db_pool.executemany(
         "INSERT INTO deck_cards (deck_id, card_id) VALUES ($1, $2)",
         [

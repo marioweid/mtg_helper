@@ -5,7 +5,7 @@ import json
 import pytest
 
 from tests import test_recommendation_pilot
-from tests.test_recommendation_pilot import path, request
+from tests.test_recommendation_pilot import archived_card_run, path
 
 pilot = test_recommendation_pilot.pilot
 pytestmark = pytest.mark.asyncio
@@ -27,19 +27,16 @@ async def test_artwork_enriches_source_status_and_run_without_changing_facts_or_
         assert page["snapshot_hash"] == source_hash and len(transport.calls) == 0
         assert page["cards"][0]["image_uri"] == image
         assert "image_uri" not in page["cards"][0]["facts"]
-        generated = await client.post(path(deck) + "/runs", json=request())
-        run_id = generated.json()["data"]["id"]
+        run_id = await archived_card_run(pilot)
         run = (await client.get(path(deck) + f"/runs/{run_id}")).json()["data"]
         selected = next(c for c in run["candidates"] if c["oracle_id"] == str(card["oracle_id"]))
         assert selected["image_uri"] == image and "image_uri" not in selected["facts"]
         status = (await client.get(path(deck) + "/status")).json()["data"]
-        selected = next(
-            c for c in status["run"]["candidates"] if c["oracle_id"] == str(card["oracle_id"])
-        )
-        assert selected["image_uri"] == image and len(transport.calls) == 3
+        assert status["strategy"] is None
+        assert selected["image_uri"] == image and transport.calls == []
         assert all("image_uri" not in json.dumps(call["input"]) for call in transport.calls)
         frozen = await db_pool.fetchval(
-            "SELECT data FROM recommendation_runs WHERE id = $1", generated.json()["data"]["id"]
+            "SELECT data FROM recommendation_runs WHERE id = $1", run_id
         )
         assert "image_uri" not in frozen
         await db_pool.execute("UPDATE cards SET image_uri = NULL WHERE id = $1", card["id"])
@@ -50,7 +47,7 @@ async def test_artwork_enriches_source_status_and_run_without_changing_facts_or_
         assert selected["image_uri"] is None and selected["facts"] == page["cards"][0]["facts"] | {
             "key": selected["facts"]["key"]
         }
-        assert missing["source_hash"] == source_hash and len(transport.calls) == 3
+        assert missing["source_hash"] == source_hash and transport.calls == []
     finally:
         await db_pool.execute(
             "UPDATE cards SET image_uri = $2 WHERE id = $1", card["id"], card["image_uri"]

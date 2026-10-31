@@ -1,4 +1,4 @@
-"""Default-off Discover; only explicit run and strategy-draft POSTs start paid work."""
+"""Owner-scoped Discover; setup POSTs start work while reads restore saved state."""
 
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
@@ -14,20 +14,32 @@ from mtg_helper.config import settings
 from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.common import DataResponse
 from mtg_helper.models.recommendations import (
-    DiscoveryStatus,
+    DiscoverMatches,
+    DiscoverSetup,
+    DiscoverStrategy,
+    DiscoverStrategySave,
+    DiscoverTerms,
     GenerateRequest,
     PilotFeedback,
     QueryPage,
     QueryPreview,
     RunView,
     StrategyDraftRequest,
+    TermSuggestionRequest,
+    TermSuggestionRun,
 )
 from mtg_helper.services import feature_flag_service
 from mtg_helper.services.recommendations.provider import Provider
-from mtg_helper.services.recommendations.repository import DiscoveryError, Owner
+from mtg_helper.services.recommendations.repository import (
+    DiscoveryError,
+    Owner,
+    owned_deck,
+    owned_run,
+)
 from mtg_helper.services.recommendations.service import DiscoveryService
 from mtg_helper.services.recommendations.source import Card
 from mtg_helper.services.recommendations.source_repository import SourceRepository
+from mtg_helper.services.recommendations.strategy_discover import StrategyDiscover
 
 Account = Annotated[AccountResponse, Depends(get_current_account)]
 
@@ -55,9 +67,9 @@ class PilotRoute(APIRoute):
                     content={
                         "error": {
                             "code": "INVALID_DISCOVERY_REQUEST",
-                            "message": "Malformed or unsupported Discover request; use valid IDs "
-                            "and literal filters. Card-run goals must be nonblank and at most "
-                            "1000 chars; strategy drafts accept a request key only.",
+                            "message": "Check your Discover input: use valid card/search IDs, "
+                            "a nonblank strategy of at most 2000 characters, "
+                            "and a request key for AI setup.",
                         }
                     },
                 )
@@ -88,11 +100,74 @@ def service(request: Request) -> DiscoveryService:
     return DiscoveryService(pool, sources, Provider(settings.openai_api_key.get_secret_value()))
 
 
+def strategy_service(request: Request) -> StrategyDiscover:
+    return StrategyDiscover(request.app.state.db_pool)
+
+
 @router.get("/status")
 async def status(
     deck_id: UUID, request: Request, account: Account
-) -> DataResponse[DiscoveryStatus]:
-    return DataResponse(data=await service(request).status(owner(account), deck_id))
+) -> DataResponse[DiscoverMatches]:
+    return DataResponse(data=await strategy_service(request).status(owner(account), deck_id))
+
+
+@router.get("/source-terms")
+async def source_terms(
+    deck_id: UUID, request: Request, account: Account
+) -> DataResponse[DiscoverTerms]:
+    return DataResponse(data=await strategy_service(request).terms(owner(account), deck_id))
+
+
+@router.get("/setup")
+async def setup(deck_id: UUID, request: Request, account: Account) -> DataResponse[DiscoverSetup]:
+    return DataResponse(data=await service(request).setup(owner(account), deck_id))
+
+
+@router.get("/strategy")
+async def saved_strategy(
+    deck_id: UUID, request: Request, account: Account
+) -> DataResponse[DiscoverMatches]:
+    return DataResponse(data=await strategy_service(request).status(owner(account), deck_id))
+
+
+@router.put("/strategy")
+async def save_strategy(
+    deck_id: UUID, body: DiscoverStrategySave, request: Request, account: Account
+) -> DataResponse[DiscoverStrategy]:
+    return DataResponse(data=await strategy_service(request).save(owner(account), deck_id, body))
+
+
+@router.get("/matches")
+async def matches(
+    deck_id: UUID, request: Request, account: Account, cursor: str | None = None
+) -> DataResponse[DiscoverMatches]:
+    return DataResponse(
+        data=await strategy_service(request).matches(owner(account), deck_id, cursor)
+    )
+
+
+@router.post("/matches/{oracle_id}/plan")
+async def plan_match(
+    deck_id: UUID, oracle_id: UUID, request: Request, account: Account
+) -> DataResponse[bool]:
+    await strategy_service(request).plan(owner(account), deck_id, oracle_id)
+    return DataResponse(data=True)
+
+
+@router.post("/matches/{oracle_id}/dismiss")
+async def dismiss_match(
+    deck_id: UUID, oracle_id: UUID, request: Request, account: Account
+) -> DataResponse[bool]:
+    await strategy_service(request).dismiss(owner(account), deck_id, oracle_id, undo=False)
+    return DataResponse(data=True)
+
+
+@router.delete("/matches/{oracle_id}/dismiss")
+async def undo_dismiss_match(
+    deck_id: UUID, oracle_id: UUID, request: Request, account: Account
+) -> DataResponse[bool]:
+    await strategy_service(request).dismiss(owner(account), deck_id, oracle_id, undo=True)
+    return DataResponse(data=True)
 
 
 @router.post("/preview-query")
@@ -110,11 +185,13 @@ async def generate(
     account: Account,
     background: BackgroundTasks,
 ) -> DataResponse[RunView]:
-    engine = service(request)
-    run_id, work = await engine.generate(owner(account), deck_id, body)
-    if work:
-        background.add_task(engine.run, work)
-    return DataResponse(data=await engine.view(owner(account), deck_id, run_id))
+    del body, background
+    async with request.app.state.db_pool.acquire() as conn:
+        await owned_deck(conn, owner(account), deck_id)
+    # Keep historical runs readable, but never resume the retired card-generation engine.
+    raise DiscoveryError(
+        "Card generation was retired; save a strategy and browse local matches", 410
+    )
 
 
 @router.post("/strategy-drafts", status_code=202)
@@ -130,6 +207,28 @@ async def draft_strategy(
     if work:
         background.add_task(engine.run, work)
     return DataResponse(data=await engine.view(owner(account), deck_id, run_id))
+
+
+@router.post("/term-suggestions", status_code=202)
+async def suggest_terms(
+    deck_id: UUID,
+    body: TermSuggestionRequest,
+    request: Request,
+    account: Account,
+    background: BackgroundTasks,
+) -> DataResponse[TermSuggestionRun]:
+    engine = service(request)
+    run_id, work = await engine.suggest_terms(owner(account), deck_id, body)
+    if work:
+        background.add_task(engine.run, work)
+    return DataResponse(data=await engine.terms_view(owner(account), deck_id, run_id))
+
+
+@router.get("/term-suggestions/{run_id}")
+async def term_suggestions(
+    deck_id: UUID, run_id: UUID, request: Request, account: Account
+) -> DataResponse[TermSuggestionRun]:
+    return DataResponse(data=await service(request).terms_view(owner(account), deck_id, run_id))
 
 
 @router.get("/runs/{run_id}")
@@ -150,8 +249,9 @@ async def trace(
 async def plan(
     deck_id: UUID, run_id: UUID, oracle_id: UUID, request: Request, account: Account
 ) -> DataResponse[bool]:
-    await service(request).planner.plan(owner(account), deck_id, oracle_id, run_id=run_id)
-    return DataResponse(data=True)
+    async with request.app.state.db_pool.acquire() as conn:
+        await owned_run(conn, owner(account), deck_id, run_id)
+    raise DiscoveryError("Historical AI advice is retired; use current source matches", 410)
 
 
 @router.post("/candidates/{oracle_id}/plan")

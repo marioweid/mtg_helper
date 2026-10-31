@@ -1,0 +1,3032 @@
+{
+  "source": {
+    "source_sha256": "36c8c87fb0da4ff633cc29a79f8c5221d66f393bcc4e3bf365bd3de2f9168211",
+    "tag_sha256": "1997cecccac98a5cdd4f1a3d861ec8bf6a3f5f658b9b2f6154b7521e8d432461",
+    "published_at": "2026-10-28 15:32:30.854610+00:00"
+  },
+  "paid_calls": 0,
+  "method": "Frozen selections; production filters/popularity/front-face checks",
+  "cases": {
+    "yuna": {
+      "total": 2729,
+      "reference_hits_at_10": 1,
+      "reference_hits_at_50": 11,
+      "reference_hits_in_pool": 46,
+      "target_count": 65,
+      "cards": [
+        {
+          "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+          "name": "Birds of Paradise",
+          "image_uri": "https://cards.scryfall.io/normal/front/4/9/492c2f9a-51e7-4e0f-9899-23bf43ea988b.jpg?1783903230",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Bird",
+          "oracle_text": "Flying\n{T}: Add one mana of any color.",
+          "keywords": [
+            "Flying"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 35,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "00c0543c-2a1f-4425-8283-4062d74a1637",
+          "name": "Solemn Simulacrum",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/a/daafd816-f7c1-4630-9e5c-a1e5db570a35.jpg?1783903212",
+          "mana_cost": "{4}",
+          "type_line": "Artifact Creature \u2014 Golem",
+          "oracle_text": "When this creature enters, you may search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.\nWhen this creature dies, you may draw a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 43,
+          "evidence": [
+            {
+              "query_purpose": "Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+          "name": "Llanowar Elves",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/a/6a0b230b-d391-4998-a3f7-7b158a0ec2cd.jpg?1783909057",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "{T}: Add {G}.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 55,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3aa83ed2-f48b-4ce6-a614-2c54ddf50538",
+          "name": "The One Ring",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/5/d5806e68-1054-458e-866d-1f2470f682b2.jpg?1790212038",
+          "mana_cost": "{4}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "Indestructible\nWhen The One Ring enters, if you cast it, you gain protection from everything until your next turn.\nAt the beginning of your upkeep, you lose 1 life for each burden counter on The One Ring.\n{T}: Put a burden counter on The One Ring, then draw a card for each burden counter on The One Ring.",
+          "keywords": [
+            "Indestructible"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 96,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "matched_tag_label": "counters matter",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
+          "name": "Elvish Mystic",
+          "image_uri": "https://cards.scryfall.io/normal/front/0/8/08b9a296-3b76-4f8f-9d71-7c9af92bb3b4.jpg?1785647413",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "{T}: Add {G}.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 103,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f9d3b046-0b95-4103-a630-4b3fb88bb60b",
+          "name": "Delighted Halfling",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/1/71384418-173a-4f77-adab-56e52fa23692.jpg?1783916276",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Halfling Citizen",
+          "oracle_text": "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 147,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "a1f3da21-af6d-450e-bf0b-985d158418e6",
+          "name": "Hardened Scales",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/9/99cfd1a8-49fd-4cc0-96f2-f9f159ce5d55.jpg?1783903765",
+          "mana_cost": "{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 186,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "ab8d5f5c-1976-4f77-8ed2-8d28ee666741",
+          "name": "Tireless Provisioner",
+          "image_uri": "https://cards.scryfall.io/normal/front/a/1/a1e048e0-19d2-4076-892d-f8b3104dee37.jpg?1783917135",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature \u2014 Elf Scout",
+          "oracle_text": "Landfall \u2014 Whenever a land you control enters, create a Food token or a Treasure token. (Food is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\" Treasure is an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+          "keywords": [
+            "Treasure",
+            "Food",
+            "Landfall"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 189,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "df317532-7d36-40fd-938f-e972749c8792",
+          "name": "Fyndhorn Elves",
+          "image_uri": "https://cards.scryfall.io/normal/front/4/5/450744cf-7eba-491b-97b0-ca80c6368bbb.jpg?1783928794",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "{T}: Add {G}.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 215,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3a940dfa-a026-4969-8981-ef90cdfbe9ef",
+          "name": "Ornithopter of Paradise",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/8/18bbdc6c-b6c9-4f89-8f0a-6266e53c1fb9.jpg?1783915400",
+          "mana_cost": "{2}",
+          "type_line": "Artifact Creature \u2014 Thopter",
+          "oracle_text": "Flying\n{T}: Add one mana of any color.",
+          "keywords": [
+            "Flying"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 220,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "78427103-9543-41fb-b6d4-72963fe87275",
+          "name": "The Great Henge",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/3/6340e0f3-7f9c-4d71-8daf-e1be5505eb5b.jpg?1783915629",
+          "mana_cost": "{7}{G}{G}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "This spell costs {X} less to cast, where X is the greatest power among creatures you control.\n{T}: Add {G}{G}. You gain 2 life.\nWhenever a nontoken creature you control enters, put a +1/+1 counter on it and draw a card.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 229,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+          "name": "Bloom Tender",
+          "image_uri": "https://cards.scryfall.io/normal/front/b/a/ba86688d-18f0-4b5c-a797-42bf125a6c9f.jpg?1783904436",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "Vivid \u2014 {T}: For each color among permanents you control, add one mana of that color.",
+          "keywords": [
+            "Vivid"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 249,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "0a79237e-0811-4a8a-bd4d-db3ca91bff22",
+          "name": "Everflowing Chalice",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/a/fa293bcc-39aa-4642-8e34-6e4fbb30f962.jpg?1793021160",
+          "mana_cost": "{0}",
+          "type_line": "Artifact",
+          "oracle_text": "Multikicker {2} (You may pay an additional {2} any number of times as you cast this spell.)\nThis artifact enters with a charge counter on it for each time it was kicked.\n{T}: Add {C} for each charge counter on this artifact.",
+          "keywords": [
+            "Multikicker"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 253,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "matched_tag_label": "counters matter",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "9b9a10ff-5a5d-4df8-88aa-18d84ff9117c",
+          "name": "Inspiring Call",
+          "image_uri": "https://cards.scryfall.io/normal/front/2/5/2555ec7b-5cc2-4ffd-9344-6368019feff9.jpg?1783904804",
+          "mana_cost": "{2}{G}",
+          "type_line": "Instant",
+          "oracle_text": "Draw a card for each creature you control with a +1/+1 counter on it. Those creatures gain indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy them.)",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 280,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "4ba5b3f6-503b-43e6-b66e-4f8c55cffed7",
+          "name": "Avenger of Zendikar",
+          "image_uri": "https://cards.scryfall.io/normal/front/c/6/c6f1e60f-a195-4590-80b0-86767de6c423.jpg?1783904552",
+          "mana_cost": "{5}{G}{G}",
+          "type_line": "Creature \u2014 Elemental",
+          "oracle_text": "When this creature enters, create a 0/1 green Plant creature token for each land you control.\nLandfall \u2014 Whenever a land you control enters, you may put a +1/+1 counter on each Plant creature you control.",
+          "keywords": [
+            "Landfall"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 301,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+          "name": "The Ozolith",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/3/9341ed06-53db-4604-b60a-3ea9129afbc2.jpg?1783931006",
+          "mana_cost": "{1}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on The Ozolith.\nAt the beginning of combat on your turn, if The Ozolith has counters on it, you may move all counters from The Ozolith onto target creature.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 303,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "df701b09-a6c7-499b-ae14-3ddf41c0d5b6",
+              "matched_tag_label": "counter preservation",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "8ad91f64-ccab-4edc-bd54-b2ee9267d614",
+          "name": "Lotus Cobra",
+          "image_uri": "https://cards.scryfall.io/normal/front/a/4/a4b759f0-901f-4be3-93fa-224609b08d48.jpg?1783929336",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Snake",
+          "oracle_text": "Landfall \u2014 Whenever a land you control enters, add one mana of any color.",
+          "keywords": [
+            "Landfall"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 329,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "28fe909b-06e0-424c-9f75-c824a25f5865",
+          "name": "Branching Evolution",
+          "image_uri": "https://cards.scryfall.io/normal/front/c/0/c0f1a736-8b12-4f58-a031-bf1733f65c51.jpg?1783911212",
+          "mana_cost": "{2}{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "If one or more +1/+1 counters would be put on a creature you control, twice that many +1/+1 counters are put on that creature instead.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 377,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "2ef75cf3-30dc-4852-a6d1-1d6391fad022",
+          "name": "Forgotten Ancient",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/8/f8c9d744-8294-4747-ae7e-99be2b6e7479.jpg?1783903766",
+          "mana_cost": "{3}{G}",
+          "type_line": "Creature \u2014 Elemental",
+          "oracle_text": "Whenever a player casts a spell, you may put a +1/+1 counter on this creature.\nAt the beginning of your upkeep, you may move any number of +1/+1 counters from this creature onto other creatures.",
+          "keywords": [],
+          "match_count": 3,
+          "global_popularity_rank": 389,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "b45fdeab-00cc-4422-af9f-66f30a880a7c",
+          "name": "Evolution Sage",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/d/1d58d08d-cd62-416d-8d8e-7d9c56d5c4da.jpg?1783904546",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "Landfall \u2014 Whenever a land you control enters, proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+          "keywords": [
+            "Proliferate",
+            "Landfall"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 401,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "b7cfc923-3a15-4168-876b-525ce37850c5",
+              "matched_tag_label": "repeatable proliferate",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f122624f-f30d-444e-a62a-939829241045",
+          "name": "Kami of Whispered Hopes",
+          "image_uri": "https://cards.scryfall.io/normal/front/0/b/0be4e5f6-a1fc-4a91-aafe-f963878cd1b3.jpg?1783903765",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature \u2014 Spirit",
+          "oracle_text": "If one or more +1/+1 counters would be put on a permanent you control, that many plus one +1/+1 counters are put on that permanent instead.\n{T}: Add X mana of any one color, where X is this creature's power.",
+          "keywords": [],
+          "match_count": 3,
+          "global_popularity_rank": 404,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "7973820b-fdaf-46ec-9e3e-d4c0e77b5067",
+          "name": "Fanatic of Rhonas",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/f/1f9fb33a-3b39-4aff-93b8-aedafe0ea694.jpg?1783911261",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Snake Druid",
+          "oracle_text": "{T}: Add {G}.\nFerocious \u2014 {T}: Add {G}{G}{G}{G}. Activate only if you control a creature with power 4 or greater.\nEternalize {2}{G}{G} ({2}{G}{G}, Exile this card from your graveyard: Create a token that's a copy of it, except it's a 4/4 black Zombie Snake Druid with no mana cost. Eternalize only as a sorcery.)",
+          "keywords": [
+            "Ferocious",
+            "Eternalize"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 405,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "1d725121-e50c-42f0-9128-56802f07c89e",
+          "name": "Selvala, Heart of the Wilds",
+          "image_uri": "https://cards.scryfall.io/normal/front/8/1/812856be-cf51-42de-96d2-4ac91e71d442.jpg?1783904541",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Legendary Creature \u2014 Elf Scout",
+          "oracle_text": "Whenever another creature enters, its controller may draw a card if its power is greater than each other creature's power.\n{G}, {T}: Add X mana in any combination of colors, where X is the greatest power among creatures you control.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 406,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "4b515bb0-f275-4400-8032-3173b799ab40",
+          "name": "Walking Ballista",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/2/5272436e-74f0-44c4-a291-ea8ebc3f1525.jpg?1783930088",
+          "mana_cost": "{X}{X}",
+          "type_line": "Artifact Creature \u2014 Construct",
+          "oracle_text": "This creature enters with X +1/+1 counters on it.\n{4}: Put a +1/+1 counter on this creature.\nRemove a +1/+1 counter from this creature: It deals 1 damage to any target.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 420,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "fa6fe7e9-a697-4666-b8c5-1473dc6e4690",
+              "matched_tag_label": "counter fuel-pp",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+          "name": "Enduring Vitality",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/d/9d76a30c-0431-4334-892a-9822dda9671a.jpg?1783909457",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Enchantment Creature \u2014 Elk Glimmer",
+          "oracle_text": "Vigilance\nCreatures you control have \"{T}: Add one mana of any color.\"\nWhen Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+          "keywords": [
+            "Vigilance"
+          ],
+          "match_count": 3,
+          "global_popularity_rank": 426,
+          "evidence": [
+            {
+              "query_purpose": "Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "1e6a24be-8281-41c1-a5ba-b68f0ef1d7b8",
+          "name": "Snakeskin Veil",
+          "image_uri": "https://cards.scryfall.io/normal/front/a/3/a3d2c692-7566-468e-9c86-47a9f768fde2.jpg?1783907335",
+          "mana_cost": "{G}",
+          "type_line": "Instant",
+          "oracle_text": "Put a +1/+1 counter on target creature you control. It gains hexproof until end of turn. (It can't be the target of spells or abilities your opponents control.)",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 427,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "70a6f08e-854d-4e2f-9d8c-c45ec3231157",
+          "name": "Faeburrow Elder",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/4/145dcac4-2c53-4ae9-9ede-24dc07474b01.jpg?1783911522",
+          "mana_cost": "{1}{G}{W}",
+          "type_line": "Creature \u2014 Treefolk Druid",
+          "oracle_text": "Vigilance\nThis creature gets +1/+1 for each color among permanents you control.\n{T}: For each color among permanents you control, add one mana of that color.",
+          "keywords": [
+            "Vigilance"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 489,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "069f6530-e65c-4d52-85f3-e0a2acd148c5",
+          "name": "Avacyn's Pilgrim",
+          "image_uri": "https://cards.scryfall.io/normal/front/a/3/a390a7df-b8da-41aa-93e5-2c0db938a27e.jpg?1783925334",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Human Monk",
+          "oracle_text": "{T}: Add {W}.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 500,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "16629f59-bae8-4c19-bf50-443eb0ed6856",
+          "name": "Felidar Retreat",
+          "image_uri": "https://cards.scryfall.io/normal/front/8/9/89e3cc09-5057-4c05-88fc-d6cda809fc74.jpg?1783908940",
+          "mana_cost": "{3}{W}",
+          "type_line": "Enchantment",
+          "oracle_text": "Landfall \u2014 Whenever a land you control enters, choose one \u2014\n\u2022 Create a 2/2 white Cat Beast creature token.\n\u2022 Put a +1/+1 counter on each creature you control. Those creatures gain vigilance until end of turn.",
+          "keywords": [
+            "Landfall"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 523,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "b504c445-169d-4145-abc4-65270686c208",
+              "matched_tag_label": "gives pp counters to all",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "cc65ac73-5bef-4ecb-ad8e-39199084c027",
+          "name": "Cathars' Crusade",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/2/5296e353-2efc-4d72-a877-7957eff630b9.jpg?1783908185",
+          "mana_cost": "{3}{W}{W}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control enters, put a +1/+1 counter on each creature you control.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 558,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "b504c445-169d-4145-abc4-65270686c208",
+              "matched_tag_label": "gives pp counters to all",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "97435e03-2fff-4fe0-8fa9-69ab0a046a33",
+          "name": "Unbreakable Formation",
+          "image_uri": "https://cards.scryfall.io/normal/front/0/6/06e1cc7b-9319-4f6f-88ee-2e6b6d2efbc6.jpg?1783913340",
+          "mana_cost": "{2}{W}",
+          "type_line": "Instant",
+          "oracle_text": "Creatures you control gain indestructible until end of turn.\nAddendum \u2014 If you cast this spell during your main phase, put a +1/+1 counter on each of those creatures and they gain vigilance until end of turn.",
+          "keywords": [
+            "Addendum"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 569,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "b504c445-169d-4145-abc4-65270686c208",
+              "matched_tag_label": "gives pp counters to all",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "11b5308d-5bc0-4782-875f-a28be36e665d",
+          "name": "Beastmaster Ascension",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/4/f404d133-fc1a-4751-ac72-554e6553e486.jpg?1783923253",
+          "mana_cost": "{2}{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control attacks, you may put a quest counter on this enchantment.\nAs long as this enchantment has seven or more quest counters on it, creatures you control get +5/+5.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 572,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "matched_tag_label": "counters matter",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "c549b0fd-1e08-4873-952e-a14dc45a0fd2",
+          "name": "Champion of Lambholt",
+          "image_uri": "https://cards.scryfall.io/normal/front/4/6/46eff31d-f460-48f2-aab7-8b9b89cd87fe.jpg?1783917143",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Creature \u2014 Human Warrior",
+          "oracle_text": "Creatures with power less than this creature's power can't block creatures you control.\nWhenever another creature you control enters, put a +1/+1 counter on this creature.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 585,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "4567a528-75f0-4ea6-b927-3a500caf76ac",
+          "name": "Arbor Elf",
+          "image_uri": "https://cards.scryfall.io/normal/front/4/b/4b81165e-f091-4211-8b47-5ea6868b0d4c.jpg?1783935136",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "{T}: Untap target Forest.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 606,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "72deedab-7c17-4505-aeca-4bc8596d80a5",
+          "name": "Tribute to the World Tree",
+          "image_uri": "https://cards.scryfall.io/normal/front/c/0/c0cdeaba-fc21-44e6-bf99-aa1ff379401b.jpg?1783916960",
+          "mana_cost": "{G}{G}{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control enters, draw a card if its power is 3 or greater. Otherwise, put two +1/+1 counters on it.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 617,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "3c1ef404-e2c6-486d-a5a2-d5779c71d498",
+          "name": "Archdruid's Charm",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/c/5caae5ae-845f-42c2-b1ae-956df2739433.jpg?1783912870",
+          "mana_cost": "{G}{G}{G}",
+          "type_line": "Instant",
+          "oracle_text": "Choose one \u2014\n\u2022 Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand. Then shuffle.\n\u2022 Put a +1/+1 counter on target creature you control. It deals damage equal to its power to target creature you don't control.\n\u2022 Exile target artifact or enchantment.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 622,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "36f68aa3-9955-46f1-bc87-497f16ef5222",
+          "name": "Wizard Class",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/1/d1f629fb-b097-4240-8560-ef47f5678f48.jpg?1783926504",
+          "mana_cost": "{U}",
+          "type_line": "Enchantment \u2014 Class",
+          "oracle_text": "(Gain the next level as a sorcery to add its ability.)\nYou have no maximum hand size.\n{2}{U}: Level 2\nWhen this Class becomes level 2, draw two cards.\n{4}{U}: Level 3\nWhenever you draw a card, put a +1/+1 counter on target creature you control.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 637,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "34428f42-03ac-4795-8286-6cbea796df2b",
+          "name": "Incubation Druid",
+          "image_uri": "https://cards.scryfall.io/normal/front/b/3/b3d8c95e-09b9-46d6-80e9-95adb2c2ea9d.jpg?1783917139",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Elf Druid",
+          "oracle_text": "{T}: Add one mana of any type that a land you control could produce. If this creature has a +1/+1 counter on it, add three mana of that type instead.\n{3}{G}{G}: Adapt 3. (If this creature has no +1/+1 counters on it, put three +1/+1 counters on it.)",
+          "keywords": [
+            "Adapt"
+          ],
+          "match_count": 3,
+          "global_popularity_rank": 641,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "41fed659-237c-4d8e-ad31-d17fa0d3f764",
+          "name": "Ozolith, the Shattered Spire",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/d/1d5bab94-362e-45e6-8988-69e2b2c681b1.jpg?1783903762",
+          "mana_cost": "{1}{G}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "If one or more +1/+1 counters would be put on an artifact or creature you control, that many plus one +1/+1 counters are put on it instead.\n{1}{G}, {T}: Put a +1/+1 counter on target artifact or creature you control. Activate only as a sorcery.\nCycling {2} ({2}, Discard this card: Draw a card.)",
+          "keywords": [
+            "Cycling"
+          ],
+          "match_count": 3,
+          "global_popularity_rank": 643,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "f78af825-023a-42e9-8374-5c52303a1417",
+          "name": "Elspeth, Storm Slayer",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/3/73a065e3-b530-4e62-ab3c-4f6f908184ec.jpg?1783907414",
+          "mana_cost": "{3}{W}{W}",
+          "type_line": "Legendary Planeswalker \u2014 Elspeth",
+          "oracle_text": "If one or more tokens would be created under your control, twice that many of those tokens are created instead.\n+1: Create a 1/1 white Soldier creature token.\n0: Put a +1/+1 counter on each creature you control. Those creatures gain flying until your next turn.\n\u22123: Destroy target creature an opponent controls with mana value 3 or greater.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 644,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "b504c445-169d-4145-abc4-65270686c208",
+              "matched_tag_label": "gives pp counters to all",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "e6555cca-e608-4c87-b835-9cd47fd1f543",
+          "name": "Tireless Tracker",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/6/66444549-ad9b-49c6-a7c6-34e977c1085d.jpg?1783906030",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature \u2014 Human Scout",
+          "oracle_text": "Landfall \u2014 Whenever a land you control enters, investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nWhenever you sacrifice a Clue, put a +1/+1 counter on this creature.",
+          "keywords": [
+            "Investigate",
+            "Landfall"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 667,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "5e7ef7fe-968b-4ada-9fe4-6fda0541aafc",
+          "name": "The Earth Crystal",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/5/d585e218-3dc8-4fbd-8ad2-795fbc9b2155.jpg?1783906588",
+          "mana_cost": "{2}{G}{G}",
+          "type_line": "Legendary Artifact",
+          "oracle_text": "Green spells you cast cost {1} less to cast.\nIf one or more +1/+1 counters would be put on a creature you control, twice that many +1/+1 counters are put on that creature instead.\n{4}{G}{G}, {T}: Distribute two +1/+1 counters among one or two target creatures you control.",
+          "keywords": [],
+          "match_count": 3,
+          "global_popularity_rank": 670,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "acfe7ec0-0606-4d5e-b1fa-25f0c7aeec47",
+          "name": "Sanctum Weaver",
+          "image_uri": "https://cards.scryfall.io/normal/front/3/c/3c9ac089-6962-48fd-bf67-f041ece27fa9.jpg?1783915420",
+          "mana_cost": "{1}{G}",
+          "type_line": "Enchantment Creature \u2014 Dryad",
+          "oracle_text": "{T}: Add X mana of any one color, where X is the number of enchantments you control.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 677,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "749d2994-44e7-40d3-8630-7bebed239e9e",
+          "name": "Haywire Mite",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/f/6f813bc3-6d81-4555-8e4b-6ecd9a6757b7.jpg?1783903739",
+          "mana_cost": "{1}",
+          "type_line": "Artifact Creature \u2014 Insect",
+          "oracle_text": "When this creature dies, you gain 2 life.\n{G}, Sacrifice this creature: Exile target noncreature artifact or noncreature enchantment.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 683,
+          "evidence": [
+            {
+              "query_purpose": "Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "915b75d1-b5e3-4aca-a54c-beaccef0a2e4",
+          "name": "Innkeeper's Talent",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/4/941b0afc-0e8f-45f2-ae7f-07595e164611.jpg?1784634092",
+          "mana_cost": "{1}{G}",
+          "type_line": "Enchantment \u2014 Class",
+          "oracle_text": "(Gain the next level as a sorcery to add its ability.)\nAt the beginning of combat on your turn, put a +1/+1 counter on target creature you control.\n{G}: Level 2\nPermanents you control with counters on them have ward {1}.\n{3}{G}: Level 3\nIf you would put one or more counters on a permanent or player, put twice that many of each of those kinds of counters on that permanent or player instead.",
+          "keywords": [],
+          "match_count": 3,
+          "global_popularity_rank": 694,
+          "evidence": [
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "matched_tag_label": "counters matter",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "criterion_label": "gives pp counters",
+              "matched_tag_id": "c1100c9e-08bf-4845-9263-1a5f86b9005f",
+              "matched_tag_label": "gives pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "69facbc7-3859-4716-b627-5199571fb3cf",
+          "name": "Chasm Skulker",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/9/794e01e7-430c-43cf-ba2b-1028cd088148.jpg?1783917173",
+          "mana_cost": "{2}{U}",
+          "type_line": "Creature \u2014 Squid Horror",
+          "oracle_text": "Whenever you draw a card, put a +1/+1 counter on this creature.\nWhen this creature dies, create X 1/1 blue Squid creature tokens with islandwalk, where X is the number of +1/+1 counters on this creature. (They can't be blocked as long as defending player controls an Island.)",
+          "keywords": [],
+          "match_count": 3,
+          "global_popularity_rank": 704,
+          "evidence": [
+            {
+              "query_purpose": "Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "62d225b0-9a54-40c0-8c82-7d8a3c8ce5df",
+              "matched_tag_label": "splits on death",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "7b0767b8-b504-456e-93bd-218502f73b3d",
+          "name": "Palladium Myr",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/7/f7c6aba3-38c3-45d1-83e1-40829eb07862.jpg?1783915400",
+          "mana_cost": "{3}",
+          "type_line": "Artifact Creature \u2014 Myr",
+          "oracle_text": "{T}: Add {C}{C}.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 727,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd",
+              "criterion_label": "mana producer",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "criterion_label": "mana dork",
+              "matched_tag_id": "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+              "matched_tag_label": "mana dork",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "98a389f4-2905-47f3-b60e-3d4afb3e5cb0",
+          "name": "Enduring Innocence",
+          "image_uri": "https://cards.scryfall.io/normal/front/0/8/08f79439-b8f8-418f-9772-26d81844749e.jpg?1783909512",
+          "mana_cost": "{1}{W}{W}",
+          "type_line": "Enchantment Creature \u2014 Sheep Glimmer",
+          "oracle_text": "Lifelink\nWhenever one or more other creatures you control with power 2 or less enter, draw a card. This ability triggers only once each turn.\nWhen Enduring Innocence dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+          "keywords": [
+            "Lifelink"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 728,
+          "evidence": [
+            {
+              "query_purpose": "Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "84122d81-9634-4d3f-85a5-f6cf4303691a",
+          "name": "Mossborn Hydra",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/0/7054a0d7-396f-40b4-ab24-db591c3b08f0.jpg?1783909097",
+          "mana_cost": "{2}{G}",
+          "type_line": "Creature \u2014 Elemental Hydra",
+          "oracle_text": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nThis creature enters with a +1/+1 counter on it.\nLandfall \u2014 Whenever a land you control enters, double the number of +1/+1 counters on this creature.",
+          "keywords": [
+            "Trample",
+            "Double",
+            "Landfall"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 746,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Repeatable +1/+1 counter growth across the creature board.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "criterion_label": "repeatable pp counters",
+              "matched_tag_id": "9a3f1038-140e-447a-ba5d-020893c49977",
+              "matched_tag_label": "repeatable pp counters",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "4ac94586-3ac7-4ade-af31-ad0d0e3ffc4a",
+          "name": "Terrasymbiosis",
+          "image_uri": "https://cards.scryfall.io/normal/front/2/6/26008c7d-5dbe-4da2-b475-4dd307e7bc68.jpg?1783905928",
+          "mana_cost": "{2}{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever you put one or more +1/+1 counters on a creature you control, you may draw that many cards. Do this only once each turn.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 757,
+          "evidence": [
+            {
+              "query_purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0",
+              "criterion_label": "counters matter",
+              "matched_tag_id": "aaba92d3-4e92-4ac7-9111-3576e1fc178c",
+              "matched_tag_label": "pp counters matter",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": true
+        }
+      ],
+      "queries": [
+        {
+          "purpose": "Creature-based acceleration to develop mana while supporting a creature-heavy board.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "bb6c0ff7-302d-48ff-aee9-5cfefd44e351",
+                "5f1260dd-e1dc-435a-a9ff-ce7172b7a5cd"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        },
+        {
+          "purpose": "Repeatable +1/+1 counter growth across the creature board.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "9a3f1038-140e-447a-ba5d-020893c49977",
+                "c1100c9e-08bf-4845-9263-1a5f86b9005f"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": []
+        },
+        {
+          "purpose": "Counter distribution and scaling that turns counters on permanents into additional growth.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "15372c12-7e27-4b5a-bdb3-f641b7ac4272",
+                "9cbfd4f0-aa13-4d0e-9e57-11d1d482e8a0"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": []
+        },
+        {
+          "purpose": "Preserve or reclaim counter-bearing creatures as they leave the battlefield, complementing counter redistribution.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "df701b09-a6c7-499b-ae14-3ddf41c0d5b6",
+                "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        }
+      ]
+    },
+    "meren": {
+      "total": 1326,
+      "reference_hits_at_10": 6,
+      "reference_hits_at_50": 20,
+      "reference_hits_in_pool": 29,
+      "target_count": 66,
+      "cards": [
+        {
+          "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+          "name": "Skullclamp",
+          "image_uri": "https://cards.scryfall.io/normal/front/2/5/250156b6-9db5-4e2e-b544-21598da948a1.jpg?1793101214",
+          "mana_cost": "{1}",
+          "type_line": "Artifact \u2014 Equipment",
+          "oracle_text": "Equipped creature gets +1/-1.\nWhenever equipped creature dies, draw two cards.\nEquip {1}",
+          "keywords": [
+            "Equip"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 39,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "00c0543c-2a1f-4425-8283-4062d74a1637",
+          "name": "Solemn Simulacrum",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/a/daafd816-f7c1-4630-9e5c-a1e5db570a35.jpg?1783903212",
+          "mana_cost": "{4}",
+          "type_line": "Artifact Creature \u2014 Golem",
+          "oracle_text": "When this creature enters, you may search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.\nWhen this creature dies, you may draw a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 43,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "e3afc704-220f-498f-9eaa-0821b17dc24c",
+          "name": "Sakura-Tribe Elder",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/a/7a8b1c49-8594-426d-b585-41140235bb0e.jpg?1783903761",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Snake Shaman",
+          "oracle_text": "Sacrifice this creature: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 115,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "310f141c-7f37-4729-aed6-dd9c09db448d",
+          "name": "Blood Artist",
+          "image_uri": "https://cards.scryfall.io/normal/front/b/5/b5275d76-2947-4219-be21-614c7421614a.jpg?1783903786",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature \u2014 Vampire",
+          "oracle_text": "Whenever this creature or another creature dies, target player loses 1 life and you gain 1 life.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 144,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "criterion_label": "blood artist ability",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "a784481f-eccb-4112-bb38-04a659319660",
+          "name": "Pitiless Plunderer",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/b/5b5cd187-857a-44dd-8595-a52857a0b753.jpg?1783913869",
+          "mana_cost": "{3}{B}",
+          "type_line": "Creature \u2014 Human Pirate",
+          "oracle_text": "Whenever another creature you control dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+          "keywords": [
+            "Treasure"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 226,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "76b003e0-15af-4f22-bdf2-1ade5430964a",
+          "name": "Zulaport Cutthroat",
+          "image_uri": "https://cards.scryfall.io/normal/front/c/4/c43609fb-3cee-44e0-98d0-3ecaba1d5767.jpg?1783903779",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature \u2014 Human Rogue Ally",
+          "oracle_text": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 236,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "criterion_label": "blood artist ability",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "322f44f0-e6da-4ee0-b474-e7d5e9a461c5",
+          "name": "Morbid Opportunist",
+          "image_uri": "https://cards.scryfall.io/normal/front/0/8/08838865-a9b6-4323-96a2-0d3a7aba9d3d.jpg?1783903784",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Human Rogue",
+          "oracle_text": "Whenever one or more other creatures die, draw a card. This ability triggers only once each turn.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 246,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "f82a4e85-526d-4456-b700-7760043a31be",
+          "name": "Viscera Seer",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/5/f511830b-1c1f-4d30-aa5d-4314726d142e.jpg?1783903780",
+          "mana_cost": "{B}",
+          "type_line": "Creature \u2014 Vampire Wizard",
+          "oracle_text": "Sacrifice a creature: Scry 1. (Look at the top card of your library. You may put that card on the bottom.)",
+          "keywords": [
+            "Scry"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 257,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "14c3ff84-1e82-4606-a433-869fc52cc382",
+          "name": "Syr Konrad, the Grim",
+          "image_uri": "https://cards.scryfall.io/normal/front/4/4/443a4eac-f972-4027-aed4-552d4edc2ce1.jpg?1783909613",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Legendary Creature \u2014 Human Knight",
+          "oracle_text": "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than the battlefield, or a creature card leaves your graveyard, Syr Konrad deals 1 damage to each opponent.\n{1}{B}: Each player mills a card. (They each put the top card of their library into their graveyard.)",
+          "keywords": [
+            "Mill"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 266,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "e0445c80-fa53-4c3e-881e-940e9fce7f57",
+          "name": "Braids, Arisen Nightmare",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/9/f96223d0-04c4-40c2-87a9-0c6bc74adddb.jpg?1783906041",
+          "mana_cost": "{1}{B}{B}",
+          "type_line": "Legendary Creature \u2014 Nightmare",
+          "oracle_text": "At the beginning of your end step, you may sacrifice an artifact, creature, enchantment, land, or planeswalker. If you do, each opponent may sacrifice a permanent of their choice that shares a card type with it. For each opponent who doesn't, that player loses 2 life and you draw a card.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 298,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "c7f33cea-2ec8-4081-9208-a5b1d86721b3",
+          "name": "Bastion of Remembrance",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/f/6fe6ccad-e303-48f9-9dfa-0db7c1878031.jpg?1783904806",
+          "mana_cost": "{2}{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "When this enchantment enters, create a 1/1 white Human Soldier creature token.\nWhenever a creature you control dies, each opponent loses 1 life and you gain 1 life.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 330,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "criterion_label": "blood artist ability",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f1c2dbe2-fbe0-4058-bdf1-91d1b1832786",
+          "name": "Dauthi Voidwalker",
+          "image_uri": "https://cards.scryfall.io/normal/front/3/5/3573b9a2-7911-475c-8ae7-25bd0dbb7159.jpg?1783907090",
+          "mana_cost": "{B}{B}",
+          "type_line": "Creature \u2014 Dauthi Rogue",
+          "oracle_text": "Shadow (This creature can block or be blocked by only creatures with shadow.)\nIf a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it.\n{T}, Sacrifice this creature: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.",
+          "keywords": [
+            "Shadow"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 395,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "ace86e56-efde-4eb7-8815-71456a4c3abe",
+          "name": "Warren Soultrader",
+          "image_uri": "https://cards.scryfall.io/normal/front/b/3/b334e4c6-d316-4141-8889-f95afcc04701.jpg?1784634565",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Zombie Goblin Wizard",
+          "oracle_text": "Pay 1 life, Sacrifice another creature: Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+          "keywords": [
+            "Treasure"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 412,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+          "name": "Enduring Vitality",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/d/9d76a30c-0431-4334-892a-9822dda9671a.jpg?1783909457",
+          "mana_cost": "{1}{G}{G}",
+          "type_line": "Enchantment Creature \u2014 Elk Glimmer",
+          "oracle_text": "Vigilance\nCreatures you control have \"{T}: Add one mana of any color.\"\nWhen Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+          "keywords": [
+            "Vigilance"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 426,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "2699005b-a471-429f-a9d8-fbf2077ee2fd",
+          "name": "Disciple of Freyalise // Garden of Freyalise",
+          "image_uri": "https://cards.scryfall.io/normal/front/a/8/a8e9ea5a-5e10-4b77-baef-0352ff035483.jpg?1783911228",
+          "mana_cost": null,
+          "type_line": "Creature \u2014 Elf Druid // Land",
+          "oracle_text": null,
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 454,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "d8ad23a1-0b43-48ea-9fbe-d89b29194509",
+          "name": "Accursed Marauder",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/d/5da14d86-0780-4821-a799-96f64b377df4.jpg?1783911284",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature \u2014 Zombie Warrior",
+          "oracle_text": "When this creature enters, each player sacrifices a nontoken creature of their choice.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 476,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "893fed41-c144-433f-af88-bc7d419b7fb3",
+          "name": "Burnished Hart",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/5/65ebbff0-fbe6-4310-a33f-e00bb2534979.jpg?1783909049",
+          "mana_cost": "{3}",
+          "type_line": "Artifact Creature \u2014 Elk",
+          "oracle_text": "{3}, Sacrifice this creature: Search your library for up to two basic land cards, put them onto the battlefield tapped, then shuffle.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 515,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "93cf50cf-0ecc-4d3e-abea-778c1ebacec4",
+          "name": "Massacre Wurm",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/7/670a36cc-34e1-4d11-808e-1b6bc88eb5d8.jpg?1787562900",
+          "mana_cost": "{3}{B}{B}{B}",
+          "type_line": "Creature \u2014 Phyrexian Wurm",
+          "oracle_text": "When this creature enters, creatures your opponents control get -2/-2 until end of turn.\nWhenever a creature an opponent controls dies, that player loses 2 life.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 516,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "9a45a752-c1fd-44e9-9bc7-785997d3dace",
+              "matched_tag_label": "death trigger opponent",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "127de52b-df75-4342-95a0-20d84c5bf916",
+          "name": "The Meathook Massacre",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/0/70d0540f-93c6-4af5-ab2d-65e6c03001c7.jpg?1783908137",
+          "mana_cost": "{X}{B}{B}",
+          "type_line": "Legendary Enchantment",
+          "oracle_text": "When The Meathook Massacre enters, each creature gets -X/-X until end of turn.\nWhenever a creature you control dies, each opponent loses 1 life.\nWhenever a creature an opponent controls dies, you gain 1 life.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 517,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "9a45a752-c1fd-44e9-9bc7-785997d3dace",
+              "matched_tag_label": "death trigger opponent",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "726d9d2c-736a-4852-9938-a0f50d8fd89f",
+          "name": "Marionette Apprentice",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/1/d16f8670-f038-400a-83e7-a53a7f8c47ac.jpg?1783911278",
+          "mana_cost": "{1}{B}",
+          "type_line": "Creature \u2014 Human Artificer",
+          "oracle_text": "Fabricate 1 (When this creature enters, put a +1/+1 counter on it or create a 1/1 colorless Servo artifact creature token.)\nWhenever another creature or artifact you control is put into a graveyard from the battlefield, each opponent loses 1 life.",
+          "keywords": [
+            "Fabricate"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 567,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "6f4ac4a4-53ec-4bc9-8f5c-d4b801d867b2",
+          "name": "Grave Pact",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/5/f5a4970b-2ba6-4c91-a301-369369cdf360.jpg?1783915673",
+          "mana_cost": "{1}{B}{B}{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control dies, each other player sacrifices a creature of their choice.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 577,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "0025ee30-ee96-4c59-8561-74988efd384c",
+              "criterion_label": "grave pact",
+              "matched_tag_id": "0025ee30-ee96-4c59-8561-74988efd384c",
+              "matched_tag_label": "grave pact",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "a1cc5e37-b09a-4b7f-afd5-77c1c35aa425",
+          "name": "Carrion Feeder",
+          "image_uri": "https://cards.scryfall.io/normal/front/0/a/0a19da90-880e-4eca-8cf7-6d7baf090d53.jpg?1783933131",
+          "mana_cost": "{B}",
+          "type_line": "Creature \u2014 Zombie",
+          "oracle_text": "This creature can't block.\nSacrifice a creature: Put a +1/+1 counter on this creature.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 608,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "7fd61a18-6e4f-40c5-aa00-3d101ec1ec82",
+          "name": "Stitcher's Supplier",
+          "image_uri": "https://cards.scryfall.io/normal/front/2/e/2edcde06-b326-476e-884d-770187c785fe.jpg?1783907080",
+          "mana_cost": "{B}",
+          "type_line": "Creature \u2014 Zombie",
+          "oracle_text": "When this creature enters or dies, mill three cards. (Put the top three cards of your library into your graveyard.)",
+          "keywords": [
+            "Mill"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 615,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "53436ffa-653e-4362-a298-7bc9f8118961",
+              "matched_tag_label": "life-and-death-trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "374e54d8-8e73-4268-9dde-c28c77bbbf32",
+          "name": "Aftermath Analyst",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/6/66f135b4-8cb3-4a4e-86ae-81a3cf4b7259.jpg?1783906036",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Elf Detective",
+          "oracle_text": "When this creature enters, mill three cards. (Put the top three cards of your library into your graveyard.)\n{3}{G}, Sacrifice this creature: Return all land cards from your graveyard to the battlefield tapped.",
+          "keywords": [
+            "Mill"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 628,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "2e3ee458-fa3f-4452-ab95-5a7fb5a0483b",
+          "name": "Plaguecrafter",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/7/97505837-e0e2-4f7b-8581-01942e886bb8.jpg?1783913321",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Human Shaman",
+          "oracle_text": "When this creature enters, each player sacrifices a creature or planeswalker of their choice. Each player who can't discards a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 638,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "749d2994-44e7-40d3-8630-7bebed239e9e",
+          "name": "Haywire Mite",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/f/6f813bc3-6d81-4555-8e4b-6ecd9a6757b7.jpg?1783903739",
+          "mana_cost": "{1}",
+          "type_line": "Artifact Creature \u2014 Insect",
+          "oracle_text": "When this creature dies, you gain 2 life.\n{G}, Sacrifice this creature: Exile target noncreature artifact or noncreature enchantment.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 683,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "21338b71-37f5-4121-9b84-565025ebcd17",
+          "name": "Black Market",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/8/78c80c6d-f3ae-48d3-ba6a-b9b738e1affb.jpg?1783922463",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature dies, put a charge counter on this enchantment.\nAt the beginning of your first main phase, add {B} for each charge counter on this enchantment.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 684,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "9218b56d-aaec-482f-99e9-d95d227bfe25",
+          "name": "Sheoldred, Whispering One",
+          "image_uri": "https://cards.scryfall.io/normal/front/8/b/8b207a4a-47d1-4905-81d3-455c59bfd7da.jpg?1783930409",
+          "mana_cost": "{5}{B}{B}",
+          "type_line": "Legendary Creature \u2014 Phyrexian Praetor",
+          "oracle_text": "Swampwalk (This creature can't be blocked as long as defending player controls a Swamp.)\nAt the beginning of your upkeep, return target creature card from your graveyard to the battlefield.\nAt the beginning of each opponent's upkeep, that player sacrifices a creature of their choice.",
+          "keywords": [
+            "Landwalk",
+            "Swampwalk"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 723,
+          "evidence": [
+            {
+              "query_purpose": "Creature recursion that reuses creatures from the graveyard as recurring resources.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "c05a300c-2ec4-446a-a399-b3c314497de7",
+              "criterion_label": "reanimate-creature",
+              "matched_tag_id": "c05a300c-2ec4-446a-a399-b3c314497de7",
+              "matched_tag_label": "reanimate-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "d5ea905b-4bb6-48d0-9082-c472703db550",
+          "name": "Bloodchief Ascension",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/5/d56d1535-d9de-459f-bc31-0923f621e0e9.jpg?1783915683",
+          "mana_cost": "{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "At the beginning of each end step, if an opponent lost 2 or more life this turn, you may put a quest counter on this enchantment. (Damage causes loss of life.)\nWhenever a card is put into an opponent's graveyard from anywhere, if this enchantment has three or more quest counters on it, you may have that player lose 2 life. If you do, you gain 2 life.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 767,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "9a45a752-c1fd-44e9-9bc7-785997d3dace",
+              "matched_tag_label": "death trigger opponent",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "b15c6203-6311-44eb-916d-a4c271960c74",
+          "name": "Kaya's Ghostform",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/8/98f3be88-24e2-433f-9138-f0cb59d09a0f.jpg?1783933444",
+          "mana_cost": "{B}",
+          "type_line": "Enchantment \u2014 Aura",
+          "oracle_text": "Enchant creature or planeswalker you control\nWhen enchanted permanent dies or is put into exile, return that card to the battlefield under your control.",
+          "keywords": [
+            "Enchant"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 770,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "98e698ae-1a69-469c-9cfb-0e3fedeb71d4",
+          "name": "Enduring Tenacity",
+          "image_uri": "https://cards.scryfall.io/normal/front/d/5/d5756d4b-3068-412c-8643-880d3459151e.jpg?1783909481",
+          "mana_cost": "{2}{B}{B}",
+          "type_line": "Enchantment Creature \u2014 Snake Glimmer",
+          "oracle_text": "Whenever you gain life, target opponent loses that much life.\nWhen Enduring Tenacity dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 786,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "4b1bf05e-753e-4350-a913-894cf3cecc0c",
+          "name": "Fleshbag Marauder",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/c/fce2baa4-2976-4bbd-b6c5-a5a3c6a901be.jpg?1783912547",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Zombie Warrior",
+          "oracle_text": "When this creature enters, each player sacrifices a creature of their choice.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 793,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "d5b80895-621a-40df-bf48-6c7295658f21",
+          "name": "Cankerbloom",
+          "image_uri": "https://cards.scryfall.io/normal/front/8/9/89b39293-6f57-4294-85fc-c718bdbb4d40.jpg?1783918019",
+          "mana_cost": "{1}{G}",
+          "type_line": "Creature \u2014 Phyrexian Fungus",
+          "oracle_text": "{1}, Sacrifice this creature: Choose one \u2014\n\u2022 Destroy target artifact.\n\u2022 Destroy target enchantment.\n\u2022 Proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+          "keywords": [
+            "Proliferate"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 829,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "388168b3-ec68-4af2-b88c-6a5ec88c15f6",
+          "name": "Ayara, First of Locthwain",
+          "image_uri": "https://cards.scryfall.io/normal/front/e/d/ed0ace28-9a33-4f0d-b8c8-f5517f20ccf1.jpg?1783932644",
+          "mana_cost": "{B}{B}{B}",
+          "type_line": "Legendary Creature \u2014 Elf Noble",
+          "oracle_text": "Whenever Ayara or another black creature you control enters, each opponent loses 1 life and you gain 1 life.\n{T}, Sacrifice another black creature: Draw a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 831,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "a1e232c0-dc38-47be-a5a0-f68bc1d86a29",
+          "name": "Yawgmoth, Thran Physician",
+          "image_uri": "https://cards.scryfall.io/normal/front/b/5/b5a79f5d-d0df-4799-ac3a-84305e3af0c9.jpg?1783918469",
+          "mana_cost": "{2}{B}{B}",
+          "type_line": "Legendary Creature \u2014 Human Cleric",
+          "oracle_text": "Protection from Humans\nPay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one target creature and draw a card.\n{B}{B}, Discard a card: Proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+          "keywords": [
+            "Protection",
+            "Proliferate"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 836,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "391978f6-0bbc-41e8-9246-f7d0e21c7900",
+          "name": "Nadier's Nightblade",
+          "image_uri": "https://cards.scryfall.io/normal/front/b/c/bc9926d7-91b7-4067-b590-a0430bf68d16.jpg?1783911216",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Elf Warrior",
+          "oracle_text": "Whenever a token you control leaves the battlefield, each opponent loses 1 life and you gain 1 life.",
+          "keywords": [],
+          "match_count": 2,
+          "global_popularity_rank": 859,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "criterion_label": "blood artist ability",
+              "matched_tag_id": "00dd108a-d034-45a8-92e1-02c8fc59980d",
+              "matched_tag_label": "blood artist ability",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "9d2d6479-531c-4ce1-b52b-00e36fa63b64",
+          "name": "Rancor",
+          "image_uri": "https://cards.scryfall.io/normal/front/8/6/86d6b411-4a31-4bfc-8dd6-e19f553bb29b.jpg?1783921864",
+          "mana_cost": "{G}",
+          "type_line": "Enchantment \u2014 Aura",
+          "oracle_text": "Enchant creature\nEnchanted creature gets +2/+0 and has trample.\nWhen this Aura is put into a graveyard from the battlefield, return it to its owner's hand.",
+          "keywords": [
+            "Enchant"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 863,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "164f3f85-21fc-40b7-9871-4f303ba98428",
+          "name": "Scrap Trawler",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/1/614be454-3829-4c3b-9485-930755dfa16d.jpg?1783917111",
+          "mana_cost": "{3}",
+          "type_line": "Artifact Creature \u2014 Construct",
+          "oracle_text": "Whenever this creature dies or another artifact you control is put into a graveyard from the battlefield, return to your hand target artifact card in your graveyard with lesser mana value.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 883,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "d07d3be3-f69d-4484-8467-cffd43871788",
+          "name": "Myr Retriever",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/f/7f0149d4-0731-474a-a1c3-28c25e486c14.jpg?1783930101",
+          "mana_cost": "{2}",
+          "type_line": "Artifact Creature \u2014 Myr",
+          "oracle_text": "When this creature dies, return another target artifact card from your graveyard to your hand.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 893,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "63353a72-d5ba-429d-a70d-ba706a0d74b8",
+              "matched_tag_label": "death trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "5b5ef43b-13fd-4461-8d2d-18be65e9a790",
+          "name": "Ichor Wellspring",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/c/1ccdb407-ac8f-4736-89d3-ab0d086096ea.jpg?1783927513",
+          "mana_cost": "{2}",
+          "type_line": "Artifact",
+          "oracle_text": "When this artifact enters or is put into a graveyard from the battlefield, draw a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 970,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "53436ffa-653e-4362-a298-7bc9f8118961",
+              "matched_tag_label": "life-and-death-trigger-self",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "68639a3d-2192-4921-8298-c76bb0cd6b02",
+          "name": "Moldervine Reclamation",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/3/f3e93085-ffcb-4f48-8649-3fcbc5e97699.jpg?1783903749",
+          "mana_cost": "{3}{B}{G}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature you control dies, you gain 1 life and draw a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 1004,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "7c777a41-e40a-4b40-96bf-8ddd5c12924c",
+          "name": "Dictate of Erebos",
+          "image_uri": "https://cards.scryfall.io/normal/front/9/f/9f06db70-95f9-41eb-8e5f-8bc56fd34c09.jpg?1783939437",
+          "mana_cost": "{3}{B}{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "Flash\nWhenever a creature you control dies, each opponent sacrifices a creature of their choice.",
+          "keywords": [
+            "Flash"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 1028,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "0025ee30-ee96-4c59-8561-74988efd384c",
+              "criterion_label": "grave pact",
+              "matched_tag_id": "0025ee30-ee96-4c59-8561-74988efd384c",
+              "matched_tag_label": "grave pact",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "fdba89eb-1cf5-46e6-9d09-1adb9bc40fcd",
+          "name": "Yahenni, Undying Partisan",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/1/518b155a-cb84-48d3-9aba-07577f60f091.jpg?1783903779",
+          "mana_cost": "{2}{B}",
+          "type_line": "Legendary Creature \u2014 Aetherborn Vampire",
+          "oracle_text": "Haste\nWhenever a creature an opponent controls dies, put a +1/+1 counter on Yahenni.\nSacrifice another creature: Yahenni gains indestructible until end of turn.",
+          "keywords": [
+            "Haste"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 1038,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "9a45a752-c1fd-44e9-9bc7-785997d3dace",
+              "matched_tag_label": "death trigger opponent",
+              "relation": "descendant"
+            },
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "e8c7566d-7cc0-48af-a986-83223ec7e06c",
+          "name": "Midnight Reaper",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/2/f229b0e6-1ffd-410e-b04b-a0afc179c58c.jpg?1783908929",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Zombie Knight",
+          "oracle_text": "Whenever a nontoken creature you control dies, this creature deals 1 damage to you and you draw a card.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 1040,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "f15b3b76-d38a-48db-bb44-3296183c8641",
+          "name": "Chatterfang, Squirrel General",
+          "image_uri": "https://cards.scryfall.io/normal/front/1/7/1785cf85-1ac0-4246-9b89-1a8221a8e1b2.jpg?1783926835",
+          "mana_cost": "{2}{G}",
+          "type_line": "Legendary Creature \u2014 Squirrel Warrior",
+          "oracle_text": "Forestwalk (This creature can't be blocked as long as defending player controls a Forest.)\nIf one or more tokens would be created under your control, those tokens plus that many 1/1 green Squirrel creature tokens are created instead.\n{B}, Sacrifice X Squirrels: Target creature gets +X/-X until end of turn.",
+          "keywords": [
+            "Landwalk",
+            "Forestwalk"
+          ],
+          "match_count": 2,
+          "global_popularity_rank": 1062,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            },
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "criterion_label": "sacrifice outlet-creature",
+              "matched_tag_id": "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+              "matched_tag_label": "sacrifice outlet-creature",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "d1a60f44-7696-49ee-91fb-cab5b3102962",
+          "name": "Wurmcoil Engine",
+          "image_uri": "https://cards.scryfall.io/normal/front/5/d/5d275f04-cc60-4e3f-95cc-3d02bc916b82.jpg?1783930088",
+          "mana_cost": "{6}",
+          "type_line": "Artifact Creature \u2014 Phyrexian Wurm",
+          "oracle_text": "Deathtouch, lifelink\nWhen this creature dies, create a 3/3 colorless Phyrexian Wurm artifact creature token with deathtouch and a 3/3 colorless Phyrexian Wurm artifact creature token with lifelink.",
+          "keywords": [
+            "Lifelink",
+            "Deathtouch"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 1079,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "62d225b0-9a54-40c0-8c82-7d8a3c8ce5df",
+              "matched_tag_label": "splits on death",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "97db6c39-e690-49b6-93a6-e51b8dfad10b",
+          "name": "Spore Frog",
+          "image_uri": "https://cards.scryfall.io/normal/front/6/d/6d42fd52-34ea-4d1b-80dc-58fb0593bb5b.jpg?1783933092",
+          "mana_cost": "{G}",
+          "type_line": "Creature \u2014 Frog",
+          "oracle_text": "Sacrifice this creature: Prevent all combat damage that would be dealt this turn.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 1148,
+          "evidence": [
+            {
+              "query_purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "criterion_label": "martyr",
+              "matched_tag_id": "aa20ca6b-5548-48ac-92f3-8abb069273de",
+              "matched_tag_label": "martyr",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "72aef1d8-11df-4bc2-af83-907b05df73a8",
+          "name": "Grim Haruspex",
+          "image_uri": "https://cards.scryfall.io/normal/front/f/5/f5c19b87-e114-46d4-9f6c-c02e838a08dd.jpg?1783922449",
+          "mana_cost": "{2}{B}",
+          "type_line": "Creature \u2014 Human Wizard",
+          "oracle_text": "Morph {B} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nWhenever another nontoken creature you control dies, draw a card.",
+          "keywords": [
+            "Morph"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 1156,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": true
+        },
+        {
+          "oracle_id": "cc3fcd26-c088-4335-9a35-0e11019e3d5b",
+          "name": "Revel in Riches",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/9/79b0e035-8716-469d-99ae-a530cd96ef09.jpg?1783935756",
+          "mana_cost": "{4}{B}",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a creature an opponent controls dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nAt the beginning of your upkeep, if you control ten or more Treasures, you win the game.",
+          "keywords": [
+            "Treasure"
+          ],
+          "match_count": 1,
+          "global_popularity_rank": 1168,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "9a45a752-c1fd-44e9-9bc7-785997d3dace",
+              "matched_tag_label": "death trigger opponent",
+              "relation": "descendant"
+            }
+          ],
+          "reference_hit": false
+        },
+        {
+          "oracle_id": "d0ade00d-a496-441d-9b7e-7dc033d3292c",
+          "name": "Titania, Protector of Argoth",
+          "image_uri": "https://cards.scryfall.io/normal/front/7/3/732c208b-cd9e-48a9-9b9d-aba63066ba53.jpg?1783906029",
+          "mana_cost": "{3}{G}{G}",
+          "type_line": "Legendary Creature \u2014 Elemental",
+          "oracle_text": "When Titania enters, return target land card from your graveyard to the battlefield.\nWhenever a land you control is put into a graveyard from the battlefield, create a 5/3 green Elemental creature token.",
+          "keywords": [],
+          "match_count": 1,
+          "global_popularity_rank": 1178,
+          "evidence": [
+            {
+              "query_purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+              "criterion_type": "oracle_tag",
+              "criterion_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "criterion_label": "death trigger",
+              "matched_tag_id": "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+              "matched_tag_label": "death trigger",
+              "relation": "direct"
+            }
+          ],
+          "reference_hit": false
+        }
+      ],
+      "queries": [
+        {
+          "purpose": "Creature-based sacrifice outlets that reliably convert expendable creatures into deaths and value.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "d5dcbcc6-d49b-4d76-9272-35a062bcb656",
+                "aa20ca6b-5548-48ac-92f3-8abb069273de"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        },
+        {
+          "purpose": "Creature recursion that reuses creatures from the graveyard as recurring resources.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "c05a300c-2ec4-446a-a399-b3c314497de7"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        },
+        {
+          "purpose": "Death-trigger payoffs that turn repeated sacrifices into life loss, advantage, or opposing-creature attrition.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "3bcd7cdd-61ca-42dd-adc5-1a695eaec2d2",
+                "00dd108a-d034-45a8-92e1-02c8fc59980d",
+                "0025ee30-ee96-4c59-8561-74988efd384c"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature",
+            "Enchantment",
+            "Artifact"
+          ]
+        },
+        {
+          "purpose": "Creatures whose enter-or-leave patterns reward repeatedly reanimating and sacrificing them.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "bad44322-e38a-4ec9-9d19-dec53d46c76b"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        },
+        {
+          "purpose": "Creature-based mana acceleration that can also become sacrifice fodder for the recursion engine.",
+          "groups": [
+            {
+              "oracle_tag_ids": [
+                "0bd507bc-e6e9-404e-b8d9-5ba2cb7ad509"
+              ],
+              "printed_keywords": []
+            }
+          ],
+          "card_types_any": [
+            "Creature"
+          ]
+        }
+      ]
+    }
+  }
+}

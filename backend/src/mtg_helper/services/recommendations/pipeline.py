@@ -5,7 +5,15 @@ from dataclasses import dataclass
 
 from pydantic import Field, ValidationError
 
-from mtg_helper.services.recommendations import budget, profiles, refinement, strategy
+from mtg_helper.services.recommendations import (
+    budget,
+    profiles,
+    refinement,
+    strategy,
+    term_queries,
+    term_selection,
+    terms,
+)
 from mtg_helper.services.recommendations.discovery import (
     Assessment,
     Query,
@@ -182,6 +190,12 @@ def stage(phase: str, payload: Card, *, profile: str = budget.VERSION) -> profil
     bound = budget.bounds(profile)[phase]
     if profile == budget.STRATEGY_VERSION:
         return profiles.Stage(strategy.PROMPT, strategy.StrategyDraft, *bound)
+    if profile == budget.BOUNDED_TERMS_VERSION:
+        return profiles.Stage(term_selection.PROMPT, term_selection.selection_type(payload), *bound)
+    if profile == budget.TERMS_VERSION:
+        return profiles.Stage(term_queries.PROMPT, term_queries.TermsDraft, *bound)
+    if profile == budget.LEGACY_TERMS_VERSION:
+        return profiles.Stage(terms.PROMPT, terms.TermsDraft, *bound)
     plan = profiles.PLAN_PROMPT.replace(
         "Do not invent budget/bracket/combo constraints.", "Respect declared typed constraints."
     )

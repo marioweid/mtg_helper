@@ -758,6 +758,49 @@ CREATE TABLE IF NOT EXISTS recommendation_feedback (
     PRIMARY KEY (run_id, oracle_id)
 );
 
+-- Saved Discover intent is deliberately separate from a deck description, personal
+-- categories, and the legacy mixed archetype picker.  A revision makes an editor's
+-- stale save fail rather than replacing a newer selection.
+CREATE TABLE IF NOT EXISTS discover_strategies (
+    deck_id UUID PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    prose TEXT NOT NULL CHECK (char_length(btrim(prose)) BETWEEN 1 AND 2000),
+    queries JSONB NOT NULL DEFAULT '[]'
+        CHECK (jsonb_typeof(queries) = 'array' AND jsonb_array_length(queries) <= 6),
+    revision UUID NOT NULL DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS discover_strategies_account ON discover_strategies (account_id);
+
+-- Convert saved criteria without changing intent, ownership, revisions or user card state.
+ALTER TABLE discover_strategies ADD COLUMN IF NOT EXISTS queries JSONB NOT NULL DEFAULT '[]';
+DO $discover_queries$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+        AND table_name='discover_strategies' AND column_name='oracle_tag_ids') THEN
+        UPDATE discover_strategies SET queries = jsonb_build_array(jsonb_build_object(
+            'purpose', 'Saved search', 'groups', jsonb_build_array(jsonb_build_object(
+                'oracle_tag_ids', to_jsonb(oracle_tag_ids),
+                'printed_keywords', to_jsonb(printed_keywords))), 'card_types_any', '[]'::jsonb))
+        WHERE queries='[]'::jsonb
+            AND (cardinality(oracle_tag_ids)>0 OR cardinality(printed_keywords)>0);
+        ALTER TABLE discover_strategies DROP COLUMN oracle_tag_ids;
+        ALTER TABLE discover_strategies DROP COLUMN printed_keywords;
+    END IF;
+END $discover_queries$;
+ALTER TABLE discover_strategies DROP CONSTRAINT IF EXISTS discover_strategies_queries_check;
+ALTER TABLE discover_strategies ADD CONSTRAINT discover_strategies_queries_check
+    CHECK (jsonb_typeof(queries)='array' AND jsonb_array_length(queries)<=6);
+
+-- Discover dismissals are owner- and deck-local, just like New Cards dismissals.
+CREATE TABLE IF NOT EXISTS discover_dismissals (
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    oracle_id UUID NOT NULL,
+    PRIMARY KEY (deck_id, account_id, oracle_id)
+);
+
 -- Recreate after source tables so deck reads expose direct Scryfall identities.
 -- A view's output columns cannot be reordered by CREATE OR REPLACE, so remove
 -- the retired projection before defining the source-only contract.

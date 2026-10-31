@@ -1,0 +1,22 @@
+{
+  "created_at": "2026-10-30T15:52:49.785814+00:00",
+  "profile": "app-strategy-terms-v3",
+  "attempts": 4,
+  "ratings_count": 49,
+  "files_sha256": {
+    "README.md": "f428ab464944d7674f01c159fdb34d249296c9c69c54a485cb262d301f134a7c",
+    "attempts.json": "efb556a964c97daeccaa85113e5f57496d269243336ea5bf6282e7a284b6b461",
+    "diagnostics.json": "4c1b0b331c7215f5ca4ba5e8c27b7e0f96c282d2bef28a3c68cdf599251d4b2e",
+    "graded-results.json": "1b498d1155e8949ecc5240712a9c8c175eb34c7c22336411f02e3453c206eee0",
+    "inputs.json": "28b8722bad22723f303619111d7906d65cfa09b091a576ae2282b88232b0290c",
+    "ratings.json": "6a8adccaa12a04c674e9ba63f95091f61a039aeb3de6d8a2e6d63353702f1e75",
+    "report.md": "79bf0252088d134f7d9c4607de8fa1c5956fec905754f28588149bc0986d56e1",
+    "requests/meren-baseline.json": "b2eb7562485bed3d2f829a42fa5a027e9108d44fa2ac6afa8891a41b64f9edc6",
+    "requests/meren-refined.json": "2da09cfce71ca5e049d4a17b777518c809e1c5cbf84a2854ad6332d6cb843459",
+    "requests/yuna-baseline.json": "f35537276058e151717939886e5d90ff855edb08e59c4e07539b9769a4ea73f1",
+    "requests/yuna-refined.json": "83e1d1c84cae139ca612fe144fa0d0b9d9e9a20c8de55a73f2f14d194b7cc630",
+    "results.json": "6cc86bf888ef43fffc599f784201ea149937e9f093d64cc8c2e22963bacd7c7c",
+    "review-packet.json": "70899a45a8ba7b579d6baa44ec5d5b3507f763b4637dc5be17a10299cc441280",
+    "verification.md": "3767549c46a1f7adc5b0233b687c7bffa503c89182427f6c37f15754e8b94864"
+  }
+}
