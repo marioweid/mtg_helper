@@ -46,6 +46,23 @@ The application combines a local Scryfall-backed card database, deck management 
 - **Experimental New Cards** — Explicitly analyze recent, released Commander-legal cards for your physical deck. Review unverified advice alongside source rules, then plan an addition or dismiss it. No previews or automatic deck edits. See [setup and limits](OPERATIONS.md#experimental-new-cards-pilot).
 - **Experimental Discover (default off)** — Source-backed, commander-only discovery with an optional strategy draft and explicit, bounded card generation. It does not assess physical-deck interactions. See [access and limits](docs/recommendation-pilot-contract.md).
 
+## Compare and export cards
+
+In **Planned changes**, use **Compare physical → planned** to preview additions and cuts without
+applying them. Either comparison side can be physical, planned, or a snapshot; use **Swap sides**
+to reverse the delta. Planned deck totals include commanders. Existing snapshots saved main-deck
+cards only, so their commander configuration still comes from the current deck.
+
+Export incoming delta quantities (including increases), selected rows, or either full deck from
+Compare. Planned changes also supports all or selected additions. Choose **MTGO text** or
+**Cardmarket buy list**, then copy the list or download a TXT with one `quantity card name` per line.
+
+Select binders under **Subtract cards from selected binders** to export only the remaining copies.
+No binders selected means full quantities; leave proxy binders unchecked when buying real cards.
+Alternate printings count together. The preview includes needed/available/exporting quantities,
+a capped binder pull list, and estimated remaining EUR cost with missing prices flagged. Exports
+never move or reserve inventory, apply planned changes, or place orders.
+
 ## Tech stack
 
 - **Frontend:** Next.js, React, TypeScript

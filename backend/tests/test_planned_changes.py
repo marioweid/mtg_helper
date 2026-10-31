@@ -1,6 +1,6 @@
 """Behavioral tests for physical deck state and planned-change overlays."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import asyncpg
 import pytest
@@ -14,11 +14,19 @@ from tests.conftest import (
     create_test_deck,
 )
 
+FOREST_SCRYFALL_ID = UUID("6d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 
-async def _add_now(client: AsyncClient, deck_id: str, quantity: int = 1) -> None:
+
+async def _add_now(
+    client: AsyncClient,
+    deck_id: str,
+    quantity: int = 1,
+    *,
+    scryfall_id: UUID = SOL_RING_SCRYFALL_ID,
+) -> None:
     response = await client.post(
         f"/api/v1/decks/{deck_id}/cards",
-        json={"card_scryfall_id": str(SOL_RING_SCRYFALL_ID), "quantity": quantity},
+        json={"card_scryfall_id": str(scryfall_id), "quantity": quantity},
     )
     assert response.status_code == 201
 
@@ -28,11 +36,13 @@ async def _plan(
     deck_id: str,
     direction: str,
     quantity: int = 1,
+    *,
+    scryfall_id: UUID = SOL_RING_SCRYFALL_ID,
 ) -> dict[str, object] | None:
     response = await client.post(
         f"/api/v1/decks/{deck_id}/planned-changes",
         json={
-            "card_scryfall_id": str(SOL_RING_SCRYFALL_ID),
+            "card_scryfall_id": str(scryfall_id),
             "direction": direction,
             "quantity": quantity,
         },
@@ -89,7 +99,7 @@ async def _shopping_list(
 async def test_planned_addition_is_excluded_from_physical_deck(client: AsyncClient) -> None:
     deck_id = await create_test_deck(client)
 
-    plan = await _plan(client, deck_id, "addition", 2)
+    plan = await _plan(client, deck_id, "addition", 2, scryfall_id=FOREST_SCRYFALL_ID)
     deck = (await client.get(f"/api/v1/decks/{deck_id}")).json()["data"]
 
     assert plan is not None
@@ -115,11 +125,11 @@ async def test_planned_cut_remains_in_physical_deck(client: AsyncClient) -> None
 @pytest.mark.asyncio
 async def test_opposite_plan_offsets_existing_quantity(client: AsyncClient) -> None:
     deck_id = await create_test_deck(client)
-    await _add_now(client, deck_id, quantity=2)
-    await _plan(client, deck_id, "cut", 2)
+    await _add_now(client, deck_id, quantity=2, scryfall_id=FOREST_SCRYFALL_ID)
+    await _plan(client, deck_id, "cut", 2, scryfall_id=FOREST_SCRYFALL_ID)
 
-    remaining = await _plan(client, deck_id, "addition", 1)
-    cancelled = await _plan(client, deck_id, "addition", 1)
+    remaining = await _plan(client, deck_id, "addition", 1, scryfall_id=FOREST_SCRYFALL_ID)
+    cancelled = await _plan(client, deck_id, "addition", 1, scryfall_id=FOREST_SCRYFALL_ID)
 
     assert remaining is not None
     assert remaining["direction"] == "cut"
@@ -130,7 +140,7 @@ async def test_opposite_plan_offsets_existing_quantity(client: AsyncClient) -> N
 @pytest.mark.asyncio
 async def test_partial_addition_completion_leaves_remainder(client: AsyncClient) -> None:
     deck_id = await create_test_deck(client)
-    plan = await _plan(client, deck_id, "addition", 2)
+    plan = await _plan(client, deck_id, "addition", 2, scryfall_id=FOREST_SCRYFALL_ID)
     assert plan is not None
 
     response = await client.post(
@@ -141,7 +151,7 @@ async def test_partial_addition_completion_leaves_remainder(client: AsyncClient)
 
     assert response.status_code == 200
     assert response.json()["data"]["quantity"] == 1
-    assert deck["cards"][0]["name"] == "Sol Ring"
+    assert deck["cards"][0]["name"] == "Forest"
     assert deck["cards"][0]["quantity"] == 1
     assert deck["planned_changes"][0]["quantity"] == 1
 
@@ -208,9 +218,9 @@ async def test_selected_collection_is_revalidated_atomically(client: AsyncClient
     collection_id = collection.json()["data"]["id"]
     await client.post(
         f"/api/v1/collections/{collection_id}/cards",
-        json={"scryfall_id": str(SOL_RING_SCRYFALL_ID), "quantity": 1},
+        json={"scryfall_id": str(FOREST_SCRYFALL_ID), "quantity": 1},
     )
-    plan = await _plan(client, deck_id, "addition", 2)
+    plan = await _plan(client, deck_id, "addition", 2, scryfall_id=FOREST_SCRYFALL_ID)
     assert plan is not None
     await client.patch(
         f"/api/v1/decks/{deck_id}/planned-changes/{plan['id']}",
@@ -257,9 +267,9 @@ async def test_commander_and_excessive_cut_are_rejected(client: AsyncClient) -> 
 @pytest.mark.asyncio
 async def test_immediate_add_consumes_matching_plan(client: AsyncClient) -> None:
     deck_id = await create_test_deck(client)
-    await _plan(client, deck_id, "addition", 2)
+    await _plan(client, deck_id, "addition", 2, scryfall_id=FOREST_SCRYFALL_ID)
 
-    await _add_now(client, deck_id)
+    await _add_now(client, deck_id, scryfall_id=FOREST_SCRYFALL_ID)
     deck = (await client.get(f"/api/v1/decks/{deck_id}")).json()["data"]
 
     assert deck["cards"][0]["quantity"] == 1
@@ -269,19 +279,19 @@ async def test_immediate_add_consumes_matching_plan(client: AsyncClient) -> None
 @pytest.mark.asyncio
 async def test_shopping_list_uses_only_selected_collections(client: AsyncClient) -> None:
     deck_id = await create_test_deck(client)
-    await _plan(client, deck_id, "addition", 2)
+    await _plan(client, deck_id, "addition", 2, scryfall_id=FOREST_SCRYFALL_ID)
     await _plan_card(client, deck_id, str(DOUBLING_SEASON_SCRYFALL_ID))
     binder = await _create_collection(client, "Binder")
     proxies = await _create_collection(client, "Proxies")
-    await _add_collection_card(client, binder, str(SOL_RING_SCRYFALL_ID))
-    await _add_collection_card(client, proxies, str(SOL_RING_SCRYFALL_ID))
+    await _add_collection_card(client, binder, str(FOREST_SCRYFALL_ID))
+    await _add_collection_card(client, proxies, str(FOREST_SCRYFALL_ID))
 
     none_selected = await _shopping_list(client, deck_id, [])
     binder_selected = await _shopping_list(client, deck_id, [binder])
     all_selected = await _shopping_list(client, deck_id, [binder, proxies])
 
-    assert none_selected.text == "1 Doubling Season\n2 Sol Ring"
-    assert binder_selected.text == "1 Doubling Season\n1 Sol Ring"
+    assert none_selected.text == "1 Doubling Season\n2 Forest"
+    assert binder_selected.text == "1 Doubling Season\n1 Forest"
     assert all_selected.text == "1 Doubling Season"
 
 

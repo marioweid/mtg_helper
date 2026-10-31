@@ -3,7 +3,7 @@
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import asyncpg
@@ -306,7 +306,7 @@ class _Composition:
     def __init__(
         self,
         *,
-        kind: str,
+        kind: Literal["deck", "planned", "snapshot"],
         side_id: UUID,
         deck_id: UUID,
         deck_name: str,
@@ -332,7 +332,7 @@ class _Composition:
 
     def meta(self) -> ComparisonSideMeta:
         return ComparisonSideMeta(
-            kind="snapshot" if self.kind == "snapshot" else "deck",
+            kind=self.kind,
             id=self.side_id,
             deck_id=self.deck_id,
             deck_name=self.deck_name,
@@ -425,6 +425,68 @@ async def _load_snapshot_composition(
         commander_id=snapshot_row["commander_id"],
         cards=cards,
     )
+
+
+async def _apply_pending_plans(conn: asyncpg.Connection, composition: _Composition) -> None:
+    plans = await conn.fetch(
+        """
+        SELECT p.card_id, p.quantity, p.direction, p.categories,
+               c.scryfall_id, c.name, c.mana_cost, c.cmc, c.type_line,
+               c.image_uri, c.color_identity,
+               CASE WHEN c.prices->>'eur' IS NULL THEN NULL
+                    ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer END AS price_eur_cents
+        FROM deck_card_plans p JOIN cards c ON c.id = p.card_id
+        WHERE p.deck_id = $1
+        """,
+        composition.deck_id,
+    )
+    for plan in plans:
+        card_id = plan["card_id"]
+        existing = composition.cards.get(card_id)
+        physical = int(existing["quantity"]) if existing else 0
+        change = plan["quantity"] if plan["direction"] == "addition" else -plan["quantity"]
+        quantity = max(0, physical + change)
+        if quantity == 0:
+            composition.cards.pop(card_id, None)
+        else:
+            composition.cards[card_id] = {
+                **dict(plan),
+                "quantity": quantity,
+                "categories": _merge_categories(
+                    list(existing.get("categories") or []) if existing else [],
+                    list(plan["categories"] or []),
+                ),
+            }
+    composition.kind = "planned"
+
+
+async def _include_commanders(conn: asyncpg.Connection, composition: _Composition) -> None:
+    rows = await conn.fetch(
+        """
+        SELECT c.id AS card_id, c.scryfall_id, c.name, c.mana_cost, c.cmc, c.type_line,
+               c.image_uri, c.color_identity, 1 AS quantity, ARRAY['commander'] AS categories,
+               CASE WHEN c.prices->>'eur' IS NULL THEN NULL
+                    ELSE ROUND((c.prices->>'eur')::numeric * 100)::integer END AS price_eur_cents
+        FROM decks d JOIN cards c ON c.id = d.commander_id OR c.id = d.partner_id
+        WHERE d.id = $1
+        """,
+        composition.deck_id,
+    )
+    for row in rows:
+        composition.cards[row["card_id"]] = dict(row)
+
+
+async def _load_composition(
+    conn: asyncpg.Connection, kind: str, side_id: UUID, email: str
+) -> _Composition:
+    if kind == "snapshot":
+        composition = await _load_snapshot_composition(conn, side_id, email)
+    else:
+        composition = await _load_deck_composition(conn, side_id, email)
+        if kind == "planned":
+            await _apply_pending_plans(conn, composition)
+    await _include_commanders(conn, composition)
+    return composition
 
 
 def _card_info(row: dict[str, Any]) -> DiffCardInfo:
@@ -552,23 +614,21 @@ async def compare(
     email: str,
     account_id: UUID | None = None,
 ) -> DeckCompareResponse:
-    """Diff two compositions. Each side may be a live deck or a snapshot."""
-    async with pool.acquire() as conn:
-        if left_kind == "snapshot":
-            left = await _load_snapshot_composition(conn, left_id, email)
-        else:
-            left = await _load_deck_composition(conn, left_id, email)
-        if right_kind == "snapshot":
-            right = await _load_snapshot_composition(conn, right_id, email)
-        else:
-            right = await _load_deck_composition(conn, right_id, email)
+    """Diff physical, planned or snapshot compositions without writing deck data."""
+    async with pool.acquire() as conn, conn.transaction(isolation="repeatable_read", readonly=True):
+        left = await _load_composition(conn, left_kind, left_id, email)
+        right = await _load_composition(conn, right_kind, right_id, email)
 
     diff = diff_compositions(left.cards, right.cards)
     left.mana_curve = await mana_curve_service.deck_curve(
-        pool, left.commander_id, list(left.cards.values())
+        pool,
+        left.commander_id,
+        [card for card in left.cards.values() if "commander" not in card["categories"]],
     )
     right.mana_curve = await mana_curve_service.deck_curve(
-        pool, right.commander_id, list(right.cards.values())
+        pool,
+        right.commander_id,
+        [card for card in right.cards.values() if "commander" not in card["categories"]],
     )
     await _attach_ownership(pool, diff, account_id)
     return DeckCompareResponse(left=left.meta(), right=right.meta(), diff=diff)

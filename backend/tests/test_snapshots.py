@@ -272,3 +272,77 @@ def test_diff_compositions_pure() -> None:
     assert [e.card.name for e in diff.quantity_changed] == ["Bravo"]
     assert [e.card.name for e in diff.added] == ["Charlie"]
     assert diff.removed == []
+
+
+@pytest.mark.asyncio
+async def test_compare_physical_to_planned_applies_additions_and_cuts_read_only(
+    client: AsyncClient,
+) -> None:
+    deck_id = await create_test_deck(client)
+    await client.post(
+        f"/api/v1/decks/{deck_id}/cards",
+        json={
+            "card_scryfall_id": str(SOL_RING_SCRYFALL_ID),
+        },
+    )
+    for card, direction in [
+        (SOL_RING_SCRYFALL_ID, "cut"),
+        (DOUBLING_SEASON_SCRYFALL_ID, "addition"),
+    ]:
+        response = await client.post(
+            f"/api/v1/decks/{deck_id}/planned-changes",
+            json={
+                "card_scryfall_id": str(card),
+                "direction": direction,
+            },
+        )
+        assert response.status_code == 201
+    before = (await client.get(f"/api/v1/decks/{deck_id}")).json()["data"]
+    response = await client.get(
+        "/api/v1/decks/compare",
+        params={
+            "left": deck_id,
+            "right": deck_id,
+            "right_kind": "planned",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["right"]["kind"] == "planned"
+    assert data["left"]["card_count"] == data["right"]["card_count"] == 2
+    assert [e["card"]["name"] for e in data["diff"]["added"]] == ["Doubling Season"]
+    assert [e["card"]["name"] for e in data["diff"]["removed"]] == ["Sol Ring"]
+    assert [e["card"]["name"] for e in data["diff"]["common"]] == ["Hazel of the Rootbloom"]
+    after = (await client.get(f"/api/v1/decks/{deck_id}")).json()["data"]
+    assert before == after
+
+
+@pytest.mark.asyncio
+async def test_planned_comparison_supports_quantity_increases_and_owner_checks(
+    client: AsyncClient,
+) -> None:
+    deck_id = await create_test_deck(client)
+    forest_id = "6d7b8d2c-36f5-40e7-91de-9c8c1b44da67"
+    await client.post(
+        f"/api/v1/decks/{deck_id}/cards",
+        json={
+            "card_scryfall_id": forest_id,
+            "quantity": 2,
+        },
+    )
+    await client.post(
+        f"/api/v1/decks/{deck_id}/planned-changes",
+        json={
+            "card_scryfall_id": forest_id,
+            "direction": "addition",
+            "quantity": 3,
+        },
+    )
+    params = {"left": deck_id, "left_kind": "planned", "right": deck_id}
+    response = await client.get("/api/v1/decks/compare", params=params)
+    assert response.status_code == 200
+    entry = response.json()["data"]["diff"]["quantity_changed"][0]
+    assert (entry["left_quantity"], entry["right_quantity"]) == (5, 2)
+    await create_test_account(client, "Foreign planned comparison")
+    denied = await client.get("/api/v1/decks/compare", params=params)
+    assert denied.status_code == 404

@@ -116,7 +116,7 @@ class DeckDiff(BaseModel):
 class ComparisonSideMeta(BaseModel):
     """Metadata describing one side of a comparison."""
 
-    kind: Literal["deck", "snapshot"]
+    kind: Literal["deck", "planned", "snapshot"]
     id: UUID
     deck_id: UUID
     deck_name: str
