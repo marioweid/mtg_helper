@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ComparisonPlanDialog } from "@/components/comparison-plan-dialog";
+import { ComparisonPlanningSummary } from "@/components/comparison-planning-summary";
 import { comparisonPlanningChanges, type PlanningScope } from "@/lib/comparison";
 import type { DeckCompareResponse, DeckSummary } from "@/lib/types";
 
@@ -22,11 +23,22 @@ export function ComparisonPlanningActions({ result, decks, selected, onPlanned }
       aria-label="Plan selected comparison cards"
       className="rounded-xl border border-emerald-500/20 bg-emerald-950/10 p-4"
     >
-      <h2 className="text-sm font-medium text-emerald-200">Plan selected cards</h2>
+      <h2 className="text-sm font-medium text-emerald-200">Plan additions or swaps</h2>
       <p className="mt-1 text-xs text-gray-400">
         Queue left → right deltas on a chosen deck after confirmation. Common cards and commander
         changes are excluded. Swap sides to reverse the direction. Physical cards stay unchanged.
       </p>
+      <p className="mt-1 text-xs text-gray-400">
+        Plan selected changes reviews additions and cuts together; each card is checked separately.
+      </p>
+      <ComparisonPlanningSummary changes={changes} />
+      {selected.size > changes.length && (
+        <p className="mt-1 text-xs text-gray-400">
+          {selected.size - changes.length} selected{" "}
+          {selected.size - changes.length === 1 ? "card is" : "cards are"} export-only
+          (common/commander).
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"

@@ -23,6 +23,54 @@ export interface ComparisonPlannedChange extends PlannedDeckChangeCreate {
   categories: string[];
 }
 
+export type ComparisonSelectionPreset = "changes" | "additions" | "cuts";
+
+/** Select changed rows by direction; common cards require an explicit group or row selection. */
+export function comparisonSelectionPreset(
+  diff: DeckDiff,
+  preset: ComparisonSelectionPreset,
+): Set<string> {
+  const entries = [...diff.added, ...diff.removed, ...diff.quantity_changed];
+  return new Set(
+    entries
+      .filter((entry) => {
+        const delta = entry.right_quantity - entry.left_quantity;
+        if (preset === "additions") return delta > 0;
+        if (preset === "cuts") return delta < 0;
+        return delta !== 0;
+      })
+      .map((entry) => entry.card.card_id),
+  );
+}
+
+/** Fill a partial group or clear a complete one without disturbing selections elsewhere. */
+export function toggleComparisonGroup(
+  selected: ReadonlySet<string>,
+  entries: DiffEntry[],
+): Set<string> {
+  const next = new Set(selected);
+  const allSelected = entries.every((entry) => selected.has(entry.card.card_id));
+  for (const entry of entries) {
+    if (allSelected) next.delete(entry.card.card_id);
+    else next.add(entry.card.card_id);
+  }
+  return next;
+}
+
+/** Count selected card types separately from positive and negative copy deltas. */
+export function comparisonSelectionTotals(diff: DeckDiff, selected: ReadonlySet<string>) {
+  const totals = { types: 0, changedTypes: 0, addedCopies: 0, removedCopies: 0 };
+  for (const entry of [...diff.added, ...diff.removed, ...diff.quantity_changed, ...diff.common]) {
+    if (!selected.has(entry.card.card_id)) continue;
+    const delta = entry.right_quantity - entry.left_quantity;
+    totals.types += 1;
+    if (delta !== 0) totals.changedTypes += 1;
+    totals.addedCopies += Math.max(0, delta);
+    totals.removedCopies += Math.max(0, -delta);
+  }
+  return totals;
+}
+
 /** Convert selected non-commander deltas to minimum pending quantities on a target deck. */
 export function comparisonPlanningChanges(
   diff: DeckDiff,

@@ -51,6 +51,15 @@ describe("comparison results", () => {
     expect(html).toContain('aria-label="Select Forest for export or planning"');
     expect(html).toContain("Plan selected additions");
     expect(html).toContain("Plan selected changes");
+    expect(html).toContain('aria-label="Select all Added cards"');
+    expect(html).toContain('aria-label="Select all Removed cards"');
+    expect(html).toContain('aria-label="Select all Quantity changed cards"');
+    expect(html.indexOf('aria-label="Comparison selection"')).toBeLessThan(
+      html.indexOf('aria-label="Plan selected comparison cards"'),
+    );
+    expect(html.indexOf('aria-label="Plan selected comparison cards"')).toBeLessThan(
+      html.indexOf('aria-label="Comparison actions"'),
+    );
     expect(html).toContain("2 → 5");
   });
 

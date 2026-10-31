@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { comparisonExportCards, comparisonPlanningChanges } from "@/lib/comparison";
+import {
+  comparisonExportCards,
+  comparisonPlanningChanges,
+  comparisonSelectionPreset,
+  comparisonSelectionTotals,
+  toggleComparisonGroup,
+} from "@/lib/comparison";
 import type { DeckDiff, DiffEntry } from "@/lib/types";
 
 function entry(name: string, left: number, right: number): DiffEntry {
@@ -119,5 +125,53 @@ describe("comparison planning selections", () => {
         categories: ["ramp"],
       },
     ]);
+  });
+});
+
+describe("comparison bulk selection", () => {
+  it("selects all changed types but leaves common cards out of bulk presets", () => {
+    expect([...comparisonSelectionPreset(diff, "changes")]).toEqual([
+      "New card",
+      "Cut card",
+      "Increase",
+      "Decrease",
+    ]);
+    expect([...comparisonSelectionPreset(diff, "additions")]).toEqual(["New card", "Increase"]);
+    expect([...comparisonSelectionPreset(diff, "cuts")]).toEqual(["Cut card", "Decrease"]);
+  });
+
+  it("fills a partial group without dropping other selected groups or mutating input", () => {
+    const selected = new Set(["Increase", "Unchanged"]);
+    const next = toggleComparisonGroup(selected, diff.quantity_changed);
+    expect([...next]).toEqual(["Increase", "Unchanged", "Decrease"]);
+    expect([...selected]).toEqual(["Increase", "Unchanged"]);
+  });
+
+  it("clears only a fully selected group and permits selecting common cards for export", () => {
+    const selected = new Set(["Increase", "Decrease", "Unchanged"]);
+    expect([...toggleComparisonGroup(selected, diff.quantity_changed)]).toEqual(["Unchanged"]);
+    expect([...toggleComparisonGroup(new Set(["New card"]), diff.common)]).toEqual([
+      "New card",
+      "Unchanged",
+    ]);
+    expect([...toggleComparisonGroup(selected, [])]).toEqual([...selected]);
+  });
+
+  it("distinguishes selected types from incoming/outgoing copy deltas", () => {
+    const selected = new Set(["New card", "Increase", "Decrease", "Cut card", "Unchanged"]);
+    expect(comparisonSelectionTotals(diff, selected)).toEqual({
+      types: 5,
+      changedTypes: 4,
+      addedCopies: 5,
+      removedCopies: 6,
+    });
+    const empty = { added: [], removed: [], quantity_changed: [], common: [] };
+    expect([...comparisonSelectionPreset(empty, "changes")]).toEqual([]);
+    expect(comparisonSelectionTotals(diff, new Set())).toEqual({
+      types: 0,
+      changedTypes: 0,
+      addedCopies: 0,
+      removedCopies: 0,
+    });
   });
 });
