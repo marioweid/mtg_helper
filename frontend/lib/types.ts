@@ -276,8 +276,29 @@ export interface PlannedDeckChangeUpdate {
   collection_id?: string | null;
 }
 
-export interface PlannedShoppingListRequest {
-  collection_ids: string[];
+export interface ExportCard {
+  card_id: string;
+  quantity: number;
+}
+
+export interface CardExportRow {
+  card_id: string;
+  name: string;
+  needed_quantity: number;
+  available_quantity: number;
+  export_quantity: number;
+  price_eur_cents: number | null;
+  pulls: CollectionMembership[];
+}
+
+export interface CardExportPreview {
+  rows: CardExportRow[];
+  needed_quantity: number;
+  from_binders_quantity: number;
+  export_quantity: number;
+  known_price_eur_cents: number;
+  unpriced_quantity: number;
+  text: string;
 }
 
 export interface CardSuggestion {
@@ -1135,7 +1156,7 @@ export interface DeckDiff {
   common: DiffEntry[];
 }
 
-export type ComparisonKind = "deck" | "snapshot";
+export type ComparisonKind = "deck" | "planned" | "snapshot";
 
 export interface ComparisonSideMeta {
   kind: ComparisonKind;

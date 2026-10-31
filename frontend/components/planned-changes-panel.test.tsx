@@ -2,9 +2,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ToastProvider } from "./toast";
-import { PlannedChangesPanel } from "./planned-changes-panel";
-import type { PlannedDeckChange } from "../lib/types";
+import { ToastProvider } from "@/components/toast";
+import { PlannedChangesPanel } from "@/components/planned-changes-panel";
+import type { PlannedDeckChange } from "@/lib/types";
 
 const plannedAddition = {
   id: "plan-1",
@@ -41,5 +41,9 @@ describe("PlannedChangesPanel", () => {
     );
 
     expect(html).toMatch(/<span[^>]+role="button"[^>]*>Sol Ring/);
+    expect(html).toContain("Export additions");
+    expect(html).toContain("Export selected additions");
+    expect(html).toContain("Compare physical → planned");
+    expect(html).toContain("right_kind=planned");
   });
 });

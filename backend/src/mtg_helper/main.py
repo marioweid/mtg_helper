@@ -16,6 +16,7 @@ from mtg_helper.routers import (
     admin,
     ai,
     capabilities,
+    card_exports,
     cards,
     collections,
     decks,
@@ -130,6 +131,7 @@ app.include_router(health.router)
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(capabilities.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(cards.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(card_exports.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(revisions.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)

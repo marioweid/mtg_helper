@@ -130,12 +130,13 @@ async def delete_snapshot(
 async def compare(
     request: Request,
     account: CurrentAccount,
-    left: UUID = Query(...),
-    left_kind: Literal["deck", "snapshot"] = Query(default="deck"),
-    right: UUID = Query(...),
-    right_kind: Literal["deck", "snapshot"] = Query(default="deck"),
+    *,
+    left: Annotated[UUID, Query()],
+    right: Annotated[UUID, Query()],
+    left_kind: Literal["deck", "planned", "snapshot"] = "deck",
+    right_kind: Literal["deck", "planned", "snapshot"] = "deck",
 ) -> DataResponse[DeckCompareResponse]:
-    """Diff two compositions. Either side may be a live deck or a snapshot."""
+    """Diff physical, planned or snapshot compositions without applying changes."""
     email = _require_email(account)
     try:
         result = await snapshot_service.compare(

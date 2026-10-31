@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { ApplyRevisionDialog } from "@/components/apply-revision-dialog";
 import { CardHover } from "@/components/card-hover";
 import { OwnedBadge } from "@/components/owned-badge";
-import { PlannedBuyListDialog } from "@/components/planned-buy-list-dialog";
+import { CardExportDialog } from "@/components/card-export-dialog";
+import { physicalToPlannedHref } from "@/lib/comparison";
 import { apiClient, ApiError } from "@/lib/api";
-import type { CollectionMembership, CollectionResponse, PlannedDeckChange } from "@/lib/types";
+import type {
+  CollectionMembership,
+  CollectionResponse,
+  ExportCard,
+  PlannedDeckChange,
+} from "@/lib/types";
 
 interface Props {
   deckId: string;
@@ -29,20 +36,9 @@ function collectionOptions(
   }));
 }
 
-export function PlannedChangesPanel({
-  deckId,
-  plans,
-  physicalCount,
-  plannedCount,
-  onChanged,
-}: Props) {
+function usePlanCollections() {
   const [collections, setCollections] = useState<CollectionResponse[]>([]);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [buyListOpen, setBuyListOpen] = useState(false);
-  const [revisionOpen, setRevisionOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     let cancelled = false;
     void apiClient
@@ -50,13 +46,23 @@ export function PlannedChangesPanel({
       .then((items) => {
         if (!cancelled) setCollections(items);
       })
-      .catch(() => {
-        if (!cancelled) setCollections([]);
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load binders");
       });
     return () => {
       cancelled = true;
     };
   }, []);
+  return { collections, error };
+}
+
+function usePlannedChanges({ plans, onChanged }: Props) {
+  const { collections, error: collectionError } = usePlanCollections();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [exportCards, setExportCards] = useState<ExportCard[] | null>(null);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const available = new Set(plans.map((plan) => plan.id));
@@ -65,8 +71,8 @@ export function PlannedChangesPanel({
 
   const grouped = useMemo(
     () => ({
-      additions: plans.filter((plan) => plan.direction === "addition"),
-      cuts: plans.filter((plan) => plan.direction === "cut"),
+      addition: plans.filter((plan) => plan.direction === "addition"),
+      cut: plans.filter((plan) => plan.direction === "cut"),
     }),
     [plans],
   );
@@ -74,6 +80,12 @@ export function PlannedChangesPanel({
     () => plans.filter((plan) => selectedIds.has(plan.id)),
     [plans, selectedIds],
   );
+  const exportAdditions = (items: PlannedDeckChange[]) =>
+    setExportCards(
+      items
+        .filter((plan) => plan.direction === "addition")
+        .map((plan) => ({ card_id: plan.card_id, quantity: plan.quantity })),
+    );
 
   const toggleSelected = (planId: string) => {
     setSelectedIds((current) => {
@@ -109,69 +121,157 @@ export function PlannedChangesPanel({
     }
   }
 
+  return {
+    collections,
+    busyId,
+    error: error ?? collectionError,
+    exportCards,
+    setExportCards,
+    revisionOpen,
+    setRevisionOpen,
+    selectedIds,
+    setSelectedIds,
+    grouped,
+    selectedPlans,
+    exportAdditions,
+    toggleSelected,
+    toggleGroup,
+    run,
+  };
+}
+
+type PanelState = ReturnType<typeof usePlannedChanges>;
+
+export function PlannedChangesPanel(props: Props) {
+  const state = usePlannedChanges(props);
   return (
     <details className="rounded-xl border border-indigo-500/25 bg-indigo-950/15">
       <PlannedSummary
-        physicalCount={physicalCount}
-        plannedCount={plannedCount}
-        planCount={plans.length}
+        physicalCount={props.physicalCount}
+        plannedCount={props.plannedCount}
+        planCount={props.plans.length}
       />
+      <PlannedContents deckId={props.deckId} plans={props.plans} state={state} />
+      <PlannedDialogs props={props} state={state} />
+    </details>
+  );
+}
 
-      <div className="border-t border-white/10 px-3 py-3">
-        {error && (
-          <p className="mb-3 rounded border border-red-500/30 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-            {error}
-          </p>
-        )}
-        {plans.length === 0 ? (
-          <p className="px-1 py-2 text-xs text-gray-500">No pending additions or cuts.</p>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-indigo-500/20 bg-indigo-950/20 px-3 py-2">
-              <span className="text-xs text-indigo-200">{selectedPlans.length} selected</span>
-              <button
-                type="button"
-                disabled={selectedPlans.length === 0}
-                onClick={() => setRevisionOpen(true)}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-              >
-                Apply selected
-              </button>
-            </div>
+function PlannedContents({
+  deckId,
+  plans,
+  state,
+}: {
+  deckId: string;
+  plans: PlannedDeckChange[];
+  state: PanelState;
+}) {
+  const {
+    error,
+    grouped,
+    collections,
+    busyId,
+    run,
+    exportAdditions,
+    selectedIds,
+    toggleSelected,
+    toggleGroup,
+  } = state;
+  return (
+    <div className="border-t border-white/10 px-3 py-3">
+      <Link
+        href={physicalToPlannedHref(deckId)}
+        className="mb-3 inline-block text-xs text-indigo-300 hover:text-indigo-200"
+      >
+        Compare physical → planned
+      </Link>
+      {error && (
+        <p
+          className={`mb-3 rounded border border-red-500/30 bg-red-950/30
+            px-3 py-2 text-xs text-red-300`}
+        >
+          {error}
+        </p>
+      )}
+      {plans.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-gray-500">No pending additions or cuts.</p>
+      ) : (
+        <div className="space-y-4">
+          <PlannedSelectionActions state={state} />
+          {(["addition", "cut"] as const).map((tone) => (
             <PlanGroup
-              title="Planned additions"
-              tone="addition"
-              plans={grouped.additions}
+              key={tone}
+              title={tone === "addition" ? "Planned additions" : "Planned cuts"}
+              tone={tone}
+              plans={grouped[tone]}
               collections={collections}
               busyId={busyId}
               onRun={run}
               deckId={deckId}
-              onCreateBuyList={() => setBuyListOpen(true)}
+              onExport={tone === "addition" ? () => exportAdditions(grouped.addition) : undefined}
               selectedIds={selectedIds}
               onToggle={toggleSelected}
-              onToggleAll={() => toggleGroup(grouped.additions)}
+              onToggleAll={() => toggleGroup(grouped[tone])}
             />
-            <PlanGroup
-              title="Planned cuts"
-              tone="cut"
-              plans={grouped.cuts}
-              collections={collections}
-              busyId={busyId}
-              onRun={run}
-              deckId={deckId}
-              selectedIds={selectedIds}
-              onToggle={toggleSelected}
-              onToggleAll={() => toggleGroup(grouped.cuts)}
-            />
-          </div>
-        )}
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlannedSelectionActions({ state }: { state: PanelState }) {
+  const { selectedPlans, exportAdditions, setRevisionOpen } = state;
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 rounded-lg
+      border border-indigo-500/20 bg-indigo-950/20 px-3 py-2`}
+    >
+      <span className="text-xs text-indigo-200">{selectedPlans.length} selected</span>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={!selectedPlans.some((plan) => plan.direction === "addition")}
+          onClick={() => exportAdditions(selectedPlans)}
+          className={`rounded-md border border-indigo-400/30 px-3 py-1.5
+            text-xs text-indigo-200 disabled:opacity-40`}
+        >
+          Export selected additions
+        </button>
+        <button
+          type="button"
+          disabled={selectedPlans.length === 0}
+          onClick={() => setRevisionOpen(true)}
+          className={`rounded-md bg-indigo-600 px-3 py-1.5 text-xs
+            font-medium text-white disabled:opacity-40`}
+        >
+          Apply selected
+        </button>
       </div>
-      <PlannedBuyListDialog
-        open={buyListOpen}
-        deckId={deckId}
-        collections={collections}
-        onClose={() => setBuyListOpen(false)}
-      />
+    </div>
+  );
+}
+
+function PlannedDialogs({ props, state }: { props: Props; state: PanelState }) {
+  const {
+    exportCards,
+    setExportCards,
+    revisionOpen,
+    selectedPlans,
+    collections,
+    setRevisionOpen,
+    setSelectedIds,
+  } = state;
+  const { deckId, physicalCount, onChanged } = props;
+  return (
+    <>
+      {exportCards && (
+        <CardExportDialog
+          title="Export planned additions"
+          cards={exportCards}
+          onClose={() => setExportCards(null)}
+        />
+      )}
       <ApplyRevisionDialog
         open={revisionOpen}
         deckId={deckId}
@@ -185,7 +285,7 @@ export function PlannedChangesPanel({
           await onChanged();
         }}
       />
-    </details>
+    </>
   );
 }
 
@@ -221,7 +321,7 @@ interface GroupProps {
   busyId: string | null;
   deckId: string;
   onRun: (planId: string, action: () => Promise<unknown>) => Promise<void>;
-  onCreateBuyList?: () => void;
+  onExport: (() => void) | undefined;
   selectedIds: Set<string>;
   onToggle: (planId: string) => void;
   onToggleAll: () => void;
@@ -235,7 +335,7 @@ function PlanGroup({
   busyId,
   deckId,
   onRun,
-  onCreateBuyList,
+  onExport,
   selectedIds,
   onToggle,
   onToggleAll,
@@ -256,13 +356,14 @@ function PlanGroup({
           >
             {plans.every((plan) => selectedIds.has(plan.id)) ? "Clear" : "Select all"}
           </button>
-          {onCreateBuyList && (
+          {onExport && (
             <button
               type="button"
-              onClick={onCreateBuyList}
-              className="rounded border border-emerald-500/30 px-2 py-1 text-[11px] font-medium text-emerald-200 hover:border-emerald-400/60 hover:text-white"
+              onClick={onExport}
+              className={`rounded border border-emerald-500/30 px-2 py-1 text-[11px]
+                font-medium text-emerald-200 hover:border-emerald-400/60 hover:text-white`}
             >
-              Create buy list
+              Export additions
             </button>
           )}
         </div>
@@ -299,13 +400,13 @@ interface RowProps {
 
 function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onToggle }: RowProps) {
   const options = collectionOptions(plan, collections);
-  const updateQuantity = (quantity: number) =>
-    onRun(plan.id, () => apiClient.updatePlannedChange(deckId, plan.id, { quantity }));
   const completeOne = () =>
     onRun(plan.id, () => apiClient.completePlannedChange(deckId, plan.id, 1));
-
   return (
-    <li className="grid items-center gap-2 bg-black/10 px-3 py-2 sm:grid-cols-[auto_minmax(180px,1fr)_auto_180px_auto]">
+    <li
+      className={`grid items-center gap-2 bg-black/10 px-3 py-2
+      sm:grid-cols-[auto_minmax(180px,1fr)_auto_180px_auto]`}
+    >
       <input
         type="checkbox"
         checked={selected}
@@ -327,25 +428,13 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onTog
           <p className="text-[10px] text-gray-500">Still in the physical deck</p>
         )}
       </div>
-      <div className="flex items-center gap-1 text-xs text-gray-300">
-        <button
-          type="button"
-          disabled={busy || plan.quantity <= 1}
-          onClick={() => void updateQuantity(plan.quantity - 1)}
-          className="h-6 w-6 rounded border border-white/10 disabled:opacity-30"
-        >
-          −
-        </button>
-        <span className="w-7 text-center tabular-nums">{plan.quantity}</span>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void updateQuantity(plan.quantity + 1)}
-          className="h-6 w-6 rounded border border-white/10 disabled:opacity-30"
-        >
-          +
-        </button>
-      </div>
+      <PlanQuantityControls
+        plan={plan}
+        busy={busy}
+        onChange={(quantity) =>
+          onRun(plan.id, () => apiClient.updatePlannedChange(deckId, plan.id, { quantity }))
+        }
+      />
       <select
         value={plan.collection_id ?? ""}
         disabled={busy}
@@ -361,7 +450,8 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onTog
             }),
           )
         }
-        className="min-w-0 rounded-md border border-white/15 bg-gray-900 px-2 py-1.5 text-xs text-gray-200"
+        className={`min-w-0 rounded-md border border-white/15 bg-gray-900
+          px-2 py-1.5 text-xs text-gray-200`}
       >
         <option value="">— No collection</option>
         {options.map((collection) => (
@@ -390,11 +480,46 @@ function PlanRow({ plan, tone, collections, busy, deckId, onRun, selected, onTog
           title="Cancel planned change"
           aria-label={`Cancel planned change for ${plan.name}`}
           onClick={() => void onRun(plan.id, () => apiClient.cancelPlannedChange(deckId, plan.id))}
-          className="rounded px-2 py-1 text-xs text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-40"
+          className={`rounded px-2 py-1 text-xs text-gray-400
+            hover:bg-white/5 hover:text-white disabled:opacity-40`}
         >
           ×
         </button>
       </div>
     </li>
+  );
+}
+
+function PlanQuantityControls({
+  plan,
+  busy,
+  onChange,
+}: {
+  plan: PlannedDeckChange;
+  busy: boolean;
+  onChange: (quantity: number) => Promise<void>;
+}) {
+  return (
+    <div className="flex items-center gap-1 text-xs text-gray-300">
+      <button
+        type="button"
+        disabled={busy || plan.quantity <= 1}
+        aria-label={`Decrease planned quantity for ${plan.name}`}
+        onClick={() => void onChange(plan.quantity - 1)}
+        className="h-6 w-6 rounded border border-white/10 disabled:opacity-30"
+      >
+        −
+      </button>
+      <span className="w-7 text-center tabular-nums">{plan.quantity}</span>
+      <button
+        type="button"
+        disabled={busy}
+        aria-label={`Increase planned quantity for ${plan.name}`}
+        onClick={() => void onChange(plan.quantity + 1)}
+        className="h-6 w-6 rounded border border-white/10 disabled:opacity-30"
+      >
+        +
+      </button>
+    </div>
   );
 }
