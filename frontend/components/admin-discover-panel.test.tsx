@@ -21,13 +21,14 @@ function render(patch: Partial<AdminDiscoverState>) {
   );
 }
 
-it("labels account-only access, free browsing, paid Generate and how to find the tab", () => {
+it("explains account-only access and the strategy-first AI flow", () => {
   const html = render({ enabled: true });
   expect(html).toContain("Disable for my account");
   expect(html).toContain("Test admin · Enabled");
   expect(html).toContain("Other accounts are unchanged");
-  expect(html).toContain("Enabling and browsing do not call AI");
-  expect(html).toContain("$0.10/run");
+  expect(html).toContain("Enabling access does not call AI");
+  expect(html).toContain("Find cards");
+  expect(html).not.toContain("Generate cards");
   expect(html).toContain("in-flight request may still bill");
   expect(html).toContain("Open a deck (reload if already open)");
 });

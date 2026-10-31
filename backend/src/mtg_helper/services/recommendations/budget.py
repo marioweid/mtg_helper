@@ -5,6 +5,11 @@ from typing import Any
 MODEL = "gpt-5.6-luna"
 VERSION = "app-pilot-v1"
 STRATEGY_VERSION = "app-strategy-v2"
+LEGACY_TERMS_VERSION = "app-strategy-terms-v1"
+# Frozen v2 is still addressable by historical experiment replay, not new app setup.
+TERMS_VERSION = "app-strategy-terms-v2"
+BOUNDED_TERMS_VERSION = "app-strategy-terms-v3"
+TERMS_BOUNDS = {"plan": (80_000, 4_000)}
 STRATEGY_BOUNDS = {"plan": (20_000, 4_000)}
 STRATEGY_CAP = 10_000
 BOUNDS = {"plan": (20_000, 5_000), "revise": (60_000, 5_000), "review": (95_000, 10_000)}
@@ -23,7 +28,9 @@ def bounds(profile: str) -> dict[str, tuple[int, int]]:
     """Return only a known paid protocol's fixed stages; unknown profiles cannot spend."""
     if profile == VERSION:
         return BOUNDS
-    if profile == STRATEGY_VERSION:
+    if profile in {TERMS_VERSION, BOUNDED_TERMS_VERSION}:
+        return TERMS_BOUNDS
+    if profile in {STRATEGY_VERSION, LEGACY_TERMS_VERSION}:
         return STRATEGY_BOUNDS
     raise ValueError("Unknown Discover spending profile")
 
@@ -31,7 +38,9 @@ def bounds(profile: str) -> dict[str, tuple[int, int]]:
 def run_cap(profile: str) -> int:
     """Resolve a known protocol's estimate ceiling without changing the shared daily limit."""
     bounds(profile)
-    return STRATEGY_CAP if profile == STRATEGY_VERSION else RUN_CAP
+    if profile in {TERMS_VERSION, BOUNDED_TERMS_VERSION}:
+        return 25_000
+    return STRATEGY_CAP if profile in {STRATEGY_VERSION, LEGACY_TERMS_VERSION} else RUN_CAP
 
 
 def reservation(profile: str = VERSION) -> int:

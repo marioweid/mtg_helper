@@ -13,15 +13,18 @@
 - Runtime: 3.13, managed with `uv`
 - Lint + format: `ruff check` / `ruff format`
 - Types: `ty check`
-- Tests: `pytest -q` from `backend/`
+- Tests: `pytest -q` in the backend Compose container
 
-```bash
-cd backend
-uv run ruff check .
-uv run ruff format .
-uv run ty check src/
-uv run pytest -q
-```
+## Verification: Docker only
+
+- Build, boot, test, lint, type-check, and verify formatting in Docker Compose containers.
+  Browser checks target the Compose-hosted application. Read `VERIFY.md` for exact commands.
+- Check the Docker daemon first. If it is unavailable, ask the user to start Docker; they may
+  simply have forgotten. Resume once available instead of launching host-side replacements.
+- Use the explicit local `docker-compose.yml` by default. Host PostgreSQL, uvicorn, Node/pnpm,
+  or host-run test suites are not verification fallbacks. Never select live mode implicitly.
+- Automatic local identity is an explicit isolated-Compose feature, not a test auth bypass.
+  Preserve its deployment/database guards and existing account ownership; see `VERIFY.md`.
 
 ## Code constraints
 

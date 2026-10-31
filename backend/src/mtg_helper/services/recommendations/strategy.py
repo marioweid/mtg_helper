@@ -97,6 +97,9 @@ class Workflow:
         """Supply the complete commander only; no existing goal, support or exclusions."""
         if phase != "plan":
             raise ValueError("Strategy drafting permits exactly one plan request")
+        commanders = self.context.get("commanders")
+        if commanders:
+            return {"commanders": [card_facts(commander) for commander in commanders]}
         return {"commander": card_facts(self.context["commander"])}
 
     def accept(self, phase: str, text: str, data: Card) -> Card:

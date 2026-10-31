@@ -1,0 +1,78 @@
+{
+  "arms": [
+    {
+      "deck": "yuna",
+      "arm": "baseline",
+      "reviewed": 20,
+      "counts": {
+        "direct": 20
+      },
+      "fit_score": 49,
+      "contributions": {
+        "requested": 11,
+        "engine": 9
+      }
+    },
+    {
+      "deck": "meren",
+      "arm": "baseline",
+      "reviewed": 20,
+      "counts": {
+        "direct": 19,
+        "conditional": 1
+      },
+      "fit_score": 57,
+      "contributions": {
+        "engine": 19,
+        "dependency": 1
+      }
+    },
+    {
+      "deck": "meren",
+      "arm": "refined",
+      "reviewed": 20,
+      "counts": {
+        "direct": 18,
+        "conditional": 1,
+        "support": 1
+      },
+      "fit_score": 55,
+      "contributions": {
+        "engine": 18,
+        "dependency": 1,
+        "generic": 1
+      }
+    },
+    {
+      "deck": "yuna",
+      "arm": "refined",
+      "reviewed": 20,
+      "counts": {
+        "direct": 20
+      },
+      "fit_score": 47,
+      "contributions": {
+        "requested": 13,
+        "engine": 7
+      }
+    }
+  ],
+  "gates": {
+    "yuna": {
+      "fit_improved": false,
+      "off_plan_not_increased": true,
+      "baseline_reference_retention": 0.7941176470588235,
+      "coverage_guard_passed": false,
+      "passed": false
+    },
+    "meren": {
+      "fit_improved": false,
+      "off_plan_not_increased": true,
+      "baseline_reference_retention": 0.65625,
+      "coverage_guard_passed": false,
+      "passed": false
+    }
+  },
+  "recommend_adoption": false,
+  "grading": "Lead assistant judgment, not independent human truth or accuracy"
+}

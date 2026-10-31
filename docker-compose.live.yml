@@ -5,3 +5,9 @@ services:
     environment:
       DATABASE_URL: ${LIVE_DATABASE_URL:?Set LIVE_DATABASE_URL in the ignored root .env}
       RUN_STARTUP_MAINTENANCE: "false"
+      APP_ENV: live
+      LOCAL_DEV_AUTH: "false"
+  frontend:
+    environment:
+      APP_ENV: live
+      LOCAL_DEV_AUTH: "false"

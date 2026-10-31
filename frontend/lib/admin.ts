@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getAppUser } from "@/lib/app-identity";
 
 function adminEmails(): Set<string> {
   const raw = process.env["ADMIN_EMAILS"] ?? "";
@@ -16,7 +16,7 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 }
 
 export async function getAdminEmail(): Promise<string | null> {
-  const session = await auth();
-  const email = session?.user?.email ?? null;
+  const user = await getAppUser();
+  const email = user?.email ?? null;
   return isAdminEmail(email) ? email : null;
 }

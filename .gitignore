@@ -236,6 +236,10 @@ __marimo__/
 !docs/research/commander-discovery-luna-refined/*.json
 !docs/research/commander-discovery-luna-refined/requests/*.json
 !docs/research/commander-discovery-luna-refined/observations/*.json
+# Public source-search experiments are replay fixtures, not local caches or credentials.
+!docs/research/discover-relevance/**/*.json
+!docs/research/discover-result-aware/**/*.json
+!docs/research/discover-bounded-result-aware/**/*.json
 
 # Public Scryfall-only coverage receipts; full archives and operational backups stay ignored.
 !docs/research/scryfall-tag-coverage/*.json

@@ -1,0 +1,218 @@
+{
+  "source": {
+    "source_sha256": "36c8c87fb0da4ff633cc29a79f8c5221d66f393bcc4e3bf365bd3de2f9168211",
+    "tag_sha256": "1997cecccac98a5cdd4f1a3d861ec8bf6a3f5f658b9b2f6154b7521e8d432461",
+    "published_at": "2026-10-28 15:32:30.854610+00:00",
+    "ranking_fingerprint": "0dbc97b70852c8fe275249e8c4e8d29e"
+  },
+  "queries": [
+    {
+      "deck": "yuna",
+      "arm": "baseline",
+      "searches": [
+        {
+          "purpose": "Find effects that place +1/+1 counters on creatures, including repeatable counter engines.",
+          "count": 1577
+        },
+        {
+          "purpose": "Find effects that redistribute or preserve counters as permanents leave the battlefield.",
+          "count": 14
+        },
+        {
+          "purpose": "Find creature-based mana acceleration.",
+          "count": 292
+        },
+        {
+          "purpose": "Find effects combining creature-spell casting with +1/+1 counter support.",
+          "count": 118
+        }
+      ]
+    },
+    {
+      "deck": "meren",
+      "arm": "baseline",
+      "searches": [
+        {
+          "purpose": "Find repeatable creature sacrifice outlets.",
+          "count": 345
+        },
+        {
+          "purpose": "Find permanents that reward sacrificing your own permanents.",
+          "count": 45
+        },
+        {
+          "purpose": "Find creature-death payoff effects.",
+          "count": 797
+        },
+        {
+          "purpose": "Find creature recursion to reuse enter-the-battlefield and death value.",
+          "count": 232
+        },
+        {
+          "purpose": "Find creatures with both enter and leave battlefield value for sacrifice loops.",
+          "count": 3
+        },
+        {
+          "purpose": "Find sacrifice-based interaction and removal.",
+          "count": 213
+        }
+      ]
+    },
+    {
+      "deck": "meren",
+      "arm": "refined",
+      "searches": [
+        {
+          "purpose": "Find creature-based sacrifice outlets.",
+          "count": 345
+        },
+        {
+          "purpose": "Find permanents that reward sacrificing your own permanents.",
+          "count": 45
+        },
+        {
+          "purpose": "Find direct life-loss and life-gain payoffs for creatures dying.",
+          "count": 30
+        },
+        {
+          "purpose": "Find creature recursion to reuse enter-the-battlefield value.",
+          "count": 232
+        },
+        {
+          "purpose": "Find creatures with both entering and leaving battlefield effects.",
+          "count": 3
+        },
+        {
+          "purpose": "Find sacrifice-based removal and opponent-forcing interaction.",
+          "count": 213
+        }
+      ]
+    },
+    {
+      "deck": "yuna",
+      "arm": "refined",
+      "searches": [
+        {
+          "purpose": "Find permanent counter engines and repeatable ways to place +1/+1 counters, narrowed to cards that explicitly interact with counters.",
+          "count": 282
+        },
+        {
+          "purpose": "Find effects that preserve, move, or redistribute counters when permanents leave the battlefield.",
+          "count": 14
+        },
+        {
+          "purpose": "Find creature-based mana acceleration suitable for a creature-heavy strategy.",
+          "count": 292
+        },
+        {
+          "purpose": "Find cast-trigger effects that also place +1/+1 counters, emphasizing creature-spell and permanent growth support.",
+          "count": 118
+        }
+      ]
+    }
+  ],
+  "top_twenty_changes": {
+    "yuna": {
+      "removed": [
+        {
+          "name": "The Great Henge",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Avenger of Zendikar",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Snakeskin Veil",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        }
+      ],
+      "added": [
+        {
+          "name": "Avacyn's Pilgrim",
+          "contribution": "requested",
+          "baseline_rank": 21
+        },
+        {
+          "name": "Arbor Elf",
+          "contribution": "requested",
+          "baseline_rank": 26
+        },
+        {
+          "name": "Incubation Druid",
+          "contribution": "engine",
+          "baseline_rank": 30
+        }
+      ]
+    },
+    "meren": {
+      "removed": [
+        {
+          "name": "Skullclamp",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Solemn Simulacrum",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Pitiless Plunderer",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Morbid Opportunist",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Syr Konrad, the Grim",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        },
+        {
+          "name": "Enduring Vitality",
+          "contribution": "engine",
+          "still_in_refined_pool": false
+        }
+      ],
+      "added": [
+        {
+          "name": "Rise of the Dark Realms",
+          "contribution": "engine",
+          "baseline_rank": 21
+        },
+        {
+          "name": "Blasphemous Edict",
+          "contribution": "engine",
+          "baseline_rank": 22
+        },
+        {
+          "name": "Dread Return",
+          "contribution": "engine",
+          "baseline_rank": 25
+        },
+        {
+          "name": "Grave Pact",
+          "contribution": "engine",
+          "baseline_rank": 27
+        },
+        {
+          "name": "Carrion Feeder",
+          "contribution": "engine",
+          "baseline_rank": 28
+        },
+        {
+          "name": "Torment of Hailfire",
+          "contribution": "generic",
+          "baseline_rank": 30
+        }
+      ]
+    }
+  }
+}

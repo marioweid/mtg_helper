@@ -1,14 +1,3 @@
-export interface DiscoverQuery {
-  purpose: string;
-  oracle_text_all: string[];
-  oracle_text_any: string[];
-  type_line_any: string[];
-  keywords_any: string[];
-  mana_cost_all: string[];
-  mana_value_min: number | null;
-  mana_value_max: number | null;
-}
-
 export interface DiscoverFace {
   name: string;
   mana_cost: string | null;
@@ -44,8 +33,6 @@ export interface DiscoverCandidate {
   excluded: boolean;
 }
 
-export const STRATEGY_PROFILE = "app-strategy-v2";
-
 export interface CommanderStrategyChoice {
   title: string;
   pace: string;
@@ -74,52 +61,87 @@ export interface DiscoverRun {
   strategies?: CommanderStrategyChoice[];
 }
 
-export interface DiscoverStatus {
-  ready: boolean;
-  reason: string | null;
-  source_hash: string | null;
-  rules_hash: string | null;
-  catalog_updated_at: string | null;
-  goal_seed: string;
-  run: DiscoverRun | null;
-  strategy_run?: DiscoverRun | null;
-  strategy_cap_microusd?: number;
-  strategy_reserved_microusd?: number;
-  strategy_maximum_calls?: number;
-  run_cap_microusd: number;
-  daily_cap_microusd: number;
-  reserved_microusd: number;
-  maximum_calls: number;
+export interface StrategyTerm {
+  id: string;
+  slug: string;
+  label: string;
 }
 
-export interface DiscoverPreview {
-  name?: string;
-  query?: DiscoverQuery | null;
-  snapshot_hash?: string | null;
-  rules_hash?: string | null;
-  rule_query?: { purpose: string; text_all: string[]; text_any: string[]; cursor: string | null };
-  cursor?: string | null;
-  limit?: number;
+export interface DiscoverStrategy {
+  prose: string;
+  queries: StrategyQuery[];
+  revision: string;
+  updated_at: string;
+  needs_review: boolean;
 }
 
-export interface DiscoverPage {
-  rules_hash: string;
-  snapshot_hash: string;
-  total: number;
+export interface StrategyQuery {
+  purpose: string;
+  groups: { oracle_tag_ids: string[]; printed_keywords: string[] }[];
+  card_types_any: (
+    | "Creature"
+    | "Artifact"
+    | "Enchantment"
+    | "Instant"
+    | "Sorcery"
+    | "Planeswalker"
+    | "Battle"
+  )[];
+}
+
+export interface DiscoverSourceStatus {
+  status: "ready" | "stale" | "unavailable" | "mismatched";
+  card_updated_at: string | null;
+  tag_updated_at: string | null;
+  warning: string | null;
+}
+
+export interface StrategyMatch {
+  oracle_id: string;
+  name: string;
+  image_uri: string | null;
+  mana_cost: string | null;
+  type_line: string | null;
+  oracle_text: string | null;
+  keywords: string[];
+  match_count: number;
+  global_popularity_rank: number | null;
+  evidence: {
+    query_purpose: string;
+    criterion_type: "oracle_tag" | "printed_keyword";
+    criterion_id: string | null;
+    criterion_label: string;
+    matched_tag_id: string | null;
+    matched_tag_label: string | null;
+    relation: "direct" | "descendant" | "keyword";
+  }[];
+}
+
+export interface StrategyMatches {
+  status: "ready" | "stale" | "setup_needed" | "unavailable" | "mismatched";
+  source: DiscoverSourceStatus;
+  strategy: DiscoverStrategy | null;
+  cards: StrategyMatch[];
   next_cursor: string | null;
-  cards: DiscoverCandidate[];
-  rule_results?: {
-    rules_hash: string;
-    matching_count: number;
-    truncated: boolean;
-    next_cursor: string | null;
-    selected: { key: string; text: string }[];
-  } | null;
+  total: number;
 }
 
-export interface DiscoverGenerate {
-  request_key: string;
-  goal: string;
-  constraint: DiscoverQuery | null;
-  excluded_ids: string[];
+export interface DiscoverTerms {
+  oracle_tags: StrategyTerm[];
+  printed_keywords: string[];
+}
+
+export interface TermSuggestionRun {
+  id: string;
+  status: "running" | "completed" | "failed" | "interrupted" | "unknown";
+  error: string | null;
+  queries: StrategyQuery[];
+  strategy_revision: string | null;
+  source_hash: string | null;
+}
+
+export interface DiscoverSetup {
+  draft: DiscoverRun | null;
+  suggestion: TermSuggestionRun | null;
+  prose: string | null;
 }

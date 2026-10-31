@@ -1,0 +1,25 @@
+{
+  "arms": [
+    {
+      "deck": "yuna",
+      "arm": "baseline",
+      "reviewed": 20,
+      "counts": {
+        "direct": 20
+      },
+      "fit_score": 40
+    }
+  ],
+  "gates": {
+    "yuna": {
+      "passed": false,
+      "reason": "Missing a complete pair"
+    },
+    "meren": {
+      "passed": false,
+      "reason": "Missing a complete pair"
+    }
+  },
+  "recommend_adoption": false,
+  "grading": "Lead assistant judgment, not independent human truth or accuracy"
+}

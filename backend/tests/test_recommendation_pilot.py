@@ -10,11 +10,14 @@ import pytest
 import pytest_asyncio
 from openai import AsyncOpenAI
 
+from mtg_helper.models.recommendations import StrategyDraftRequest
 from mtg_helper.services import feature_flag_service
 from mtg_helper.services.new_cards import catalog
 from mtg_helper.services.new_cards.discovery import release_history
 from mtg_helper.services.recommendations import budget, provider
+from mtg_helper.services.recommendations.discovery import card_facts, eligible_cards
 from mtg_helper.services.recommendations.repository import Owner
+from mtg_helper.services.recommendations.run_repository import NewRun
 from mtg_helper.services.recommendations.service import DiscoveryService
 from mtg_helper.services.recommendations.source_repository import SourceRepository
 from tests.conftest import create_test_account, create_test_deck
@@ -30,6 +33,7 @@ class Transport:
         self.status = 200
         self.bad_quote = False
         self.strategy_title = "Quick setup"
+        self.reported_model = None
 
     async def handle(self, request):
         body = json.loads(request.content)
@@ -43,6 +47,20 @@ class Transport:
         if "strategies" in body["text"]["format"]["schema"]["properties"]:
             output = drafts()
             output["strategies"][0]["title"] = self.strategy_title
+        elif {"oracle_tag_ids", "queries"} <= body["text"]["format"]["schema"]["properties"].keys():
+            output = {
+                "oracle_tag_ids": [payload["oracle_tags"][0]["id"]],
+                "printed_keywords": [],
+                "queries": [
+                    {
+                        "purpose": "Source-backed artifacts",
+                        "groups": [{"oracle_tag_indices": [0], "printed_keyword_indices": []}],
+                        "card_types_any": [],
+                    }
+                ],
+            }
+        elif "oracle_tag_ids" in body["text"]["format"]["schema"]["properties"]:
+            output = {"oracle_tag_ids": [], "printed_keywords": []}
         elif "candidates" in payload:
             rows = {}
             for index, card in enumerate(payload["candidates"]):
@@ -76,7 +94,7 @@ class Transport:
                 "object": "response",
                 "created_at": 1,
                 "status": "completed",
-                "model": body["model"],
+                "model": self.reported_model or body["model"],
                 "service_tier": "default",
                 "usage": {
                     "input_tokens": 100,
@@ -128,6 +146,13 @@ async def pilot(client, db_pool, monkeypatch):
     ]
     async with db_pool.acquire() as conn, conn.transaction():
         await catalog.publish(conn, sources, release_history(sources), datetime.now(UTC))
+        source_hash = await conn.fetchval("SELECT source_sha256 FROM new_card_catalog_state")
+        await conn.execute(
+            "INSERT INTO scryfall_tag_state (singleton,source_sha256,tag_sha256,archive_sha256,"
+            "manifest,started_at,published_at,tag_count,membership_count) "
+            "VALUES (true,$1,$1,$1,'{}',now(),now(),1000,1000)",
+            source_hash,
+        )
     await feature_flag_service.set_flag(db_pool, "recommendations", True, owner.account_id)
     service = DiscoveryService(db_pool, SourceRepository(db_pool), provider.Provider("test"))
     yield deck, owner, service, transport
@@ -145,6 +170,69 @@ def request():
     return {"request_key": str(uuid4()), "goal": "Commander-only infrastructure"}
 
 
+async def archived_card_run(pilot):
+    """Seed historical records without restarting a retired paid workflow."""
+    deck, owner, service, transport = pilot
+    cards_hash, rules_hash = await service.sources.current()
+    sources = await service.sources.load(cards_hash, rules_hash)
+    commander = await service.pool.fetchval(
+        "SELECT c.oracle_id::text FROM decks d JOIN cards c ON c.id=d.commander_id WHERE d.id=$1",
+        deck,
+    )
+    leader = sources.cards[commander]
+    run_id, _ = await service.runs.create(
+        NewRun(
+            owner=owner,
+            deck_id=deck,
+            request_key=uuid4(),
+            request_hash="archived",
+            source_hash=cards_hash,
+            rules_hash=rules_hash,
+            context={"commander": leader, "goal": "Archived commander advice"},
+        )
+    )
+    candidates = [
+        card_facts(card) | {"key": f"C{i:02d}"}
+        for i, card in enumerate(eligible_cards(sources.catalog, leader))
+    ]
+    assessments = [
+        {
+            "card_key": c["key"],
+            "fit": "support",
+            "reason": "Historical advice",
+            "caveat": "Unverified",
+            "evidence": [{"key": c["key"], "quote": "Historical quote"}],
+            "evidence_errors": ["invalid_quote"] if transport.bad_quote and i else [],
+        }
+        for i, c in enumerate(candidates)
+    ]
+    data = {
+        "candidates": candidates,
+        "review": {
+            "assessments": assessments,
+            "recommendations": [
+                {"key": c["key"], "recommendation_valid": not a["evidence_errors"]}
+                for c, a in zip(candidates, assessments, strict=True)
+            ],
+        },
+    }
+    await service.pool.execute(
+        "UPDATE recommendation_runs SET status='completed', phase='done', data=$2::jsonb, "
+        "known_cost_microusd=435, held_microusd=0 WHERE id=$1",
+        run_id,
+        json.dumps(data),
+    )
+    for phase in ("plan", "revise", "review"):
+        await service.pool.execute(
+            "INSERT INTO recommendation_attempts (run_id,phase,status,request,receipt,"
+            "reservation_microusd,cost_microusd,settled_at) "
+            "VALUES ($1,$2,'known','{}','{}',145,145,now())",
+            run_id,
+            phase,
+        )
+    return str(run_id)
+
+
 async def test_disabled_backend_and_unowned_deck_are_not_accessible(client, db_pool):
     deck = await create_test_deck(client)
     response = await client.get(path(deck) + "/status")
@@ -155,31 +243,21 @@ async def test_disabled_backend_and_unowned_deck_are_not_accessible(client, db_p
     assert (await client.get(path(deck) + "/status")).status_code == 404
 
 
-async def test_three_checkpointed_calls_are_real_discoveries_and_reads_are_free(pilot, client):
+async def test_archived_card_runs_remain_readable_without_restarting_generation(pilot, client):
     deck, owner, service, transport = pilot
-    assert (await client.get(path(deck) + "/status")).json()["data"]["ready"]
+    run_id = await archived_card_run(pilot)
+    assert (await client.get(path(deck) + "/status")).json()["data"]["strategy"] is None
     browse = await client.post(path(deck) + "/preview-query", json={})
     assert browse.status_code == 200 and len(browse.json()["data"]["cards"]) == 2
     assert transport.calls == []
-    body = request()
-    started = await client.post(path(deck) + "/runs", json=body)
-    assert started.status_code == 202
-    run_id = started.json()["data"]["id"]
+    assert (await client.post(path(deck) + "/runs", json=request())).status_code == 410
     view = (await client.get(path(deck) + f"/runs/{run_id}")).json()["data"]
     assert view["status"] == "completed" and view["known_cost_microusd"] == 435
     assert view["held_microusd"] == 0 and len(view["candidates"]) == 2
     assert all(c["recommended"] for c in view["candidates"])
-    assert len(transport.calls) == 3
-    for emitted in transport.calls:
-        payload = json.loads(emitted["input"])
-        assert not {"physical", "planned", "diagnostics", "community"} & payload.keys()
-        assert emitted["store"] is False and emitted["service_tier"] == "default"
-    duplicate = await client.post(path(deck) + "/runs", json=body)
-    assert duplicate.json()["data"]["id"] == run_id and len(transport.calls) == 3
-    mismatch = await client.post(path(deck) + "/runs", json=body | {"goal": "Different"})
-    assert mismatch.status_code == 409
     trace = await service.trace(owner, deck, UUID(run_id))
-    assert len(trace["attempts"]) == 3 and "revise_observation" in trace["data"]
+    assert len(trace["attempts"]) == 3 and trace["data"]["candidates"]
+    assert transport.calls == []
 
 
 async def test_quote_failure_keeps_neighbor_and_feedback_does_not_touch_legacy(
@@ -187,16 +265,16 @@ async def test_quote_failure_keeps_neighbor_and_feedback_does_not_touch_legacy(
 ):
     deck, _, _, transport = pilot
     transport.bad_quote = True
-    start = await client.post(path(deck) + "/runs", json=request())
-    run_id = start.json()["data"]["id"]
+    run_id = await archived_card_run(pilot)
     result = (await client.get(path(deck) + f"/runs/{run_id}")).json()["data"]
     assert [c["state"] for c in result["candidates"]] == ["assessed", "failed"]
     good = result["candidates"][0]["oracle_id"]
     bad = result["candidates"][1]["oracle_id"]
     endpoint = path(deck) + f"/runs/{run_id}/candidates/"
-    assert (await client.post(endpoint + bad + "/plan")).status_code == 409
-    assert (await client.post(endpoint + good + "/plan")).status_code == 200
-    assert (await client.post(endpoint + good + "/plan")).status_code == 200
+    assert (await client.post(endpoint + bad + "/plan")).status_code == 410
+    assert (await client.post(endpoint + good + "/plan")).status_code == 410
+    assert (await client.post(path(deck) + f"/candidates/{good}/plan")).status_code == 200
+    assert (await client.post(path(deck) + f"/candidates/{good}/plan")).status_code == 200
     assert await db_pool.fetchval("SELECT count(*) FROM deck_cards") == 0
     assert await db_pool.fetchval("SELECT count(*) FROM deck_card_plans") == 1
     assert await db_pool.fetchval("SELECT recommendation_origin FROM deck_card_plans")
@@ -209,8 +287,8 @@ async def test_quote_failure_keeps_neighbor_and_feedback_does_not_touch_legacy(
     assert await db_pool.fetchval("SELECT count(*) FROM deck_feedback") == 0
 
 
-@pytest.mark.parametrize(("endpoint", "held"), [("runs", 11_000), ("strategy-drafts", 9_800)])
-async def test_unknown_billing_blocks_new_runs_and_is_never_retried(
+@pytest.mark.parametrize(("endpoint", "held"), [("strategy-drafts", 9_800)])
+async def test_unknown_receipts_are_preserved_without_replay_or_blocking_explicit_setup(
     pilot, client, db_pool, endpoint, held
 ):
     deck, _, _, transport = pilot
@@ -225,18 +303,21 @@ async def test_unknown_billing_blocks_new_runs_and_is_never_retried(
     await db_pool.execute(
         "UPDATE recommendation_attempts SET settled_at = now() - interval '2 days'"
     )
-    blocked = await client.post(path(deck) + "/runs", json=request())
-    assert blocked.status_code == 409 and len(transport.calls) == 1
+    repeated = await client.post(path(deck) + f"/{endpoint}", json=body)
+    assert repeated.json()["data"]["id"] == run_id and len(transport.calls) == 1
+    transport.status = 200
     draft = await client.post(path(deck) + "/strategy-drafts", json={"request_key": str(uuid4())})
-    assert draft.status_code == 409 and len(transport.calls) == 1
-    assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 1
+    assert draft.status_code == 202 and len(transport.calls) == 2
+    assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 2
+    original = await db_pool.fetchrow("SELECT * FROM recommendation_runs WHERE id=$1", UUID(run_id))
+    assert original["status"] == "unknown" and original["held_microusd"] == held
 
 
 async def test_expired_and_duplicate_workers_cannot_send_a_paid_request(pilot, db_pool):
     deck, owner, service, transport = pilot
-    from mtg_helper.models.recommendations import GenerateRequest
-
-    run_id, work = await service.generate(owner, deck, GenerateRequest.model_validate(request()))
+    run_id, work = await service.draft_strategy(
+        owner, deck, StrategyDraftRequest(request_key=uuid4())
+    )
     assert work
     await db_pool.execute(
         "UPDATE recommendation_runs SET lease_until = now() - interval '1 second'"
@@ -245,20 +326,21 @@ async def test_expired_and_duplicate_workers_cannot_send_a_paid_request(pilot, d
     assert transport.calls == []
     result = await service.view(owner, deck, run_id)
     assert result.status == "interrupted" and result.held_microusd == 0
-    _, new_work = await service.generate(owner, deck, GenerateRequest.model_validate(request()))
+    _, new_work = await service.draft_strategy(
+        owner, deck, StrategyDraftRequest(request_key=uuid4())
+    )
     assert new_work
     await asyncio.gather(service.run(new_work), service.run(new_work))
-    assert len(transport.calls) == 3
-    assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 3
+    assert len(transport.calls) == 1
+    assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 1
 
 
 async def test_completion_rechecks_legality_and_preserves_whole_revision(pilot, client, db_pool):
     deck, _, _, _ = pilot
-    start = await client.post(path(deck) + "/runs", json=request())
-    run_id = start.json()["data"]["id"]
+    run_id = await archived_card_run(pilot)
     result = (await client.get(path(deck) + f"/runs/{run_id}")).json()["data"]
     card_id = result["candidates"][0]["oracle_id"]
-    await client.post(path(deck) + f"/runs/{run_id}/candidates/{card_id}/plan")
+    await client.post(path(deck) + f"/candidates/{card_id}/plan")
     plan_id = await db_pool.fetchval("SELECT id FROM deck_card_plans")
     await db_pool.execute(
         'UPDATE cards SET legalities = \'{"commander":"banned"}\' WHERE oracle_id = $1',
@@ -273,28 +355,37 @@ async def test_completion_rechecks_legality_and_preserves_whole_revision(pilot, 
     assert await db_pool.fetchval("SELECT count(*) FROM deck_card_plans") == 1
 
 
-async def test_daily_ceiling_checks_settled_spend_and_persists_after_deck_deletion(
+async def test_settled_spend_survives_deck_deletion_without_blocking_current_strategy_setup(
     pilot, client, db_pool
 ):
     deck, _, _, transport = pilot
-    await client.post(path(deck) + "/runs", json=request())
+    await client.post(path(deck) + "/strategy-drafts", json={"request_key": str(uuid4())})
     await db_pool.execute(
         "UPDATE recommendation_attempts SET cost_microusd = $1 WHERE phase = 'plan'",
         budget.DAILY_CAP,
     )
-    assert (await client.post(path(deck) + "/runs", json=request())).status_code == 429
+    body = {"request_key": str(uuid4())}
+    assert (await client.post(path(deck) + "/strategy-drafts", json=body)).status_code == 202
     assert (await client.delete(f"/api/v1/decks/{deck}")).status_code == 204
-    assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 3
+    assert await db_pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 2
+    assert (
+        await db_pool.fetchval("SELECT max(cost_microusd) FROM recommendation_attempts")
+        == budget.DAILY_CAP
+    )
     fresh_deck = await create_test_deck(client)
-    assert (await client.post(path(fresh_deck) + "/runs", json=request())).status_code == 429
+    assert (
+        await client.post(path(fresh_deck) + "/strategy-drafts", json={"request_key": str(uuid4())})
+    ).status_code == 202
     assert len(transport.calls) == 3
 
 
 async def test_new_publication_and_worker_restart_preserve_old_run_sources(pilot, db_pool):
-    from mtg_helper.models.recommendations import GenerateRequest, QueryPreview
+    from mtg_helper.models.recommendations import QueryPreview
 
     deck, owner, service, transport = pilot
-    run_id, work = await service.generate(owner, deck, GenerateRequest.model_validate(request()))
+    run_id, work = await service.draft_strategy(
+        owner, deck, StrategyDraftRequest(request_key=uuid4())
+    )
     old = await service.sources.load(work.source_hash, work.rules_hash)
     original = old.cards[next(iter(old.cards))]["name"]
     raw = list(old.cards.values())
@@ -306,7 +397,7 @@ async def test_new_publication_and_worker_restart_preserve_old_run_sources(pilot
     assert retained.cards[next(iter(retained.cards))]["name"] == original
     await service.run(work)
     result = await service.view(owner, deck, run_id)
-    assert result.status == "completed" and result.stale and len(transport.calls) == 3
+    assert result.status == "failed" and result.stale and len(transport.calls) == 1
     old_page = await service.preview(owner, deck, QueryPreview(snapshot_hash=work.source_hash))
     assert old_page.snapshot_hash == work.source_hash
 
@@ -347,17 +438,17 @@ async def test_card_continuation_survives_a_reviewed_rules_update(
 
 
 async def test_attempted_crash_holds_cost_and_late_receipt_settles_once(pilot, db_pool):
-    from mtg_helper.models.recommendations import GenerateRequest
-
     deck, owner, service, transport = pilot
-    run_id, work = await service.generate(owner, deck, GenerateRequest.model_validate(request()))
+    run_id, work = await service.draft_strategy(
+        owner, deck, StrategyDraftRequest(request_key=uuid4())
+    )
     assert await service.runs.checkpoint(work, "plan", {})
     assert not await service.runs.checkpoint(work, "plan", {})
     await db_pool.execute(
         "UPDATE recommendation_runs SET lease_until = now() - interval '1 second'"
     )
     result = await service.view(owner, deck, run_id)
-    assert result.status == "interrupted" and result.held_microusd == 11_000
+    assert result.status == "interrupted" and result.held_microusd == 9_800
     for _ in range(2):
         await service.runs.receipt(work, "plan", {"late": True}, 145)
     settled = await service.view(owner, deck, run_id)
@@ -367,8 +458,7 @@ async def test_attempted_crash_holds_cost_and_late_receipt_settles_once(pilot, d
 
 async def test_all_run_reads_and_actions_recheck_ownership(pilot, client, db_pool):
     deck, _, _, transport = pilot
-    start = await client.post(path(deck) + "/runs", json=request())
-    run_id = start.json()["data"]["id"]
+    run_id = await archived_card_run(pilot)
     oracle_id = (await client.get(path(deck) + f"/runs/{run_id}")).json()["data"]["candidates"][0][
         "oracle_id"
     ]
@@ -384,7 +474,7 @@ async def test_all_run_reads_and_actions_recheck_ownership(pilot, client, db_poo
         (f"/runs/{run_id}/feedback", {"oracle_id": oracle_id, "verdict": "useful"}),
     ]:
         assert (await client.post(path(deck) + suffix, json=body)).status_code == 404
-    assert len(transport.calls) == 3
+    assert transport.calls == []
 
 
 async def test_manual_browsing_plan_and_successful_completion_require_no_ai(pilot, client, db_pool):
@@ -400,6 +490,28 @@ async def test_manual_browsing_plan_and_successful_completion_require_no_ai(pilo
     assert await db_pool.fetchval("SELECT count(*) FROM deck_cards") == 1
     assert await db_pool.fetchval("SELECT count(*) FROM deck_card_plans") == 0
     assert transport.calls == []
+
+
+async def test_retired_workers_never_replay_old_card_generation(pilot):
+    deck, owner, service, transport = pilot
+    cards_hash, rules_hash = await service.sources.current()
+    run_id, work = await service.runs.create(
+        NewRun(
+            owner=owner,
+            deck_id=deck,
+            request_key=uuid4(),
+            request_hash="historical-work",
+            source_hash=cards_hash,
+            rules_hash=rules_hash,
+            context={"goal": "Historical"},
+        )
+    )
+    assert work is not None
+    await service.run(work)
+    row = await service.pool.fetchrow("SELECT * FROM recommendation_runs WHERE id=$1", run_id)
+    assert row["status"] == "failed" and row["held_microusd"] == 0
+    assert transport.calls == []
+    assert await service.pool.fetchval("SELECT count(*) FROM recommendation_attempts") == 0
 
 
 async def test_origin_survives_manual_merge_repair_partial_and_batch_completion(
@@ -476,8 +588,6 @@ async def test_origin_survives_manual_merge_repair_partial_and_batch_completion(
 
 
 async def test_request_bounds_unsupported_scopes_and_active_cross_deck_conflict(pilot, client):
-    from mtg_helper.models.recommendations import GenerateRequest
-
     deck, owner, service, transport = pilot
     assert (
         await client.post(path(deck) + "/runs", json=request() | {"goal": "x" * 1001})
@@ -485,7 +595,11 @@ async def test_request_bounds_unsupported_scopes_and_active_cross_deck_conflict(
     assert (
         await client.post(path(deck) + "/runs", json=request() | {"unsupported": True})
     ).status_code == 422
-    _, work = await service.generate(owner, deck, GenerateRequest.model_validate(request()))
+    _, work = await service.draft_strategy(owner, deck, StrategyDraftRequest(request_key=uuid4()))
     second_deck = UUID(await create_test_deck(client, name="Second Deck"))
-    assert (await client.post(path(second_deck) + "/runs", json=request())).status_code == 409
+    assert (
+        await client.post(
+            path(second_deck) + "/strategy-drafts", json={"request_key": str(uuid4())}
+        )
+    ).status_code == 409
     assert transport.calls == [] and work

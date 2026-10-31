@@ -1,0 +1,129 @@
+{
+  "reviewer": "Lead assistant, Oracle-text review before reading recovery metrics",
+  "limitations": "Only Yuna produced a valid baseline. Meren's invalid output was not ranked. No refinement ran. These are source-grounded judgments on a known regression case, not independent human truth. The predeclared direct-fit category includes explicitly requested creature-based acceleration, so ordinary mana creatures qualify without claiming counter-specific synergy.",
+  "cases": {
+    "yuna": [
+      {
+        "oracle_id": "4ba5b3f6-503b-43e6-b66e-4f8c55cffed7",
+        "rating": "direct",
+        "quote": "you may put a +1/+1 counter on each Plant creature you control.",
+        "reason": "Creates a board whose Plant tokens can gain counters through landfall and later feed Yuna's redistribution when they die. Yuna's cast bonus does not itself give the newly created Plant tokens two counters. Seven mana is a real cost, not an unstated budget violation."
+      },
+      {
+        "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+        "rating": "direct",
+        "quote": "{T}: Add one mana of any color.",
+        "reason": "A one-mana creature directly supplies the requested creature-based acceleration and Bant fixing. Its mana output does not increase with +1/+1 counters; the direct grade credits the explicitly requested ramp function, not invented counter scaling."
+      },
+      {
+        "oracle_id": "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+        "rating": "direct",
+        "quote": "For each color among permanents you control, add one mana of that color.",
+        "reason": "Direct creature-based acceleration. Yuna provides three colors on the battlefield, enabling three-color output without assuming an additional package. The amount depends on permanent colors, not the number of counters."
+      },
+      {
+        "oracle_id": "f9d3b046-0b95-4103-a630-4b3fb88bb60b",
+        "rating": "direct",
+        "quote": "Spend this mana only to cast a legendary spell, and that spell can't be countered.",
+        "reason": "A one-mana creature accelerates the legendary commander and can protect that cast from countering. Its colored mana is restricted to legendary spells; nonlegendary engine creatures cannot use that mode. It still has unconditional colorless production."
+      },
+      {
+        "oracle_id": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
+        "rating": "direct",
+        "quote": "{T}: Add {G}.",
+        "reason": "Directly fills the brief's creature-based acceleration function at one mana. This is a straightforward mana creature, not a counter multiplier or power-scaling mana engine. Its presence alone says nothing about the right number of ramp alternatives in the feed."
+      },
+      {
+        "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+        "rating": "direct",
+        "quote": "Creatures you control have \"{T}: Add one mana of any color.\"",
+        "reason": "Turns the creature-heavy board into mana sources, directly supporting creature-based acceleration. This does not untap creatures, grant haste, or let Yuna pay two separate tap costs with one tap. Its death return changes it into a noncreature enchantment."
+      },
+      {
+        "oracle_id": "70a6f08e-854d-4e2f-9d8c-c45ec3231157",
+        "rating": "direct",
+        "quote": "{T}: For each color among permanents you control, add one mana of that color.",
+        "reason": "Creature-based mana production is explicitly requested, and Yuna contributes the three Bant colors. The separate gets +1/+1 text is a continuous stat bonus, not +1/+1 counters that Yuna can redistribute."
+      },
+      {
+        "oracle_id": "7973820b-fdaf-46ec-9e3e-d4c0e77b5067",
+        "rating": "direct",
+        "quote": "{T}: Add {G}.",
+        "reason": "Its unconditional mana ability fits the requested creature acceleration. The four-green mode additionally needs a creature with power at least four, which counter growth can enable but does not guarantee at every point. The grade does not assume that condition is already met."
+      },
+      {
+        "oracle_id": "2ef75cf3-30dc-4852-a6d1-1d6391fad022",
+        "rating": "direct",
+        "quote": "At the beginning of your upkeep, you may move any number of +1/+1 counters from this creature onto other creatures.",
+        "reason": "An explicit counter-growth and redistribution engine: spell casts accumulate counters and upkeep moves them to other creatures. It connects directly to the stated plan without requiring a separate named-card package."
+      },
+      {
+        "oracle_id": "df317532-7d36-40fd-938f-e972749c8792",
+        "rating": "direct",
+        "quote": "{T}: Add {G}.",
+        "reason": "One-mana creature-based acceleration directly matches the brief. Like the other simple Elves it is not a counter payoff; whether this many similar ramp options should occupy the first page is a composition question, not an unsupported individual-card interaction."
+      },
+      {
+        "oracle_id": "f122624f-f30d-444e-a62a-939829241045",
+        "rating": "direct",
+        "quote": "Add X mana of any one color, where X is this creature's power.",
+        "reason": "The mana ability scales with power, so Yuna's entry counters directly improve its output. While established on the battlefield, Kami also increases +1/+1-counter placement on controlled permanents. It is not a proliferate ability and does not modify player counters."
+      },
+      {
+        "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+        "rating": "direct",
+        "quote": "{T}: Add {G}.",
+        "reason": "Directly supplies the explicitly requested creature-based acceleration. No special counter-to-mana scaling is claimed for this fixed-output Elf, and no unsupported speed or budget preference is imposed."
+      },
+      {
+        "oracle_id": "8ad91f64-ccab-4edc-bd54-b2ee9267d614",
+        "rating": "direct",
+        "quote": "Whenever a land you control enters, add one mana of any color.",
+        "reason": "A creature turns normal land entries into additional mana, matching creature-based acceleration. Repeated ordinary land plays are a normal game resource, not an assumed dedicated landfall combo; output timing depends on those entries rather than tapping or counter count."
+      },
+      {
+        "oracle_id": "3a940dfa-a026-4969-8981-ef90cdfbe9ef",
+        "rating": "direct",
+        "quote": "{T}: Add one mana of any color.",
+        "reason": "An artifact creature supplies any-color mana for the stated creature-ramp plan. Flying and Yuna's entry counters can make its body relevant, but its fixed mana output does not scale with those counters."
+      },
+      {
+        "oracle_id": "1d725121-e50c-42f0-9128-56802f07c89e",
+        "rating": "direct",
+        "quote": "Add X mana in any combination of colors, where X is the greatest power among creatures you control.",
+        "reason": "Counter-grown creature power increases its mana production, connecting both major functions in the brief. Its entry-based draw is conditional on greatest power and can benefit opponents; it is not unconditional controller-only draw."
+      },
+      {
+        "oracle_id": "1e6a24be-8281-41c1-a5ba-b68f0ef1d7b8",
+        "rating": "direct",
+        "quote": "Put a +1/+1 counter on target creature you control. It gains hexproof until end of turn.",
+        "reason": "Adds a counter while protecting a chosen counter carrier from targeted effects for the turn. This directly advances and protects counter investment; it does not grant permanent protection or stop every kind of board wipe."
+      },
+      {
+        "oracle_id": "78427103-9543-41fb-b6d4-72963fe87275",
+        "rating": "direct",
+        "quote": "Whenever a nontoken creature you control enters, put a +1/+1 counter on it and draw a card.",
+        "reason": "Combines creature-entry counters, cards and mana for the selected creature/counter plan. Its discount requires a sufficiently powerful creature, and Plant or other token entries do not trigger the nontoken draw ability. No budget or low-cost guarantee is assumed."
+      },
+      {
+        "oracle_id": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+        "rating": "direct",
+        "quote": "you may move all counters from The Ozolith onto target creature.",
+        "reason": "Preserves creature-counter value on leaving and offers a combat-time transfer onto another creature. It directly complements Yuna's graveyard redistribution; its own preservation is creature-only and applies to broader leaving events than Yuna's trigger."
+      },
+      {
+        "oracle_id": "ab8d5f5c-1976-4f77-8ed2-8d28ee666741",
+        "rating": "direct",
+        "quote": "Whenever a land you control enters, create a Food token or a Treasure token.",
+        "reason": "The creature body generates storable Treasure mana from normal land entries, directly serving creature-based acceleration. Food is an alternative utility resource, not counter growth. No dedicated landfall engine or infinite loop is assumed."
+      },
+      {
+        "oracle_id": "4b515bb0-f275-4400-8032-3173b799ab40",
+        "rating": "direct",
+        "quote": "Remove a +1/+1 counter from this creature: It deals 1 damage to any target.",
+        "reason": "An explicit counter sink and interaction/payoff: accumulated +1/+1 counters can become damage. Yuna's cast-entry bonus is relevant to a creature entering with counters, but no infinite combo or unlimited damage is claimed from these two cards alone."
+      }
+    ],
+    "meren": []
+  }
+}

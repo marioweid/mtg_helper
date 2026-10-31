@@ -1,6 +1,110 @@
-# Discover pilot: implementation and operating boundaries
+# Discover: Scryfall-only strategy matches
 
-## Now
+## Replacement workflow
+
+The Discover replacement uses a saved commander strategy and local Scryfall source criteria instead
+of an AI-generated card shortlist. This describes the feature-branch implementation, not a production
+deployment or approval to spend. The existing experimental capability stays default off. New Cards
+and Community Picks retain their own behavior and sources.
+
+1. First-time setup restores current strategy ideas or prepares one set automatically. Full strategy
+   cards show the plan before selection; the user can also write their own strategy.
+2. **Find cards** prepares source searches, validates and saves the strategy, then loads local matches.
+   Separate drafting, term-application and save buttons are not part of the normal flow.
+3. The full active strategy stays visible above results. **Advanced search details** is optional:
+    selected searches show their grouping and front-face scopes. Oracle tags and printed keywords
+    remain editable in bounded searchable pickers; editing them replaces automatic filters with one
+    unscoped manual OR search. Merely opening Advanced details preserves all automatic filters.
+4. Opening saved Discover results, refreshing them and paging use local Scryfall data without new
+   model calls or community-provider requests. Strategy prose is saved independently of the deck
+   description and existing deck tag choices, and remains available for future deck-agent integration.
+
+### Source matching, not per-card AI assessment
+
+- Oracle tags and printed keywords are separate source criteria. Unknown terms are rejected, not
+  silently invented or turned into global labels. Find cards validates AI-selected terms before saving;
+  the user can override them manually in Advanced search details.
+- Each saved search has one or two nonempty source groups: criteria are OR alternatives inside a
+  group and groups are ANDed. Searches are alternatives, not required roles or quotas. Selected
+  parent tags include descendants. Optional card-type scopes use the front face; a Battle is not
+  admitted to a creature-scoped search because its transformed back face is a creature.
+- Filter before ordering. Use existing global Commander popularity (`edhrec_rank`) from the card
+  catalog, unknown/nonpositive ranks last, then stable name and Oracle identity. No match-count
+  boost, role round-robin, source-weight cutoff, card-specific exceptions, release-recency boost,
+  or Moxfield/Archidekt request. Global popularity is explicitly not commander-specific synergy.
+- Results explain only criteria from searches the card actually satisfies. Distinct matched-term
+  count remains source evidence, not a relevance score. Source labels do not certify beneficial
+  triggers, cast/entry compatibility, simultaneous face access, or strategic usefulness.
+- Search paper, Commander-legal nonlands of all release ages within the stored commander/partner
+  color union. This does not certify pairing legality, bracket, price, rules synergy or deck balance.
+- Physical cards, pending additions and deck-local Discover dismissals are exclusions, not strategic
+  evidence. Planning creates pending additions only; completion retains source/legality/copy guards.
+- No criteria is an unfinished setup, not a successful empty recommendation result. Cards without
+  Oracle tags may still match selected printed keywords. A current valid query can genuinely be empty.
+
+### Availability and AI setup
+
+Scryfall remains the only card-data source. Discover reads a consistent local card/tag publication;
+missing or mismatched publications are unavailable rather than empty. A last-good publication older
+than two days remains browseable with a source-age/last-known-legality warning. Failed updates do
+not erase valid local data. New Cards' separate freshness policy is unchanged.
+
+First-time setup may start one strategy request, and Find cards may start one source-term request.
+Persisted work is resumed across reloads instead of regenerated. Explicit retries or **Try other
+strategies** may start new work; automatic status polling never does. Ownership, capability, request
+size/output bounds, timeout, concurrency and single-use request guards remain enforced. Current setup
+is not blocked by dollar estimates or historical unknown-price holds. Unknown costs remain unknown
+in the preserved receipt/accounting history, never silently priced as zero.
+Model errors must not erase saved strategy or make local browsing depend on AI availability. The AI
+term-selection catalog retains strategy retrieval and adds commander/partner source tags, their
+immediate source hierarchy neighbors, and commander-text retrieval. At most 160 Oracle tags and
+120 printed keywords are supplied, with source descriptions capped at 600 characters and an explicit
+truncation marker. Complete commander facts are included; private deck contents are not. The draft
+may select at most eight distinct tags and eight keywords across at most six searches. It must not
+fill roles mechanically or confuse a cast trigger with direct reanimation. These prompt safeguards
+are not a per-card semantic validator. Suggestions are not exhaustive. The full source catalog remains
+searchable manually, but only 20 suggestions per picker are rendered at a time. Browsing does not
+need the historical rules snapshot.
+
+Current setup uses `app-strategy-terms-v3`, one request bounded at 80,000 input bytes/token-reservation
+units and 4,000 output tokens; the conservative reservation is $0.0248, not an invoice. The provider
+schema enumerates the exact frozen catalog in global `oracle_tag_ids` and `printed_keywords` arrays,
+each capped at eight entries. Search groups use zero-based indices into these selected arrays,
+not the input catalog. The backend rejects duplicate choices, missing/repeated indices, empty groups
+and equivalent searches, then decodes into the existing grouped queries. No trimming or repair calls.
+An unavailable source kind permits only []; neither kind available stops before a provider attempt.
+These structural limits do not establish strategic usefulness or guarantee every response is valid.
+
+Retain this single-call baseline. Result-aware refinement remains an offline research experiment,
+not an application setup stage: the fresh Yuna/Meren comparison passed the v3 contract on all four
+calls, but refinement reduced the lead's top-twenty usefulness scores and reachable-reference
+coverage on both decks. Do not automatically narrow searches from result counts or regenerate saved
+criteria. See [the comparison report](research/discover-bounded-result-aware/report.md).
+
+The old v1/v2 prompts and parsers remain historical research/accounting only. New setup does not
+resume or reuse their runs. V2's already decoded grouped results remain owner-readable through the
+term-run view, and historical traces/receipts/unknown holds remain unchanged. Existing saved strategies
+are not regenerated. No live-call reliability or recommendation-quality improvement is claimed from
+offline schema/decoder checks.
+
+Saved strategies store `queries` once rather than redundant flat term arrays. Schema upgrade converts
+existing flat criteria into one equivalent unscoped OR search, preserving prose, owner, revision and
+selected identities. It does not regenerate existing criteria. A user explicitly choosing Find cards
+can prepare new criteria. Ship the matching backend/frontend contracts together. Cursor state binds
+ordering version and ranking metadata as well as strategy, source, commanders and exclusions.
+
+The old card-generation action is retired. Historical runs, traces, attempts, source snapshots, costs,
+unknown holds and pending-plan origins remain history/accounting data; they are not current strategy
+matches and are not replayed through the replacement workflow.
+
+See [the glossary](../GLOSSARY.md) for the distinction between Strategie-Treffer and New Cards'
+Tag-Treffer, and [the research discussion](research/discovery-local-first-options.md) for context.
+
+## Historical pilot checkpoint (superseded)
+
+The remainder records the prior three-stage card-generation pilot and its historical operating
+limits. It is retained to explain preserved runs, immutable profiles and accounting records, not as
+the current Discover interaction contract. New card-generation work described below is retired.
 
 Discover is implemented but **default off**. This document is not live enablement, spending approval,
 or deployment verification. New Cards retains its existing workflow;

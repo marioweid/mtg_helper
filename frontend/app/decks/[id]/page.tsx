@@ -80,6 +80,16 @@ export default function DeckDetailPage() {
     tag: new Set(),
   }));
   const [tab, setTab] = useState<DeckTab>("cards");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "discover") setTab("discover");
+  }, [deckId]);
+  const selectTab = (next: DeckTab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "discover") url.searchParams.set("tab", "discover");
+    else url.searchParams.delete("tab");
+    window.history.replaceState(window.history.state, "", url.toString());
+  };
   const [discoverEnabled, setDiscoverEnabled] = useState(false);
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -334,11 +344,11 @@ export default function DeckDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* Card list / combos */}
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
           <div
             role="tablist"
             aria-label="Deck view"
-            className="inline-flex w-fit overflow-hidden rounded-lg border border-white/10 text-sm"
+            className="inline-flex w-fit max-w-full overflow-x-auto rounded-lg border border-white/10 text-sm"
           >
             {(["cards", "top-picks", "discover", "new-cards", "combos", "history"] as const)
               .filter((t) => t !== "discover" || discoverEnabled)
@@ -349,8 +359,8 @@ export default function DeckDetailPage() {
                     key={t}
                     role="tab"
                     aria-selected={active}
-                    onClick={() => setTab(t)}
-                    className={`px-4 py-1.5 capitalize transition-colors ${
+                    onClick={() => selectTab(t)}
+                    className={`min-h-11 shrink-0 whitespace-nowrap px-4 py-1.5 capitalize transition-colors ${
                       active
                         ? "bg-indigo-600 text-white"
                         : "text-gray-400 hover:bg-white/5 hover:text-gray-200"

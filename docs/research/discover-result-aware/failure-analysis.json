@@ -1,0 +1,20 @@
+{
+  "attempt": "meren/baseline",
+  "provider_status": "completed",
+  "application_validation": "ValidationError: Searches permit at most 8 distinct terms of each kind",
+  "queries": 6,
+  "distinct_oracle_tags": 13,
+  "allowed_distinct_oracle_tags": 8,
+  "out_of_menu_oracle_tags": [
+    "524845ed-ea82-4a60-8b52-8a38ab06a503"
+  ],
+  "out_of_menu_tag_exists_in_local_source": false,
+  "provider_schema_tag_group_max_items": 40,
+  "provider_schema_oracle_tag_item": {
+    "format": "uuid",
+    "type": "string"
+  },
+  "finding": "The provider schema constrains UUID syntax and individual group sizes, but not supplied-catalog membership or the cross-query eight-distinct-tag budget. Backend validation correctly rejected the result. The missing-catalog UUID is an additional failure independent of the global budget violation.",
+  "experiment_effect": "Stopped after two baseline attempts. Neither result-aware refinement was requested. No invalid plan was trimmed, ranked, saved to a deck or credited as a successful baseline.",
+  "next_hypothesis": "A model-facing global term-choice array capped at eight, with catalog-enumerated identities and query references to those choices, could enforce these constraints structurally while decoding into the existing persisted query format. This is a proposed fix, not an implemented or verified improvement."
+}

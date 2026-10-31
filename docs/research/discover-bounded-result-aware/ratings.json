@@ -1,0 +1,304 @@
+{
+  "reviewer": "Lead assistant, alphabetical source-only packet before inspecting recovery or arm/rank mappings",
+  "limitations": "Familiar regression decks; not independent human grading. One consistent grade per card/deck, not a final deck composition or a claim that every engine fit is equally strong. No bracket, budget or speed restriction was inferred.",
+  "cases": {
+    "yuna": [
+      {
+        "oracle_id": "4567a528-75f0-4ea6-b927-3a500caf76ac",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Untap target Forest.",
+        "reason": "Arbor Elf supplies the explicitly requested creature-based acceleration by reusing a Forest. It needs an actual Forest, not merely any green-producing land; ordinary Forest access is a normal resource rather than an assumed combo package. No counter scaling is printed."
+      },
+      {
+        "oracle_id": "069f6530-e65c-4d52-85f3-e0a2acd148c5",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Add {W}.",
+        "reason": "Avacyn's Pilgrim is a one-mana creature that accelerates white mana for the Bant commander/plan. It fulfills the requested ramp function, but +1/+1 counters do not improve its fixed mana output."
+      },
+      {
+        "oracle_id": "4ba5b3f6-503b-43e6-b66e-4f8c55cffed7",
+        "rating": "direct", "contribution": "engine",
+        "quote": "you may put a +1/+1 counter on each Plant creature you control.",
+        "reason": "Avenger of Zendikar creates a board of Plants that landfall can turn into counter carriers, feeding Yuna's redistribution on their deaths. The cast bonus on Avenger itself does not also give every newly created token two counters. Seven mana is a real cost, not an inferred pace violation."
+      },
+      {
+        "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Add one mana of any color.",
+        "reason": "Birds of Paradise is inexpensive creature acceleration and color fixing. Flying gives a useful body to grow, but any creature receiving Yuna's cast bonus is not by itself a distinctive counter-engine interaction. Its mana remains fixed."
+      },
+      {
+        "oracle_id": "0c23fefe-9891-4dd8-9bb1-eebdb3274e31",
+        "rating": "direct", "contribution": "requested",
+        "quote": "For each color among permanents you control, add one mana of that color.",
+        "reason": "Bloom Tender directly supplies creature acceleration, and Yuna herself establishes the three Bant colors while present. This is meaningful fixing/output, but it scales with colors rather than the declared counter-growth engine."
+      },
+      {
+        "oracle_id": "f9d3b046-0b95-4103-a630-4b3fb88bb60b",
+        "rating": "direct", "contribution": "requested",
+        "quote": "Spend this mana only to cast a legendary spell, and that spell can't be countered.",
+        "reason": "Delighted Halfling accelerates the legendary commander and protects that cast from countering. Its colored mana cannot cast ordinary nonlegendary engine creatures; the separate colorless mode is unrestricted. No counter-based mana scaling is claimed."
+      },
+      {
+        "oracle_id": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Add {G}.",
+        "reason": "Elvish Mystic fulfills the explicit one-mana creature-ramp function. It is a plausible inclusion or alternative, not an intrinsically distinctive counter payoff; multiple similar Elves on a recommendation page create a composition concern rather than making each individually unrelated."
+      },
+      {
+        "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+        "rating": "direct", "contribution": "requested",
+        "quote": "Creatures you control have \"{T}: Add one mana of any color.\"",
+        "reason": "Enduring Vitality turns the creature board into mana sources, directly filling creature-based acceleration. It neither grants haste nor lets one tap pay both Yuna's native ability and the granted ability. Its death return produces a noncreature enchantment, not an endlessly reusable creature by itself."
+      },
+      {
+        "oracle_id": "70a6f08e-854d-4e2f-9d8c-c45ec3231157",
+        "rating": "direct", "contribution": "requested",
+        "quote": "For each color among permanents you control, add one mana of that color.",
+        "reason": "Faeburrow Elder is creature acceleration with three colors available from Yuna herself. Its separate +1/+1-per-color bonus is a continuous stat modifier, not +1/+1 counters available for redistribution. The grade credits ramp rather than falsely treating that bonus as the counter engine."
+      },
+      {
+        "oracle_id": "7973820b-fdaf-46ec-9e3e-d4c0e77b5067",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Activate only if you control a creature with power 4 or greater.",
+        "reason": "Fanatic of Rhonas connects the counter-growth plan to a four-mana production threshold, beyond its ordinary one-green mode. Yuna's two additional counters alone take this printed 1-power creature only to 3 power, not 4; further growth or another sufficiently powerful creature is needed. Eternalize is a separate sorcery-speed resource."
+      },
+      {
+        "oracle_id": "2ef75cf3-30dc-4852-a6d1-1d6391fad022",
+        "rating": "direct", "contribution": "engine",
+        "quote": "you may move any number of +1/+1 counters from this creature onto other creatures.",
+        "reason": "Forgotten Ancient explicitly accumulates counters from spell casts and redistributes them at upkeep. Both operations directly match the declared counter-growth/redistribution engine without assuming a named combo package."
+      },
+      {
+        "oracle_id": "df317532-7d36-40fd-938f-e972749c8792",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Add {G}.",
+        "reason": "Fyndhorn Elves is another inexpensive creature-ramp option explicitly requested by the brief. Countering its body does not increase its mana. Its similarity to the other fixed-output Elves should be visible when judging the page's composition."
+      },
+      {
+        "oracle_id": "34428f42-03ac-4795-8286-6cbea796df2b",
+        "rating": "direct", "contribution": "engine",
+        "quote": "If this creature has a +1/+1 counter on it, add three mana of that type instead.",
+        "reason": "Incubation Druid has an immediate concrete counter-to-mana upgrade: Yuna's cast-entry counters can enable three mana without paying the adapt cost. It produces a type a controlled land could produce, not automatically every color, and adapt does not add its counters when counters are already present."
+      },
+      {
+        "oracle_id": "f122624f-f30d-444e-a62a-939829241045",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Add X mana of any one color, where X is this creature's power.",
+        "reason": "Kami of Whispered Hopes turns counter-driven power into mana and, while established, increases +1/+1-counter placement on controlled permanents. These are two actual engine connections. It does not proliferate player counters or independently create an infinite loop."
+      },
+      {
+        "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Add {G}.",
+        "reason": "Llanowar Elves supplies the declared creature-based acceleration. This is a sensible fixed-output ramp alternative, not a distinctive counter interaction; the grade makes no unstated assumption about the desired number of mana creatures in the final deck."
+      },
+      {
+        "oracle_id": "8ad91f64-ccab-4edc-bd54-b2ee9267d614",
+        "rating": "direct", "contribution": "requested",
+        "quote": "Whenever a land you control enters, add one mana of any color.",
+        "reason": "Lotus Cobra is a creature that converts ordinary land entries into mana, fitting the requested acceleration. It needs land entries for output and does not scale with +1/+1 counters. No dedicated landfall combo is assumed."
+      },
+      {
+        "oracle_id": "3a940dfa-a026-4969-8981-ef90cdfbe9ef",
+        "rating": "direct", "contribution": "requested",
+        "quote": "{T}: Add one mana of any color.",
+        "reason": "Ornithopter of Paradise provides creature-based fixing/acceleration. Its flying body can carry counters, but that generic eligibility does not make it a distinctive counter engine; its mana ability remains fixed-output."
+      },
+      {
+        "oracle_id": "1d725121-e50c-42f0-9128-56802f07c89e",
+        "rating": "direct", "contribution": "engine",
+        "quote": "where X is the greatest power among creatures you control.",
+        "reason": "Selvala, Heart of the Wilds converts the deck's counter-grown creature power into larger mana output. Its entry-based draw is conditional on the entering creature being strictly largest and can reward opponents too; it is not unconditional controller-only draw."
+      },
+      {
+        "oracle_id": "1e6a24be-8281-41c1-a5ba-b68f0ef1d7b8",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Put a +1/+1 counter on target creature you control. It gains hexproof until end of turn.",
+        "reason": "Snakeskin Veil both advances a counter carrier and protects that invested creature from opposing targeted effects for the turn. It is direct counter-engine protection, not a universal answer to sweepers or permanent hexproof."
+      },
+      {
+        "oracle_id": "78427103-9543-41fb-b6d4-72963fe87275",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever a nontoken creature you control enters, put a +1/+1 counter on it and draw a card.",
+        "reason": "The Great Henge directly adds counters and cards to nontoken creature entries, and counter-grown power can improve its discount. It also supplies mana. Tokens do not trigger its nontoken draw ability; the printed high cost is not an invented budget exclusion."
+      },
+      {
+        "oracle_id": "1946ded1-5f53-409f-b0a6-5433bb0357d2",
+        "rating": "direct", "contribution": "engine",
+        "quote": "you may move all counters from The Ozolith onto target creature.",
+        "reason": "The Ozolith explicitly preserves counter value from creatures leaving and transfers it to a creature at combat, complementing Yuna's graveyard redistribution. Its preservation applies to creatures, not all permanents, and leaving is broader than dying."
+      },
+      {
+        "oracle_id": "ab8d5f5c-1976-4f77-8ed2-8d28ee666741",
+        "rating": "direct", "contribution": "requested",
+        "quote": "Whenever a land you control enters, create a Food token or a Treasure token.",
+        "reason": "Tireless Provisioner is a creature-based source of storable Treasure mana from normal land entries, directly fulfilling requested acceleration. Food is alternative utility, not counter growth; the tokens do not inherently carry counters for Yuna."
+      },
+      {
+        "oracle_id": "4b515bb0-f275-4400-8032-3173b799ab40",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Remove a +1/+1 counter from this creature: It deals 1 damage to any target.",
+        "reason": "Walking Ballista is an actual +1/+1-counter damage outlet. Yuna's cast-entry bonus and later redistribution can provide counters to spend, including supporting a small initial X. No unlimited damage or infinite combo is established by the two cards alone."
+      }
+    ],
+    "meren": [
+      {
+        "oracle_id": "d8ad23a1-0b43-48ea-9fbe-d89b29194509",
+        "rating": "direct", "contribution": "engine",
+        "quote": "each player sacrifices a nontoken creature of their choice.",
+        "reason": "Accursed Marauder supplies repeatable creature-based interaction when Meren returns it. It can be the controller's own nontoken sacrifice, feeding experience while opposing players choose their victims. It does not target or guarantee removal of a particular opposing creature."
+      },
+      {
+        "oracle_id": "c0d8fef4-65f4-4769-982d-b397d2b7e977",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Return enchanted creature card to the battlefield under your control and attach this Aura to it.",
+        "reason": "Animate Dead directly reuses a creature and its entry effects as supplemental recursion. Removing the Aura forces sacrifice of that creature, which can feed death rewards, but is also a vulnerability; Meren cannot directly return the Aura with her creature-card ability."
+      },
+      {
+        "oracle_id": "c7f33cea-2ec8-4081-9208-a5b1d86721b3",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever a creature you control dies, each opponent loses 1 life and you gain 1 life.",
+        "reason": "Bastion of Remembrance converts the declared sacrifice/death engine into life drain and provides one initial creature token. It is a payoff, not a sacrifice outlet or repeatable token factory, and cannot itself be returned by Meren's creature-card ability."
+      },
+      {
+        "oracle_id": "6cf50e21-0f60-4e9a-b910-ebe1bad2a29e",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Each player sacrifices thirteen creatures of their choice.",
+        "reason": "Blasphemous Edict is mass interaction that also puts the controller's creatures into the sacrifice/recursion cycle and can generate experience while Meren sees them die. It can remove Meren and friendly payoffs too; the one-black alternate cost requires thirteen creatures on the whole battlefield, not automatically this deck's board."
+      },
+      {
+        "oracle_id": "310f141c-7f37-4729-aed6-dd9c09db448d",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever this creature or another creature dies, target player loses 1 life and you gain 1 life.",
+        "reason": "Blood Artist is a direct death payoff for repeated sacrifice, including its own death and opposing creature deaths. It drains one targeted player per trigger rather than every opponent, and does not provide its own sacrifice outlet."
+      },
+      {
+        "oracle_id": "e0445c80-fa53-4c3e-881e-940e9fce7f57",
+        "rating": "direct", "contribution": "engine",
+        "quote": "At the beginning of your end step, you may sacrifice an artifact, creature, enchantment, land, or planeswalker.",
+        "reason": "Braids, Arisen Nightmare is a scheduled sacrifice outlet that can convert a creature into experience and opponent pressure/cards. Opponents can sacrifice matching types instead of conceding the draw. Meren's end-step target is selected before Braids' sacrifice resolves; do not assume a newly sacrificed creature can be targeted by that same end-step trigger."
+      },
+      {
+        "oracle_id": "a1cc5e37-b09a-4b7f-afd5-77c1c35aa425",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Sacrifice a creature: Put a +1/+1 counter on this creature.",
+        "reason": "Carrion Feeder is a repeatable sacrifice outlet without a mana/tap activation cost, enabling controlled deaths and Meren experience. Its inability to block is real, and neither its growth nor Meren alone establishes an infinite loop."
+      },
+      {
+        "oracle_id": "2699005b-a471-429f-a9d8-fbf2077ee2fd",
+        "rating": "direct", "contribution": "engine",
+        "quote": "When this creature enters, you may sacrifice another creature.",
+        "reason": "Disciple of Freyalise's creature front supplies an entry-based sacrifice and power-based cards/life that Meren can reuse. It needs another creature and six experience to return this six-mana front directly through Meren. Its land back is an alternative play, not simultaneous access to both faces."
+      },
+      {
+        "oracle_id": "352b64d2-2ae5-44ee-a64f-94932ef545d3",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Return target creature card from your graveyard to the battlefield.",
+        "reason": "Dread Return directly recycles a creature and its entry value; flashback turns three creature sacrifices into another use, fitting the death engine. Three bodies are an actual flashback cost, and flashback exiles the spell afterward rather than creating endlessly reusable recursion."
+      },
+      {
+        "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+        "rating": "direct", "contribution": "engine",
+        "quote": "When Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control.",
+        "reason": "Enduring Vitality can be sacrificed for a Meren death/experience event and preserve its team-mana effect by returning itself. This is a real self-recursion connection as well as infrastructure, but the returned permanent is a noncreature enchantment: it cannot be fed repeatedly as a creature without something else changing that state."
+      },
+      {
+        "oracle_id": "69872a9a-fe54-4e58-940c-89395af71acd",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Search your library and/or graveyard for a creature card with mana value X or less and put it onto the battlefield.",
+        "reason": "Finale of Devastation provides creature recursion or access to an engine creature and triggers entry abilities without casting that creature. The large-X pump/haste clause is an optional expensive payoff; no specific missing combo target or guaranteed ten-X resources are assumed."
+      },
+      {
+        "oracle_id": "6f4ac4a4-53ec-4bc9-8f5c-d4b801d867b2",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever a creature you control dies, each other player sacrifices a creature of their choice.",
+        "reason": "Grave Pact converts the deck's controlled deaths into repeated opponent interaction, directly rewarding the sacrifice engine. Opponents choose their creatures; the enchantment supplies neither its own outlet nor recursion by Meren. Its triple-black requirement is a real casting constraint."
+      },
+      {
+        "oracle_id": "9e6a3df4-67a3-452e-a6ef-f04dbadb21ef",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control",
+        "reason": "Living Death combines mass sacrifice with reusing creatures already stocked in graveyards, directly fitting the engine. It is symmetric and can help opponents. Creatures sacrificed during its own resolution were not in the initial exiled set and are not returned by that same resolution."
+      },
+      {
+        "oracle_id": "0636b6c3-0662-420a-b30d-f0a14e7c512d",
+        "rating": "conditional", "contribution": "dependency",
+        "quote": "Whenever you create or sacrifice a token, each opponent loses 1 life.",
+        "reason": "Mirkwood Bats rewards token creation/sacrifice, not the nontoken creature-card recursion that Meren supplies. A deliberate token/Treasure package could make it excellent, but neither Meren nor the brief establishes that package. Other proposed candidates must not be treated as already-owned support."
+      },
+      {
+        "oracle_id": "322f44f0-e6da-4ee0-b474-e7d5e9a461c5",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever one or more other creatures die, draw a card.",
+        "reason": "Morbid Opportunist turns the sacrifice/death plan into cards, including deaths outside the controller's board. Its ability triggers only once each turn, not for every body or once for every separate simultaneous death. It does not trigger from its own death."
+      },
+      {
+        "oracle_id": "a784481f-eccb-4112-bb38-04a659319660",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever another creature you control dies, create a Treasure token.",
+        "reason": "Pitiless Plunderer converts the recurring sacrifice resource into mana, a concrete engine connection without requiring an additional token package first. It does not trigger on its own death and is a payoff rather than an outlet; no infinite loop is established by Meren alone."
+      },
+      {
+        "oracle_id": "a044474a-cd72-4e9d-bd8d-a08f2de9cdc0",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Put target creature card from a graveyard onto the battlefield under your control.",
+        "reason": "Reanimate supplements Meren with direct creature reuse from either graveyard and beneficial entry triggers. Life loss equals the target's mana value and can be substantial; it does not cast the creature or require Meren experience counters."
+      },
+      {
+        "oracle_id": "e5223a09-f732-4747-8914-e6546ab0ef4c",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Put all creature cards from all graveyards onto the battlefield under your control.",
+        "reason": "Rise of the Dark Realms is an expensive mass-recursion payoff that directly reuses creatures and entry effects, including opponents' graveyards. Nine mana is a substantial opportunity cost; without a specified speed limit it is not automatically off-plan or evidence of a separate required combo package."
+      },
+      {
+        "oracle_id": "65986c1b-8e51-4604-b685-d82fa7d1263a",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever equipped creature dies, draw two cards.",
+        "reason": "Skullclamp turns reusable creatures into cards, directly rewarding Meren's sacrifice/recursion loop. Its +1/-1 can kill a one-toughness creature, and equip costs one mana at normal equip timing. It is not itself an unrestricted instant-speed sacrifice outlet for every body."
+      },
+      {
+        "oracle_id": "00c0543c-2a1f-4425-8283-4062d74a1637",
+        "rating": "direct", "contribution": "engine",
+        "quote": "When this creature dies, you may draw a card.",
+        "reason": "Solemn Simulacrum explicitly offers both land-search entry value and a death card, making repeated sacrifice/return genuinely useful rather than merely possible. Meren needs four experience for a direct battlefield return, and its searched basic enters tapped."
+      },
+      {
+        "oracle_id": "14c3ff84-1e82-4606-a433-869fc52cc382",
+        "rating": "direct", "contribution": "engine",
+        "quote": "or a creature card leaves your graveyard, Syr Konrad deals 1 damage to each opponent.",
+        "reason": "Syr Konrad rewards creature deaths and Meren moving creature cards out of the graveyard to hand or battlefield; these are concrete connections to both halves of the engine. Its mill can stock graveyards but does not guarantee favorable cards, and Konrad's own death is not the other-creature death event."
+      },
+      {
+        "oracle_id": "30a0a6c2-1fbb-4784-ab96-22611d57e62c",
+        "rating": "support", "contribution": "generic",
+        "quote": "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a card.",
+        "reason": "Torment of Hailfire is a generic mana-sink/closing spell, not a payoff for the controller's creature recursion. Opponents can pay life or discard instead of sacrificing, so it is not reliable creature removal or a guaranteed Meren experience source. A large-X resource engine is not established, but ordinary finisher utility remains plausible."
+      },
+      {
+        "oracle_id": "240e85d3-e495-4877-8609-4b4056c402f7",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Sacrifice a creature. If you do, return the chosen cards to the battlefield tapped.",
+        "reason": "Victimize trades a creature death for two creature returns and entry effects, directly fitting the selected engine. It requires two legal graveyard targets and a creature to sacrifice; the creature sacrificed during resolution is not one of those already-chosen graveyard targets. Returned creatures enter tapped."
+      },
+      {
+        "oracle_id": "f82a4e85-526d-4456-b700-7760043a31be",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Sacrifice a creature: Scry 1.",
+        "reason": "Viscera Seer is a repeatable no-mana sacrifice outlet that turns controlled deaths into selection and Meren experience. Scry is not card draw and the commander returns at most the creature selected for her end-step trigger; no infinite engine is assumed."
+      },
+      {
+        "oracle_id": "ace86e56-efde-4eb7-8815-71456a4c3abe",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Pay 1 life, Sacrifice another creature: Create a Treasure token.",
+        "reason": "Warren Soultrader is an actual repeatable sacrifice outlet that converts another creature and life into Treasure, directly supporting the recursion/death engine. It cannot sacrifice itself with this ability, requires life to pay, and does not alone establish an infinite loop with Meren."
+      },
+      {
+        "oracle_id": "76b003e0-15af-4f22-bdf2-1ade5430964a",
+        "rating": "direct", "contribution": "engine",
+        "quote": "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life.",
+        "reason": "Zulaport Cutthroat converts repeated deaths of controlled creatures into table-wide drain, directly rewarding the plan. Unlike Blood Artist it does not trigger for opponents' creatures dying; it provides a payoff, not the sacrifice outlet itself."
+      }
+    ]
+  }
+}

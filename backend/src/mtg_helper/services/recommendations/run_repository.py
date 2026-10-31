@@ -37,6 +37,7 @@ class NewRun:
     rules_hash: str
     context: Card
     profile: str = budget.VERSION
+    reuse_latest: bool = False
 
 
 async def account_lock(conn: asyncpg.Connection, account_id: UUID) -> None:
@@ -107,6 +108,22 @@ class RunRepository:
                 ):
                     raise DiscoveryError("Request key already used for different inputs", 409)
                 return existing["id"], None
+            if new.reuse_latest:
+                reused = await conn.fetchval(
+                    "SELECT id FROM recommendation_runs WHERE account_id=$1 AND deck_id=$2 "
+                    "AND profile=$3 AND source_hash=$4 AND rules_hash=$5 AND request_hash=$6 "
+                    "AND context - 'excluded_ids' - 'seed' = $7::jsonb - 'excluded_ids' - 'seed' "
+                    "ORDER BY created_at DESC, id DESC LIMIT 1",
+                    new.owner.account_id,
+                    new.deck_id,
+                    new.profile,
+                    new.source_hash,
+                    new.rules_hash,
+                    new.request_hash,
+                    json.dumps(new.context),
+                )
+                if reused:
+                    return reused, None
             await self._can_create(conn, new)
             run_id, token = uuid4(), uuid4()
             await conn.execute(
@@ -143,6 +160,12 @@ class RunRepository:
         )
         if active:
             raise DiscoveryError("A Discover run is already active; refresh its status", 409)
+        if new.profile in {
+            budget.STRATEGY_VERSION,
+            budget.TERMS_VERSION,
+            budget.BOUNDED_TERMS_VERSION,
+        }:
+            return
         unknown = await conn.fetchval(
             "SELECT EXISTS(SELECT 1 FROM recommendation_runs "
             "WHERE account_id = $1 AND status <> 'running' AND held_microusd > 0)",
@@ -223,7 +246,8 @@ class RunRepository:
     async def publish(self, work: Work, phase: str, data: Card) -> bool:
         next_phase = (
             "done"
-            if work.profile == budget.STRATEGY_VERSION
+            if work.profile
+            in {budget.STRATEGY_VERSION, budget.TERMS_VERSION, budget.BOUNDED_TERMS_VERSION}
             else {"plan": "revise", "revise": "review", "review": "done"}[phase]
         )
         if phase == "revise" and not data["candidates"]:
@@ -231,7 +255,9 @@ class RunRepository:
         result = await self.pool.execute(
             "UPDATE recommendation_runs SET data = $3::jsonb, phase = $4, "
             "status = CASE WHEN $4 = 'done' THEN 'completed' ELSE 'running' END, "
-            "held_microusd = CASE WHEN $4 = 'done' THEN 0 ELSE held_microusd END, "
+            "held_microusd = CASE WHEN $4 = 'done' THEN COALESCE("
+            "(SELECT sum(a.reservation_microusd) FROM recommendation_attempts a "
+            "WHERE a.run_id=$1 AND a.cost_microusd IS NULL),0) ELSE held_microusd END, "
             "finished_at = CASE WHEN $4 = 'done' THEN now() ELSE NULL END "
             "WHERE id = $1 AND token = $2 AND status = 'running' AND phase = $5 "
             "AND lease_until > now() AND profile = $6",
