@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { comparisonExportCards } from "@/lib/comparison";
+import { comparisonExportCards, comparisonPlanningChanges } from "@/lib/comparison";
 import type { DeckDiff, DiffEntry } from "@/lib/types";
 
 function entry(name: string, left: number, right: number): DiffEntry {
@@ -66,5 +66,58 @@ describe("comparison exports", () => {
     expect(
       comparisonExportCards({ added: [], removed: [], quantity_changed: [], common: [] }, "right"),
     ).toEqual([]);
+  });
+});
+
+describe("comparison planning selections", () => {
+  const selected = new Set(["New card", "Cut card", "Increase", "Decrease", "Unchanged"]);
+
+  it("uses only selected incoming deltas for planned additions", () => {
+    expect(
+      comparisonPlanningChanges(diff, "additions", selected).map((change) => [
+        change.name,
+        change.direction,
+        change.quantity,
+      ]),
+    ).toEqual([
+      ["New card", "addition", 2],
+      ["Increase", "addition", 3],
+    ]);
+    expect(comparisonPlanningChanges(diff, "additions", new Set())).toEqual([]);
+  });
+
+  it("includes selected cuts and decreases without treating common cards as changes", () => {
+    expect(
+      comparisonPlanningChanges(diff, "changes", selected).map((change) => [
+        change.name,
+        change.direction,
+        change.quantity,
+      ]),
+    ).toEqual([
+      ["New card", "addition", 2],
+      ["Cut card", "cut", 3],
+      ["Increase", "addition", 3],
+      ["Decrease", "cut", 3],
+    ]);
+  });
+
+  it("carries addition categories but excludes commander changes", () => {
+    const addition = { ...entry("Ramp", 0, 1), right_categories: ["ramp"] };
+    const commander = { ...entry("Commander", 0, 1), right_categories: ["commander"] };
+    const result = comparisonPlanningChanges(
+      { ...diff, added: [addition, commander] },
+      "changes",
+      new Set(["Ramp", "Commander"]),
+    );
+    expect(result).toEqual([
+      {
+        card_id: "Ramp",
+        card_scryfall_id: "Ramp",
+        name: "Ramp",
+        direction: "addition",
+        quantity: 1,
+        categories: ["ramp"],
+      },
+    ]);
   });
 });

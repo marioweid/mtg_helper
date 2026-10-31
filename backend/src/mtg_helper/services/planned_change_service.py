@@ -1,5 +1,6 @@
 """Planned main-deck changes kept separate from physical deck composition."""
 
+import logging
 from typing import Literal
 from uuid import UUID
 
@@ -7,10 +8,14 @@ import asyncpg
 
 from mtg_helper.models.card_exports import CardExportRequest, ExportCard
 from mtg_helper.models.decks import (
+    PlannedChangeBatchItem,
+    PlannedChangesBatchResult,
     PlannedDeckChange,
     PlannedDeckChangeCreate,
 )
 from mtg_helper.services import card_export_service, card_identity_service, collection_service
+
+_log = logging.getLogger(__name__)
 
 
 class PlannedChangeError(ValueError):
@@ -121,63 +126,160 @@ async def create_plan(
     async with pool.acquire() as conn, conn.transaction():
         deck = await _owned_deck(conn, deck_id, email, lock=True)
         card = await _card_by_scryfall(conn, data.card_scryfall_id)
-        physical_quantity = await _validate_main_deck_card(conn, deck, card, data.direction)
-        existing = await conn.fetchrow(
-            "SELECT * FROM deck_card_plans WHERE deck_id = $1 AND card_id = $2 FOR UPDATE",
-            deck_id,
-            card["id"],
+        plan_id = await _save_plan(conn, deck, card, data)
+    if plan_id is None:
+        return None
+    return await get_plan(pool, deck_id, plan_id, email, account_id)
+
+
+async def _save_plan(
+    conn: asyncpg.Connection,
+    deck: asyncpg.Record,
+    card: asyncpg.Record,
+    data: PlannedDeckChangeCreate,
+) -> UUID | None:
+    physical_quantity = await _validate_main_deck_card(conn, deck, card, data.direction)
+    deck_id = deck["id"]
+    existing = await conn.fetchrow(
+        "SELECT * FROM deck_card_plans WHERE deck_id = $1 AND card_id = $2 FOR UPDATE",
+        deck_id,
+        card["id"],
+    )
+    direction, quantity = _net_plan(
+        existing["direction"] if existing else None,
+        int(existing["quantity"]) if existing else 0,
+        data.direction,
+        data.quantity,
+    )
+    if direction == "addition":
+        limit = card_identity_service.commander_copy_limit(card["type_line"], card["oracle_text"])
+        projected = card_identity_service.clamp_quantity(physical_quantity + quantity, limit)
+        quantity = projected - physical_quantity
+    if direction == "cut" and quantity > physical_quantity:
+        raise InvalidPlanError("Planned cut exceeds the physical deck quantity")
+    if direction is None or quantity == 0:
+        if existing:
+            await conn.execute("DELETE FROM deck_card_plans WHERE id = $1", existing["id"])
+        return None
+    categories = list(data.categories) if direction == "addition" else []
+    collection_id = existing["collection_id"] if existing and direction == data.direction else None
+    row = await conn.fetchrow(
+        """
+        INSERT INTO deck_card_plans (
+            deck_id, card_id, direction, quantity, collection_id,
+            categories, added_by, ai_reasoning
+        ) VALUES ($1, $2, $3, $4, $5, $6::text[], $7, $8)
+        ON CONFLICT (deck_id, card_id) DO UPDATE SET
+            direction = EXCLUDED.direction,
+            quantity = EXCLUDED.quantity,
+            collection_id = EXCLUDED.collection_id,
+            categories = CASE
+                WHEN cardinality(EXCLUDED.categories) > 0 THEN EXCLUDED.categories
+                ELSE deck_card_plans.categories
+            END,
+            added_by = EXCLUDED.added_by,
+            ai_reasoning = COALESCE(EXCLUDED.ai_reasoning, deck_card_plans.ai_reasoning),
+            updated_at = now()
+        RETURNING id
+        """,
+        deck_id,
+        card["id"],
+        direction,
+        quantity,
+        collection_id,
+        categories,
+        data.added_by,
+        data.ai_reasoning,
+    )
+    return row["id"]
+
+
+async def _ensure_plan(
+    conn: asyncpg.Connection, deck: asyncpg.Record, data: PlannedDeckChangeCreate
+) -> PlannedChangeBatchItem:
+    card = await _card_by_scryfall(conn, data.card_scryfall_id)
+    await _validate_main_deck_card(conn, deck, card, data.direction)
+    existing = await conn.fetchrow(
+        "SELECT direction, quantity FROM deck_card_plans WHERE deck_id = $1 AND card_id = $2",
+        deck["id"],
+        card["id"],
+    )
+    quantity = int(existing["quantity"]) if existing else 0
+    if existing and existing["direction"] != data.direction:
+        raise InvalidPlanError(
+            "An opposite-direction change is already planned; resolve it in Planned changes first"
         )
-        direction, quantity = _net_plan(
-            existing["direction"] if existing else None,
-            int(existing["quantity"]) if existing else 0,
-            data.direction,
-            data.quantity,
+    if quantity >= data.quantity:
+        return PlannedChangeBatchItem(
+            card_scryfall_id=data.card_scryfall_id,
+            status="unchanged",
+            message=f"Already planned: {quantity} pending {data.direction} copies",
+            pending_quantity=quantity,
         )
-        if direction == "addition":
-            limit = card_identity_service.commander_copy_limit(
-                card["type_line"], card["oracle_text"]
+    plan_id = await _save_plan(
+        conn,
+        deck,
+        card,
+        data.model_copy(
+            update={
+                "quantity": data.quantity - quantity,
+                "categories": [] if existing else data.categories,
+            }
+        ),
+    )
+    saved_quantity = await conn.fetchval(
+        "SELECT quantity FROM deck_card_plans WHERE id = $1", plan_id
+    )
+    if saved_quantity is None or int(saved_quantity) < data.quantity:
+        raise InvalidPlanError(
+            f"Cannot plan {data.quantity} {card['name']} copies; check the Commander copy limit"
+        )
+    return PlannedChangeBatchItem(
+        card_scryfall_id=data.card_scryfall_id,
+        status="planned",
+        message=f"Pending {data.direction} set to {int(saved_quantity)} copies",
+        pending_quantity=int(saved_quantity),
+    )
+
+
+async def ensure_plans(
+    pool: asyncpg.Pool, deck_id: UUID, changes: list[PlannedDeckChangeCreate], email: str
+) -> PlannedChangesBatchResult:
+    """Ensure pending quantities per card, preserving conflicts and collecting failures.
+
+    Args:
+        pool: Application database pool.
+        deck_id: Owned target deck; physical cards and inventory are never changed.
+        changes: Minimum pending quantities, not increments. Safe to retry.
+        email: Authenticated target owner's email.
+
+    Returns:
+        One planned, unchanged or failed result per input, in input order.
+
+    Raises:
+        PlanNotFoundError: The target deck is missing or belongs to another account.
+    """
+    async with pool.acquire() as conn:
+        await _owned_deck(conn, deck_id, email)
+    items: list[PlannedChangeBatchItem] = []
+    for change in changes:
+        try:
+            async with pool.acquire() as conn, conn.transaction():
+                deck = await _owned_deck(conn, deck_id, email, lock=True)
+                item = await _ensure_plan(conn, deck, change)
+        except PlannedChangeError as exc:
+            item = PlannedChangeBatchItem(
+                card_scryfall_id=change.card_scryfall_id, status="failed", message=str(exc)
             )
-            projected = card_identity_service.clamp_quantity(physical_quantity + quantity, limit)
-            quantity = projected - physical_quantity
-        if direction == "cut" and quantity > physical_quantity:
-            raise InvalidPlanError("Planned cut exceeds the physical deck quantity")
-        if direction is None or quantity == 0:
-            if existing:
-                await conn.execute("DELETE FROM deck_card_plans WHERE id = $1", existing["id"])
-            return None
-        categories = list(data.categories) if direction == "addition" else []
-        collection_id = (
-            existing["collection_id"] if existing and direction == data.direction else None
-        )
-        row = await conn.fetchrow(
-            """
-            INSERT INTO deck_card_plans (
-                deck_id, card_id, direction, quantity, collection_id,
-                categories, added_by, ai_reasoning
-            ) VALUES ($1, $2, $3, $4, $5, $6::text[], $7, $8)
-            ON CONFLICT (deck_id, card_id) DO UPDATE SET
-                direction = EXCLUDED.direction,
-                quantity = EXCLUDED.quantity,
-                collection_id = EXCLUDED.collection_id,
-                categories = CASE
-                    WHEN cardinality(EXCLUDED.categories) > 0 THEN EXCLUDED.categories
-                    ELSE deck_card_plans.categories
-                END,
-                added_by = EXCLUDED.added_by,
-                ai_reasoning = COALESCE(EXCLUDED.ai_reasoning, deck_card_plans.ai_reasoning),
-                updated_at = now()
-            RETURNING id
-            """,
-            deck_id,
-            card["id"],
-            direction,
-            quantity,
-            collection_id,
-            categories,
-            data.added_by,
-            data.ai_reasoning,
-        )
-    return await get_plan(pool, deck_id, row["id"], email, account_id)
+        except Exception:
+            _log.exception("Planning failed for deck %s card %s", deck_id, change.card_scryfall_id)
+            item = PlannedChangeBatchItem(
+                card_scryfall_id=change.card_scryfall_id,
+                status="failed",
+                message="Could not save this planned change; retry this card",
+            )
+        items.append(item)
+    return PlannedChangesBatchResult(items=items)
 
 
 def _row_to_plan(row: asyncpg.Record) -> PlannedDeckChange:

@@ -138,6 +138,25 @@ class PlannedDeckChangeUpdate(BaseModel):
     collection_id: UUID | None = None
 
 
+class PlannedChangesBatchCreate(BaseModel):
+    """Ensure minimum pending quantities without duplicating existing matching plans."""
+
+    changes: list[PlannedDeckChangeCreate] = Field(min_length=1, max_length=200)
+
+
+class PlannedChangeBatchItem(BaseModel):
+    """Explicit outcome for one requested card, including partial batch failures."""
+
+    card_scryfall_id: UUID
+    status: Literal["planned", "unchanged", "failed"]
+    message: str
+    pending_quantity: int | None = None
+
+
+class PlannedChangesBatchResult(BaseModel):
+    items: list[PlannedChangeBatchItem]
+
+
 class PlannedDeckChangeComplete(BaseModel):
     """Complete one or more copies of a pending change."""
 
