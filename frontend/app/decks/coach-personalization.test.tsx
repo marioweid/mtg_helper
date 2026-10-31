@@ -129,6 +129,7 @@ function response(data: unknown) {
 }
 
 async function flush() {
+  await vi.dynamicImportSettled();
   for (let index = 0; index < 5; index += 1) {
     for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
     await new Promise<void>((resolve) => setImmediate(resolve));

@@ -1,10 +1,13 @@
 import { signIn } from "@/auth";
+import { localIdentityEnabled } from "@/lib/local-identity";
+import { redirect } from "next/navigation";
 
 export default function SignInPage({
   searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
+  if (localIdentityEnabled()) redirect("/decks");
   return (
     <div className="relative mx-auto flex max-w-md flex-col items-center gap-6 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-10 py-16 text-center shadow-2xl">
       <div

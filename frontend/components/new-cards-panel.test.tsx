@@ -81,6 +81,7 @@ function render() {
 }
 
 async function flush() {
+  await vi.dynamicImportSettled();
   for (let index = 0; index < 50; index += 1) await Promise.resolve();
 }
 

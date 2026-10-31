@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { getAdminEmail } from "@/lib/admin";
+import { localIdentityEnabled } from "@/lib/local-identity";
 
 export async function Nav() {
   const adminEmail = await getAdminEmail();
@@ -43,20 +44,26 @@ export async function Nav() {
             Admin
           </Link>
         ) : null}
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/signin" });
-          }}
-          className="ml-auto flex-shrink-0"
-        >
-          <button
-            type="submit"
-            className="text-sm text-gray-400 hover:text-white transition-colors"
+        {localIdentityEnabled() ? (
+          <span className="ml-auto flex-shrink-0 rounded-full bg-indigo-400/10 px-3 py-1 text-xs text-indigo-200">
+            Local development
+          </span>
+        ) : (
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/signin" });
+            }}
+            className="ml-auto flex-shrink-0"
           >
-            Sign out
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Sign out
+            </button>
+          </form>
+        )}
       </div>
     </nav>
   );

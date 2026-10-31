@@ -11,6 +11,8 @@ from uuid import UUID
 # Set required env vars before importing any app module that reads config at import time.
 os.environ.setdefault("DATABASE_URL", "postgresql://mtg:mtg_dev@localhost:5432/mtg_helper")
 os.environ.setdefault("OPENAI_API_KEY", "test")
+# Running-app local identity must never replace explicit test identities or OAuth checks.
+os.environ["LOCAL_DEV_AUTH"] = "false"
 # Never send test traffic to a developer's configured Assay instance.
 os.environ.update(ASSAY_ENDPOINT="", ASSAY_API_KEY="", ASSAY_APPLICATION="")
 

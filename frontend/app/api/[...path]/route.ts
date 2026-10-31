@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getBackendHeaders } from "@/lib/app-identity";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -26,8 +26,8 @@ async function forward(
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const session = await auth();
-  if (!session || session.error === "RefreshFailed" || !session.idToken) {
+  const identity = await getBackendHeaders();
+  if (!identity) {
     return NextResponse.json(
       { error: { code: "UNAUTHENTICATED", message: "sign in required" } },
       { status: 401 },
@@ -37,9 +37,11 @@ async function forward(
   const url = `${BACKEND}/api/${path.join("/")}${req.nextUrl.search}`;
   const headers = new Headers();
   for (const [key, value] of req.headers.entries()) {
-    if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
+    if (!HOP_BY_HOP.has(key.toLowerCase()) && key.toLowerCase() !== "authorization") {
+      headers.set(key, value);
+    }
   }
-  if (session.idToken) headers.set("authorization", `Bearer ${session.idToken}`);
+  identity.forEach((value, key) => headers.set(key, value));
 
   const init: RequestInit & { duplex?: "half" } = {
     method: req.method,

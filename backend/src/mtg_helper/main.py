@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from mtg_helper.auth import get_current_account, require_admin_or_internal
+from mtg_helper.auth import get_current_account, require_admin_or_internal, validate_local_account
 from mtg_helper.config import settings
 from mtg_helper.db import apply_schema, close_pool, create_pool
 from mtg_helper.observability import configure_assay, shutdown_assay
@@ -57,6 +57,7 @@ async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.optimizer_jobs = {}
     app.state.coach_jobs = {}
     try:
+        await validate_local_account(app.state.db_pool)
         if settings.run_startup_maintenance:
             await _run_startup_maintenance(app)
         else:

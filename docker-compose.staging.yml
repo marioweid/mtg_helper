@@ -34,6 +34,8 @@ services:
       - "127.0.0.1:8001:8000"
     environment:
       DATABASE_URL: ${STAGING_DATABASE_URL:?Generate the staging runtime env first}
+      APP_ENV: staging
+      LOCAL_DEV_AUTH: "false"
       OPENAI_API_KEY: staging-disabled-no-provider-key
       GOOGLE_OAUTH_CLIENT_ID: ${AUTH_GOOGLE_ID:?Local Google OAuth credentials are required}
       ADMIN_EMAILS: ${ADMIN_EMAILS:?Use the same admin allowlist as the frontend}
@@ -54,6 +56,8 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       BACKEND_ORIGIN: http://backend:8000
+      APP_ENV: staging
+      LOCAL_DEV_AUTH: "false"
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:?Local Google OAuth credentials are required}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:?Local Google OAuth credentials are required}
       AUTH_SECRET: ${STAGING_AUTH_SECRET:?Generate the staging runtime env first}

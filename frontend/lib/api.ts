@@ -99,9 +99,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   // Server-side (RSC) calls bypass the Next proxy and hit BACKEND_ORIGIN
   // directly, so they must inject the bearer token themselves.
   if (typeof window === "undefined" && !headers["authorization"]) {
-    const { auth } = await import("@/auth");
-    const session = await auth();
-    if (session?.idToken) headers["authorization"] = `Bearer ${session.idToken}`;
+    const { getBackendHeaders } = await import("@/lib/app-identity");
+    const identity = await getBackendHeaders();
+    if (!identity) throw new ApiError("UNAUTHENTICATED", "Sign in required");
+    identity.forEach((value, key) => {
+      headers[key] = value;
+    });
   }
   const res = await fetch(`${CLIENT_BASE}${path}`, {
     ...options,

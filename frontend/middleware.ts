@@ -1,12 +1,14 @@
 import { auth } from "@/auth";
+import { localIdentityEnabled } from "@/lib/local-identity";
 import { NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
-export default auth((req) => {
+const googleMiddleware = auth((req, _event: NextFetchEvent) => {
   const { pathname } = req.nextUrl;
-  const isAuthRoute = pathname.startsWith("/api/auth");
+  const isApiRoute = pathname.startsWith("/api/");
   const isSignInPage = pathname === "/signin";
 
-  if (isAuthRoute || isSignInPage) {
+  if (isApiRoute || isSignInPage) {
     return NextResponse.next();
   }
 
@@ -19,6 +21,11 @@ export default auth((req) => {
 
   return NextResponse.next();
 });
+
+export default function middleware(request: NextRequest, event: NextFetchEvent) {
+  if (localIdentityEnabled()) return NextResponse.next();
+  return googleMiddleware(request, event);
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
