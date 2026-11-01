@@ -23,6 +23,12 @@ def _prompt(guide_input: TeachingInput, perspective: str) -> str:
         f"{fact.quantity} {fact.name}: {fact.oracle_text or 'rules text unavailable'}"
         for fact in guide_input.evidence.commanders + guide_input.evidence.cards
     )
+    rules = "\n".join(f"{rule.identifier}: {rule.text}" for rule in guide_input.evidence.rules)
+    combos = "\n".join(
+        f"{combo.identifier}: {' + '.join(combo.pieces)} → "
+        f"{', '.join(combo.produces) or 'no outlet'}"
+        for combo in guide_input.evidence.combos
+    )
     return "\n".join(
         [
             f"You are a {perspective} Magic: The Gathering deck teacher.",
@@ -39,6 +45,12 @@ def _prompt(guide_input: TeachingInput, perspective: str) -> str:
             f"Saved description: {guide_input.description or 'none'}; "
             f"bracket: {guide_input.bracket!s}.",
             "Warnings: " + "; ".join(guide_input.evidence.warnings or ["none"]),
+            "Source status: "
+            + "; ".join(
+                f"{kind}={status}" for kind, status in guide_input.evidence.sources.items()
+            ),
+            "Pinned rules: " + (rules or "unavailable"),
+            "Captured combo lines: " + (combos or "none verified"),
             "Frozen card facts:",
             cards,
         ]

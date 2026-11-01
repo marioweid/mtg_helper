@@ -32,11 +32,29 @@ class TutorCardFact(BaseModel):
     oracle_text: str | None
 
 
+class TutorRuleFact(BaseModel):
+    """One exact, pinned Comprehensive Rules excerpt available to a guide."""
+
+    identifier: str
+    text: str
+
+
+class TutorComboFact(BaseModel):
+    """A source-reported current line with its required pieces and outlet."""
+
+    identifier: str
+    pieces: list[str]
+    produces: list[str]
+    description: str | None = None
+
+
 class TutorEvidence(BaseModel):
     """Frozen exact facts and explicit source gaps for one guide run."""
 
     commanders: list[TutorCardFact]
     cards: list[TutorCardFact]
+    rules: list[TutorRuleFact] = Field(default_factory=list)
+    combos: list[TutorComboFact] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     sources: dict[str, str | None] = Field(default_factory=dict)
 

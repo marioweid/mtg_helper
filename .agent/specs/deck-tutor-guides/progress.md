@@ -27,4 +27,21 @@
   after 96 passes; see `build-notes.md`.
 - Pending work: live-model fixture quality and local-browser acceptance, plus the unrelated full-suite
   buylist/backlog failures. No Tutor reference/chat/practice scope was added.
-- Next action: hand off the committed round for evaluation; evaluator should independently run slice checks.
+- Round 2 feedback read: `eval-1.md` is the sole feedback. It found startup schema ordering,
+  canonical printing aggregation, exact evidence/provenance, and mode publication freshness failures.
+  Tutor HTTP is the pre-agreed test seam for this repair round; begin with a failing Docker test for
+  printing-only composition identity, then implement only the reported follow-ups.
+- Next action: add and run the focused red Tutor HTTP/lifespan checks in Docker, then make the
+  smallest schema, capture, and publication fixes before re-running affected Compose checks.
+- Completed round 2 implementation/test phase: wrote the red Tutor HTTP printing-split freshness
+  test (failed with `current: false`), then made it green. Added a blocked-generation Tutor HTTP
+  test proving a saved mode change publishes the old run as `superseded`; focused suite is 5 passed.
+  Normal existing-volume Compose startup now applies schema before run recovery and `/health` returned
+  `{"status":"ok"`.
+- Evidence: affected Tutor/deck/identity/snapshot/retrieval Docker suite is 41 passed; backend
+  ruff/format/type and all five frontend Docker commands are green. The source evidence now stores
+  exact local card facts, a pinned rules identifier/excerpt, active combo dependencies/outlets or a
+  distinct timeout/unavailable/zero-results state. Reads and publication freshness skip source I/O.
+- Pending handoff checks: evaluator should rerun browser/live-model fixture quality and its full
+  source/persistence probes. No live model generation was made and `GLOSSARY.md` remains untouched.
+- Next action: write round-2 notes and commit the focused recovery fixes for independent evaluation.

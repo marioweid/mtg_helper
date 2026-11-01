@@ -79,7 +79,7 @@ class TutorRepository:
                 deck_id,
                 owner.account_id,
             )
-            manifest, guide_evidence = await evidence.capture(conn, deck)
+            manifest, guide_evidence = await evidence.capture(conn, deck, self.pool, owner.email)
             mode = setup["mode"]
             current_hash = evidence.teaching_hash(manifest, mode)
             if active is not None and active["teaching_hash"] == current_hash:
@@ -123,8 +123,16 @@ class TutorRepository:
         """Publish only if owner, deck, and captured teaching inputs still match."""
         async with self.pool.acquire() as conn, conn.transaction():
             deck = await owned_deck(conn, work.owner, work.deck_id, lock=True)
-            manifest, _ = await evidence.capture(conn, deck)
-            current = evidence.teaching_hash(manifest, work.mode)
+            manifest, _ = await evidence.capture(
+                conn, deck, self.pool, work.owner.email, include_sources=False
+            )
+            setup = await conn.fetchrow(
+                "SELECT mode FROM tutor_setups WHERE deck_id=$1 AND account_id=$2",
+                work.deck_id,
+                work.owner.account_id,
+            )
+            current_mode = setup["mode"] if setup is not None else None
+            current = evidence.teaching_hash(manifest, current_mode) if current_mode else ""
             expected = evidence.teaching_hash(work.manifest, work.mode)
             status = "succeeded" if current == expected else "superseded"
             await conn.execute(
@@ -167,7 +175,9 @@ class TutorRepository:
                 deck_id,
                 owner.account_id,
             )
-            manifest, _ = await evidence.capture(conn, deck)
+            manifest, _ = await evidence.capture(
+                conn, deck, self.pool, owner.email, include_sources=False
+            )
             current_hashes = {
                 mode: evidence.teaching_hash(manifest, mode) for mode in ("commander", "cedh")
             }
