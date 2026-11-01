@@ -28,6 +28,7 @@ from mtg_helper.routers import (
     revisions,
     snapshots,
     tags,
+    tutor,
 )
 from mtg_helper.services import (
     oracle_duplicate_repair_service,
@@ -36,6 +37,7 @@ from mtg_helper.services import (
 from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.new_cards.repository import NewCardsError
 from mtg_helper.services.recommendations.repository import DiscoveryError
+from mtg_helper.services.tutor.repository import interrupt_running
 
 _log = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage startup and shutdown of shared resources."""
     app.state.db_pool = await create_pool(settings.database_url)
+    await interrupt_running(app.state.db_pool)
     app.state.admin_jobs = JobRegistry()
     app.state.optimizer_jobs = {}
     app.state.coach_jobs = {}
@@ -135,6 +138,7 @@ app.include_router(card_exports.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(revisions.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(tutor.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(new_cards.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(recommendations.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)

@@ -68,6 +68,8 @@ import type {
   SwapResponse,
   TopPicksResponse,
   TopPickSource,
+  TutorMode,
+  TutorStateResponse,
 } from "@/lib/types";
 
 import type {
@@ -242,6 +244,20 @@ export const apiClient = {
     }),
 
   getDeck: (id: string) => request<DeckDetailResponse>(`/decks/${id}`),
+
+  getTutor: (deckId: string) => request<TutorStateResponse>(`/decks/${deckId}/tutor`),
+
+  saveTutorSetup: (deckId: string, body: { mode: TutorMode }) =>
+    request<TutorStateResponse>(`/decks/${deckId}/tutor/setup`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  generateTutorGuide: (deckId: string, body: { request_key: string }) =>
+    request<TutorStateResponse>(`/decks/${deckId}/tutor/guides`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   getTopPicks: (deckId: string, source: TopPickSource = "combined") =>
     request<TopPicksResponse>(`/decks/${deckId}/top-picks?source=${source}`),

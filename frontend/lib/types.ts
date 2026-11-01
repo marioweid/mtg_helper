@@ -232,6 +232,47 @@ export interface DeckCardResponse {
   added_by: string;
 }
 
+export type TutorMode = "commander" | "cedh";
+export type TutorRunStatus = "running" | "succeeded" | "failed" | "interrupted" | "superseded";
+
+export interface TutorCardFact {
+  oracle_id: string | null;
+  name: string;
+  quantity: number;
+  type_line: string | null;
+  oracle_text: string | null;
+}
+
+export interface TutorEvidence {
+  commanders: TutorCardFact[];
+  cards: TutorCardFact[];
+  warnings: string[];
+  sources: Record<string, string | null>;
+}
+
+export interface TutorGuideDraft {
+  title: string;
+  content: string;
+}
+
+export interface TutorRunResponse {
+  id: string;
+  status: TutorRunStatus;
+  mode: TutorMode;
+  current: boolean;
+  guide: TutorGuideDraft | null;
+  evidence: TutorEvidence | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface TutorStateResponse {
+  mode: TutorMode | null;
+  latest_run: TutorRunResponse | null;
+  last_successful_run: TutorRunResponse | null;
+}
+
 // AI
 export interface CollectionMembership {
   id: string;

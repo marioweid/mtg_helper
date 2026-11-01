@@ -546,6 +546,42 @@ SELECT
 FROM deck_cards dc
 JOIN cards c ON dc.card_id = c.id;
 
+-- ============================================================
+-- DECK TUTOR (manual saved learning guides)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tutor_setups (
+    deck_id UUID PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    mode TEXT NOT NULL CHECK (mode IN ('commander', 'cedh')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tutor_setups_account ON tutor_setups (account_id);
+
+CREATE TABLE IF NOT EXISTS tutor_runs (
+    id UUID PRIMARY KEY,
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    request_key UUID NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('commander', 'cedh')),
+    composition_hash TEXT NOT NULL,
+    teaching_hash TEXT NOT NULL,
+    manifest JSONB NOT NULL,
+    evidence JSONB NOT NULL,
+    guide JSONB,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'succeeded', 'failed', 'interrupted', 'superseded')),
+    token UUID NOT NULL,
+    lease_until TIMESTAMPTZ NOT NULL DEFAULT now() + interval '10 minutes',
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    UNIQUE (account_id, request_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS tutor_one_active_run
+    ON tutor_runs (deck_id, account_id) WHERE status = 'running';
+CREATE INDEX IF NOT EXISTS idx_tutor_runs_deck ON tutor_runs (deck_id, account_id, created_at DESC);
+
 -- Experimental released-card discovery; additive and safe on existing databases.
 ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;
 
