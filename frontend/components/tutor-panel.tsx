@@ -26,12 +26,15 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<TutorStateResponse | null> => {
     try {
-      setState(await apiClient.getTutor(deckId));
+      const next = await apiClient.getTutor(deckId);
+      setState(next);
       setError(null);
+      return next;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Tutor could not load");
+      return null;
     }
   }, [deckId]);
 
@@ -41,8 +44,17 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
 
   useEffect(() => {
     if (state?.latest_run?.status !== "running") return;
-    const timer = window.setTimeout(() => void load(), 1500);
-    return () => window.clearTimeout(timer);
+    let active = true;
+    let timer = window.setTimeout(poll, 1500);
+
+    async function poll() {
+      const next = await load();
+      if (active && next?.latest_run?.status === "running") timer = window.setTimeout(poll, 1500);
+    }
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [load, state?.latest_run?.status]);
 
   async function saveMode(mode: TutorMode) {
@@ -156,6 +168,7 @@ export function TutorPanelView({ state, busy, error, onMode, onGenerate }: Tutor
         <Guide
           title={guide.title}
           content={guide.content}
+          openingHands={guide.opening_hands}
           warnings={run?.evidence?.warnings ?? []}
         />
       )}
@@ -192,10 +205,12 @@ function ModeOption({
 function Guide({
   title,
   content,
+  openingHands,
   warnings,
 }: {
   title: string;
   content: string;
+  openingHands: { decision: string; cards: string[]; explanation: string }[];
   warnings: string[];
 }) {
   return (
@@ -208,6 +223,17 @@ function Guide({
       ))}
       <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-gray-200">
         {content}
+      </div>
+      <div className="mt-5 space-y-3" aria-label="Worked opening hands">
+        {openingHands.map((hand) => (
+          <section key={hand.decision} className="rounded-xl border border-white/10 p-4">
+            <h4 className="font-semibold capitalize text-white">{hand.decision}</h4>
+            <p className="mt-1 break-words text-sm leading-6 text-gray-200">
+              {hand.cards.join(", ")}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-gray-400">{hand.explanation}</p>
+          </section>
+        ))}
       </div>
     </article>
   );

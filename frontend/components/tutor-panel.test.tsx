@@ -12,7 +12,11 @@ const saved: TutorStateResponse = {
     status: "succeeded",
     mode: "commander",
     current: false,
-    guide: { title: "Saved guide", content: "Keep interaction available before committing." },
+    guide: {
+      title: "Saved guide",
+      content: "Keep interaction available before committing.",
+      opening_hands: [],
+    },
     evidence: { commanders: [], cards: [], warnings: ["Rules snapshot unavailable."], sources: {} },
     error: null,
     created_at: "2026-11-01T00:00:00Z",

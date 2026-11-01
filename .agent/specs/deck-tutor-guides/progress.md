@@ -45,3 +45,22 @@
 - Pending handoff checks: evaluator should rerun browser/live-model fixture quality and its full
   source/persistence probes. No live model generation was made and `GLOSSARY.md` remains untouched.
 - Next action: write round-2 notes and commit the focused recovery fixes for independent evaluation.
+- Round 3 feedback read: `eval-2.md` is the sole repair scope. Preserve the pre-existing
+  `GLOSSARY.md` edit. The authenticated Tutor HTTP, teaching, and rendered Tutor-view seams cover
+  the reported faults: malformed/partial evidence, command-zone-aware teaching input, durable
+  lifecycle/persistence matrices, and repeated running-state polling.
+- Current phase: write focused red checks for the reported seams, then implement only the smallest
+  fixes. Pending final Docker-only affected suites and the Verify gate.
+- Completed round 3 implementation/test phase: the red command-zone opening-hand HTTP test now
+  passes. Teacher output carries three typed, rendered, quantity-validated mainboard examples;
+  command-zone facts are separate. Combo malformed coverage is distinct from zero results, partial
+  rules/combo sources create visible warnings, and relevant pinned rule excerpts are retained.
+  Commander and cEDH adapters now supply distinct teaching focus. Tutor polling continues across
+  repeated running responses and stops on completion/unmount.
+- Evidence: added real HTTP/SQL `evidence`, `runs`, and `persistence` selector coverage plus the
+  requested shared fixture module. Docker affected backend gate is green: 45 passed, Ruff clean,
+  257 files formatted, and ty clean. Docker frontend gate completed earlier this round: 31 files /
+  127 tests passed, typecheck/lint/format/build green. Two broad backend-suite attempts exceeded
+  tooling timeouts; their orphaned one-off containers were stopped before the final isolated gate.
+- Next action: round 3 build notes and local commit only. No live generation or browser quality
+  rerun was made, and the pre-existing `GLOSSARY.md` edit remains untouched.

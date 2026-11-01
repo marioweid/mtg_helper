@@ -59,11 +59,20 @@ class TutorEvidence(BaseModel):
     sources: dict[str, str | None] = Field(default_factory=dict)
 
 
+class TutorOpeningHand(BaseModel):
+    """One verified seven-card example drawn from the saved mainboard."""
+
+    decision: Literal["keep", "mulligan", "context-dependent"]
+    cards: list[str] = Field(min_length=7, max_length=7)
+    explanation: str = Field(min_length=1, max_length=1200)
+
+
 class TutorGuideDraft(BaseModel):
     """The teacher's bounded, readable guide output."""
 
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1, max_length=24000)
+    opening_hands: list[TutorOpeningHand] = Field(default_factory=list, max_length=3)
 
 
 class TutorRunResponse(BaseModel):

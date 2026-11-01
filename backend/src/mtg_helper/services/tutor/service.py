@@ -10,7 +10,7 @@ from mtg_helper.models.tutor import TutorMode, TutorStateResponse
 from mtg_helper.services.recommendations.repository import Owner
 from mtg_helper.services.tutor import cedh, commander
 from mtg_helper.services.tutor.repository import TutorRepository, TutorWork
-from mtg_helper.services.tutor.teaching import TeachingInput
+from mtg_helper.services.tutor.teaching import TeachingInput, validate_opening_hands
 
 _log = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ class TutorService:
                 if work.mode == "commander"
                 else cedh.generate(teacher_input)
             )
+            validate_opening_hands(guide, work.guide_evidence)
             await self.repository.publish(work, guide)
         except Exception:
             _log.exception("Tutor guide generation failed")

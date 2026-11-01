@@ -31,6 +31,10 @@ class ComboFetchError(RuntimeError):
     """Raised when the Commander Spellbook API fails or returns garbage."""
 
 
+class ComboResponseError(ComboFetchError):
+    """Raised when Commander Spellbook returns an unusable result shape."""
+
+
 async def fetch_combos(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
@@ -52,10 +56,7 @@ async def fetch_combos(
     commander_names = await _commander_names(pool, deck)
     body = _build_request_body(commander_names, deck)
     payload = await _call_spellbook(body, client=client)
-    raw_results = (payload.get("results") or {}) if isinstance(payload, dict) else {}
-
-    raw_active: list[dict[str, Any]] = list(raw_results.get("included") or [])
-    raw_almost: list[dict[str, Any]] = list(raw_results.get("almostIncluded") or [])
+    raw_active, raw_almost = _result_lists(payload)
 
     deck_names = _deck_card_names(deck, commander_names)
     referenced_names = _collect_referenced_names(raw_active + raw_almost)
@@ -69,6 +70,20 @@ async def fetch_combos(
             almost.append(translated)
 
     return ComboListResponse(active=active, almost_there=almost)
+
+
+def _result_lists(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate result coverage before an empty result can be trusted as absence."""
+    results = payload.get("results")
+    if not isinstance(results, dict):
+        raise ComboResponseError("Commander Spellbook response is missing results")
+    included = results.get("included")
+    almost_included = results.get("almostIncluded")
+    if not isinstance(included, list) or not isinstance(almost_included, list):
+        raise ComboResponseError("Commander Spellbook response has invalid result lists")
+    if not all(isinstance(combo, dict) for combo in included + almost_included):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    return included, almost_included
 
 
 async def _commander_names(pool: asyncpg.Pool, deck: DeckDetailResponse) -> list[str]:

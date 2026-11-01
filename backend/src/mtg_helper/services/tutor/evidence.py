@@ -9,7 +9,7 @@ import asyncpg
 
 from mtg_helper.models.tutor import TutorCardFact, TutorComboFact, TutorEvidence, TutorRuleFact
 from mtg_helper.services import combo_service, deck_service
-from mtg_helper.services.combo_service import ComboFetchError
+from mtg_helper.services.combo_service import ComboFetchError, ComboResponseError
 from mtg_helper.services.recommendations import source_repository
 from mtg_helper.services.recommendations.snapshots import unpack
 
@@ -73,7 +73,7 @@ async def capture(
         if include_sources
         else ([], "not refreshed")
     )
-    warnings = _warnings(commanders, cards, combo_status)
+    warnings = _warnings(commanders, cards, rules_status, combo_status)
     evidence = TutorEvidence(
         commanders=commanders,
         cards=cards,
@@ -100,14 +100,20 @@ def _fact(row: asyncpg.Record, quantity: int) -> TutorCardFact:
 
 
 def _rules_evidence() -> tuple[list[TutorRuleFact], str]:
-    """Return one stable official rule excerpt and its immutable source identity."""
+    """Return relevant stable official rule excerpts and immutable source identity."""
     try:
         blob, digest = source_repository.rules_resource()
         rules = unpack(blob, digest)
-        text = rules["103.4c"]["text"]
-        return [TutorRuleFact(identifier="103.4c", text=text)], f"pinned-rules:{digest}"
-    except (KeyError, OSError, ValueError) as exc:
+        identifiers = ("103.4c", "122.1", "603.10a", "608.2h", "903.3")
+        facts = [
+            TutorRuleFact(identifier=identifier, text=rules[identifier]["text"])
+            for identifier in identifiers
+        ]
+        return facts, f"pinned-rules:{digest}"
+    except OSError as exc:
         return [], f"unavailable: rules resource {type(exc).__name__}"
+    except (KeyError, TypeError, ValueError) as exc:
+        return [], f"malformed: rules resource {type(exc).__name__}"
 
 
 async def _combo_evidence(
@@ -122,8 +128,12 @@ async def _combo_evidence(
             response = await combo_service.fetch_combos(pool, detail)
     except TimeoutError:
         return [], "timeout: Commander Spellbook"
+    except ComboResponseError:
+        return [], "malformed: Commander Spellbook response"
     except ComboFetchError as exc:
         return [], f"unavailable: Commander Spellbook {exc}"
+    if not hasattr(response, "active"):
+        return [], "malformed: Commander Spellbook response"
     combos = [
         TutorComboFact(
             identifier=combo.id,
@@ -141,7 +151,10 @@ async def _combo_evidence(
 
 
 def _warnings(
-    commanders: list[TutorCardFact], cards: list[TutorCardFact], combo_status: str
+    commanders: list[TutorCardFact],
+    cards: list[TutorCardFact],
+    rules_status: str,
+    combo_status: str,
 ) -> list[str]:
     warnings: list[str] = []
     if any(card.oracle_text is None for card in commanders + cards):
@@ -151,6 +164,8 @@ def _warnings(
         warnings.append(
             f"This saved list has {total} cards including commanders; it may be incomplete."
         )
-    if combo_status.startswith(("timeout:", "unavailable:")):
+    if rules_status.startswith(("timeout:", "unavailable:", "malformed:")):
+        warnings.append("Rules coverage is unavailable; rule-dependent claims are unverified.")
+    if combo_status.startswith(("timeout:", "unavailable:", "malformed:")):
         warnings.append("Combo coverage is unavailable; no missing line is treated as absent.")
     return warnings

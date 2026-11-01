@@ -253,6 +253,13 @@ export interface TutorEvidence {
 export interface TutorGuideDraft {
   title: string;
   content: string;
+  opening_hands: TutorOpeningHand[];
+}
+
+export interface TutorOpeningHand {
+  decision: "keep" | "mulligan" | "context-dependent";
+  cards: string[];
+  explanation: string;
 }
 
 export interface TutorRunResponse {
