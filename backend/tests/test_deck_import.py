@@ -1,9 +1,10 @@
 """Tests for deck import: parser unit tests and endpoint integration tests."""
 
+import json
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import asyncpg
 import pytest
@@ -14,6 +15,7 @@ from mtg_helper.services.import_service import ParsedCard, import_parsed_entries
 from tests.conftest import (
     create_test_account,
 )
+from tests.tutor_fixtures import BLUE_FARM_FLAVOR_ALIASES
 
 # ── parse_deck_list unit tests ────────────────────────────────────────────────
 
@@ -259,6 +261,56 @@ async def test_import_color_violation_reported(client: AsyncClient) -> None:
     data = resp.json()["data"]
     assert "Rhystic Study" in data["color_violations"]
     assert data["imported_count"] == 1  # Sol Ring added; Rhystic Study skipped
+
+
+async def test_import_resolves_exact_blue_farm_flavor_printings(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    """Exact aliases resolve before fuzzy matching can select unrelated cards."""
+    await _insert_import_card(db_pool, "Kraum, Ludevic's Opus", ["W", "U", "B", "R"])
+    await _insert_import_card(db_pool, "Tymna the Weaver", ["W", "B"])
+    for alias, canonical in BLUE_FARM_FLAVOR_ALIASES:
+        oracle_id = await _insert_import_card(db_pool, canonical, [])
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO card_aliases (alias, oracle_id, generation) VALUES ($1, $2, $3)",
+                alias,
+                oracle_id,
+                uuid4(),
+            )
+
+    deck_list = "\n".join(
+        [
+            "1 Kraum, Ludevic's Opus *CMDR*",
+            "1 Tymna the Weaver *CMDR*",
+            *(f"1 {alias}" for alias, _ in BLUE_FARM_FLAVOR_ALIASES),
+        ]
+    )
+    response = await client.post(
+        "/api/v1/decks/import", json={"deck_list": deck_list, "name": "Blue"}
+    )
+
+    assert response.status_code == 201, response.text
+    data = response.json()["data"]
+    assert data["imported_count"] == len(BLUE_FARM_FLAVOR_ALIASES)
+    assert data["unresolved"] == []
+    assert data["color_violations"] == []
+
+
+async def _insert_import_card(pool: asyncpg.Pool, name: str, colors: list[str]) -> UUID:
+    """Seed a canonical legal card for one import-resolution scenario."""
+    oracle_id = uuid4()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, type_line, "
+            "legalities, is_canonical) VALUES ($1, $2, $3, $4, 'Creature', $5::jsonb, true)",
+            uuid4(),
+            oracle_id,
+            name,
+            colors,
+            json.dumps({"commander": "legal"}),
+        )
+    return oracle_id
 
 
 async def test_import_owner_derived_from_auth(client: AsyncClient) -> None:

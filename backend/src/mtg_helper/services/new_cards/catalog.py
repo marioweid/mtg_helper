@@ -120,6 +120,12 @@ async def publish(
             """,
             rows[offset : offset + 500],
         )
+    aliases = _aliases(cards, history, generation)
+    await conn.execute("DELETE FROM card_aliases")
+    if aliases:
+        await conn.executemany(
+            "INSERT INTO card_aliases (alias, oracle_id, generation) VALUES ($1, $2, $3)", aliases
+        )
     # Tombstone discovery only: historical facts and user decisions remain addressable.
     await conn.execute(
         "UPDATE new_card_catalog SET released_at = NULL WHERE generation <> $1", generation
@@ -138,3 +144,21 @@ async def publish(
         len(cards),
         source.digest,
     )
+
+
+def _aliases(
+    cards: list[dict[str, Any]], history: dict[str, ReleaseHistory], generation: object
+) -> list[tuple[str, object, object]]:
+    """Return noncanonical flavor names linked to one current Oracle identity."""
+    names = {card.get("oracle_id"): card.get("name") for card in cards if card.get("oracle_id")}
+    aliases: list[tuple[str, object, object]] = []
+    for oracle_id, entry in history.items():
+        canonical = names.get(oracle_id)
+        if not isinstance(canonical, str):
+            continue
+        aliases.extend(
+            (alias, oracle_id, generation)
+            for alias in sorted(entry.aliases)
+            if alias.casefold() != canonical.casefold()
+        )
+    return aliases

@@ -30,6 +30,15 @@ class TutorCardFact(BaseModel):
     quantity: int = Field(ge=1)
     type_line: str | None
     oracle_text: str | None
+    faces: list["TutorCardFace"] = Field(default_factory=list)
+
+
+class TutorCardFace(BaseModel):
+    """One exact source face, kept separate from flattened card rules text."""
+
+    name: str
+    type_line: str | None = None
+    oracle_text: str | None = None
 
 
 class TutorRuleFact(BaseModel):
@@ -46,6 +55,18 @@ class TutorComboFact(BaseModel):
     pieces: list[str]
     produces: list[str]
     description: str | None = None
+    requirements: list["TutorLineRequirement"] = Field(default_factory=list)
+    resources: list[str] = Field(default_factory=list)
+    resource_status: Literal["supported", "unverified"] = "unverified"
+    outlet: str | None = None
+    outlet_status: Literal["supported", "unverified"] = "unverified"
+
+
+class TutorLineRequirement(BaseModel):
+    """A source-reported line piece and its captured deck location."""
+
+    name: str
+    zone: Literal["command_zone", "mainboard"]
 
 
 class TutorEvidence(BaseModel):

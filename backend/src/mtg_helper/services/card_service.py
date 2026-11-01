@@ -235,6 +235,15 @@ async def resolve_card_by_name(pool: asyncpg.Pool, name: str) -> CardResponse | 
         )
         if row is None:
             row = await conn.fetchrow(
+                f"{_CARD_SELECT} WHERE oracle_id = ("
+                "SELECT (array_agg(DISTINCT oracle_id))[1] FROM card_aliases "
+                "WHERE lower(alias) = lower($1) "
+                "GROUP BY lower(alias) HAVING count(DISTINCT oracle_id) = 1"
+                f"){_legal_filter} LIMIT 1",
+                name,
+            )
+        if row is None:
+            row = await conn.fetchrow(
                 f"{_CARD_SELECT} WHERE similarity(name, $1) > 0.4"
                 f"{_legal_filter}"
                 " ORDER BY similarity(name, $1) DESC LIMIT 1",

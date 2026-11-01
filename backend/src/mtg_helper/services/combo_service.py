@@ -81,9 +81,45 @@ def _result_lists(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], list[d
     almost_included = results.get("almostIncluded")
     if not isinstance(included, list) or not isinstance(almost_included, list):
         raise ComboResponseError("Commander Spellbook response has invalid result lists")
-    if not all(isinstance(combo, dict) for combo in included + almost_included):
-        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    for combo in included + almost_included:
+        _validate_combo_entry(combo)
     return included, almost_included
+
+
+def _validate_combo_entry(combo: object) -> None:
+    """Reject incomplete nested combo data before it can become supporting evidence."""
+    if (
+        not isinstance(combo, dict)
+        or not isinstance(combo.get("id"), str)
+        or not combo["id"].strip()
+    ):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    uses = combo.get("uses")
+    if not isinstance(uses, list) or not uses:
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    if any(not _valid_use(use) for use in uses):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    produces = combo.get("produces", [])
+    if not isinstance(produces, list) or any(not _valid_produces(entry) for entry in produces):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+
+
+def _valid_use(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("card"), dict)
+        and isinstance(value["card"].get("name"), str)
+        and bool(value["card"]["name"].strip())
+    )
+
+
+def _valid_produces(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("feature"), dict)
+        and isinstance(value["feature"].get("name"), str)
+        and bool(value["feature"]["name"].strip())
+    )
 
 
 async def _commander_names(pool: asyncpg.Pool, deck: DeckDetailResponse) -> list[str]:

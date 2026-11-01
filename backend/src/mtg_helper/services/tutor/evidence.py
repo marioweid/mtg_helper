@@ -1,13 +1,21 @@
 """Capture exact saved-list facts without treating missing coverage as absence."""
 
 import asyncio
+import json
 from hashlib import sha256
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import asyncpg
 
-from mtg_helper.models.tutor import TutorCardFact, TutorComboFact, TutorEvidence, TutorRuleFact
+from mtg_helper.models.tutor import (
+    TutorCardFace,
+    TutorCardFact,
+    TutorComboFact,
+    TutorEvidence,
+    TutorLineRequirement,
+    TutorRuleFact,
+)
 from mtg_helper.services import combo_service, deck_service
 from mtg_helper.services.combo_service import ComboFetchError, ComboResponseError
 from mtg_helper.services.recommendations import source_repository
@@ -39,19 +47,21 @@ async def capture(
     """Freeze canonical list identity and exact local card facts for one guide request."""
     ids = [deck["commander_id"]] + ([deck["partner_id"]] if deck["partner_id"] else [])
     commander_rows = await conn.fetch(
-        "SELECT oracle_id, name, type_line, oracle_text FROM cards "
+        "SELECT c.oracle_id, c.name, c.type_line, c.oracle_text, nc.source_facts FROM cards c "
+        "LEFT JOIN new_card_catalog nc ON nc.oracle_id = c.oracle_id "
         "WHERE id = ANY($1::uuid[]) "
-        "ORDER BY COALESCE(oracle_id::text, lower(name)), lower(name)",
+        "ORDER BY COALESCE(c.oracle_id::text, lower(c.name)), lower(c.name)",
         ids,
     )
     card_rows = await conn.fetch(
         """
         SELECT DISTINCT ON (COALESCE(c.oracle_id::text, lower(c.name)))
-            c.oracle_id, c.name, c.type_line, c.oracle_text,
+            c.oracle_id, c.name, c.type_line, c.oracle_text, nc.source_facts,
             SUM(dc.quantity) OVER (
                 PARTITION BY COALESCE(c.oracle_id::text, lower(c.name))
             ) AS quantity
         FROM deck_cards dc JOIN cards c ON c.id = dc.card_id
+        LEFT JOIN new_card_catalog nc ON nc.oracle_id = c.oracle_id
         WHERE dc.deck_id = $1
         ORDER BY COALESCE(c.oracle_id::text, lower(c.name)), c.scryfall_id
         """,
@@ -74,6 +84,12 @@ async def capture(
         else ([], "not refreshed")
     )
     warnings = _warnings(commanders, cards, rules_status, combo_status)
+    card_source = await conn.fetchval("SELECT source_sha256 FROM new_card_catalog_state")
+    card_status = (
+        f"pinned-cards:{card_source}"
+        if isinstance(card_source, str) and len(card_source) == 64
+        else "local-card-catalog"
+    )
     evidence = TutorEvidence(
         commanders=commanders,
         cards=cards,
@@ -81,7 +97,7 @@ async def capture(
         combos=combos,
         warnings=warnings,
         sources={
-            "cards": "local-card-catalog",
+            "cards": card_status,
             "rules": rules_status,
             "combos": combo_status,
         },
@@ -96,7 +112,46 @@ def _fact(row: asyncpg.Record, quantity: int) -> TutorCardFact:
         quantity=quantity,
         type_line=row["type_line"],
         oracle_text=row["oracle_text"],
+        faces=_faces(row["source_facts"]),
     )
+
+
+def _faces(value: object) -> list[TutorCardFace]:
+    """Return source-defined card faces without deriving them from flattened text."""
+    source = _json_object(value)
+    raw_faces = source.get("faces")
+    if not isinstance(raw_faces, list):
+        return []
+    faces: list[TutorCardFace] = []
+    for face in raw_faces:
+        if isinstance(face, dict) and isinstance(face.get("name"), str):
+            faces.append(
+                TutorCardFace(
+                    name=face["name"],
+                    type_line=face.get("type_line")
+                    if isinstance(face.get("type_line"), str)
+                    else None,
+                    oracle_text=(
+                        face.get("oracle_text")
+                        if isinstance(face.get("oracle_text"), str)
+                        else None
+                    ),
+                )
+            )
+    return faces
+
+
+def _json_object(value: object) -> dict[str, object]:
+    """Decode a JSONB object while treating malformed saved source facts as unavailable."""
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _rules_evidence() -> tuple[list[TutorRuleFact], str]:
@@ -140,6 +195,15 @@ async def _combo_evidence(
             pieces=[piece.card.name for piece in combo.pieces],
             produces=combo.produces,
             description=combo.description,
+            requirements=[
+                TutorLineRequirement(
+                    name=piece.card.name,
+                    zone=_piece_zone(piece.card.name, detail),
+                )
+                for piece in combo.pieces
+            ],
+            outlet=combo.produces[0] if combo.produces else None,
+            outlet_status="supported" if combo.produces else "unverified",
         )
         for combo in response.active
         if combo.missing_count == 0 and all(piece.in_deck for piece in combo.pieces)
@@ -148,6 +212,16 @@ async def _combo_evidence(
         combos,
         "Commander Spellbook: captured" if combos else "zero-results: Commander Spellbook",
     )
+
+
+def _piece_zone(name: str, deck: object) -> Literal["command_zone", "mainboard"]:
+    """Translate a captured source piece to a deck zone without inferring availability."""
+    commander_names = {
+        card.name.casefold()
+        for card in (getattr(deck, "commander_card", None), getattr(deck, "partner_card", None))
+        if card is not None
+    }
+    return "command_zone" if name.casefold() in commander_names else "mainboard"
 
 
 def _warnings(
@@ -159,6 +233,10 @@ def _warnings(
     warnings: list[str] = []
     if any(card.oracle_text is None for card in commanders + cards):
         warnings.append("Some exact card rules text is unavailable; related claims are unverified.")
+    if any("//" in (card.type_line or "") and not card.faces for card in commanders + cards):
+        warnings.append(
+            "Some exact card faces are unavailable; face-specific claims are unverified."
+        )
     total = len(commanders) + sum(card.quantity for card in cards)
     if total != 100:
         warnings.append(

@@ -100,8 +100,9 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
 
 export function TutorPanelView({ state, busy, error, onMode, onGenerate }: TutorPanelViewProps) {
   const run = state.latest_run;
-  const guide = run?.guide ?? state.last_successful_run?.guide;
-  const outdated = !!run && !run.current;
+  const displayedRun = run?.guide ? run : state.last_successful_run;
+  const guide = displayedRun?.guide;
+  const outdated = !!displayedRun && !displayedRun.current;
   const generating = run?.status === "running";
   const action = guide ? (outdated ? "Update Guide" : "Generate Guide") : "Generate Guide";
   return (
@@ -169,7 +170,7 @@ export function TutorPanelView({ state, busy, error, onMode, onGenerate }: Tutor
           title={guide.title}
           content={guide.content}
           openingHands={guide.opening_hands}
-          warnings={run?.evidence?.warnings ?? []}
+          warnings={displayedRun?.evidence?.warnings ?? []}
         />
       )}
     </section>

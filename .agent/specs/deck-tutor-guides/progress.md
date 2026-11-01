@@ -64,3 +64,50 @@
   tooling timeouts; their orphaned one-off containers were stopped before the final isolated gate.
 - Next action: round 3 build notes and local commit only. No live generation or browser quality
   rerun was made, and the pre-existing `GLOSSARY.md` edit remains untouched.
+
+## Final coordinator handoff
+Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and all static/build checks). eval-3 remains FAIL with S1 VIOLATES; review not reached. Spec marked blocked, report.md written. Evaluator cleanup complete; existing GLOSSARY.md preserved. Next action: resolve report open issues in a newly approved run.
+
+## User-authorized continuation
+
+- User requested continuation until finished; spec reapproved without changing acceptance or scope.
+- Original BASE and slice-start HEAD remain `7778d49a1f8fda1892053d1a7282df3dc2705d0d`.
+- Continuation starts from `29eb51fb83f22de149bf173312d2039c316398fb` on
+  `ship/deck-tutor-guides`; Docker daemon 29.5.3 is available.
+- Preserve the pre-existing `GLOSSARY.md` edit and earlier progress records.
+- Next action: repair report/eval-3 failures test-first, complete deterministic verification matrices,
+  then independently evaluate live teaching/browser acceptance and run both review axes.
+
+## Continuation implementation
+
+- Read `report.md` and `eval-3.md` completely, the parent recovery contract, teaching rubric, and
+  exact Yuna/Blue Farm lists. Repair scope is limited to their open findings: last-good display
+  freshness, nested malformed evidence, grounded teaching, reusable pinned fixtures, exact catalog
+  aliases, and the named deterministic lifecycle/evidence/persistence matrices.
+- Current phase: begin the pre-agreed HTTP/teaching/render seams with red regression checks. The
+  pre-existing `GLOSSARY.md` edit remains preserved and untouched.
+
+## Continuation completion
+
+- Completed deterministic repair at the Tutor HTTP, teaching, and rendered-view seams. The displayed
+  last-good run now controls historical state and warnings after a failed update. Nested malformed
+  Commander Spellbook entries are rejected before capture; frozen evidence carries exact faces plus
+  typed line zone/resource/outlet availability; prompts delimit all saved/source text as untrusted
+  data and prohibit command-zone battlefield-ability claims.
+- Reusable `tutor_fixtures.py` now exposes the complete supplied lists, exact Blue Farm flavor-name
+  aliases, pinned face facts, hostile text, and deterministic Oracle/Pact/Breach evidence reused by
+  HTTP/import tests. Alias ingestion preserves `flavor_name` from the normal Scryfall history and
+  resolves an unambiguous exact alias before fuzzy matching.
+- Tutor-run source references now protect pinned source snapshots from pruning and cascade with deck
+  deletion. Deterministic coverage includes failed last-good display, malformed/timeout/zero-source
+  distinctions, Oracle/Pact/Breach removal membership, faces, hostile source text, source pruning,
+  lifecycle deduplication/failure, and cross-owner denial.
+- Docker gates: backend affected suite/static checks `92 passed in 73.66s`, Ruff clean, `257 files
+  already formatted`, Ty clean; frontend `31` files / `129` tests passed, typecheck/lint/format and
+  production build passed.
+- Live quality remains external: evaluator must first refresh the isolated catalog through the normal
+  Scryfall sync so `card_aliases` is populated from real `default_cards` flavor names, then import the
+  exact fixture (never seed production facts manually). The supplied aliases resolve to canonical
+  City of Brass, Rograkh, Silence, Rhystic Study, and Lotus Petal; this conflicts with the parent
+  prose that calls three canonical identities absent, so live assessment must preserve the printed
+  fixture names and record that acceptance-text inconsistency rather than fabricate a different list.

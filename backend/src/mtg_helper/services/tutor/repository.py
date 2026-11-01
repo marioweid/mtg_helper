@@ -1,6 +1,7 @@
 """Durable owner-scoped Tutor setup, runs, frozen manifests, and results."""
 
 import json
+import re
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
@@ -117,6 +118,17 @@ class TutorRepository:
                 guide_evidence.model_dump_json(),
                 work.token,
             )
+            source_hashes = _source_hashes(guide_evidence.sources)
+            if source_hashes:
+                present = await conn.fetch(
+                    "SELECT sha256 FROM recommendation_sources WHERE sha256 = ANY($1::text[])",
+                    source_hashes,
+                )
+                await conn.executemany(
+                    "INSERT INTO tutor_run_sources (run_id, source_hash) VALUES ($1, $2) "
+                    "ON CONFLICT DO NOTHING",
+                    [(work.id, row["sha256"]) for row in present],
+                )
             return work
 
     async def publish(self, work: TutorWork, guide: TutorGuideDraft) -> None:
@@ -233,6 +245,15 @@ def _value(raw: object) -> dict[str, object]:
     if not isinstance(value, dict):
         raise TutorError("Stored Tutor data is invalid", 500)
     return dict(value)
+
+
+def _source_hashes(sources: dict[str, str | None]) -> list[str]:
+    """Extract immutable source digests from explicit evidence statuses."""
+    return [
+        status.rsplit(":", maxsplit=1)[1]
+        for status in sources.values()
+        if isinstance(status, str) and re.fullmatch(r"pinned-(?:cards|rules):[0-9a-f]{64}", status)
+    ]
 
 
 async def interrupt_running(pool: asyncpg.Pool) -> None:

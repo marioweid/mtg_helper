@@ -40,6 +40,16 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE INDEX IF NOT EXISTS idx_cards_name_trgm
     ON cards USING GIN (name gin_trgm_ops);
 
+-- Flavor names identify a printing while still resolving to its canonical Oracle card.
+-- Multiple Oracle identities may share an alias; resolution deliberately rejects ambiguity.
+CREATE TABLE IF NOT EXISTS card_aliases (
+    alias           TEXT NOT NULL,
+    oracle_id       UUID NOT NULL,
+    generation      UUID NOT NULL,
+    PRIMARY KEY (alias, oracle_id)
+);
+CREATE INDEX IF NOT EXISTS idx_card_aliases_lookup ON card_aliases (lower(alias));
+
 -- Color identity subset filtering
 CREATE INDEX IF NOT EXISTS idx_cards_color_identity
     ON cards USING GIN (color_identity);
@@ -702,6 +712,14 @@ CREATE TABLE IF NOT EXISTS recommendation_sources (
     kind TEXT NOT NULL CHECK (kind IN ('cards', 'rules', 'oracle_tags')),
     payload BYTEA NOT NULL CHECK (octet_length(payload) <= 136314880),
     published_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Tutor evidence is self-contained, while this association prevents explicit
+-- source maintenance from deleting a snapshot it also identifies.
+CREATE TABLE IF NOT EXISTS tutor_run_sources (
+    run_id UUID NOT NULL REFERENCES tutor_runs(id) ON DELETE CASCADE,
+    source_hash TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    PRIMARY KEY (run_id, source_hash)
 );
 
 ALTER TABLE recommendation_sources DROP CONSTRAINT IF EXISTS recommendation_sources_kind_check;
