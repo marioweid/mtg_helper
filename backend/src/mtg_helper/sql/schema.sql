@@ -588,8 +588,21 @@ CREATE TABLE IF NOT EXISTS tutor_runs (
     finished_at TIMESTAMPTZ,
     UNIQUE (account_id, request_key)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS tutor_one_active_run
-    ON tutor_runs (deck_id, account_id) WHERE status = 'running';
+-- The original per-owner guard allowed a transferred deck to execute twice.  Resolve a
+-- pre-upgrade duplicate deterministically before replacing the index, so schema reapplication is safe.
+WITH ranked_tutor_runs AS (
+    SELECT id, row_number() OVER (PARTITION BY deck_id ORDER BY created_at DESC, id DESC) AS position
+    FROM tutor_runs
+    WHERE status = 'running'
+)
+UPDATE tutor_runs AS run
+SET status = 'superseded',
+    finished_at = now(),
+    error = 'A newer active guide generation exists for this deck.'
+FROM ranked_tutor_runs AS ranked
+WHERE run.id = ranked.id AND ranked.position > 1;
+DROP INDEX IF EXISTS tutor_one_active_run;
+CREATE UNIQUE INDEX tutor_one_active_run ON tutor_runs (deck_id) WHERE status = 'running';
 CREATE INDEX IF NOT EXISTS idx_tutor_runs_deck ON tutor_runs (deck_id, account_id, created_at DESC);
 
 -- Experimental released-card discovery; additive and safe on existing databases.

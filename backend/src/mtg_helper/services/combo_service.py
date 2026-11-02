@@ -5,6 +5,7 @@ the response into the trimmed ``ComboListResponse`` the UI consumes.
 """
 
 import logging
+import math
 from typing import Any
 from uuid import UUID
 
@@ -184,7 +185,7 @@ async def _call_spellbook(
         try:
             return response.json()
         except ValueError as exc:
-            raise ComboFetchError("Commander Spellbook response was not valid JSON") from exc
+            raise ComboResponseError("Commander Spellbook response was not valid JSON") from exc
     finally:
         if owned_client:
             await http_client.aclose()
@@ -283,6 +284,8 @@ def _coerce_int(value: Any) -> int | None:
     if isinstance(value, int):
         return value
     if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ComboResponseError("Commander Spellbook response has non-finite popularity")
         return int(value)
     if isinstance(value, str) and value.isdigit():
         return int(value)

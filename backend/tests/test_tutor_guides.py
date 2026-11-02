@@ -2,18 +2,24 @@
 
 import asyncio
 import json
+from collections import Counter
 from uuid import UUID, uuid4
 
 import asyncpg
+import httpx
 import pytest
 from httpx import AsyncClient
+from pydantic import ValidationError
 
 from tests.conftest import HAZEL_SCRYFALL_ID, SCHEMA_PATH, create_test_account
 from tests.tutor_fixtures import (
     BLUE_FARM_LINE_CARDS,
+    BLUE_FARM_MAINBOARD,
     BLUE_FARM_PINNED_FACTS,
     HOSTILE_SOURCE_TEXT,
     PINNED_FACE_SOURCE_FACTS,
+    YUNA_MAINBOARD,
+    acceptance_fixtures,
     blue_farm_combo_payload,
 )
 
@@ -87,6 +93,159 @@ async def test_setup_saves_mode_without_starting_a_guide(client: AsyncClient) ->
 def test_tutor_fixture_commander_is_stable() -> None:
     """The shared Tutor fixture uses the existing deterministic commander identity."""
     assert UUID(str(HAZEL_SCRYFALL_ID)).version == 4
+
+
+def test_acceptance_fixtures_materialize_complete_lists_and_pinned_combo_facts() -> None:
+    """Portable fixture data retains both supplied decks and every pinned combo fact."""
+    yuna, blue_farm = acceptance_fixtures()
+
+    assert yuna.mainboard == YUNA_MAINBOARD
+    assert blue_farm.mainboard == BLUE_FARM_MAINBOARD
+    assert sum(quantity for quantity, _ in yuna.mainboard) == 99
+    assert sum(quantity for quantity, _ in blue_farm.mainboard) == 98
+    assert {name for _, name in blue_farm.mainboard} >= set(BLUE_FARM_LINE_CARDS)
+    assert set(BLUE_FARM_PINNED_FACTS) == set(BLUE_FARM_LINE_CARDS)
+    blue_counts = Counter({name: quantity for quantity, name in blue_farm.mainboard})
+    hand = [
+        "Ancient Tomb",
+        "Underground Sea",
+        "Mana Vault",
+        "Chrome Mox",
+        "Demonic Tutor",
+        "Porom's Silence Magic",
+        "Swan Song",
+    ]
+    assert not Counter(hand) - blue_counts
+    lines = blue_farm_combo_payload()["results"]["included"]
+    assert {line["id"] for line in lines if isinstance(line, dict)} == {
+        "oracle-consultation",
+        "oracle-tainted-pact",
+        "breach-freeze",
+    }
+
+
+def test_teaching_candidates_mix_actual_lands_and_castable_actions() -> None:
+    """Candidate construction offers useful actual-list contrast rather than all-land hands."""
+    from mtg_helper.models.tutor import TutorCardFact, TutorEvidence
+    from mtg_helper.services.tutor.teaching import _opening_hand_candidates
+
+    evidence = TutorEvidence(
+        commanders=[],
+        cards=[
+            TutorCardFact(
+                oracle_id=None,
+                name="Forest",
+                quantity=4,
+                type_line="Basic Land",
+                oracle_text="",
+                mana_cost=None,
+                cmc=0,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Island",
+                quantity=3,
+                type_line="Basic Land",
+                oracle_text="",
+                mana_cost=None,
+                cmc=0,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Sol Ring",
+                quantity=1,
+                type_line="Artifact",
+                oracle_text="",
+                mana_cost="{1}",
+                cmc=1,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Swan Song",
+                quantity=1,
+                type_line="Instant",
+                oracle_text="",
+                mana_cost="{U}",
+                cmc=1,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Mystic Remora",
+                quantity=1,
+                type_line="Enchantment",
+                oracle_text="",
+                mana_cost="{U}",
+                cmc=1,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Rhystic Study",
+                quantity=1,
+                type_line="Enchantment",
+                oracle_text="",
+                mana_cost="{2}{U}",
+                cmc=3,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Doubling Season",
+                quantity=1,
+                type_line="Enchantment",
+                oracle_text="",
+                mana_cost="{4}{G}",
+                cmc=6,
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="An Offer You Can't Refuse",
+                quantity=1,
+                type_line="Instant",
+                oracle_text="",
+                mana_cost="{U}",
+                cmc=1,
+            ),
+        ],
+    )
+
+    candidates = _opening_hand_candidates(evidence)
+    assert len(candidates) >= 3
+    assert all(len(hand) == 7 for hand in candidates)
+    assert all(any(card not in {"Forest", "Island"} for card in hand) for hand in candidates)
+    assert len({tuple(hand) for hand in candidates}) >= 3
+    assert [sum(card in {"Forest", "Island"} for card in hand) for hand in candidates] == [
+        3,
+        1,
+        2,
+        3,
+    ]
+    assert sum(card not in {"Forest", "Island"} for card in candidates[0]) == 4
+
+
+def test_teaching_structured_output_requires_each_opening_hand_decision() -> None:
+    """Named model fields make all persisted worked-hand decisions deterministic."""
+    from mtg_helper.models.tutor import TutorGuideStructuredOutput
+
+    hand = {"cards": ["Forest"] * 7, "explanation": "A tested opening-hand example."}
+    draft = TutorGuideStructuredOutput(
+        title="Structured guide",
+        content="Interpretation: use the saved list.",
+        keep=hand,
+        mulligan=hand,
+        context_dependent=hand,
+    ).to_draft()
+
+    assert [example.decision for example in draft.opening_hands] == [
+        "keep",
+        "mulligan",
+        "context-dependent",
+    ]
+    with pytest.raises(ValidationError):
+        TutorGuideStructuredOutput(
+            title="Incomplete guide",
+            content="Interpretation: this output must fail honestly.",
+            keep=hand,
+            mulligan=hand,
+        )
 
 
 @pytest.mark.asyncio
@@ -315,6 +474,47 @@ async def test_evidence_marks_malformed_combo_coverage_and_retains_exact_rules(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "body",
+    [
+        b"{not-json",
+        (
+            b'{"results":{"included":[{"id":"overflow","uses":[{"card":{"name":"Forest"}}],'
+            b'"produces":[],"popularity":1e999}],"almostIncluded":[]}}'
+        ),
+    ],
+    ids=("invalid-json", "non-finite-popularity"),
+)
+async def test_evidence_classifies_malformed_http_combo_responses(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, body: bytes
+) -> None:
+    """HTTP 200 malformed bodies remain source gaps instead of failed guide intent."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    async def fixed_teacher(_input: object) -> object:
+        return _valid_guide()
+
+    call_spellbook = combo_service._call_spellbook
+
+    async def malformed_http(_body: dict[str, object], *, client: object = None) -> object:
+        transport = httpx.MockTransport(lambda _: httpx.Response(200, content=body))
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            return await call_spellbook({}, client=http_client)
+
+    monkeypatch.setattr(combo_service, "_call_spellbook", malformed_http)
+    monkeypatch.setattr(commander, "generate", fixed_teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+
+    run = await _finished_state(client, deck_id)
+    assert run["status"] == "succeeded"
+    assert run["evidence"]["sources"]["combos"] == "malformed: Commander Spellbook response"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "payload",
     [
         {"results": {"included": [{}], "almostIncluded": []}},
@@ -440,7 +640,7 @@ async def test_evidence_retains_exact_commander_faces(
         await conn.execute(
             "INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, type_line, "
             "oracle_text, legalities, is_canonical) VALUES ($1, $2, "
-            "'Front Lesson // Back Lesson', '{G}', 'Legendary Creature // Legendary Land', "
+            "'Barkchannel Pathway // Tidechannel Pathway', '{G,U}', 'Land // Land', "
             "'Flattened text must not become face facts.', "
             '\'{"commander":"legal"}\'::jsonb, true)',
             scryfall_id,
@@ -554,6 +754,36 @@ async def test_teaching_treats_hostile_saved_and_source_text_as_data(
     assert "opening_hand_candidates" in prompt
     assert "Only listed commanders begin in the command zone" in prompt
     assert "additional cost from that hand" in prompt
+
+
+@pytest.mark.asyncio
+async def test_runs_rejects_an_oversized_hostile_description_before_model_work(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A maliciously large saved description fails durably without a hidden paid retry."""
+    from mtg_helper.services.tutor import commander, teaching
+
+    prompt_calls = 0
+
+    async def bounded_teacher(guide_input: teaching.TeachingInput) -> object:
+        nonlocal prompt_calls
+        prompt_calls += 1
+        teaching._prompt(guide_input, "Commander", "test")
+        return _valid_guide()
+
+    monkeypatch.setattr(commander, "generate", bounded_teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    oversized = HOSTILE_SOURCE_TEXT + "x" * (1024 * 1024)
+    updated = await client.patch(f"/api/v1/decks/{deck_id}", json={"description": oversized})
+    assert updated.status_code == 200
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+
+    run = await _finished_state(client, deck_id)
+    assert run["status"] == "failed"
+    assert run["error"] == "Guide generation failed; retry explicitly."
+    assert prompt_calls == 1
 
 
 @pytest.mark.asyncio
@@ -724,6 +954,139 @@ async def test_runs_deduplicates_active_work_and_preserves_last_good_guide(
     assert state["status"] == "failed"
     loaded = await client.get(f"/api/v1/decks/{deck_id}/tutor")
     assert loaded.json()["data"]["last_successful_run"]["guide"]["title"] == "Hazel guide"
+
+
+@pytest.mark.asyncio
+async def test_runs_allow_only_one_active_teacher_after_a_deck_transfer(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A transferred Lerndeck cannot start a second teacher before its old run finishes."""
+    from mtg_helper.models.accounts import AccountResponse
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+    from tests.conftest import set_current_account
+
+    calls = 0
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def teacher(_input: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            entered.set()
+            await release.wait()
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    old_row = await db_pool.fetchrow("SELECT * FROM accounts WHERE email='default@test.local'")
+    old_owner = AccountResponse.model_validate(dict(old_row))
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+    await entered.wait()
+
+    new_account_id = await create_test_account(client, "Transferred Active Owner")
+    new_email = await db_pool.fetchval(
+        "SELECT email FROM accounts WHERE id=$1", UUID(new_account_id)
+    )
+    await db_pool.execute("UPDATE decks SET owner_email=$2 WHERE id=$1", UUID(deck_id), new_email)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    second = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert second.status_code == 200
+    await asyncio.sleep(0)
+    assert calls == 1
+    assert (
+        await db_pool.fetchval(
+            "SELECT count(*) FROM tutor_runs WHERE deck_id=$1 AND status='running'", UUID(deck_id)
+        )
+        == 1
+    )
+
+    release.set()
+    for _ in range(20):
+        if (
+            await db_pool.fetchval(
+                "SELECT count(*) FROM tutor_runs WHERE deck_id=$1 AND status='running'",
+                UUID(deck_id),
+            )
+            == 0
+        ):
+            break
+        await asyncio.sleep(0)
+    assert (
+        await db_pool.fetchval(
+            "SELECT count(*) FROM tutor_runs WHERE deck_id=$1 AND status='running'", UUID(deck_id)
+        )
+        == 0
+    )
+    replacement = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert replacement.status_code == 200
+    assert (await _finished_state(client, deck_id))["status"] == "succeeded"
+    assert calls == 2
+
+    set_current_account(old_owner)
+    assert (await client.get(f"/api/v1/decks/{deck_id}/tutor")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_persistence_replaces_old_active_run_index_idempotently(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    """Schema reapplication upgrades an old per-owner guard without duplicate active work."""
+    deck_id = UUID(await _deck_id(client))
+    second_account = await db_pool.fetchval(
+        "INSERT INTO accounts (display_name, email) VALUES ('Index Owner', 'index@test.local') "
+        "RETURNING id"
+    )
+    async with db_pool.acquire() as conn:
+        await conn.execute("DROP INDEX tutor_one_active_run")
+        await conn.execute(
+            "CREATE UNIQUE INDEX tutor_one_active_run ON tutor_runs (deck_id, account_id) "
+            "WHERE status = 'running'"
+        )
+        await conn.executemany(
+            "INSERT INTO tutor_runs (id, deck_id, account_id, request_key, mode, composition_hash, "
+            "teaching_hash, manifest, evidence, token) VALUES ($1,$2,$3,$4,'commander','old','old',"
+            "'{}'::jsonb,'{}'::jsonb,$5)",
+            [(uuid4(), deck_id, account, uuid4(), uuid4()) for account in (second_account,)],
+        )
+        owner = await conn.fetchval("SELECT id FROM accounts WHERE email='default@test.local'")
+        await conn.execute(
+            "INSERT INTO tutor_runs (id, deck_id, account_id, request_key, mode, composition_hash, "
+            "teaching_hash, manifest, evidence, token) VALUES ($1,$2,$3,$4,'commander','new','new',"
+            "'{}'::jsonb,'{}'::jsonb,$5)",
+            uuid4(),
+            deck_id,
+            owner,
+            uuid4(),
+            uuid4(),
+        )
+        await conn.execute(SCHEMA_PATH.read_text())
+        await conn.execute(SCHEMA_PATH.read_text())
+
+    assert (
+        await db_pool.fetchval(
+            "SELECT count(*) FROM tutor_runs WHERE deck_id=$1 AND status='running'", deck_id
+        )
+        == 1
+    )
+    index_definition = await db_pool.fetchval(
+        "SELECT indexdef FROM pg_indexes WHERE indexname='tutor_one_active_run'"
+    )
+    assert "UNIQUE INDEX tutor_one_active_run" in index_definition
+    assert "(deck_id) WHERE" in index_definition
 
 
 @pytest.mark.asyncio

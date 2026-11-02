@@ -30,6 +30,8 @@ class TutorCardFact(BaseModel):
     quantity: int = Field(ge=1)
     type_line: str | None
     oracle_text: str | None
+    mana_cost: str | None = None
+    cmc: float | None = None
     color_identity: list[str] = Field(default_factory=list)
     legalities: dict[str, str] = Field(default_factory=dict)
     faces: list["TutorCardFace"] = Field(default_factory=list)
@@ -88,6 +90,37 @@ class TutorOpeningHand(BaseModel):
     decision: Literal["keep", "mulligan", "context-dependent"]
     cards: list[str] = Field(min_length=7, max_length=7)
     explanation: str = Field(min_length=1, max_length=1200)
+
+
+class TutorOpeningHandOutput(BaseModel):
+    """One model-produced hand before its required output field supplies the decision."""
+
+    cards: list[str] = Field(min_length=7, max_length=7)
+    explanation: str = Field(min_length=1, max_length=1200)
+
+
+class TutorGuideStructuredOutput(BaseModel):
+    """Model-only shape that requires every worked-hand decision exactly once."""
+
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=24000)
+    keep: TutorOpeningHandOutput
+    mulligan: TutorOpeningHandOutput
+    context_dependent: TutorOpeningHandOutput
+
+    def to_draft(self) -> "TutorGuideDraft":
+        """Convert named model fields to the persisted, rendered worked-hand list."""
+        return TutorGuideDraft(
+            title=self.title,
+            content=self.content,
+            opening_hands=[
+                TutorOpeningHand(decision="keep", **self.keep.model_dump()),
+                TutorOpeningHand(decision="mulligan", **self.mulligan.model_dump()),
+                TutorOpeningHand(
+                    decision="context-dependent", **self.context_dependent.model_dump()
+                ),
+            ],
+        )
 
 
 class TutorGuideDraft(BaseModel):

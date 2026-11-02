@@ -77,3 +77,38 @@ lint `0 warnings and 0 errors`; format clean; production build compiled successf
 No paid model calls, harness/environment changes, live-data operation, or acceptance-text edit was made. The
 pre-existing `GLOSSARY.md` modification remains excluded from this commit. The approved exact-fixture correction
 recognizing Rhystic Study, Silence, and Lotus Petal flavor aliases is preserved. Fresh live re-evaluation is pending.
+
+## Round 6 — eval-5 repair
+
+- `backend/src/mtg_helper/models/tutor.py`: added frozen mana/CMC facts and a named structured teacher-output
+  shape that deterministically materializes all three persisted hand decisions.
+- `backend/src/mtg_helper/services/tutor/teaching.py`: added complete-input byte/card/source limits, mixed
+  quantity-valid hand candidates, named-output conversion, and zero model retries.
+- `backend/src/mtg_helper/services/tutor/evidence.py`: captures exact mana costs and CMCs without truncating
+  Oracle/rule text.
+- `backend/src/mtg_helper/services/combo_service.py`: classifies HTTP JSON decoding and non-finite popularity
+  as malformed Commander Spellbook responses.
+- `backend/src/mtg_helper/services/tutor/repository.py`: prevents a second active teacher for the same deck,
+  including after ownership transfer.
+- `backend/src/mtg_helper/sql/schema.sql`: safely replaces the old owner-qualified active index and resolves
+  pre-upgrade duplicate running rows before reapplication.
+- `backend/tests/tutor_fixtures.py`: materializes complete Yuna/Blue Farm lists and real pinned card/face facts
+  without reading ignored specs.
+- `backend/tests/test_tutor_guides.py`: covers portable fixture integrity, mixed candidates, named output,
+  malformed HTTP/overflow coverage, oversized hostile descriptions, transfer interleaving, and index upgrade.
+- `backend/tests/test_scryfall_label_schema.py`: isolates its old-tag-table simulation by dropping the local
+  dependent view first.
+- `.agent/specs/deck-tutor-guides/{progress,build-notes}.md`: records the final scoped repair and checks.
+
+Gate: explicit local Docker Compose only. Affected backend command
+`pytest -q -W error tests/test_tutor_guides.py tests/test_deck_crud.py tests/test_deck_import.py
+tests/test_card_identity_service.py tests/test_snapshots.py tests/test_retrieval_source_tags.py
+tests/test_scryfall_label_schema.py -o cache_dir=/tmp/pytest-cache` -> `122 passed in 95.10s`.
+The required no-DB command -> `565 passed, 656 deselected in 9.91s`; Ruff `All checks passed!`; format
+`257 files already formatted`; Ty `All checks passed!`. Frontend: `31` files / `130` tests passed;
+typecheck passed; lint `0 warnings and 0 errors`; format clean; production build compiled successfully.
+
+No paid calls, source refresh, live-data operation, harness/environment change, or acceptance-text edit was made.
+The former supplementary schema failure was a baseline test-fixture dependency; the narrow test-local view drop is
+verified by the affected schema suite. The pre-existing `GLOSSARY.md` modification remains unstaged. Fresh live
+quality attempts are external evaluator work on the committed repaired HEAD.

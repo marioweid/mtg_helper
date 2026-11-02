@@ -49,7 +49,8 @@ async def capture(
     """Freeze canonical list identity and exact local card facts for one guide request."""
     ids = [deck["commander_id"]] + ([deck["partner_id"]] if deck["partner_id"] else [])
     commander_rows = await conn.fetch(
-        "SELECT c.oracle_id, c.name, c.type_line, c.oracle_text, c.color_identity, c.legalities, "
+        "SELECT c.oracle_id, c.name, c.type_line, c.oracle_text, c.mana_cost, c.cmc, "
+        "c.color_identity, c.legalities, "
         "nc.source_facts FROM cards c "
         "LEFT JOIN new_card_catalog nc ON nc.oracle_id = c.oracle_id "
         "WHERE id = ANY($1::uuid[]) "
@@ -59,7 +60,8 @@ async def capture(
     card_rows = await conn.fetch(
         """
         SELECT DISTINCT ON (COALESCE(c.oracle_id::text, lower(c.name)))
-            c.oracle_id, c.name, c.type_line, c.oracle_text, c.color_identity, c.legalities,
+            c.oracle_id, c.name, c.type_line, c.oracle_text, c.mana_cost, c.cmc,
+            c.color_identity, c.legalities,
             nc.source_facts,
             SUM(dc.quantity) OVER (
                 PARTITION BY COALESCE(c.oracle_id::text, lower(c.name))
@@ -116,6 +118,8 @@ def _fact(row: asyncpg.Record, quantity: int) -> TutorCardFact:
         quantity=quantity,
         type_line=row["type_line"],
         oracle_text=row["oracle_text"],
+        mana_cost=row["mana_cost"],
+        cmc=float(row["cmc"]) if row["cmc"] is not None else None,
         color_identity=list(row["color_identity"] or []),
         legalities=_string_object(row["legalities"]),
         faces=_faces(row["source_facts"]),

@@ -57,19 +57,10 @@ class TutorRepository:
     async def create(self, owner: Owner, deck_id: UUID, request_key: UUID) -> TutorWork | None:
         """Persist one explicit intent and immutable capture, reusing an idempotent request key."""
         async with self.pool.acquire() as conn, conn.transaction():
-            await owned_deck(conn, owner, deck_id)
-            active = await conn.fetchrow(
-                "SELECT teaching_hash FROM tutor_runs WHERE deck_id=$1 AND account_id=$2 "
-                "AND status='running' FOR UPDATE",
-                deck_id,
-                owner.account_id,
-            )
             deck = await owned_deck(conn, owner, deck_id, lock=True)
             active = await conn.fetchrow(
-                "SELECT teaching_hash FROM tutor_runs WHERE deck_id=$1 AND account_id=$2 "
-                "AND status='running'",
+                "SELECT teaching_hash FROM tutor_runs WHERE deck_id=$1 AND status='running'",
                 deck_id,
-                owner.account_id,
             )
             setup = await conn.fetchrow(
                 "SELECT mode FROM tutor_setups WHERE deck_id = $1 AND account_id = $2",
@@ -88,19 +79,13 @@ class TutorRepository:
                 if previous["deck_id"] != deck_id:
                     raise TutorError("Request key already belongs to another deck", 409)
                 return None
+            if active is not None:
+                return None
             manifest, guide_evidence = await evidence.capture(
                 conn, deck, self.pool, owner.email, include_sources=False
             )
             mode = setup["mode"]
             current_hash = evidence.teaching_hash(manifest, mode)
-            if active is not None and active["teaching_hash"] == current_hash:
-                return None
-            await conn.execute(
-                "UPDATE tutor_runs SET status='superseded', finished_at=now() "
-                "WHERE deck_id=$1 AND account_id=$2 AND status='running'",
-                deck_id,
-                owner.account_id,
-            )
             work = TutorWork(
                 id=uuid4(),
                 token=uuid4(),

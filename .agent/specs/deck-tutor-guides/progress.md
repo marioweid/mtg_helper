@@ -138,3 +138,31 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
   exact Blue Farm deck recognizes the supplied Rhystic Study, Silence, and Lotus Petal flavor aliases.
 - Next action: commit the scoped round-5 repair, leaving the pre-existing `GLOSSARY.md` modification
   unstaged for its owner. Live re-evaluation remains pending and must issue fresh explicit runs.
+
+## Eval-5 repair
+
+- Feedback read in full from `eval-5.md` plus its independent teaching, API/SQL, and scope audits.
+  Repair scope is limited to their remaining AC2/AC4/AC5/AC7 and static-deliverable findings:
+  diverse actual-list hand candidates with reliable typed decisions, malformed HTTP/numeric combo
+  coverage, a deck-wide active-run guard across ownership transfer, bounded teaching input, portable
+  complete fixture lists/pinned facts, and an honest baseline schema-gate record.
+- Current phase: add red checks only at the approved Tutor HTTP/teaching seams, implement the smallest
+  bounded deep-module changes, then run Docker-only affected suites and the full VERIFY gate. Preserve
+  the pre-existing `GLOSSARY.md` edit and all previous evaluation evidence.
+- Completed round 6 repair: named structured model fields now require keep, mulligan, and
+  context-dependent hand outputs before conversion to the existing rendered list; malformed output still
+  fails once, without a hidden retry. Candidate construction uses frozen mainboard quantities plus land,
+  CMC, and mana-cost facts to offer a balanced action hand, a low-mana curve-stress hand, and mixed
+  alternatives rather than all-land examples. No fixture card or primer is selected in production code.
+- Completed source/lifecycle repair: HTTP-200 invalid JSON and non-finite popularity become malformed
+  Commander Spellbook coverage; oversized descriptions/evidence are rejected before the model with no
+  silent Oracle/rule truncation; the active-run index and repository guard are deck-wide across transfer.
+  Full Yuna/Blue Farm lists and real pinned facts are now portable test data, and the schema-upgrade test
+  drops its dependent test-local view before simulating the older tag tables.
+- Final Docker-only verification: affected Tutor/CRUD/import/identity/snapshot/source/schema suite
+  `122 passed in 95.10s`; no-DB suite `565 passed, 656 deselected in 9.91s`; Ruff clean; `257 files
+  already formatted`; Ty clean. Frontend gate: `31` files / `130` tests passed, typecheck passed, lint
+  `0 warnings and 0 errors`, format clean, and production build compiled successfully.
+- No paid model call, live-data operation, source refresh, or acceptance edit was made. Fresh six-attempt
+  live teaching evaluation is intentionally pending on the repaired committed HEAD; the pre-existing
+  `GLOSSARY.md` edit remains unstaged.
