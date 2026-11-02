@@ -72,8 +72,10 @@ async def fetch_combos(
     return ComboListResponse(active=active, almost_there=almost)
 
 
-def _result_lists(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _result_lists(payload: object) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Validate result coverage before an empty result can be trusted as absence."""
+    if not isinstance(payload, dict):
+        raise ComboResponseError("Commander Spellbook response is not an object")
     results = payload.get("results")
     if not isinstance(results, dict):
         raise ComboResponseError("Commander Spellbook response is missing results")
@@ -102,6 +104,8 @@ def _validate_combo_entry(combo: object) -> None:
     produces = combo.get("produces", [])
     if not isinstance(produces, list) or any(not _valid_produces(entry) for entry in produces):
         raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    if any(not _optional_string(combo.get(field)) for field in ("description", "bracketTag")):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
 
 
 def _valid_use(value: object) -> bool:
@@ -110,6 +114,7 @@ def _valid_use(value: object) -> bool:
         and isinstance(value.get("card"), dict)
         and isinstance(value["card"].get("name"), str)
         and bool(value["card"]["name"].strip())
+        and _optional_string(value["card"].get("imageUriFrontNormal"))
     )
 
 
@@ -120,6 +125,11 @@ def _valid_produces(value: object) -> bool:
         and isinstance(value["feature"].get("name"), str)
         and bool(value["feature"]["name"].strip())
     )
+
+
+def _optional_string(value: object) -> bool:
+    """Accept an omitted/null or string optional source field."""
+    return value is None or isinstance(value, str)
 
 
 async def _commander_names(pool: asyncpg.Pool, deck: DeckDetailResponse) -> list[str]:
@@ -160,7 +170,7 @@ async def _call_spellbook(
     body: dict[str, Any],
     *,
     client: httpx.AsyncClient | None,
-) -> dict[str, Any]:
+) -> object:
     """POST the request body to Commander Spellbook, return parsed JSON."""
     owned_client = client is None
     http_client = client or httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)

@@ -2,7 +2,7 @@
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -46,7 +46,8 @@ class TutorRepository:
                 """
                 INSERT INTO tutor_setups (deck_id, account_id, mode)
                 VALUES ($1, $2, $3)
-                ON CONFLICT (deck_id) DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()
+                ON CONFLICT (deck_id) DO UPDATE SET account_id = EXCLUDED.account_id,
+                    mode = EXCLUDED.mode, updated_at = now()
                 """,
                 deck_id,
                 owner.account_id,
@@ -56,7 +57,20 @@ class TutorRepository:
     async def create(self, owner: Owner, deck_id: UUID, request_key: UUID) -> TutorWork | None:
         """Persist one explicit intent and immutable capture, reusing an idempotent request key."""
         async with self.pool.acquire() as conn, conn.transaction():
+            await owned_deck(conn, owner, deck_id)
+            active = await conn.fetchrow(
+                "SELECT teaching_hash FROM tutor_runs WHERE deck_id=$1 AND account_id=$2 "
+                "AND status='running' FOR UPDATE",
+                deck_id,
+                owner.account_id,
+            )
             deck = await owned_deck(conn, owner, deck_id, lock=True)
+            active = await conn.fetchrow(
+                "SELECT teaching_hash FROM tutor_runs WHERE deck_id=$1 AND account_id=$2 "
+                "AND status='running'",
+                deck_id,
+                owner.account_id,
+            )
             setup = await conn.fetchrow(
                 "SELECT mode FROM tutor_setups WHERE deck_id = $1 AND account_id = $2",
                 deck_id,
@@ -74,13 +88,9 @@ class TutorRepository:
                 if previous["deck_id"] != deck_id:
                     raise TutorError("Request key already belongs to another deck", 409)
                 return None
-            active = await conn.fetchrow(
-                "SELECT teaching_hash FROM tutor_runs WHERE deck_id=$1 AND account_id=$2 "
-                "AND status='running'",
-                deck_id,
-                owner.account_id,
+            manifest, guide_evidence = await evidence.capture(
+                conn, deck, self.pool, owner.email, include_sources=False
             )
-            manifest, guide_evidence = await evidence.capture(conn, deck, self.pool, owner.email)
             mode = setup["mode"]
             current_hash = evidence.teaching_hash(manifest, mode)
             if active is not None and active["teaching_hash"] == current_hash:
@@ -118,22 +128,60 @@ class TutorRepository:
                 guide_evidence.model_dump_json(),
                 work.token,
             )
-            source_hashes = _source_hashes(guide_evidence.sources)
-            if source_hashes:
-                present = await conn.fetch(
-                    "SELECT sha256 FROM recommendation_sources WHERE sha256 = ANY($1::text[])",
-                    source_hashes,
+        return await self._capture_evidence(work)
+
+    async def _capture_evidence(self, work: TutorWork) -> TutorWork | None:
+        """Attach fallible source evidence after durable manual intent exists."""
+        try:
+            async with self.pool.acquire() as conn, conn.transaction():
+                run = await conn.fetchrow(
+                    "SELECT id FROM tutor_runs WHERE id=$1 AND token=$2 "
+                    "AND status='running' FOR UPDATE",
+                    work.id,
+                    work.token,
                 )
-                await conn.executemany(
-                    "INSERT INTO tutor_run_sources (run_id, source_hash) VALUES ($1, $2) "
-                    "ON CONFLICT DO NOTHING",
-                    [(work.id, row["sha256"]) for row in present],
+                if run is None:
+                    return None
+                deck = await owned_deck(conn, work.owner, work.deck_id, lock=True)
+                manifest, guide_evidence = await evidence.capture(
+                    conn, deck, self.pool, work.owner.email
                 )
-            return work
+                setup = await conn.fetchrow(
+                    "SELECT mode FROM tutor_setups WHERE deck_id=$1 AND account_id=$2",
+                    work.deck_id,
+                    work.owner.account_id,
+                )
+                current_mode = setup["mode"] if setup else None
+                current = evidence.teaching_hash(manifest, current_mode) if current_mode else ""
+                expected = evidence.teaching_hash(work.manifest, work.mode)
+                status = "running" if current == expected else "superseded"
+                await conn.execute(
+                    "UPDATE tutor_runs SET evidence=$3::jsonb, status=$4, finished_at="
+                    "CASE WHEN $4='superseded' THEN now() ELSE NULL END, error="
+                    "CASE WHEN $4='superseded' THEN 'Deck or Tutor inputs changed during capture.' "
+                    "ELSE NULL END WHERE id=$1 AND token=$2 AND status='running'",
+                    work.id,
+                    work.token,
+                    guide_evidence.model_dump_json(),
+                    status,
+                )
+                await self._pin_sources(conn, work.id, guide_evidence)
+                return replace(work, guide_evidence=guide_evidence) if status == "running" else None
+        except Exception:
+            await self._fail_token(work, "Guide evidence capture failed; retry explicitly.")
+            return None
 
     async def publish(self, work: TutorWork, guide: TutorGuideDraft) -> None:
         """Publish only if owner, deck, and captured teaching inputs still match."""
         async with self.pool.acquire() as conn, conn.transaction():
+            run = await conn.fetchrow(
+                "SELECT id FROM tutor_runs WHERE id=$1 AND token=$2 "
+                "AND status='running' FOR UPDATE",
+                work.id,
+                work.token,
+            )
+            if run is None:
+                return
             deck = await owned_deck(conn, work.owner, work.deck_id, lock=True)
             manifest, _ = await evidence.capture(
                 conn, deck, self.pool, work.owner.email, include_sources=False
@@ -160,28 +208,25 @@ class TutorRepository:
 
     async def fail(self, work: TutorWork) -> None:
         """Store a safe terminal error without replacing the last successful guide."""
+        await self._fail_token(work, "Guide generation failed; retry explicitly.")
+
+    async def _fail_token(self, work: TutorWork, message: str) -> None:
+        """Store a failure only for the original durable execution token."""
         await self.pool.execute(
             "UPDATE tutor_runs SET status='failed', "
-            "error='Guide generation failed; retry explicitly.', "
+            "error=$3, "
             "finished_at=now() WHERE id=$1 AND token=$2 AND status='running'",
             work.id,
             work.token,
+            message,
         )
 
     async def state(
         self, owner: Owner, deck_id: UUID
     ) -> tuple[TutorMode | None, TutorRunResponse | None, TutorRunResponse | None]:
-        """Read setup and guide status, marking abandoned execution interrupted once."""
+        """Read setup and guide status without changing lifecycle state."""
         async with self.pool.acquire() as conn, conn.transaction():
             deck = await owned_deck(conn, owner, deck_id)
-            await conn.execute(
-                "UPDATE tutor_runs SET status='interrupted', finished_at=now(), "
-                "error='Guide generation was interrupted; retry explicitly.' "
-                "WHERE deck_id=$1 AND account_id=$2 AND status='running' "
-                "AND lease_until <= now()",
-                deck_id,
-                owner.account_id,
-            )
             setup = await conn.fetchrow(
                 "SELECT mode FROM tutor_setups WHERE deck_id=$1 AND account_id=$2",
                 deck_id,
@@ -217,6 +262,24 @@ class TutorRepository:
                 else None
             )
             return (setup["mode"] if setup else None, latest, successful)
+
+    @staticmethod
+    async def _pin_sources(
+        conn: asyncpg.Connection, run_id: UUID, guide_evidence: TutorEvidence
+    ) -> None:
+        """Retain source snapshots explicitly cited by a saved run."""
+        source_hashes = _source_hashes(guide_evidence.sources)
+        if not source_hashes:
+            return
+        present = await conn.fetch(
+            "SELECT sha256 FROM recommendation_sources WHERE sha256 = ANY($1::text[])",
+            source_hashes,
+        )
+        await conn.executemany(
+            "INSERT INTO tutor_run_sources (run_id, source_hash) VALUES ($1, $2) "
+            "ON CONFLICT DO NOTHING",
+            [(run_id, row["sha256"]) for row in present],
+        )
 
     @staticmethod
     def _view(

@@ -1,7 +1,9 @@
 """Capture exact saved-list facts without treating missing coverage as absence."""
 
 import asyncio
+import gzip
 import json
+import zlib
 from hashlib import sha256
 from typing import Any, Literal
 from uuid import UUID
@@ -47,7 +49,8 @@ async def capture(
     """Freeze canonical list identity and exact local card facts for one guide request."""
     ids = [deck["commander_id"]] + ([deck["partner_id"]] if deck["partner_id"] else [])
     commander_rows = await conn.fetch(
-        "SELECT c.oracle_id, c.name, c.type_line, c.oracle_text, nc.source_facts FROM cards c "
+        "SELECT c.oracle_id, c.name, c.type_line, c.oracle_text, c.color_identity, c.legalities, "
+        "nc.source_facts FROM cards c "
         "LEFT JOIN new_card_catalog nc ON nc.oracle_id = c.oracle_id "
         "WHERE id = ANY($1::uuid[]) "
         "ORDER BY COALESCE(c.oracle_id::text, lower(c.name)), lower(c.name)",
@@ -56,7 +59,8 @@ async def capture(
     card_rows = await conn.fetch(
         """
         SELECT DISTINCT ON (COALESCE(c.oracle_id::text, lower(c.name)))
-            c.oracle_id, c.name, c.type_line, c.oracle_text, nc.source_facts,
+            c.oracle_id, c.name, c.type_line, c.oracle_text, c.color_identity, c.legalities,
+            nc.source_facts,
             SUM(dc.quantity) OVER (
                 PARTITION BY COALESCE(c.oracle_id::text, lower(c.name))
             ) AS quantity
@@ -112,6 +116,8 @@ def _fact(row: asyncpg.Record, quantity: int) -> TutorCardFact:
         quantity=quantity,
         type_line=row["type_line"],
         oracle_text=row["oracle_text"],
+        color_identity=list(row["color_identity"] or []),
+        legalities=_string_object(row["legalities"]),
         faces=_faces(row["source_facts"]),
     )
 
@@ -154,21 +160,34 @@ def _json_object(value: object) -> dict[str, object]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _string_object(value: object) -> dict[str, str]:
+    """Return known string-valued source facts without coercing malformed values."""
+    return {key: item for key, item in _json_object(value).items() if isinstance(item, str)}
+
+
 def _rules_evidence() -> tuple[list[TutorRuleFact], str]:
     """Return relevant stable official rule excerpts and immutable source identity."""
     try:
         blob, digest = source_repository.rules_resource()
         rules = unpack(blob, digest)
-        identifiers = ("103.4c", "122.1", "603.10a", "608.2h", "903.3")
+        identifiers = ("103.4c", "113.7a", "122.1", "603.10a", "608.2h", "700.5", "903.3")
         facts = [
             TutorRuleFact(identifier=identifier, text=rules[identifier]["text"])
             for identifier in identifiers
         ]
         return facts, f"pinned-rules:{digest}"
+    except (
+        gzip.BadGzipFile,
+        EOFError,
+        json.JSONDecodeError,
+        zlib.error,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return [], f"malformed: rules resource {type(exc).__name__}"
     except OSError as exc:
         return [], f"unavailable: rules resource {type(exc).__name__}"
-    except (KeyError, TypeError, ValueError) as exc:
-        return [], f"malformed: rules resource {type(exc).__name__}"
 
 
 async def _combo_evidence(
@@ -241,6 +260,19 @@ def _warnings(
     if total != 100:
         warnings.append(
             f"This saved list has {total} cards including commanders; it may be incomplete."
+        )
+    banned = [
+        card.name for card in commanders + cards if card.legalities.get("commander") == "banned"
+    ]
+    if banned:
+        warnings.append(f"Known Commander-banned cards in this saved list: {', '.join(banned)}.")
+    commander_colors = {color for commander in commanders for color in commander.color_identity}
+    off_color = [
+        card.name for card in cards if not set(card.color_identity).issubset(commander_colors)
+    ]
+    if off_color:
+        warnings.append(
+            "Known cards outside the saved commander color identity: " + ", ".join(off_color) + "."
         )
     if rules_status.startswith(("timeout:", "unavailable:", "malformed:")):
         warnings.append("Rules coverage is unavailable; rule-dependent claims are unverified.")

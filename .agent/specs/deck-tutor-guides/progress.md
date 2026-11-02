@@ -71,6 +71,10 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
 ## User-authorized continuation
 
 - User requested continuation until finished; spec reapproved without changing acceptance or scope.
+- On 2026-11-02 the user explicitly chose to keep the exact Blue Farm deck and correct the
+  contradictory rubric. Parent AC5 and slice AC2 now recognize Rhystic Study / Silence / Lotus Petal
+  under their supplied flavor names; absent-card exclusions remain for genuinely absent identities.
+  Primary Scryfall evidence and the original contradiction remain documented in `eval-4.md`.
 - Original BASE and slice-start HEAD remain `7778d49a1f8fda1892053d1a7282df3dc2705d0d`.
 - Continuation starts from `29eb51fb83f22de149bf173312d2039c316398fb` on
   `ship/deck-tutor-guides`; Docker daemon 29.5.3 is available.
@@ -111,3 +115,26 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
   City of Brass, Rograkh, Silence, Rhystic Study, and Lotus Petal; this conflicts with the parent
   prose that calls three canonical identities absent, so live assessment must preserve the printed
   fixture names and record that acceptance-text inconsistency rather than fabricate a different list.
+
+## Eval-4 repair
+
+- Feedback read in full from `eval-4.md`; repair scope is limited to its AC2–AC7 failures and S1–S4.
+- Current phase: add red HTTP/render regressions for durable intent, read-only state, publication
+  interleaving, known-fact warnings, transferred ownership, malformed sources, and initial load errors.
+- Original BASE and slice-start HEAD remain `7778d49a1f8fda1892053d1a7282df3dc2705d0d`; repair starts
+  at `2c4c55d1f06ebc3f3e313cf487744f377de9c83a`. Preserve the pre-existing `GLOSSARY.md` edit.
+- Completed deterministic repair: source intent is durable before fallible evidence capture; malformed
+  root/nested Spellbook data and corrupt rules are retained as distinct source gaps; reads are
+  observational; physical composition writers and publication serialize on the deck row and a run
+  publication locks its run before checking current inputs.
+- Completed deterministic coverage: the named selectors now exercise relevant/irrelevant freshness,
+  the complete malformed source matrix, duplicate request keys/tabs, interruption recovery, real
+  quantity publication race, transferred-owner setup/generation, late deletion publication, and
+  saved known banned/off-color warnings. No model call was made during these checks.
+- Final Docker gate: affected backend source/identity suite `113 passed in 81.48s`; Ruff clean,
+  `257 files already formatted`, Ty clean; frontend `31` files / `130` tests passed, typecheck,
+  lint (0 warnings/errors), format and production build passed.
+- Parent AC5 and slice AC2's approved correction is preserved without editing acceptance here: the
+  exact Blue Farm deck recognizes the supplied Rhystic Study, Silence, and Lotus Petal flavor aliases.
+- Next action: commit the scoped round-5 repair, leaving the pre-existing `GLOSSARY.md` modification
+  unstaged for its owner. Live re-evaluation remains pending and must issue fresh explicit runs.

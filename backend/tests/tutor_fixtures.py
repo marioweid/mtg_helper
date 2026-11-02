@@ -20,11 +20,46 @@ BLUE_FARM_FLAVOR_ALIASES = (
 BLUE_FARM_LINE_CARDS = (
     "Thassa's Oracle",
     "Demonic Consultation",
-    "Pact of Negation",
+    "Tainted Pact",
     "Underworld Breach",
     "Lion's Eye Diamond",
     "Brain Freeze",
 )
+
+BLUE_FARM_PINNED_FACTS = {
+    "Thassa's Oracle": (
+        "Creature — Merfolk Wizard",
+        "When Thassa's Oracle enters the battlefield, look at the top X cards of your library, "
+        "where X is your devotion to blue. Put up to one of them on top of your library and the "
+        "rest on the bottom of your library in a random order. If X is greater than or equal to "
+        "the number of cards in your library, you win the game.",
+    ),
+    "Demonic Consultation": (
+        "Instant",
+        "Name a card. Exile the top six cards of your library, "
+        "then reveal cards from the top of your library until you reveal the named card. Put that "
+        "card into your hand and exile all other cards revealed this way.",
+    ),
+    "Tainted Pact": (
+        "Instant",
+        "Exile the top card of your library. You may put that card into "
+        "your hand unless it has the same name as another card exiled this way. "
+        "Repeat this process until you put a card into your hand or you exile two cards "
+        "with the same name, whichever comes first.",
+    ),
+    "Underworld Breach": (
+        "Enchantment",
+        "Each nonland card in your graveyard has escape. "
+        "The escape cost is equal to the card's mana cost plus exile three other cards "
+        "from your graveyard.",
+    ),
+    "Lion's Eye Diamond": (
+        "Artifact",
+        "Sacrifice Lion's Eye Diamond, Discard your hand: Add three mana "
+        "of any one color. Activate only as an instant.",
+    ),
+    "Brain Freeze": ("Instant", "Target player mills three cards. Storm."),
+}
 
 PINNED_FACE_SOURCE_FACTS = {
     "faces": [
@@ -58,7 +93,7 @@ def blue_farm_combo_payload() -> dict[str, object]:
         "results": {
             "included": [
                 line("oracle-consultation", ["Thassa's Oracle", "Demonic Consultation"], "Win"),
-                line("oracle-pact", ["Thassa's Oracle", "Pact of Negation"], "Win"),
+                line("oracle-tainted-pact", ["Thassa's Oracle", "Tainted Pact"], "Win"),
                 line(
                     "breach-freeze",
                     ["Underworld Breach", "Lion's Eye Diamond", "Brain Freeze"],

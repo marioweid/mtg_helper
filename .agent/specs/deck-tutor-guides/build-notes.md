@@ -43,3 +43,37 @@ Gate: `docker compose -f docker-compose.yml run --rm --no-deps --volume "${PWD}:
 No harness, live-data, or production change was made. The pre-existing `GLOSSARY.md` edit remains unstaged and
 untouched. Live model quality is intentionally not claimed: refresh the isolated Scryfall catalog before exact Blue
 Farm import; flavor-name aliases resolve to real canonical facts and expose the parent acceptance-text conflict.
+
+## Round 5 — eval-4 repair
+
+- `backend/src/mtg_helper/models/tutor.py`: retains known card color identity and Commander legality facts in
+  frozen Tutor evidence.
+- `backend/src/mtg_helper/services/combo_service.py`: validates malformed root, result, optional description,
+  bracket, and image source shapes before translation.
+- `backend/src/mtg_helper/services/deck_service.py`: serializes quantity and removal writers with Tutor
+  publication using the existing deck row lock; category-only metadata remains outside this lock.
+- `backend/src/mtg_helper/services/tutor/evidence.py`: distinguishes corrupt rules from unavailable resources,
+  pins relevant independent-trigger/devotion rules, and reports known banned/off-color saved cards as warnings.
+- `backend/src/mtg_helper/services/tutor/repository.py`: persists manual intent before fallible evidence capture,
+  makes state reads read-only, serializes publication against physical list writes, and transfers setup ownership
+  to the current authorized owner.
+- `backend/src/mtg_helper/services/tutor/teaching.py`: grounds command-zone/rules advice and supplies generic
+  exact-list seven-card candidates so the teacher need not invent cards or quantities.
+- `backend/tests/tutor_fixtures.py`: corrects the reusable Oracle line to Tainted Pact and supplies exact pinned
+  line facts.
+- `backend/tests/test_tutor_guides.py`: covers all evaluator malformed payloads, corrupt rules, durable intent,
+  selector lifecycle/freshness/persistence matrices, source warnings, real writer race, transfer, and deletion.
+- `frontend/components/tutor-panel.tsx`: renders an initial load failure with an explicit retry action.
+- `frontend/components/tutor-panel-polling.test.tsx`: covers the initial-load retry state.
+- `.agent/specs/deck-tutor-guides/{progress,build-notes}.md`: records this recovery phase and final checks.
+
+Gate: explicit local Docker Compose only. Affected backend source/identity suite
+`tests/test_tutor_guides.py tests/test_deck_crud.py tests/test_deck_import.py tests/test_card_identity_service.py
+tests/test_snapshots.py tests/test_retrieval_source_tags.py` -> `113 passed in 81.48s`; Ruff `All checks passed!`;
+format `257 files already formatted`; Ty `All checks passed!`. Named Tutor selectors: freshness `4 passed`, evidence
+`26 passed`, runs `5 passed`, persistence `4 passed`. Frontend: `31` files / `130` tests passed; typecheck passed;
+lint `0 warnings and 0 errors`; format clean; production build compiled successfully.
+
+No paid model calls, harness/environment changes, live-data operation, or acceptance-text edit was made. The
+pre-existing `GLOSSARY.md` modification remains excluded from this commit. The approved exact-fixture correction
+recognizing Rhystic Study, Silence, and Lotus Petal flavor aliases is preserved. Fresh live re-evaluation is pending.

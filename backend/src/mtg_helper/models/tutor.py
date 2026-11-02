@@ -30,6 +30,8 @@ class TutorCardFact(BaseModel):
     quantity: int = Field(ge=1)
     type_line: str | None
     oracle_text: str | None
+    color_identity: list[str] = Field(default_factory=list)
+    legalities: dict[str, str] = Field(default_factory=dict)
     faces: list["TutorCardFace"] = Field(default_factory=list)
 
 

@@ -81,6 +81,17 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     }
   }
 
+  if (error && !state)
+    return (
+      <section aria-label="Tutor" className="space-y-3">
+        <p role="alert" className="rounded-xl border border-red-400/20 p-4 text-sm text-red-200">
+          {error}
+        </p>
+        <button type="button" className={PRIMARY} onClick={() => void load()}>
+          Retry Tutor
+        </button>
+      </section>
+    );
   if (!state)
     return (
       <p role="status" className="text-sm text-gray-400">

@@ -11,6 +11,7 @@ from httpx import AsyncClient
 from tests.conftest import HAZEL_SCRYFALL_ID, SCHEMA_PATH, create_test_account
 from tests.tutor_fixtures import (
     BLUE_FARM_LINE_CARDS,
+    BLUE_FARM_PINNED_FACTS,
     HOSTILE_SOURCE_TEXT,
     PINNED_FACE_SOURCE_FACTS,
     blue_farm_combo_payload,
@@ -164,6 +165,45 @@ async def test_freshness_ignores_a_quantity_split_between_printings(
 
     state = await client.get(f"/api/v1/decks/{deck_id}/tutor")
     assert state.json()["data"]["latest_run"]["current"] is True
+
+
+@pytest.mark.asyncio
+async def test_freshness_uses_saved_teaching_inputs_but_not_unrelated_metadata(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Title edits are inert while a saved description changes guide teaching context."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def fixed_teacher(_input: object) -> object:
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", fixed_teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+    assert (await _finished_state(client, deck_id))["current"] is True
+
+    title = await client.patch(f"/api/v1/decks/{deck_id}", json={"name": "Renamed deck"})
+    assert title.status_code == 200
+    assert (await client.get(f"/api/v1/decks/{deck_id}/tutor")).json()["data"]["latest_run"][
+        "current"
+    ] is True
+
+    description = await client.patch(
+        f"/api/v1/decks/{deck_id}", json={"description": "A different saved teaching focus."}
+    )
+    assert description.status_code == 200
+    assert (await client.get(f"/api/v1/decks/{deck_id}/tutor")).json()["data"]["latest_run"][
+        "current"
+    ] is False
 
 
 @pytest.mark.asyncio
@@ -354,6 +394,37 @@ async def test_evidence_warns_when_pinned_rules_are_unavailable(
 
 
 @pytest.mark.asyncio
+async def test_evidence_marks_corrupt_pinned_rules_as_malformed(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A corrupt rules snapshot is not reported as a merely unavailable resource."""
+    from mtg_helper.models.combos import ComboListResponse
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.recommendations import source_repository
+    from mtg_helper.services.tutor import commander
+
+    async def no_combos(*_args: object) -> ComboListResponse:
+        return ComboListResponse(active=[], almost_there=[])
+
+    def corrupt_rules() -> tuple[bytes, str]:
+        return b"not a gzip stream", "a" * 64
+
+    async def fixed_teacher(_input: object) -> object:
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(source_repository, "rules_resource", corrupt_rules)
+    monkeypatch.setattr(commander, "generate", fixed_teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+
+    run = await _finished_state(client, deck_id)
+    assert run["evidence"]["sources"]["rules"] == "malformed: rules resource BadGzipFile"
+
+
+@pytest.mark.asyncio
 async def test_evidence_retains_exact_commander_faces(
     client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -480,16 +551,19 @@ async def test_teaching_treats_hostile_saved_and_source_text_as_data(
     assert HOSTILE_SOURCE_TEXT in prompt
     assert "not instructions" in prompt
     assert "tool requests" in prompt
+    assert "opening_hand_candidates" in prompt
+    assert "Only listed commanders begin in the command zone" in prompt
+    assert "additional cost from that hand" in prompt
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("removed", "expected"),
     [
-        (None, {"oracle-consultation", "oracle-pact", "breach-freeze"}),
-        ("Demonic Consultation", {"oracle-pact", "breach-freeze"}),
+        (None, {"oracle-consultation", "oracle-tainted-pact", "breach-freeze"}),
+        ("Demonic Consultation", {"oracle-tainted-pact", "breach-freeze"}),
         ("Thassa's Oracle", {"breach-freeze"}),
-        ("Underworld Breach", {"oracle-consultation", "oracle-pact"}),
+        ("Underworld Breach", {"oracle-consultation", "oracle-tainted-pact"}),
     ],
 )
 async def test_evidence_tracks_blue_farm_line_membership_after_removals(
@@ -548,9 +622,12 @@ async def _seed_line_cards(pool: asyncpg.Pool) -> dict[str, UUID]:
     async with pool.acquire() as conn:
         await conn.executemany(
             "INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, type_line, "
-            "oracle_text, legalities, is_canonical) VALUES ($1, $2, $3, '{}', 'Artifact', "
-            "'Pinned deterministic fact.', '{\"commander\":\"legal\"}'::jsonb, true)",
-            [(scryfall_id, uuid4(), name) for name, scryfall_id in ids.items()],
+            "oracle_text, legalities, is_canonical) VALUES ($1, $2, $3, '{}', $4, $5, "
+            '\'{"commander":"legal"}\'::jsonb, true)',
+            [
+                (scryfall_id, uuid4(), name, *BLUE_FARM_PINNED_FACTS[name])
+                for name, scryfall_id in ids.items()
+            ],
         )
     return ids
 
@@ -598,7 +675,7 @@ async def test_lifecycle_denies_all_tutor_operations_to_another_owner(client: As
 
 
 @pytest.mark.asyncio
-async def test_lifecycle_deduplicates_active_work_and_preserves_last_good_guide(
+async def test_runs_deduplicates_active_work_and_preserves_last_good_guide(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Manual retries share active work; a later failure cannot replace saved instruction."""
@@ -622,13 +699,17 @@ async def test_lifecycle_deduplicates_active_work_and_preserves_last_good_guide(
     deck_id = await _deck_id(client)
     await _add_opening_hand_cards(client, deck_id)
     await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    request_key = uuid4()
     first = await client.post(
-        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(request_key)}
     )
     second = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(request_key)}
+    )
+    third = await client.post(
         f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
     )
-    assert first.status_code == second.status_code == 200
+    assert first.status_code == second.status_code == third.status_code == 200
     await started.wait()
     release.set()
     assert (await _finished_state(client, deck_id))["status"] == "succeeded"
@@ -643,6 +724,376 @@ async def test_lifecycle_deduplicates_active_work_and_preserves_last_good_guide(
     assert state["status"] == "failed"
     loaded = await client.get(f"/api/v1/decks/{deck_id}/tutor")
     assert loaded.json()["data"]["last_successful_run"]["guide"]["title"] == "Hazel guide"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        None,
+        "not an object",
+        {"results": []},
+        {"results": {"included": None, "almostIncluded": []}},
+        {"results": {"included": [None], "almostIncluded": []}},
+        {
+            "results": {
+                "included": [
+                    {
+                        "id": "line",
+                        "uses": [{"card": {"name": " "}}],
+                        "produces": [{"feature": {"name": "Win"}}],
+                    }
+                ],
+                "almostIncluded": [],
+            }
+        },
+        {"results": {"included": [{"id": "line", "uses": "Forest"}], "almostIncluded": []}},
+        {
+            "results": {
+                "included": [{"id": "line", "uses": [{"card": None}]}],
+                "almostIncluded": [],
+            }
+        },
+        {
+            "results": {
+                "included": [
+                    {
+                        "id": "line",
+                        "uses": [{"card": {"name": "Forest"}}],
+                        "produces": [{"feature": {"name": 123}}],
+                    }
+                ],
+                "almostIncluded": [],
+            }
+        },
+        {
+            "results": {
+                "included": [
+                    {
+                        "id": "line",
+                        "uses": [{"card": {"name": "Forest"}}],
+                        "produces": [],
+                        "description": {"invalid": True},
+                    }
+                ],
+                "almostIncluded": [],
+            }
+        },
+        {
+            "results": {
+                "included": [
+                    {
+                        "id": "line",
+                        "uses": [{"card": {"name": "Forest"}}],
+                        "produces": [],
+                        "bracketTag": {"invalid": True},
+                    }
+                ],
+                "almostIncluded": [],
+            }
+        },
+        {
+            "results": {
+                "included": [
+                    {
+                        "id": "line",
+                        "uses": [
+                            {"card": {"name": "Forest", "imageUriFrontNormal": {"invalid": True}}}
+                        ],
+                        "produces": [],
+                    }
+                ],
+                "almostIncluded": [],
+            }
+        },
+    ],
+    ids=(
+        "root-list",
+        "root-null",
+        "root-string",
+        "results-list",
+        "included-null",
+        "null-entry",
+        "blank-name",
+        "uses-string",
+        "null-card",
+        "invalid-produce",
+        "description-object",
+        "bracket-object",
+        "image-object",
+    ),
+)
+async def test_evidence_persists_intent_for_malformed_combo_payload_matrix(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch, payload: object
+) -> None:
+    """Malformed remote roots become a saved source gap after manual intent is durable."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    async def malformed_response(*_args: object, **_kwargs: object) -> object:
+        return payload
+
+    async def fixed_teacher(_input: object) -> object:
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "_call_spellbook", malformed_response)
+    monkeypatch.setattr(commander, "generate", fixed_teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+
+    created = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert created.status_code == 200
+    run = await _finished_state(client, deck_id)
+    assert run["evidence"]["sources"]["combos"] == "malformed: Commander Spellbook response"
+    assert (
+        await db_pool.fetchval("SELECT count(*) FROM tutor_runs WHERE deck_id=$1", UUID(deck_id))
+        == 1
+    )
+
+
+@pytest.mark.asyncio
+async def test_runs_publish_superseded_after_real_quantity_change(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A physical quantity writer commits before publication and supersedes that run."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def teacher(_input: object) -> object:
+        entered.set()
+        await release.wait()
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    created = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    run_id = UUID(created.json()["data"]["latest_run"]["id"])
+    await entered.wait()
+    async with db_pool.acquire() as blocker:
+        transaction = blocker.transaction()
+        await transaction.start()
+        await blocker.fetchrow("SELECT id FROM tutor_runs WHERE id=$1 FOR UPDATE", run_id)
+        release.set()
+        changed = await client.patch(
+            f"/api/v1/decks/{deck_id}/cards/{FOREST_SCRYFALL_ID}/quantity", json={"quantity": 8}
+        )
+        assert changed.status_code == 204
+        await transaction.commit()
+    assert (await _finished_state(client, deck_id))["status"] == "superseded"
+
+
+@pytest.mark.asyncio
+async def test_runs_get_is_read_only_for_an_expired_generation(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reloading observes an expired lease; startup owns interruption recovery."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def teacher(_input: object) -> object:
+        entered.set()
+        await release.wait()
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+    await entered.wait()
+    await db_pool.execute(
+        "UPDATE tutor_runs SET lease_until=now()-interval '1 second' WHERE deck_id=$1",
+        UUID(deck_id),
+    )
+    before = await db_pool.fetchval("SELECT status FROM tutor_runs WHERE deck_id=$1", UUID(deck_id))
+    response = await client.get(f"/api/v1/decks/{deck_id}/tutor")
+    after = await db_pool.fetchval("SELECT status FROM tutor_runs WHERE deck_id=$1", UUID(deck_id))
+    release.set()
+    assert response.status_code == 200
+    assert before == after == "running"
+
+
+@pytest.mark.asyncio
+async def test_runs_lifecycle_recovery_interrupts_without_a_hidden_retry(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Startup recovery leaves an explicit retryable interruption, never a second teacher call."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor.repository import interrupt_running
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def teacher(_input: object) -> object:
+        nonlocal calls
+        calls += 1
+        entered.set()
+        await release.wait()
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+    await entered.wait()
+    await interrupt_running(db_pool)
+    release.set()
+
+    state = (await client.get(f"/api/v1/decks/{deck_id}/tutor")).json()["data"]["latest_run"]
+    assert state["status"] == "interrupted"
+    assert state["error"] == "Guide generation was interrupted; retry explicitly."
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_persistence_transferred_owner_can_save_a_tutor_mode(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A setup belongs to the current deck owner after an authorized transfer."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import cedh
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def fixed_teacher(_input: object) -> object:
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(cedh, "generate", fixed_teacher)
+    deck_id = await _deck_id(client)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    account_id = await create_test_account(client, "Transferred Tutor Owner")
+    email = await db_pool.fetchval("SELECT email FROM accounts WHERE id=$1", UUID(account_id))
+    await db_pool.execute("UPDATE decks SET owner_email=$2 WHERE id=$1", UUID(deck_id), email)
+
+    saved = await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "cedh"})
+    assert saved.status_code == 200
+    assert saved.json()["data"]["mode"] == "cedh"
+    assert await db_pool.fetchval(
+        "SELECT account_id FROM tutor_setups WHERE deck_id=$1", UUID(deck_id)
+    ) == UUID(account_id)
+    await _add_opening_hand_cards(client, deck_id)
+    generated = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert generated.status_code == 200
+    assert (await _finished_state(client, deck_id))["status"] == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_persistence_deletion_blocks_late_guide_publication(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A delayed result cannot recreate Tutor data after its deck is deleted."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def teacher(_input: object) -> object:
+        entered.set()
+        await release.wait()
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+    await entered.wait()
+    assert (await client.delete(f"/api/v1/decks/{deck_id}")).status_code == 204
+    release.set()
+
+    assert (await client.get(f"/api/v1/decks/{deck_id}/tutor")).status_code == 404
+    assert (
+        await db_pool.fetchval("SELECT count(*) FROM tutor_runs WHERE deck_id=$1", UUID(deck_id))
+        == 0
+    )
+
+
+@pytest.mark.asyncio
+async def test_freshness_captures_known_banned_and_off_color_warnings(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Guide evidence reports already-known facts without implementing full legality."""
+    from mtg_helper.services import combo_service
+    from mtg_helper.services.tutor import commander
+
+    async def no_combos(*_args: object) -> object:
+        from mtg_helper.models.combos import ComboListResponse
+
+        return ComboListResponse(active=[], almost_there=[])
+
+    async def fixed_teacher(_input: object) -> object:
+        return _valid_guide()
+
+    monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
+    monkeypatch.setattr(commander, "generate", fixed_teacher)
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    async with db_pool.acquire() as conn:
+        card = await conn.fetchrow(
+            "INSERT INTO cards (scryfall_id, oracle_id, name, color_identity, type_line, "
+            "oracle_text, legalities, is_canonical) VALUES ($1, $2, 'Known Problem Card', "
+            "'{U}', 'Creature', '', '{\"commander\":\"banned\"}'::jsonb, true) RETURNING id",
+            uuid4(),
+            uuid4(),
+        )
+        await conn.execute(
+            "INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES ($1, $2, 1)",
+            UUID(deck_id),
+            card["id"],
+        )
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": "commander"})
+    await client.post(f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())})
+    warnings = (await _finished_state(client, deck_id))["evidence"]["warnings"]
+    assert any("Commander-banned" in warning for warning in warnings)
+    assert any("outside the saved commander color identity" in warning for warning in warnings)
 
 
 @pytest.mark.asyncio

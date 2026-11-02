@@ -82,4 +82,15 @@ describe("Tutor panel polling", () => {
     stop?.();
     expect(window.clearTimeout).toHaveBeenCalledTimes(1);
   });
+
+  it("renders an initial load failure with an explicit retry", () => {
+    lifecycle.state = [null, false, "Deck not found"];
+    lifecycle.stateIndex = 0;
+
+    const markup = renderToStaticMarkup(<TutorPanel deckId="deck-1" />);
+
+    expect(markup).toContain("Deck not found");
+    expect(markup).toContain("Retry Tutor");
+    expect(markup).not.toContain("Loading Tutor");
+  });
 });
