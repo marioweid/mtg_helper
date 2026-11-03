@@ -5,7 +5,9 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from openai import AsyncOpenAI
 from pydantic_ai import Agent, RunContext, UsageLimits
+from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from mtg_helper.models.tutor import (
     TutorCardFact,
@@ -54,6 +56,8 @@ def _prompt(guide_input: TeachingInput, perspective: str, focus: str) -> str:
             "Cover commander role, packages, primary and backup lines with prerequisites or",
             "outlets/gaps, early/mid/late priorities, interaction, strengths, weaknesses, lessons,",
             "mistakes, terminology, and three actual-list seven-card worked examples.",
+            "Aim for 12,000 to 24,000 characters of focused prose. Be detailed but not exhaustive;",
+            "the saved guide content must stay below 64,000 characters.",
             "Return a structured object with required keep, mulligan, and "
             "context_dependent fields.",
             "Each field has cards and explanation and must copy one supplied candidate exactly.",
@@ -182,7 +186,7 @@ def _append_cards(hand: list[str], available: Counter[str], choices: list[str], 
 
 def _agent(focus: str) -> Agent[TeachingInput, TutorGuideStructuredOutput]:
     agent = Agent[TeachingInput, TutorGuideStructuredOutput](
-        model=make_openai_model(model_name=_TUTOR_MODEL),
+        model=make_openai_model(model_name=_TUTOR_MODEL, sdk_max_retries=0),
         deps_type=TeachingInput,
         output_type=TutorGuideStructuredOutput,
         model_settings=openai_model_settings(
@@ -215,13 +219,20 @@ def validate_opening_hands(guide: TutorGuideDraft, evidence: TutorEvidence) -> N
 
 async def run_agent(guide_input: TeachingInput, perspective: str, focus: str) -> TutorGuideDraft:
     """Run one bounded model request for a guide; malformed output raises for durable failure."""
-    result = await _agent(focus).run(
-        f"Generate the {perspective} guide now.",
-        deps=guide_input,
-        usage_limits=UsageLimits(
-            request_limit=1,
-            tool_calls_limit=0,
-            output_tokens_limit=_TUTOR_OUTPUT_TOKENS,
-        ),
-    )
+    agent = _agent(focus)
+    try:
+        result = await agent.run(
+            f"Generate the {perspective} guide now.",
+            deps=guide_input,
+            usage_limits=UsageLimits(
+                request_limit=1,
+                tool_calls_limit=0,
+                output_tokens_limit=_TUTOR_OUTPUT_TOKENS,
+            ),
+        )
+    finally:
+        if isinstance(agent.model, OpenAIResponsesModel) and isinstance(
+            agent.model.client, AsyncOpenAI
+        ):
+            await agent.model.client.close()
     return result.output.to_draft()

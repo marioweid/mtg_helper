@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from openai import AsyncOpenAI
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -12,13 +13,21 @@ TextVerbosity = Literal["low", "medium"]
 OPENAI_MODEL = "gpt-5.6-luna"
 
 
-def make_openai_model(*, model_name: str = OPENAI_MODEL) -> OpenAIResponsesModel:
+def make_openai_model(
+    *, model_name: str = OPENAI_MODEL, sdk_max_retries: int | None = None
+) -> OpenAIResponsesModel:
     """Build one OpenAI Responses model from application settings.
 
     Args:
         model_name: Explicit workflow model; defaults to the shared application model.
+        sdk_max_retries: Optional OpenAI SDK retry budget for an isolated workflow client.
     """
-    provider = OpenAIProvider(api_key=settings.openai_api_key.get_secret_value())
+    api_key = settings.openai_api_key.get_secret_value()
+    provider = (
+        OpenAIProvider(api_key=api_key)
+        if sdk_max_retries is None
+        else OpenAIProvider(openai_client=AsyncOpenAI(api_key=api_key, max_retries=sdk_max_retries))
+    )
     return OpenAIResponsesModel(model_name, provider=provider)
 
 

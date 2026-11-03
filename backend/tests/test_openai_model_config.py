@@ -102,6 +102,21 @@ def test_tutor_uses_its_approved_model_without_changing_the_shared_default() -> 
 
 
 @pytest.mark.asyncio
+async def test_tutor_model_disables_sdk_retries_without_changing_shared_defaults() -> None:
+    """Tutor owns a zero-retry SDK client while ordinary models retain the SDK default."""
+    from mtg_helper.services.tutor.teaching import _agent
+
+    tutor = _agent("test")
+    shared = make_openai_model()
+
+    try:
+        assert tutor.model.client.max_retries == 0
+        assert shared.client.max_retries == 2
+    finally:
+        await tutor.model.client.close()
+
+
+@pytest.mark.asyncio
 async def test_tutor_request_spy_receives_high_reasoning_and_bounded_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -120,11 +135,15 @@ async def test_tutor_request_spy_receives_high_reasoning_and_bounded_output(
         },
     )
     requested_models: list[str] = []
+    requested_retry_budgets: list[int | None] = []
     usage_limit_calls: list[dict[str, int]] = []
     usage_limits = teaching.UsageLimits
 
-    def make_capturing_model(*, model_name: str) -> CapturingModel:
+    def make_capturing_model(
+        *, model_name: str, sdk_max_retries: int | None = None
+    ) -> CapturingModel:
         requested_models.append(model_name)
+        requested_retry_budgets.append(sdk_max_retries)
         return model
 
     monkeypatch.setattr(teaching, "make_openai_model", make_capturing_model)
@@ -160,6 +179,7 @@ async def test_tutor_request_spy_receives_high_reasoning_and_bounded_output(
     assert model.request_settings[0]["max_tokens"] == 16000
     assert len(model.parameters) == 1
     assert requested_models == ["gpt-6.1-sol"]
+    assert requested_retry_budgets == [0]
     assert usage_limit_calls == [
         {"request_limit": 1, "tool_calls_limit": 0, "output_tokens_limit": 16_000}
     ]

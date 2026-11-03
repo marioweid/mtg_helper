@@ -206,5 +206,29 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
 - A one-time complete backend pytest run was attempted as required and is not a green gate: `1192 passed, 10 failed,
   27 errors`. The failures are unrelated pre-existing full-suite isolation/schema assumptions (buylist/price state,
   copy-local loopback host, stale `cards.tags` swap tests, and duplicate source fixture). They are outside eval-7's
-  exclusive repair scope; affected Tutor and VERIFY-required checks above are green. Next action: commit this scoped
-  round with the complete portable dataset and report the unrelated complete-suite baseline honestly.
+   exclusive repair scope; affected Tutor and VERIFY-required checks above are green. Next action: commit this scoped
+   round with the complete portable dataset and report the unrelated complete-suite baseline honestly.
+
+## Round 9 — eval-8 repair
+
+- Feedback read in full from `eval-8.md` and its real FastAPI/SQL/SDK transport artifact. Repair scope is limited to
+  AC2's rejecting a complete detailed model output at the arbitrary 24,000-character schema bound, and AC5/S1's
+  inherited OpenAI SDK retries. The approved Tutor-only stronger model, 16,000-output-token bound, no-tools and one
+  manual action contracts remain unchanged; Coach, Discover, and the shared default must retain their current SDK
+  defaults.
+- Current phase: add red boundary/output, frontend wrapping, and real Tutor HTTP/SQL external-transport regressions
+  at the approved Tutor seams. Then widen only the typed persisted-guide bound and construct/close a Tutor-only
+  zero-retry SDK client through the existing model factory seam. Preserve the pre-existing `GLOSSARY.md` edit.
+- Completed repair: typed model and persisted-guide content now allow up to 64,000 characters, aligning with the
+  existing 16,000-token bound while still rejecting larger output. The prompt targets 12,000–24,000 focused characters,
+  avoiding needlessly long guides without throwing away complete 25,000–40,000-character results. The existing Tutor
+  guide view wraps permitted content, now protected by a 40,000-character render check.
+- Completed transport repair: Tutor alone passes an explicitly owned `AsyncOpenAI(max_retries=0)` to the existing
+  `OpenAIProvider` factory path and closes it after every request. Shared factory callers still get the SDK default
+  retry budget of two. The real FastAPI/SQL/Pydantic-AI/SDK path is exercised through external-only MockTransport for
+  HTTP 500, 429, and timeout: each attempt is exactly one request, terminal failures retain last-good content, and
+  GET/same-key reads issue no new provider request.
+- Final scoped Docker verification: expanded Tutor/CRUD/import/identity/snapshot/source/schema/model suite `146 passed
+  in 136.79s`; Ruff, format, and Ty clean. Frontend gate: 31 files / 131 tests passed, typecheck, zero-warning lint,
+  format, and production build passed. No paid model or live-data call occurred; the pre-existing `GLOSSARY.md` edit
+  remains unstaged.

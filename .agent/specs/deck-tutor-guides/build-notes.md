@@ -160,5 +160,35 @@ The mandated one-time complete backend pytest attempt is recorded honestly: `119
 Failures are pre-existing, unrelated full-suite test-isolation/schema assumptions (buylist/price, copy-local host,
 stale swap `cards.tags`, duplicate source fixture), so this round does not change unrelated modules or claim that
 supplementary command green. All eval-7 scope checks above are green. No paid calls, live-data operation, source
-refresh, environment/volume change, acceptance edit, or fixture fabrication was made; the pre-existing `GLOSSARY.md`
-modification remains unstaged and untouched.
+ refresh, environment/volume change, acceptance edit, or fixture fabrication was made; the pre-existing `GLOSSARY.md`
+ modification remains unstaged and untouched.
+
+## Round 9 — eval-8 repair
+
+- `backend/src/mtg_helper/models/tutor.py`: raised the typed persisted/model guide limit to 64,000 characters, matching
+  the existing 16,000-token Tutor output budget without truncation.
+- `backend/src/mtg_helper/services/agents/_model.py`: added an optional isolated SDK retry budget to the existing model
+  factory while preserving the shared client/default behavior for ordinary callers.
+- `backend/src/mtg_helper/services/tutor/teaching.py`: gives Tutor its owned zero-retry SDK client, closes it after each
+  run, and asks for focused 12,000–24,000-character guides below the durable 64,000-character cap.
+- `backend/tests/test_openai_model_config.py`: proves Tutor's SDK retry budget is zero while shared Coach/Discover-style
+  factory users retain the SDK default, including the real request configuration seam.
+- `backend/tests/test_tutor_guides.py`: adds durable detailed-output boundary coverage and real FastAPI/SQL/Pydantic-AI/
+  SDK external-boundary checks for HTTP 500, 429, and timeout single-attempt failures, last-good retention, and
+  read/same-key idempotency.
+- `frontend/components/tutor-panel.test.tsx`: verifies a permitted detailed guide renders completely with existing
+  whitespace-preserving word wrapping.
+- `.agent/specs/deck-tutor-guides/progress.md`: records eval-8 scope, transport evidence, and scoped verification.
+
+Gate: explicit local Docker Compose only. Expanded affected backend command
+`pytest -q -W error tests/test_tutor_guides.py tests/test_deck_crud.py tests/test_deck_import.py
+tests/test_card_identity_service.py tests/test_snapshots.py tests/test_retrieval_source_tags.py
+tests/test_scryfall_label_schema.py tests/test_openai_model_config.py -o cache_dir=/tmp/pytest-cache` ->
+`146 passed in 136.79s`; Ruff -> `All checks passed!`; format -> `257 files already formatted`; Ty -> `All checks
+passed!`. Frontend `pnpm test` -> `31 passed`, `131 passed`; typecheck passed; lint -> `0 warnings and 0 errors`;
+format passed; production build compiled successfully.
+
+No acceptance text, paid model call, live-data operation, environment/volume change, retry/fallback/critic, or shared
+Coach/Discover default changed. The documented 64,000-character cap is deliberately finite and rejects 64,001+
+characters; existing frontend wrapping renders it without truncation. The prior unrelated complete-suite baseline was
+not rerun. The pre-existing `GLOSSARY.md` modification remains unstaged and untouched.

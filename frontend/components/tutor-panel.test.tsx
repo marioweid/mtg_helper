@@ -120,4 +120,23 @@ describe("Tutor panel", () => {
 
     expect(markup).toContain("Combo coverage is unavailable");
   });
+
+  it("wraps a detailed saved guide without truncating it", () => {
+    const content = "Useful guide detail. ".repeat(2_000);
+    const markup = renderToStaticMarkup(
+      <TutorPanelView
+        state={{
+          ...saved,
+          latest_run: { ...savedRun, guide: { ...savedRun.guide!, content } },
+        }}
+        busy={false}
+        error={null}
+        onMode={vi.fn()}
+        onGenerate={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain(content);
+    expect(markup).toContain("whitespace-pre-wrap break-words");
+  });
 });

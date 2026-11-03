@@ -3,6 +3,7 @@
 import asyncio
 import json
 from collections import Counter
+from typing import Literal
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -58,6 +59,16 @@ async def _finished_state(client: AsyncClient, deck_id: str) -> dict[str, object
     raise AssertionError("Tutor run did not reach a terminal state")
 
 
+async def _finished_tutor_state(client: AsyncClient, tutor_url: str) -> dict[str, object]:
+    """Wait for one Tutor run while retaining the full API state for persistence assertions."""
+    for _ in range(20):
+        state = (await client.get(tutor_url)).json()["data"]
+        if state["latest_run"]["status"] != "running":
+            return state
+        await asyncio.sleep(0)
+    raise AssertionError("Tutor run did not reach a terminal state")
+
+
 def _valid_guide() -> object:
     """Return a teacher result with three independently legal seven-card examples."""
     from mtg_helper.models.tutor import TutorGuideDraft
@@ -75,6 +86,55 @@ def _valid_guide() -> object:
             },
         ],
     )
+
+
+def _tutor_responses_success(request: httpx.Request) -> httpx.Response:
+    """Return one Responses API-shaped structured Tutor result without external model work."""
+    body = json.loads(request.content)
+    output = {
+        "title": "Transport baseline",
+        "content": "Interpretation: a persisted guide survives a failed explicit update.",
+        "keep": {"cards": ["Forest"] * 7, "explanation": "Keep mana."},
+        "mulligan": {"cards": ["Forest"] * 7, "explanation": "No action."},
+        "context_dependent": {"cards": ["Forest"] * 7, "explanation": "Table dependent."},
+    }
+    tool_name = next(tool["name"] for tool in body["tools"] if tool["type"] == "function")
+    return httpx.Response(
+        200,
+        request=request,
+        json={
+            "id": "resp_tutor_transport",
+            "object": "response",
+            "created_at": 1793718000,
+            "status": "completed",
+            "model": body["model"],
+            "parallel_tool_calls": False,
+            "output": [
+                {
+                    "type": "function_call",
+                    "id": "fc_tutor_transport",
+                    "call_id": "call_tutor_transport",
+                    "name": tool_name,
+                    "arguments": json.dumps(output),
+                    "status": "completed",
+                }
+            ],
+            "usage": {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200},
+        },
+    )
+
+
+def _tutor_transport_response(
+    request: httpx.Request,
+    failure: Literal["500", "429", "timeout"],
+    failed_update: bool,
+) -> httpx.Response:
+    """Return the requested deterministic upstream outcome for the real SDK boundary."""
+    if not failed_update:
+        return _tutor_responses_success(request)
+    if failure == "timeout":
+        raise httpx.ReadTimeout("deterministic upstream timeout", request=request)
+    return httpx.Response(int(failure), request=request, json={"error": {"message": failure}})
 
 
 @pytest.mark.asyncio
@@ -516,6 +576,93 @@ def test_teaching_structured_output_requires_each_opening_hand_decision() -> Non
             keep=hand,
             mulligan=hand,
         )
+
+
+def test_teaching_output_keeps_detailed_guides_bounded_without_discarding_them() -> None:
+    """The persisted contract accepts useful detailed prose but still rejects oversized output."""
+    from mtg_helper.models.tutor import MAX_TUTOR_GUIDE_CONTENT_CHARS, TutorGuideDraft
+
+    detailed = "Guide detail. " * 3_000
+    accepted = TutorGuideDraft(title="Detailed guide", content=detailed)
+
+    assert len(accepted.content) == len(detailed)
+    with pytest.raises(ValidationError):
+        TutorGuideDraft(
+            title="Too long",
+            content="x" * (MAX_TUTOR_GUIDE_CONTENT_CHARS + 1),
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["500", "429", "timeout"])
+async def test_runs_send_one_sdk_request_for_each_failed_manual_tutor_update(
+    client: AsyncClient,
+    db_pool: asyncpg.Pool,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Literal["500", "429", "timeout"],
+) -> None:
+    """Real Tutor HTTP/SQL work keeps one upstream attempt and the previous guide on failure."""
+    from mtg_helper.services.tutor import teaching
+
+    deck_id = await _deck_id(client)
+    await _add_opening_hand_cards(client, deck_id)
+    tutor_url = f"/api/v1/decks/{deck_id}/tutor"
+    assert (await client.put(tutor_url + "/setup", json={"mode": "commander"})).status_code == 200
+    metadata_agent = teaching._agent("transport metadata")
+    provider_host = metadata_agent.model.client.base_url.host
+    assert metadata_agent.model.client.max_retries == 0
+    await metadata_agent.model.client.close()
+    attempts: list[str | None] = []
+    fail_update = False
+
+    async def boundary(request: httpx.Request) -> httpx.Response:
+        attempts.append(request.headers.get("x-stainless-retry-count"))
+        return _tutor_transport_response(request, failure, fail_update)
+
+    original_send = httpx.AsyncClient.send
+    async with httpx.AsyncClient(transport=httpx.MockTransport(boundary)) as external:
+
+        async def external_only(
+            self: httpx.AsyncClient, request: httpx.Request, **kwargs: object
+        ) -> object:
+            if request.url.host == provider_host:
+                return await original_send(external, request, **kwargs)
+            return await original_send(self, request, **kwargs)
+
+        monkeypatch.setattr(httpx.AsyncClient, "send", external_only)
+        assert (
+            await client.post(tutor_url + "/guides", json={"request_key": str(uuid4())})
+        ).status_code == 200
+        baseline = await _finished_tutor_state(client, tutor_url)
+        assert baseline["latest_run"]["status"] == "succeeded"
+        last_good = baseline["last_successful_run"]
+        assert attempts == ["0"]
+        fail_update = True
+        request_key = str(uuid4())
+        assert (
+            await client.post(tutor_url + "/guides", json={"request_key": request_key})
+        ).status_code == 200
+        state = await _finished_tutor_state(client, tutor_url)
+
+    failed_run = state["latest_run"]
+    stored = await db_pool.fetchrow(
+        "SELECT status, guide, finished_at FROM tutor_runs WHERE id=$1", UUID(failed_run["id"])
+    )
+    assert attempts == ["0", "0"]
+    assert failed_run["status"] == stored["status"] == "failed"
+    assert stored["guide"] is None and stored["finished_at"] is not None
+    assert state["last_successful_run"] == last_good
+    before_reads = len(attempts)
+    for _ in range(3):
+        assert (await client.get(tutor_url)).json()["data"] == state
+    assert (await client.post(tutor_url + "/guides", json={"request_key": request_key})).json()[
+        "data"
+    ] == state
+    assert len(attempts) == before_reads
+    assert (
+        await db_pool.fetchval("SELECT count(*) FROM tutor_runs WHERE deck_id=$1", UUID(deck_id))
+        == 2
+    )
 
 
 @pytest.mark.asyncio
