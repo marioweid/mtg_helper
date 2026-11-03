@@ -562,7 +562,7 @@ async def add_card_to_deck(
             await _assert_owner(conn, deck_id, email)
         # Physical additions and planned completion must share the same deck lock.
         deck_row = await conn.fetchrow(
-            "SELECT commander_id FROM decks WHERE id = $1 FOR UPDATE", deck_id
+            "SELECT commander_id, partner_id FROM decks WHERE id = $1 FOR UPDATE", deck_id
         )
         if deck_row is None:
             raise DeckNotFoundError(f"Deck {deck_id} not found")
@@ -576,6 +576,9 @@ async def add_card_to_deck(
         )
         quantity = card_identity_service.clamp_quantity(data.quantity, copy_limit)
         commander_identity = await _get_color_identity(conn, deck_row["commander_id"])
+        if deck_row["partner_id"]:
+            partner_identity = await _get_color_identity(conn, deck_row["partner_id"])
+            commander_identity = sorted(set(commander_identity) | set(partner_identity))
         card_identity = await _get_color_identity(conn, card_id)
         _check_color_identity(card_identity, commander_identity)
 

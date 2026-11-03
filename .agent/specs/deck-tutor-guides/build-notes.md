@@ -131,3 +131,34 @@ Ty -> `All checks passed!`. Frontend `pnpm test` -> `31 passed`, `130 passed`; t
 
 No acceptance text, production code, paid call, source refresh, live-data operation, or harness configuration changed.
 The pre-existing `GLOSSARY.md` edit remains unstaged and untouched.
+
+## Round 8 — eval-7 repair
+
+- `backend/src/mtg_helper/services/agents/_model.py`: retained the shared `gpt-5.6-luna` default and added a narrow
+  keyword-only model override plus the existing Responses high-reasoning type.
+- `backend/src/mtg_helper/services/tutor/{teaching,evidence}.py`: selected Tutor-only `gpt-6.1-sol`, high reasoning,
+  a 16,000-token one-request/no-tools bound, general resource/timing instructions, CR 302.6 evidence, and a
+  seven-copy candidate-work cap without changing frozen quantities.
+- `backend/src/mtg_helper/services/deck_service.py`: validates physical additions against the combined Partner
+  commander color identity, required to HTTP-seed the genuine complete Blue Farm list.
+- `backend/tests/fixtures/tutor_catalog.json`: added 185 real canonical isolated-catalog facts with Oracle identities,
+  text, type, mana, color, legality, faces, supplied-name/alias mapping, and catalog-generation provenance.
+- `backend/tests/{tutor_fixtures,test_tutor_guides,test_openai_model_config}.py`: loaded the portable catalog; seeded
+  complete 99+1 Yuna and 98+2 Blue Farm Tutor runs; checked every identity, quantity and fact including Shelinda,
+  Kraum, Tymna and printed aliases; covered Partner color validation, extreme quantity work bounds, and real-agent
+  model/settings/usage-limit spies while Coach and Discover remain default-model consumers.
+- `.agent/specs/deck-tutor-guides/progress.md`: recorded user-approved Tutor-only model intervention, dataset source,
+  repair evidence, and the full-suite baseline result.
+
+Gate: explicit local Docker Compose only. Scoped Tutor/CRUD/OpenAI suite -> `88 passed in 83.43s`; expanded affected
+Tutor/CRUD/import/identity/snapshot/source/schema suite -> `141 passed in 99.87s`; no-DB suite -> `567 passed, 662
+deselected in 9.93s`; Ruff -> `All checks passed!`; format -> `257 files already formatted`; Ty -> `All checks passed!`.
+Frontend -> `31 passed`, `130 passed`; typecheck passed; lint `0 warnings and 0 errors`; format passed; production build
+compiled successfully.
+
+The mandated one-time complete backend pytest attempt is recorded honestly: `1192 passed, 10 failed, 27 errors`.
+Failures are pre-existing, unrelated full-suite test-isolation/schema assumptions (buylist/price, copy-local host,
+stale swap `cards.tags`, duplicate source fixture), so this round does not change unrelated modules or claim that
+supplementary command green. All eval-7 scope checks above are green. No paid calls, live-data operation, source
+refresh, environment/volume change, acceptance edit, or fixture fabrication was made; the pre-existing `GLOSSARY.md`
+modification remains unstaged and untouched.

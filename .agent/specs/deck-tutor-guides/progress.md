@@ -177,3 +177,34 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
 - Final verification is green: Tutor HTTP fixture check (`52 passed`), no-DB suite (`565 passed, 657 deselected`),
   backend Ruff/format/Ty, and all five frontend checks (`130` tests, typecheck, lint, format, build). No paid or live
   operation was made; the pre-existing `GLOSSARY.md` edit remains unstaged.
+
+## Round 8 — eval-7 repair
+
+- Feedback read in full from `eval-7.md` and `artifacts/eval7-teaching.md`. Repair scope is limited to the failed
+  live teaching quality and the two deterministic scope violations: Tutor-only stronger model/reasoning budget,
+  complete portable pinned facts for both supplied fixtures, and bounded candidate work for extreme quantities.
+- User explicitly approved the Tutor-only `gpt-6.1-sol` high-reasoning intervention. The shared default model remains
+  `gpt-5.6-luna` for Coach, Discover, and every other existing consumer. Preserve the pre-existing `GLOSSARY.md` edit.
+- Original BASE and slice-start HEAD remain `7778d49a1f8fda1892053d1a7282df3dc2705d0d`; this repair starts at
+  `90b5edfb8dfaff318dab99610701cab8efb8796c`. Docker 29.5.3 and explicit local Compose configuration are available.
+- Current phase: export real canonical card facts from the already synchronized isolated Compose catalog, add red
+  Tutor HTTP/model/candidate-bound regressions at the approved seams, then implement the smallest scoped repair.
+- Completed implementation: Tutor alone constructs `gpt-6.1-sol` through the existing shared constructor, requests
+  high reasoning with a 16,000-token Responses/usage bound, keeps `retries=0`, and retains its one-request/no-tools
+  contract. Coach and Discover remain on `gpt-5.6-luna`. The general evidence-grounded prompt now requires exact
+  resource/timing/text checks and Tutor evidence includes CR 302.6.
+- Completed fixture and input-bound repair: `backend/tests/fixtures/tutor_catalog.json` contains 185 real canonical
+  local-catalog facts plus exact supplied-name mappings, faces, legalities, and generation provenance for both lists.
+  Deterministic Tutor HTTP tests seed full Yuna 99+1 and Blue Farm 98+2 lists, retain printed aliases, assert every
+  frozen fact/quantity, and cover Shelinda, Kraum, and Tymna. Candidate work now caps each identity at seven copies
+  while frozen evidence preserves the true quantity. Partner color identity is used for physical additions and its
+  regression still rejects an outside color.
+- Final scoped Docker checks are green: Tutor/CRUD/OpenAI regression suite `88 passed in 83.43s`; expanded affected
+  source/identity/schema suite `141 passed in 99.87s`; no-DB suite `567 passed, 662 deselected in 9.93s`; Ruff,
+  format, and Ty are clean; all five frontend commands pass (`31` files / `130` tests, typecheck, zero lint warnings,
+  format, build). No live or paid model call, source refresh, environment, or volume change was made.
+- A one-time complete backend pytest run was attempted as required and is not a green gate: `1192 passed, 10 failed,
+  27 errors`. The failures are unrelated pre-existing full-suite isolation/schema assumptions (buylist/price state,
+  copy-local loopback host, stale `cards.tags` swap tests, and duplicate source fixture). They are outside eval-7's
+  exclusive repair scope; affected Tutor and VERIFY-required checks above are green. Next action: commit this scoped
+  round with the complete portable dataset and report the unrelated complete-suite baseline honestly.

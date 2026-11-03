@@ -23,6 +23,7 @@ from tests.tutor_fixtures import (
     PinnedCardFact,
     acceptance_fixtures,
     blue_farm_combo_payload,
+    fixture_pinned_facts,
 )
 
 FOREST_SCRYFALL_ID = UUID("6d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
@@ -124,6 +125,162 @@ def test_acceptance_fixtures_materialize_complete_lists_and_pinned_combo_facts()
         "oracle-tainted-pact",
         "breach-freeze",
     }
+
+
+def test_acceptance_fixtures_have_portable_canonical_facts_for_every_supplied_card() -> None:
+    """Each supplied card retains a real canonical fact, identity, faces, and provenance."""
+    for fixture in acceptance_fixtures():
+        facts = fixture_pinned_facts(fixture)
+        supplied_names = set(fixture.commanders) | {name for _, name in fixture.mainboard}
+
+        assert set(facts) == supplied_names
+        assert all(fact.oracle_id and fact.canonical_name for fact in facts.values())
+        assert all(fact.type_line and fact.oracle_text for fact in facts.values())
+        assert all(fact.commander_legality for fact in facts.values())
+        assert all(
+            fact.source.get("catalog") == "isolated-compose-scryfall-catalog"
+            for fact in facts.values()
+        )
+        assert all(isinstance(fact.source.get("generation"), str) for fact in facts.values())
+    yuna, blue_farm = acceptance_fixtures()
+    assert fixture_pinned_facts(yuna)["Shelinda, Yevon Acolyte"].oracle_text.startswith("Lifelink")
+    assert fixture_pinned_facts(blue_farm)["Tymna the Weaver"].type_line.startswith("Legendary")
+    assert fixture_pinned_facts(blue_farm)["Kraum, Ludevic's Opus"].mana_cost == "{3}{U}{R}"
+    assert fixture_pinned_facts(blue_farm)["Stay with Me"].canonical_name == "Rhystic Study"
+    assert fixture_pinned_facts(blue_farm)["Porom's Silence Magic"].canonical_name == "Silence"
+    assert fixture_pinned_facts(blue_farm)["Chaos Emerald"].canonical_name == "Lotus Petal"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fixture_index", [0, 1])
+async def test_complete_acceptance_fixture_facts_reach_tutor_evidence(
+    client: AsyncClient,
+    db_pool: asyncpg.Pool,
+    monkeypatch: pytest.MonkeyPatch,
+    fixture_index: int,
+) -> None:
+    """Tutor captures all supplied quantities and canonical facts for each complete Lerndeck."""
+    from mtg_helper.models.tutor import TutorGuideDraft
+    from mtg_helper.services.tutor import cedh, commander
+    from mtg_helper.services.tutor.teaching import TeachingInput
+
+    fixture = acceptance_fixtures()[fixture_index]
+    facts = fixture_pinned_facts(fixture)
+    observed: TeachingInput | None = None
+
+    async def fixed_teacher(guide_input: TeachingInput) -> TutorGuideDraft:
+        nonlocal observed
+        observed = guide_input
+        hand = [facts[name].canonical_name for _, name in fixture.mainboard[:7]]
+        assert all(isinstance(name, str) for name in hand)
+        return TutorGuideDraft(
+            title=f"{fixture.name} guide",
+            content="Interpretation: use the complete supplied list.",
+            opening_hands=[
+                {"decision": decision, "cards": hand, "explanation": "Actual list cards."}
+                for decision in ("keep", "mulligan", "context-dependent")
+            ],
+        )
+
+    monkeypatch.setattr(
+        commander if fixture.mode == "commander" else cedh, "generate", fixed_teacher
+    )
+    ids = await _seed_pinned_card_facts(db_pool, facts)
+    created = await client.post(
+        "/api/v1/decks",
+        json={
+            "commander_scryfall_id": str(ids[fixture.commanders[0]]),
+            "partner_scryfall_id": (
+                str(ids[fixture.commanders[1]]) if len(fixture.commanders) == 2 else None
+            ),
+            "name": fixture.name,
+        },
+    )
+    assert created.status_code == 201
+    deck_id = created.json()["data"]["id"]
+    for quantity, printed_name in fixture.mainboard:
+        added = await client.post(
+            f"/api/v1/decks/{deck_id}/cards",
+            json={"card_scryfall_id": str(ids[printed_name]), "quantity": quantity},
+        )
+        assert added.status_code == 201, f"{printed_name}: {added.text}"
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": fixture.mode})
+    started = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert started.status_code == 200
+
+    run = await _finished_state(client, deck_id)
+    assert run["status"] == "succeeded"
+    assert observed is not None
+    expected_quantities = {facts[name].oracle_id: quantity for quantity, name in fixture.mainboard}
+    captured_quantities = {str(card.oracle_id): card.quantity for card in observed.evidence.cards}
+    assert captured_quantities == expected_quantities
+    captured_commanders = {str(card.oracle_id) for card in observed.evidence.commanders}
+    assert captured_commanders == {facts[name].oracle_id for name in fixture.commanders}
+    persisted_cards = {card["oracle_id"]: card for card in run["evidence"]["cards"]}
+    persisted_commanders = {card["oracle_id"]: card for card in run["evidence"]["commanders"]}
+    for printed_name, fact in facts.items():
+        persisted = (
+            persisted_commanders[fact.oracle_id]
+            if printed_name in fixture.commanders
+            else persisted_cards[fact.oracle_id]
+        )
+        expected_faces = [
+            {
+                "name": face["name"],
+                "type_line": face.get("type_line"),
+                "oracle_text": face.get("oracle_text"),
+            }
+            for face in fact.faces
+            if isinstance(face.get("name"), str)
+        ]
+        assert persisted["name"] == fact.canonical_name
+        assert persisted["mana_cost"] == fact.mana_cost
+        assert persisted["type_line"] == fact.type_line
+        assert persisted["oracle_text"] == fact.oracle_text
+        assert persisted["color_identity"] == list(fact.color_identity)
+        assert persisted["legalities"]["commander"] == fact.commander_legality
+        assert persisted["faces"] == expected_faces
+
+
+@pytest.mark.asyncio
+async def test_partner_color_identity_allows_partner_colors_and_rejects_outside_colors(
+    client: AsyncClient,
+    db_pool: asyncpg.Pool,
+) -> None:
+    """Physical additions use both saved Partner commanders without weakening color validation."""
+    yuna, blue_farm = acceptance_fixtures()
+    blue_facts = fixture_pinned_facts(blue_farm)
+    facts = {
+        name: blue_facts[name]
+        for name in ("Kraum, Ludevic's Opus", "Tymna the Weaver", "Ad Nauseam")
+    }
+    facts["Forest"] = fixture_pinned_facts(yuna)["Forest"]
+    ids = await _seed_pinned_card_facts(db_pool, facts)
+    created = await client.post(
+        "/api/v1/decks",
+        json={
+            "commander_scryfall_id": str(ids["Kraum, Ludevic's Opus"]),
+            "partner_scryfall_id": str(ids["Tymna the Weaver"]),
+            "name": "Partner color identity",
+        },
+    )
+    assert created.status_code == 201
+    deck_id = created.json()["data"]["id"]
+
+    partner_color = await client.post(
+        f"/api/v1/decks/{deck_id}/cards",
+        json={"card_scryfall_id": str(ids["Ad Nauseam"])},
+    )
+    outside_color = await client.post(
+        f"/api/v1/decks/{deck_id}/cards",
+        json={"card_scryfall_id": str(ids["Forest"])},
+    )
+
+    assert partner_color.status_code == 201
+    assert outside_color.status_code == 422
+    assert outside_color.json()["detail"]["code"] == "COLOR_IDENTITY_VIOLATION"
 
 
 @pytest.mark.asyncio
@@ -295,6 +452,43 @@ def test_teaching_candidates_mix_actual_lands_and_castable_actions() -> None:
         3,
     ]
     assert sum(card not in {"Forest", "Island"} for card in candidates[0]) == 4
+
+
+def test_teaching_candidates_bound_quantity_work_without_mutating_frozen_evidence() -> None:
+    """A huge saved quantity cannot allocate more than one opening hand can use."""
+    from mtg_helper.models.tutor import TutorCardFact, TutorEvidence
+    from mtg_helper.services.tutor.teaching import _card_names, _opening_hand_candidates
+
+    evidence = TutorEvidence(
+        commanders=[],
+        cards=[
+            TutorCardFact(
+                oracle_id=None,
+                name="Forest",
+                quantity=100_000,
+                type_line="Basic Land",
+                oracle_text="{T}: Add {G}.",
+            ),
+            TutorCardFact(
+                oracle_id=None,
+                name="Sol Ring",
+                quantity=1,
+                type_line="Artifact",
+                oracle_text="{T}: Add {C}{C}.",
+                mana_cost="{1}",
+                cmc=1,
+            ),
+        ],
+    )
+
+    names = _card_names(evidence, lambda _card: True)
+    candidates = _opening_hand_candidates(evidence)
+
+    assert evidence.cards[0].quantity == 100_000
+    assert names.count("Forest") == 7
+    assert len(names) == 8
+    assert all(len(candidate) == 7 for candidate in candidates)
+    assert all(candidate.count("Forest") <= 7 for candidate in candidates)
 
 
 def test_teaching_structured_output_requires_each_opening_hand_decision() -> None:
@@ -952,7 +1146,7 @@ async def _seed_pinned_card_facts(
                 (
                     ids[name],
                     UUID(fact.oracle_id),
-                    name,
+                    fact.canonical_name or name,
                     fact.mana_cost,
                     fact.cmc,
                     fact.type_line,
@@ -961,6 +1155,17 @@ async def _seed_pinned_card_facts(
                     json.dumps({"commander": fact.commander_legality}),
                 )
                 for name, fact in facts.items()
+            ],
+        )
+        await conn.executemany(
+            "INSERT INTO new_card_catalog (oracle_id, facts, generation, source_facts) "
+            "VALUES ($1, '{}'::jsonb, gen_random_uuid(), $2::jsonb)",
+            [
+                (
+                    UUID(fact.oracle_id),
+                    json.dumps({"faces": list(fact.faces), "fixture_source": fact.source}),
+                )
+                for fact in facts.values()
             ],
         )
     return ids

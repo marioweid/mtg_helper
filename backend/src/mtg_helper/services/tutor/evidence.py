@@ -174,7 +174,16 @@ def _rules_evidence() -> tuple[list[TutorRuleFact], str]:
     try:
         blob, digest = source_repository.rules_resource()
         rules = unpack(blob, digest)
-        identifiers = ("103.4c", "113.7a", "122.1", "603.10a", "608.2h", "700.5", "903.3")
+        identifiers = (
+            "103.4c",
+            "113.7a",
+            "122.1",
+            "302.6",
+            "603.10a",
+            "608.2h",
+            "700.5",
+            "903.3",
+        )
         facts = [
             TutorRuleFact(identifier=identifier, text=rules[identifier]["text"])
             for identifier in identifiers

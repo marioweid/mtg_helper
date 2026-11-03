@@ -1,6 +1,8 @@
 """Portable, exact Deck Tutor acceptance-list data for deterministic adapters."""
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
 
 # These are intentionally materialized rather than parsed from ignored specification files.
 # Flavor names are part of the supplied Blue Farm list and resolve to canonical identities.
@@ -263,6 +265,78 @@ class PinnedCardFact:
     oracle_text: str
     color_identity: tuple[str, ...]
     commander_legality: str
+    canonical_name: str | None = None
+    faces: tuple[dict[str, object], ...] = ()
+    source: dict[str, object] = field(default_factory=dict)
+
+
+def _load_fixture_catalog() -> tuple[dict[str, object], dict[str, PinnedCardFact]]:
+    """Load the real isolated-catalog export without reading ignored specifications."""
+    path = Path(__file__).parent / "fixtures" / "tutor_catalog.json"
+    catalog = json.loads(path.read_text(encoding="utf-8"))
+    raw_cards = catalog.get("cards")
+    if not isinstance(raw_cards, list):
+        raise ValueError("Tutor fixture catalog must contain a card list")
+    facts: dict[str, PinnedCardFact] = {}
+    for raw_card in raw_cards:
+        if not isinstance(raw_card, dict):
+            raise ValueError("Tutor fixture catalog contains a malformed card")
+        name = raw_card.get("name")
+        oracle_id = raw_card.get("oracle_id")
+        legalities = raw_card.get("legalities")
+        if (
+            not isinstance(name, str)
+            or not isinstance(oracle_id, str)
+            or not isinstance(legalities, dict)
+        ):
+            raise ValueError("Tutor fixture catalog card identity is malformed")
+        color_identity = raw_card.get("color_identity")
+        faces = raw_card.get("faces")
+        source = raw_card.get("source")
+        if (
+            not isinstance(color_identity, list)
+            or not isinstance(faces, list)
+            or not isinstance(source, dict)
+        ):
+            raise ValueError("Tutor fixture catalog card facts are malformed")
+        facts[name] = PinnedCardFact(
+            oracle_id=oracle_id,
+            mana_cost=raw_card.get("mana_cost") or "",
+            cmc=float(raw_card["cmc"] or 0),
+            type_line=str(raw_card.get("type_line") or ""),
+            oracle_text=str(raw_card.get("oracle_text") or ""),
+            color_identity=tuple(str(color) for color in color_identity),
+            commander_legality=str(legalities.get("commander") or ""),
+            canonical_name=name,
+            faces=tuple(face for face in faces if isinstance(face, dict)),
+            source=source,
+        )
+    return catalog, facts
+
+
+TUTOR_CATALOG, ALL_PINNED_CARD_FACTS = _load_fixture_catalog()
+
+
+def fixture_pinned_facts(fixture: "TutorFixture") -> dict[str, PinnedCardFact]:
+    """Return every supplied printed name with its exact canonical catalog fact."""
+    raw_mapping = TUTOR_CATALOG.get("supplied_name_to_canonical_name")
+    if not isinstance(raw_mapping, dict):
+        raise ValueError("Tutor fixture catalog lacks supplied-name identities")
+    names = (*fixture.commanders, *(name for _, name in fixture.mainboard))
+    facts: dict[str, PinnedCardFact] = {}
+    for name in names:
+        raw_identity = raw_mapping.get(name)
+        if not isinstance(raw_identity, dict):
+            raise ValueError(f"Tutor fixture catalog lacks identity for {name}")
+        canonical_name = raw_identity.get("canonical_name")
+        oracle_id = raw_identity.get("oracle_id")
+        fact = ALL_PINNED_CARD_FACTS.get(canonical_name)
+        if not isinstance(canonical_name, str) or not isinstance(oracle_id, str) or fact is None:
+            raise ValueError(f"Tutor fixture catalog has malformed identity for {name}")
+        if fact.oracle_id != oracle_id:
+            raise ValueError(f"Tutor fixture catalog identity disagrees for {name}")
+        facts[name] = fact
+    return facts
 
 
 # These local-catalog facts pin Yuna's commander and actual counter/combat engines.

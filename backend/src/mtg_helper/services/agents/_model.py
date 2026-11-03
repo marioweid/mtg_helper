@@ -7,15 +7,19 @@ from pydantic_ai.providers.openai import OpenAIProvider
 
 from mtg_helper.config import settings
 
-ReasoningLevel = Literal["minimal", "low"]
+ReasoningLevel = Literal["minimal", "low", "high"]
 TextVerbosity = Literal["low", "medium"]
 OPENAI_MODEL = "gpt-5.6-luna"
 
 
-def make_openai_model() -> OpenAIResponsesModel:
-    """Build the fixed OpenAI Responses model from application settings."""
+def make_openai_model(*, model_name: str = OPENAI_MODEL) -> OpenAIResponsesModel:
+    """Build one OpenAI Responses model from application settings.
+
+    Args:
+        model_name: Explicit workflow model; defaults to the shared application model.
+    """
     provider = OpenAIProvider(api_key=settings.openai_api_key.get_secret_value())
-    return OpenAIResponsesModel(OPENAI_MODEL, provider=provider)
+    return OpenAIResponsesModel(model_name, provider=provider)
 
 
 def openai_model_settings(
