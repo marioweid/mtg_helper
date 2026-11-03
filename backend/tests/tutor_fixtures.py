@@ -251,6 +251,183 @@ BLUE_FARM_PINNED_FACTS = {
     "Brain Freeze": ("Instant", "Target player mills three cards. Storm."),
 }
 
+
+@dataclass(frozen=True)
+class PinnedCardFact:
+    """Exact canonical card data needed by a portable Tutor fixture."""
+
+    oracle_id: str
+    mana_cost: str
+    cmc: float
+    type_line: str
+    oracle_text: str
+    color_identity: tuple[str, ...]
+    commander_legality: str
+
+
+# These local-catalog facts pin Yuna's commander and actual counter/combat engines.
+YUNA_PINNED_FACTS = {
+    "Yuna, Grand Summoner": PinnedCardFact(
+        oracle_id="ba72d4a9-6f36-4796-bd71-2342fa9b4a30",
+        mana_cost="{1}{G}{W}{U}",
+        cmc=4,
+        type_line="Legendary Creature — Human Cleric",
+        oracle_text=(
+            "Grand Summon — {T}: Add one mana of any color. When you next cast a creature spell "
+            "this turn, that creature enters with two additional +1/+1 counters on it.\nWhenever "
+            "another permanent you control is put into a graveyard from the battlefield, if it had "
+            "one or more counters on it, you may put that number of +1/+1 counters on target "
+            "creature."
+        ),
+        color_identity=("G", "U", "W"),
+        commander_legality="legal",
+    ),
+    "Basking Broodscale": PinnedCardFact(
+        oracle_id="a7c69802-99c4-4778-934e-cc09ba58c267",
+        mana_cost="{1}{G}",
+        cmc=2,
+        type_line="Creature — Eldrazi Lizard",
+        oracle_text=(
+            "Devoid (This card has no color.)\n{1}{G}: Adapt 1. (If this creature has no +1/+1 "
+            "counters on it, put a +1/+1 counter on it.)\nWhenever one or more +1/+1 counters "
+            "are put on this creature, you may create a 0/1 colorless Eldrazi Spawn creature token "
+            'with "Sacrifice this token: Add {C}."'
+        ),
+        color_identity=("G",),
+        commander_legality="legal",
+    ),
+    "Champion of Lambholt": PinnedCardFact(
+        oracle_id="c549b0fd-1e08-4873-952e-a14dc45a0fd2",
+        mana_cost="{1}{G}{G}",
+        cmc=3,
+        type_line="Creature — Human Warrior",
+        oracle_text=(
+            "Creatures with power less than this creature's power can't block creatures you "
+            "control.\n"
+            "Whenever another creature you control enters, put a +1/+1 counter on this creature."
+        ),
+        color_identity=("G",),
+        commander_legality="legal",
+    ),
+    "Danny Pink": PinnedCardFact(
+        oracle_id="92cda790-7907-47d1-8e5a-d3364c1e881f",
+        mana_cost="{3}{U}",
+        cmc=4,
+        type_line="Legendary Creature — Human Soldier Advisor",
+        oracle_text=(
+            "Mentor (Whenever this creature attacks, put a +1/+1 counter on target attacking "
+            'creature with lesser power.)\nCreatures you control have "Whenever one or more '
+            'counters are put on this creature for the first time each turn, draw a card."'
+        ),
+        color_identity=("U",),
+        commander_legality="legal",
+    ),
+    "Gyre Sage": PinnedCardFact(
+        oracle_id="e3aa16cf-079b-4737-9ffd-7bfdffef0cb2",
+        mana_cost="{1}{G}",
+        cmc=2,
+        type_line="Creature — Elf Druid",
+        oracle_text=(
+            "Evolve (Whenever a creature you control enters, if that creature has greater power or "
+            "toughness than this creature, put a +1/+1 counter on this creature.)\n{T}: Add {G} "
+            "for each +1/+1 counter on this creature."
+        ),
+        color_identity=("G",),
+        commander_legality="legal",
+    ),
+    "Hardened Scales": PinnedCardFact(
+        oracle_id="a1f3da21-af6d-450e-bf0b-985d158418e6",
+        mana_cost="{G}",
+        cmc=1,
+        type_line="Enchantment",
+        oracle_text=(
+            "If one or more +1/+1 counters would be put on a creature you control, that many plus "
+            "one +1/+1 counters are put on it instead."
+        ),
+        color_identity=("G",),
+        commander_legality="legal",
+    ),
+    "Herald of Secret Streams": PinnedCardFact(
+        oracle_id="366a218e-84d3-4cf9-bbc8-f2f8ecce92a3",
+        mana_cost="{3}{U}",
+        cmc=4,
+        type_line="Creature — Merfolk Warrior",
+        oracle_text="Creatures you control with +1/+1 counters on them can't be blocked.",
+        color_identity=("U",),
+        commander_legality="legal",
+    ),
+    "Incubation Druid": PinnedCardFact(
+        oracle_id="34428f42-03ac-4795-8286-6cbea796df2b",
+        mana_cost="{1}{G}",
+        cmc=2,
+        type_line="Creature — Elf Druid",
+        oracle_text=(
+            "{T}: Add one mana of any type that a land you control could produce. If this creature "
+            "has a +1/+1 counter on it, add three mana of that type instead.\n{3}{G}{G}: Adapt 3. "
+            "(If this creature has no +1/+1 counters on it, put three +1/+1 counters on it.)"
+        ),
+        color_identity=("G",),
+        commander_legality="legal",
+    ),
+    "Ozolith, the Shattered Spire": PinnedCardFact(
+        oracle_id="41fed659-237c-4d8e-ad31-d17fa0d3f764",
+        mana_cost="{1}{G}",
+        cmc=2,
+        type_line="Legendary Artifact",
+        oracle_text=(
+            "If one or more +1/+1 counters would be put on an artifact or creature you control, "
+            "that many plus one +1/+1 counters are put on it instead.\n{1}{G}, {T}: Put a +1/+1 "
+            "counter on target artifact or creature you control. Activate only as a sorcery.\n"
+            "Cycling {2} ({2}, Discard this card: Draw a card.)"
+        ),
+        color_identity=("G",),
+        commander_legality="legal",
+    ),
+    "Simic Ascendancy": PinnedCardFact(
+        oracle_id="57c1a98e-c4fb-4144-9e3e-d0fe6789ba26",
+        mana_cost="{G}{U}",
+        cmc=2,
+        type_line="Enchantment",
+        oracle_text=(
+            "{1}{G}{U}: Put a +1/+1 counter on target creature you control.\nWhenever one or more "
+            "+1/+1 counters are put on a creature you control, put that many growth counters on "
+            "this enchantment.\nAt the beginning of your upkeep, if this enchantment has twenty "
+            "or more growth counters on it, you win the game."
+        ),
+        color_identity=("G", "U"),
+        commander_legality="legal",
+    ),
+    "The Ozolith": PinnedCardFact(
+        oracle_id="1946ded1-5f53-409f-b0a6-5433bb0357d2",
+        mana_cost="{1}",
+        cmc=1,
+        type_line="Legendary Artifact",
+        oracle_text=(
+            "Whenever a creature you control leaves the battlefield, if it had counters on it, put "
+            "those counters on The Ozolith.\nAt the beginning of combat on your turn, if The "
+            "Ozolith has counters on it, you may move all counters from The Ozolith onto target "
+            "creature."
+        ),
+        color_identity=(),
+        commander_legality="legal",
+    ),
+    "Twenty-Toed Toad": PinnedCardFact(
+        oracle_id="cce643fb-cd88-457c-8f13-c203554df675",
+        mana_cost="{3}{U}",
+        cmc=4,
+        type_line="Creature — Frog Wizard",
+        oracle_text=(
+            "Your maximum hand size is twenty.\nWhenever you attack with two or more creatures, "
+            "put a +1/+1 counter on this creature and draw a card.\nWhenever this creature "
+            "attacks, you win the game if there are twenty or more counters on it or you have "
+            "twenty or more "
+            "cards in hand."
+        ),
+        color_identity=("U",),
+        commander_legality="legal",
+    ),
+}
+
 PINNED_FACE_SOURCE_FACTS = {
     "faces": [
         {"name": "Barkchannel Pathway", "type_line": "Land", "oracle_text": "{T}: Add {G}."},

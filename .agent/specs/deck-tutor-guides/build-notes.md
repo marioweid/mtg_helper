@@ -112,3 +112,22 @@ No paid calls, source refresh, live-data operation, harness/environment change, 
 The former supplementary schema failure was a baseline test-fixture dependency; the narrow test-local view drop is
 verified by the affected schema suite. The pre-existing `GLOSSARY.md` modification remains unstaged. Fresh live
 quality attempts are external evaluator work on the committed repaired HEAD.
+
+## Round 7 - static-review repair completion
+
+- `backend/tests/tutor_fixtures.py`: added portable exact local-catalog facts for Yuna, Grand Summoner and eleven
+  actual counter/combat engines, including Oracle identity, mana value/cost, type/text, color identity, and Commander
+  legality.
+- `backend/tests/test_tutor_guides.py`: added an authenticated Tutor HTTP/evidence consumer that seeds those facts,
+  generates a Commander guide without a model call, and verifies Yuna facts plus both shared fixture memberships.
+- `frontend/components/tutor-panel.tsx`: split four overlong class/prose literals without changing their rendered
+  strings, class order, or state semantics.
+- `.agent/specs/deck-tutor-guides/progress.md`: recorded the scoped review repair and red-to-green evidence.
+
+Gate: explicit local Docker Compose only. `tests/test_tutor_guides.py` -> `52 passed in 49.67s`; BackendCheck no-DB
+suite -> `565 passed, 657 deselected in 10.10s`; Ruff -> `All checks passed!`; format -> `257 files already formatted`;
+Ty -> `All checks passed!`. Frontend `pnpm test` -> `31 passed`, `130 passed`; typecheck passed; lint -> `0 warnings and
+0 errors`; format check passed; production build compiled successfully.
+
+No acceptance text, production code, paid call, source refresh, live-data operation, or harness configuration changed.
+The pre-existing `GLOSSARY.md` edit remains unstaged and untouched.

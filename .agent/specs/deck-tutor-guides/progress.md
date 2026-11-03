@@ -118,7 +118,7 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
 
 ## Eval-4 repair
 
-- Feedback read in full from `eval-4.md`; repair scope is limited to its AC2–AC7 failures and S1–S4.
+- Feedback read in full from `eval-4.md`; repair scope is limited to its AC2â€“AC7 failures and S1â€“S4.
 - Current phase: add red HTTP/render regressions for durable intent, read-only state, publication
   interleaving, known-fact warnings, transferred ownership, malformed sources, and initial load errors.
 - Original BASE and slice-start HEAD remain `7778d49a1f8fda1892053d1a7282df3dc2705d0d`; repair starts
@@ -166,3 +166,14 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
 - No paid model call, live-data operation, source refresh, or acceptance edit was made. Fresh six-attempt
   live teaching evaluation is intentionally pending on the repaired committed HEAD; the pre-existing
   `GLOSSARY.md` edit remains unstaged.
+
+## Round 7 - static-review repair
+
+- Read `review-spec.md` and `review-standards.md`; repair scope is limited to reusable real Yuna pinned facts with
+  deterministic Tutor HTTP/evidence consumption, plus the four documented overlong Tutor-panel lines.
+- Docker Compose local catalog supplied the exact Yuna commander and counter/combat-engine facts; no external or paid
+  source was used. Red HTTP/evidence collection failed before `YUNA_PINNED_FACTS` existed, then its focused check
+  passed after the portable fact fixture and consumer were added.
+- Final verification is green: Tutor HTTP fixture check (`52 passed`), no-DB suite (`565 passed, 657 deselected`),
+  backend Ruff/format/Ty, and all five frontend checks (`130` tests, typecheck, lint, format, build). No paid or live
+  operation was made; the pre-existing `GLOSSARY.md` edit remains unstaged.

@@ -6,8 +6,11 @@ import { apiClient } from "@/lib/api";
 import type { TutorMode, TutorStateResponse } from "@/lib/types";
 
 const FOCUS =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950";
-const PRIMARY = `min-h-11 touch-manipulation rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-50 ${FOCUS}`;
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 " +
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950";
+const PRIMARY =
+  "min-h-11 touch-manipulation rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold " +
+  `text-white hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-50 ${FOCUS}`;
 
 interface TutorPanelProps {
   deckId: string;
@@ -137,7 +140,10 @@ export function TutorPanelView({ state, busy, error, onMode, onGenerate }: Tutor
           <ModeOption
             mode="cedh"
             label="cEDH"
-            detail="Efficient lines, protection windows, and race-versus-grind decisions—not a strength certificate."
+            detail={
+              "Efficient lines, protection windows, and race-versus-grind decisions—not a strength " +
+              "certificate."
+            }
             selected={state.mode === "cedh"}
             onSelect={onMode}
           />
@@ -206,7 +212,10 @@ function ModeOption({
       type="button"
       aria-pressed={selected}
       onClick={() => onSelect(mode)}
-      className={`min-h-11 rounded-xl border p-4 text-left ${FOCUS} ${selected ? "border-indigo-400 bg-indigo-400/10" : "border-white/10 hover:border-white/30"}`}
+      className={
+        `min-h-11 rounded-xl border p-4 text-left ${FOCUS} ` +
+        (selected ? "border-indigo-400 bg-indigo-400/10" : "border-white/10 hover:border-white/30")
+      }
     >
       <span className="block font-semibold text-white">{label}</span>
       <span className="mt-1 block text-sm leading-6 text-gray-400">{detail}</span>

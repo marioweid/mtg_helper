@@ -19,6 +19,8 @@ from tests.tutor_fixtures import (
     HOSTILE_SOURCE_TEXT,
     PINNED_FACE_SOURCE_FACTS,
     YUNA_MAINBOARD,
+    YUNA_PINNED_FACTS,
+    PinnedCardFact,
     acceptance_fixtures,
     blue_farm_combo_payload,
 )
@@ -122,6 +124,80 @@ def test_acceptance_fixtures_materialize_complete_lists_and_pinned_combo_facts()
         "oracle-tainted-pact",
         "breach-freeze",
     }
+
+
+@pytest.mark.asyncio
+async def test_yuna_fixture_pinned_facts_reach_the_tutor_evidence_boundary(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Commander teaching receives real Yuna engine facts from the reusable fixture."""
+    from mtg_helper.models.tutor import TutorGuideDraft
+    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor.teaching import TeachingInput
+
+    observed: TeachingInput | None = None
+    yuna, blue_farm = acceptance_fixtures()
+    yuna_names = {name for _, name in yuna.mainboard}
+    blue_farm_names = {name for _, name in blue_farm.mainboard}
+    assert set(YUNA_PINNED_FACTS) - {"Yuna, Grand Summoner"} <= yuna_names
+    assert set(BLUE_FARM_PINNED_FACTS) <= blue_farm_names
+
+    async def fixed_teacher(guide_input: TeachingInput) -> object:
+        nonlocal observed
+        observed = guide_input
+        hand = list(YUNA_PINNED_FACTS)[1:8]
+        return TutorGuideDraft(
+            title="Yuna guide",
+            content="Interpretation: grow counters and attack through blockers.",
+            opening_hands=[
+                {"decision": decision, "cards": hand, "explanation": "Actual Yuna cards."}
+                for decision in ("keep", "mulligan", "context-dependent")
+            ],
+        )
+
+    monkeypatch.setattr(commander, "generate", fixed_teacher)
+    ids = await _seed_pinned_card_facts(db_pool, YUNA_PINNED_FACTS)
+    created = await client.post(
+        "/api/v1/decks",
+        json={"commander_scryfall_id": str(ids["Yuna, Grand Summoner"]), "name": yuna.name},
+    )
+    assert created.status_code == 201
+    deck_id = created.json()["data"]["id"]
+    for name, scryfall_id in ids.items():
+        if name == "Yuna, Grand Summoner":
+            continue
+        added = await client.post(
+            f"/api/v1/decks/{deck_id}/cards",
+            json={"card_scryfall_id": str(scryfall_id)},
+        )
+        assert added.status_code == 201
+    await client.put(f"/api/v1/decks/{deck_id}/tutor/setup", json={"mode": yuna.mode})
+    started = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert started.status_code == 200
+
+    run = await _finished_state(client, deck_id)
+    assert run["status"] == "succeeded"
+    assert observed is not None
+    assert observed.evidence.commanders[0].oracle_id == UUID(
+        YUNA_PINNED_FACTS["Yuna, Grand Summoner"].oracle_id
+    )
+    teaching_facts = {fact.name: fact for fact in observed.evidence.cards}
+    assert teaching_facts["Simic Ascendancy"].oracle_text.endswith("you win the game.")
+    assert teaching_facts["Twenty-Toed Toad"].color_identity == ["U"]
+    evidence = run["evidence"]
+    assert (
+        evidence["commanders"][0]["oracle_id"]
+        == YUNA_PINNED_FACTS["Yuna, Grand Summoner"].oracle_id
+    )
+    facts = {card["name"]: card for card in evidence["cards"]}
+    assert facts["Hardened Scales"]["oracle_text"] == (
+        "If one or more +1/+1 counters would be put on a creature you control, that many plus "
+        "one +1/+1 counters are put on it instead."
+    )
+    assert facts["Simic Ascendancy"]["mana_cost"] == "{G}{U}"
+    assert facts["Twenty-Toed Toad"]["legalities"]["commander"] == "legal"
 
 
 def test_teaching_candidates_mix_actual_lands_and_castable_actions() -> None:
@@ -857,6 +933,34 @@ async def _seed_line_cards(pool: asyncpg.Pool) -> dict[str, UUID]:
             [
                 (scryfall_id, uuid4(), name, *BLUE_FARM_PINNED_FACTS[name])
                 for name, scryfall_id in ids.items()
+            ],
+        )
+    return ids
+
+
+async def _seed_pinned_card_facts(
+    pool: asyncpg.Pool, facts: dict[str, PinnedCardFact]
+) -> dict[str, UUID]:
+    """Seed real pinned fixture facts through the same card capture path used by Tutor."""
+    ids = {name: uuid4() for name in facts}
+    async with pool.acquire() as conn:
+        await conn.executemany(
+            "INSERT INTO cards (scryfall_id, oracle_id, name, mana_cost, cmc, type_line, "
+            "oracle_text, color_identity, legalities, is_canonical) VALUES "
+            "($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, true)",
+            [
+                (
+                    ids[name],
+                    UUID(fact.oracle_id),
+                    name,
+                    fact.mana_cost,
+                    fact.cmc,
+                    fact.type_line,
+                    fact.oracle_text,
+                    list(fact.color_identity),
+                    json.dumps({"commander": fact.commander_legality}),
+                )
+                for name, fact in facts.items()
             ],
         )
     return ids
