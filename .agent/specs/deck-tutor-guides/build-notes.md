@@ -222,3 +222,22 @@ Approved deviation: none. The user explicitly removed application output length/
 round removes only those output constraints, retains input-safety bounds and provider-native limits, and does not change
 Coach/Discover. No paid call, live-data operation, acceptance edit, environment/volume change, or unrelated full backend
 suite retry occurred. The pre-existing user-owned `GLOSSARY.md` change remains uncommitted.
+
+## Round 11 — eval-10 request-validation repair
+
+- `backend/src/mtg_helper/routers/tutor.py`: added the Tutor-only route wrapper that turns validation and inherited
+  authentication `HTTPException` failures into sanitized standard error envelopes without changing legacy routers.
+- `backend/tests/test_tutor_guides.py`: added real FastAPI Tutor HTTP coverage for invalid mode/request key/path UUID,
+  missing or malformed JSON, zero persisted intent, and unauthenticated envelope/status behavior.
+- `.agent/specs/deck-tutor-guides/progress.md`: recorded the sole eval-10 scope repair, red-to-green result, and narrow
+  verification.
+- `.agent/specs/deck-tutor-guides/build-notes.md`: recorded this scoped repair and its verification summary.
+
+Gate: explicit local Docker Compose scoped backend verification. `pytest -q -W error tests/test_tutor_guides.py
+tests/test_deck_crud.py tests/test_auth.py -o cache_dir=/tmp/pytest-cache` -> `93 passed in 84.12s`; `ruff format .` ->
+`257 files left unchanged`; final `ruff format --check .` -> `257 files already formatted`; `ruff check .` and
+`ty check src/` -> `All checks passed!`.
+
+No deviation: the requested route-local wrapper is copied from the existing PilotRoute pattern and does not change
+global validation/auth behavior. The previously passing paid live runs, unaffected frontend gate, and teacher/model code
+were not rerun or modified. `GLOSSARY.md` remains the pre-existing user-owned unstaged change.

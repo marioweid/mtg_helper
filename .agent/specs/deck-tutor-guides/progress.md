@@ -254,3 +254,22 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
   passed, typecheck passed, lint `0 warnings and 0 errors`, format clean, production build compiled successfully.
 - No paid/model call, live-data operation, environment/volume change, acceptance edit, or unrelated full backend-suite
   retry was made. Next action: commit this scoped round excluding `GLOSSARY.md`, then hand off for independent evaluation.
+
+## Round 11 — eval-10 request-validation repair
+
+- Feedback read in full from `eval-10.md`; its sole failure is Scope S1: new Tutor framework
+  request-validation responses use FastAPI's `detail` payload instead of the required error envelope.
+- Original BASE and slice-start HEAD remain `7778d49a1f8fda1892053d1a7282df3dc2705d0d`; repair starts at
+  `368c043880e56c7b9c0ca20979a63d39bc67654a`. Preserve the pre-existing user-owned `GLOSSARY.md` edit.
+- Current phase: add a failing authenticated Tutor HTTP regression for invalid mode/request key, malformed deck ID,
+  absent or malformed JSON, and no persisted intent; then add a route-local normalized validation envelope without
+  altering legacy routes, teaching, model, fixture, schema, or UI code. Recheck auth and ownership status behavior.
+- Red-to-green evidence: the new Tutor HTTP check first failed on FastAPI's absent `error` field, then passed after
+  route-local handling. Invalid mode, malformed request key/path UUID, missing body, and malformed JSON now return
+  422 `ErrorResponse` values with a nonempty code/message and no submitted value; they persist no Tutor run.
+- Completed narrow verification: Docker Tutor/CRUD/auth suite `93 passed in 84.12s`; Docker Ruff format `257 files
+  already formatted`, Ruff check and Ty `All checks passed!`. The full six live generations and already-passing unchanged
+  frontend gate were deliberately not repeated; this repair cannot invoke the model.
+- Production teacher/model proof: `git diff --exit-code 368c0438 -- backend/src/mtg_helper/services/tutor/teaching.py
+  backend/src/mtg_helper/services/agents/_model.py` is clean. No teaching, model, fixture, prompt, schema, or Tutor UI
+  code changed. Next action: commit the narrow repair excluding the pre-existing `GLOSSARY.md`, then final evaluation.

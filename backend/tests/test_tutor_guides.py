@@ -194,6 +194,51 @@ async def test_tutor_errors_use_the_standard_error_envelope(
     }
 
 
+@pytest.mark.asyncio
+async def test_tutor_validation_errors_use_the_standard_error_envelope(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    """Reject invalid Tutor HTTP input without persisting or exposing submitted values."""
+    from mtg_helper.auth import get_current_account
+    from mtg_helper.main import app
+
+    deck_id = await _deck_id(client)
+    requests = (
+        ("put", f"/api/v1/decks/{deck_id}/tutor/setup", {"mode": "invalid"}),
+        ("post", f"/api/v1/decks/{deck_id}/tutor/guides", {"request_key": "not-a-uuid"}),
+        ("get", "/api/v1/decks/not-a-uuid/tutor", None),
+        ("put", f"/api/v1/decks/{deck_id}/tutor/setup", None),
+    )
+    for method, path, payload in requests:
+        response = await client.request(method.upper(), path, json=payload)
+        assert response.status_code == 422
+        body = response.json()
+        assert set(body) == {"error"}
+        error = body["error"]
+        assert error["code"] == "TUTOR_REQUEST_INVALID"
+        assert isinstance(error["message"], str) and error["message"]
+        assert "invalid" not in error["message"]
+        if payload:
+            assert all(str(value) not in response.text for value in payload.values())
+
+    malformed = await client.put(
+        f"/api/v1/decks/{deck_id}/tutor/setup",
+        content=b"{",
+        headers={"content-type": "application/json"},
+    )
+    assert malformed.status_code == 422
+    assert malformed.json()["error"]["code"] == "TUTOR_REQUEST_INVALID"
+    assert await db_pool.fetchval("SELECT count(*) FROM tutor_runs") == 0
+
+    current_account = app.dependency_overrides.pop(get_current_account)
+    try:
+        unauthenticated = await client.get(f"/api/v1/decks/{deck_id}/tutor")
+    finally:
+        app.dependency_overrides[get_current_account] = current_account
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["error"]["code"] == "UNAUTHORIZED"
+
+
 def test_tutor_fixture_commander_is_stable() -> None:
     """The shared Tutor fixture uses the existing deterministic commander identity."""
     assert UUID(str(HAZEL_SCRYFALL_ID)).version == 4
