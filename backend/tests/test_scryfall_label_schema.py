@@ -97,6 +97,7 @@ async def test_additive_tag_schema_upgrade_is_idempotent_and_preserves_user_data
             # This slice changes only these tables and the source-kind constraint. Reconstruct
             # their exact pre-publication state; the remaining schema is unchanged from HEAD.
             await conn.execute(
+                "DROP VIEW deck_detail_view; "
                 "DROP TABLE scryfall_tag_state, scryfall_tag_memberships, "
                 "scryfall_tag_descendants, scryfall_tags; "
                 "ALTER TABLE recommendation_sources DROP CONSTRAINT "

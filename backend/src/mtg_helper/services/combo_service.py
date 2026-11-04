@@ -5,6 +5,7 @@ the response into the trimmed ``ComboListResponse`` the UI consumes.
 """
 
 import logging
+import math
 from typing import Any
 from uuid import UUID
 
@@ -31,6 +32,10 @@ class ComboFetchError(RuntimeError):
     """Raised when the Commander Spellbook API fails or returns garbage."""
 
 
+class ComboResponseError(ComboFetchError):
+    """Raised when Commander Spellbook returns an unusable result shape."""
+
+
 async def fetch_combos(
     pool: asyncpg.Pool,
     deck: DeckDetailResponse,
@@ -52,10 +57,7 @@ async def fetch_combos(
     commander_names = await _commander_names(pool, deck)
     body = _build_request_body(commander_names, deck)
     payload = await _call_spellbook(body, client=client)
-    raw_results = (payload.get("results") or {}) if isinstance(payload, dict) else {}
-
-    raw_active: list[dict[str, Any]] = list(raw_results.get("included") or [])
-    raw_almost: list[dict[str, Any]] = list(raw_results.get("almostIncluded") or [])
+    raw_active, raw_almost = _result_lists(payload)
 
     deck_names = _deck_card_names(deck, commander_names)
     referenced_names = _collect_referenced_names(raw_active + raw_almost)
@@ -69,6 +71,66 @@ async def fetch_combos(
             almost.append(translated)
 
     return ComboListResponse(active=active, almost_there=almost)
+
+
+def _result_lists(payload: object) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate result coverage before an empty result can be trusted as absence."""
+    if not isinstance(payload, dict):
+        raise ComboResponseError("Commander Spellbook response is not an object")
+    results = payload.get("results")
+    if not isinstance(results, dict):
+        raise ComboResponseError("Commander Spellbook response is missing results")
+    included = results.get("included")
+    almost_included = results.get("almostIncluded")
+    if not isinstance(included, list) or not isinstance(almost_included, list):
+        raise ComboResponseError("Commander Spellbook response has invalid result lists")
+    for combo in included + almost_included:
+        _validate_combo_entry(combo)
+    return included, almost_included
+
+
+def _validate_combo_entry(combo: object) -> None:
+    """Reject incomplete nested combo data before it can become supporting evidence."""
+    if (
+        not isinstance(combo, dict)
+        or not isinstance(combo.get("id"), str)
+        or not combo["id"].strip()
+    ):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    uses = combo.get("uses")
+    if not isinstance(uses, list) or not uses:
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    if any(not _valid_use(use) for use in uses):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    produces = combo.get("produces", [])
+    if not isinstance(produces, list) or any(not _valid_produces(entry) for entry in produces):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+    if any(not _optional_string(combo.get(field)) for field in ("description", "bracketTag")):
+        raise ComboResponseError("Commander Spellbook response has invalid combo entries")
+
+
+def _valid_use(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("card"), dict)
+        and isinstance(value["card"].get("name"), str)
+        and bool(value["card"]["name"].strip())
+        and _optional_string(value["card"].get("imageUriFrontNormal"))
+    )
+
+
+def _valid_produces(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("feature"), dict)
+        and isinstance(value["feature"].get("name"), str)
+        and bool(value["feature"]["name"].strip())
+    )
+
+
+def _optional_string(value: object) -> bool:
+    """Accept an omitted/null or string optional source field."""
+    return value is None or isinstance(value, str)
 
 
 async def _commander_names(pool: asyncpg.Pool, deck: DeckDetailResponse) -> list[str]:
@@ -109,7 +171,7 @@ async def _call_spellbook(
     body: dict[str, Any],
     *,
     client: httpx.AsyncClient | None,
-) -> dict[str, Any]:
+) -> object:
     """POST the request body to Commander Spellbook, return parsed JSON."""
     owned_client = client is None
     http_client = client or httpx.AsyncClient(timeout=_REQUEST_TIMEOUT)
@@ -123,7 +185,7 @@ async def _call_spellbook(
         try:
             return response.json()
         except ValueError as exc:
-            raise ComboFetchError("Commander Spellbook response was not valid JSON") from exc
+            raise ComboResponseError("Commander Spellbook response was not valid JSON") from exc
     finally:
         if owned_client:
             await http_client.aclose()
@@ -222,6 +284,8 @@ def _coerce_int(value: Any) -> int | None:
     if isinstance(value, int):
         return value
     if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ComboResponseError("Commander Spellbook response has non-finite popularity")
         return int(value)
     if isinstance(value, str) and value.isdigit():
         return int(value)

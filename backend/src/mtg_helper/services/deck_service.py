@@ -562,7 +562,7 @@ async def add_card_to_deck(
             await _assert_owner(conn, deck_id, email)
         # Physical additions and planned completion must share the same deck lock.
         deck_row = await conn.fetchrow(
-            "SELECT commander_id FROM decks WHERE id = $1 FOR UPDATE", deck_id
+            "SELECT commander_id, partner_id FROM decks WHERE id = $1 FOR UPDATE", deck_id
         )
         if deck_row is None:
             raise DeckNotFoundError(f"Deck {deck_id} not found")
@@ -576,6 +576,9 @@ async def add_card_to_deck(
         )
         quantity = card_identity_service.clamp_quantity(data.quantity, copy_limit)
         commander_identity = await _get_color_identity(conn, deck_row["commander_id"])
+        if deck_row["partner_id"]:
+            partner_identity = await _get_color_identity(conn, deck_row["partner_id"])
+            commander_identity = sorted(set(commander_identity) | set(partner_identity))
         card_identity = await _get_color_identity(conn, card_id)
         _check_color_identity(card_identity, commander_identity)
 
@@ -780,12 +783,13 @@ async def update_deck_card_quantity(
     """
     if quantity < 1:
         return False
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn, conn.transaction():
         if email is not None:
             try:
                 await _assert_owner(conn, deck_id, email)
             except DeckNotFoundError:
                 return False
+        await _lock_deck(conn, deck_id)
         card_row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
         if card_row is None:
             return False
@@ -854,12 +858,13 @@ async def remove_card_from_deck(
     Returns:
         True if removed, False if not found / not owned.
     """
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn, conn.transaction():
         if email is not None:
             try:
                 await _assert_owner(conn, deck_id, email)
             except DeckNotFoundError:
                 return False
+        await _lock_deck(conn, deck_id)
         card_row = await card_identity_service.canonical_card_by_scryfall(conn, scryfall_id)
         if card_row is None:
             return False
@@ -872,3 +877,10 @@ async def remove_card_from_deck(
         return False
     await planned_change_service.consume_immediate_plan(pool, deck_id, card_row["id"], "cut")
     return True
+
+
+async def _lock_deck(conn: asyncpg.Connection, deck_id: UUID) -> None:
+    """Serialize physical list writes with frozen Tutor publication."""
+    deck = await conn.fetchrow("SELECT id FROM decks WHERE id=$1 FOR UPDATE", deck_id)
+    if deck is None:
+        raise DeckNotFoundError(f"Deck {deck_id} not found")

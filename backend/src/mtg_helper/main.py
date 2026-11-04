@@ -28,6 +28,7 @@ from mtg_helper.routers import (
     revisions,
     snapshots,
     tags,
+    tutor,
 )
 from mtg_helper.services import (
     oracle_duplicate_repair_service,
@@ -36,6 +37,7 @@ from mtg_helper.services import (
 from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.new_cards.repository import NewCardsError
 from mtg_helper.services.recommendations.repository import DiscoveryError
+from mtg_helper.services.tutor.repository import TutorError, interrupt_running
 
 _log = logging.getLogger(__name__)
 
@@ -60,6 +62,8 @@ async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     try:
         await validate_local_account(app.state.db_pool)
         if settings.run_startup_maintenance:
+            await apply_schema(app.state.db_pool)
+            await interrupt_running(app.state.db_pool)
             await _run_startup_maintenance(app)
         else:
             _log.warning("Startup maintenance disabled; normal application writes remain enabled")
@@ -70,8 +74,6 @@ async def _application_lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 async def _run_startup_maintenance(app: FastAPI) -> None:
     """Initialize isolated or production deployments, never shared live development."""
-    await apply_schema(app.state.db_pool)
-
     card_count: int = await app.state.db_pool.fetchval("SELECT count(*) FROM cards")
     if card_count == 0:
         _log.info("Cards table is empty — running initial Scryfall sync")
@@ -115,6 +117,15 @@ async def discovery_error_handler(_request: Request, exc: DiscoveryError) -> JSO
     )
 
 
+@app.exception_handler(TutorError)
+async def tutor_error_handler(_request: Request, exc: TutorError) -> JSONResponse:
+    """Return owner-scoped Tutor failures in the standard error envelope."""
+    return JSONResponse(
+        status_code=exc.status,
+        content={"error": {"code": exc.code, "message": str(exc)}},
+    )
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """Return a consistent error envelope for unhandled exceptions."""
@@ -135,6 +146,7 @@ app.include_router(card_exports.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(snapshots.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(revisions.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(decks.router, prefix="/api/v1", dependencies=_authed)
+app.include_router(tutor.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(new_cards.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(recommendations.router, prefix="/api/v1", dependencies=_authed)
 app.include_router(onboarding.router, prefix="/api/v1", dependencies=_authed)

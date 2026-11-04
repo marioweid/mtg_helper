@@ -40,6 +40,16 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE INDEX IF NOT EXISTS idx_cards_name_trgm
     ON cards USING GIN (name gin_trgm_ops);
 
+-- Flavor names identify a printing while still resolving to its canonical Oracle card.
+-- Multiple Oracle identities may share an alias; resolution deliberately rejects ambiguity.
+CREATE TABLE IF NOT EXISTS card_aliases (
+    alias           TEXT NOT NULL,
+    oracle_id       UUID NOT NULL,
+    generation      UUID NOT NULL,
+    PRIMARY KEY (alias, oracle_id)
+);
+CREATE INDEX IF NOT EXISTS idx_card_aliases_lookup ON card_aliases (lower(alias));
+
 -- Color identity subset filtering
 CREATE INDEX IF NOT EXISTS idx_cards_color_identity
     ON cards USING GIN (color_identity);
@@ -546,8 +556,59 @@ SELECT
 FROM deck_cards dc
 JOIN cards c ON dc.card_id = c.id;
 
+-- ============================================================
+-- DECK TUTOR (manual saved learning guides)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tutor_setups (
+    deck_id UUID PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    mode TEXT NOT NULL CHECK (mode IN ('commander', 'cedh')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tutor_setups_account ON tutor_setups (account_id);
+
+CREATE TABLE IF NOT EXISTS tutor_runs (
+    id UUID PRIMARY KEY,
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    request_key UUID NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('commander', 'cedh')),
+    composition_hash TEXT NOT NULL,
+    teaching_hash TEXT NOT NULL,
+    manifest JSONB NOT NULL,
+    evidence JSONB NOT NULL,
+    guide JSONB,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'succeeded', 'failed', 'interrupted', 'superseded')),
+    token UUID NOT NULL,
+    lease_until TIMESTAMPTZ NOT NULL DEFAULT now() + interval '10 minutes',
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    UNIQUE (account_id, request_key)
+);
+-- The original per-owner guard allowed a transferred deck to execute twice. Resolve a pre-upgrade
+-- duplicate deterministically before replacing the index, so schema reapplication is safe.
+WITH ranked_tutor_runs AS (
+    SELECT id, row_number() OVER (PARTITION BY deck_id ORDER BY created_at DESC, id DESC)
+        AS position
+    FROM tutor_runs
+    WHERE status = 'running'
+)
+UPDATE tutor_runs AS run
+SET status = 'superseded',
+    finished_at = now(),
+    error = 'A newer active guide generation exists for this deck.'
+FROM ranked_tutor_runs AS ranked
+WHERE run.id = ranked.id AND ranked.position > 1;
+DROP INDEX IF EXISTS tutor_one_active_run;
+CREATE UNIQUE INDEX tutor_one_active_run ON tutor_runs (deck_id) WHERE status = 'running';
+CREATE INDEX IF NOT EXISTS idx_tutor_runs_deck ON tutor_runs (deck_id, account_id, created_at DESC);
+
 -- Experimental released-card discovery; additive and safe on existing databases.
-ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE deck_card_plans
+    ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS new_card_catalog (
     oracle_id UUID PRIMARY KEY,
@@ -666,6 +727,14 @@ CREATE TABLE IF NOT EXISTS recommendation_sources (
     kind TEXT NOT NULL CHECK (kind IN ('cards', 'rules', 'oracle_tags')),
     payload BYTEA NOT NULL CHECK (octet_length(payload) <= 136314880),
     published_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Tutor evidence is self-contained, while this association prevents explicit
+-- source maintenance from deleting a snapshot it also identifies.
+CREATE TABLE IF NOT EXISTS tutor_run_sources (
+    run_id UUID NOT NULL REFERENCES tutor_runs(id) ON DELETE CASCADE,
+    source_hash TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    PRIMARY KEY (run_id, source_hash)
 );
 
 ALTER TABLE recommendation_sources DROP CONSTRAINT IF EXISTS recommendation_sources_kind_check;

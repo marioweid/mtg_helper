@@ -1,7 +1,7 @@
 """Conservative printing-history normalization; never infer preview playability."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -43,8 +43,12 @@ class ReleaseHistory:
     first_regular: date | None = None
     original_regular: date | None = None
     uncertain: bool = False
+    aliases: set[str] = field(default_factory=set)
 
     def observe(self, card: dict[str, Any]) -> None:
+        flavor_name = card.get("flavor_name")
+        if isinstance(flavor_name, str) and flavor_name.strip():
+            self.aliases.add(flavor_name.strip())
         raw_date = card.get("released_at")
         if not raw_date:
             self.uncertain = True
