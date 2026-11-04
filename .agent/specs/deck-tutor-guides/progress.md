@@ -10,6 +10,11 @@
 - Green: Tutor catches Starlette's base exception, preserves headers/status and returns a sanitized
   UTF-8 JSON recovery message. Final coordinator Docker gate: 163 affected backend tests passed;
   Ruff, formatting and Ty passed. Next: independent real-TCP confirmation and final review.
+- Completed: `eval-12.md` PASS, all seven criteria PASS, no Scope violations; both reviews have no
+  mandatory fixes. Independent final checks: 95 project tests + 2 exact TCP regressions + 1 header
+  test passed. Six eval-10 live PASSes retain byte-identical producer provenance without new calls.
+- Final report written; spec status built. Docker is unavailable at recovery, so no current service
+  state or new cleanup is claimed. User-owned `GLOSSARY.md`, volumes and environment preserved.
 
 - Slug: deck-tutor-guides; approved spec, no clarification markers.
 - Repository: C:\Users\mario\sources\mtg_helper
