@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { TutorMarkdown } from "@/components/tutor-markdown";
 import { apiClient } from "@/lib/api";
 import type { TutorMode, TutorStateResponse } from "@/lib/types";
 
@@ -242,8 +243,8 @@ function Guide({
           {warning}
         </p>
       ))}
-      <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-gray-200">
-        {content}
+      <div className="mt-4">
+        <TutorMarkdown>{content}</TutorMarkdown>
       </div>
       <div className="mt-5 space-y-3" aria-label="Worked opening hands">
         {openingHands.map((hand) => (
@@ -252,7 +253,9 @@ function Guide({
             <p className="mt-1 break-words text-sm leading-6 text-gray-200">
               {hand.cards.join(", ")}
             </p>
-            <p className="mt-2 text-sm leading-6 text-gray-400">{hand.explanation}</p>
+            <div className="mt-2">
+              <TutorMarkdown>{hand.explanation}</TutorMarkdown>
+            </div>
           </section>
         ))}
       </div>
