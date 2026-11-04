@@ -4,10 +4,11 @@ from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse
@@ -47,13 +48,21 @@ class TutorRoute(APIRoute):
                 return await handler(request)
             except RequestValidationError as exc:
                 return _error_response(422, "TUTOR_REQUEST_INVALID", _validation_message(exc))
-            except HTTPException as exc:
-                return _authentication_error(exc)
+            except StarletteHTTPException as exc:
+                response = _http_error(exc)
+                response.headers.update(exc.headers or {})
+                return response
 
         return bounded_validation
 
 
-def _authentication_error(exc: HTTPException) -> JSONResponse:
+def _http_error(exc: StarletteHTTPException) -> JSONResponse:
+    if exc.status_code == 400:
+        return _error_response(
+            400,
+            "TUTOR_REQUEST_INVALID",
+            "Send a valid UTF-8 JSON Tutor request body, then try again.",
+        )
     if exc.status_code == 401:
         return _error_response(401, "UNAUTHORIZED", "Sign in to access this Tutor guide.")
     if exc.status_code == 403:

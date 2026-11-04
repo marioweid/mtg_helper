@@ -239,6 +239,29 @@ async def test_tutor_validation_errors_use_the_standard_error_envelope(
     assert unauthenticated.json()["error"]["code"] == "UNAUTHORIZED"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [b"\xff", b'\xff{"mode":"commander"}'])
+async def test_tutor_invalid_encoding_uses_standard_error_envelope(
+    client: AsyncClient, db_pool: asyncpg.Pool, payload: bytes
+) -> None:
+    """Body-parser failures remain actionable and cannot save setup or start paid work."""
+    deck_id = await _deck_id(client)
+    response = await client.put(
+        f"/api/v1/decks/{deck_id}/tutor/setup",
+        content=payload,
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": {
+            "code": "TUTOR_REQUEST_INVALID",
+            "message": "Send a valid UTF-8 JSON Tutor request body, then try again.",
+        }
+    }
+    assert await db_pool.fetchval("SELECT count(*) FROM tutor_setups") == 0
+    assert await db_pool.fetchval("SELECT count(*) FROM tutor_runs") == 0
+
+
 def test_tutor_fixture_commander_is_stable() -> None:
     """The shared Tutor fixture uses the existing deterministic commander identity."""
     assert UUID(str(HAZEL_SCRYFALL_ID)).version == 4

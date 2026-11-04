@@ -241,3 +241,15 @@ tests/test_deck_crud.py tests/test_auth.py -o cache_dir=/tmp/pytest-cache` -> `9
 No deviation: the requested route-local wrapper is copied from the existing PilotRoute pattern and does not change
 global validation/auth behavior. The previously passing paid live runs, unaffected frontend gate, and teacher/model code
 were not rerun or modified. `GLOSSARY.md` remains the pre-existing user-owned unstaged change.
+
+## Round 12 — eval-11 parser-base repair
+
+- Tutor catches the documented Starlette HTTP exception base, including invalid-encoding parser
+  failures; its FastAPI subclass remains covered. HTTP 400 becomes an actionable sanitized
+  `TUTOR_REQUEST_INVALID` response; inherited exception headers and statuses are preserved.
+- Added two invalid-UTF-8 HTTP regression cases. Both failed before the fix; both now pass without
+  creating setup or generation intent. No teacher, model, evidence, schema or frontend change.
+- Final coordinator gate in explicit local Compose: Tutor/CRUD/import/identity/snapshot/source/schema/
+  model/auth suite `163 passed in 119.63s`; Ruff, format and Ty clean. The unchanged frontend and
+  six paid live-guide passes retain their eval-10 provenance; no replacement paid runs were made.
+- Next handoff: independent real-TCP parser check and final static review, then completion report.

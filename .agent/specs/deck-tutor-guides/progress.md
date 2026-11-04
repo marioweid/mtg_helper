@@ -1,5 +1,16 @@
 # Ship progress
 
+## Final parser-envelope repair
+
+- Eval-11 isolated a Starlette-base HTTP 400 parser exception missed by the FastAPI-subclass catch.
+- Next: prove invalid UTF-8 regression red, catch the documented framework base class locally,
+  and rerun affected Docker checks plus the evaluator's real-TCP probe. Teacher/model/evidence and
+  frontend remain unchanged from the six passing live guides in eval-10; no new paid runs needed.
+- Red: both invalid-UTF-8 HTTP regressions failed with the observed default `detail` envelope.
+- Green: Tutor catches Starlette's base exception, preserves headers/status and returns a sanitized
+  UTF-8 JSON recovery message. Final coordinator Docker gate: 163 affected backend tests passed;
+  Ruff, formatting and Ty passed. Next: independent real-TCP confirmation and final review.
+
 - Slug: deck-tutor-guides; approved spec, no clarification markers.
 - Repository: C:\Users\mario\sources\mtg_helper
 - Branch: ship/deck-tutor-guides (existing non-default branch reused).
