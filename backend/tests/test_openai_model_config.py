@@ -76,6 +76,15 @@ def test_openai_settings_allow_workflow_specific_verbosity() -> None:
     assert model_settings["openai_text_verbosity"] == "medium"
 
 
+def test_openai_settings_omit_an_output_limit_when_a_workflow_does_not_set_one() -> None:
+    """A workflow can defer output length to its provider without changing other settings."""
+    model_settings = openai_model_settings(reasoning="high", verbosity="medium")
+
+    assert "max_tokens" not in model_settings
+    assert model_settings["openai_reasoning_effort"] == "high"
+    assert model_settings["openai_text_verbosity"] == "medium"
+
+
 def test_factory_uses_fixed_openai_responses_model() -> None:
     model = make_openai_model()
 
@@ -95,7 +104,7 @@ def test_tutor_uses_its_approved_model_without_changing_the_shared_default() -> 
     assert isinstance(tutor.model, OpenAIResponsesModel)
     assert tutor.model.model_name == "gpt-6.1-sol"
     assert tutor.model_settings["openai_reasoning_effort"] == "high"
-    assert tutor.model_settings["max_tokens"] == 16000
+    assert "max_tokens" not in tutor.model_settings
     assert isinstance(coach.model, OpenAIResponsesModel)
     assert coach.model.model_name == "gpt-5.6-luna"
     assert DISCOVER_MODEL == "gpt-5.6-luna"
@@ -117,7 +126,7 @@ async def test_tutor_model_disables_sdk_retries_without_changing_shared_defaults
 
 
 @pytest.mark.asyncio
-async def test_tutor_request_spy_receives_high_reasoning_and_bounded_output(
+async def test_tutor_request_spy_receives_high_reasoning_without_an_output_cap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Tutor sends its approved settings through one real agent request."""
@@ -176,13 +185,11 @@ async def test_tutor_request_spy_receives_high_reasoning_and_bounded_output(
     assert len(model.request_settings) == 1
     assert model.request_settings[0] is not None
     assert model.request_settings[0]["openai_reasoning_effort"] == "high"
-    assert model.request_settings[0]["max_tokens"] == 16000
+    assert "max_tokens" not in model.request_settings[0]
     assert len(model.parameters) == 1
     assert requested_models == ["gpt-6.1-sol"]
     assert requested_retry_budgets == [0]
-    assert usage_limit_calls == [
-        {"request_limit": 1, "tool_calls_limit": 0, "output_tokens_limit": 16_000}
-    ]
+    assert usage_limit_calls == [{"request_limit": 1, "tool_calls_limit": 0}]
 
 
 @pytest.mark.parametrize(

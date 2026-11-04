@@ -8,8 +8,6 @@ from pydantic import BaseModel, Field
 
 TutorMode = Literal["commander", "cedh"]
 TutorRunStatus = Literal["running", "succeeded", "failed", "interrupted", "superseded"]
-# Align detailed saved prose with Tutor's 16,000-token response budget without silent truncation.
-MAX_TUTOR_GUIDE_CONTENT_CHARS = 64_000
 
 
 class TutorSetupUpdate(BaseModel):
@@ -91,21 +89,21 @@ class TutorOpeningHand(BaseModel):
 
     decision: Literal["keep", "mulligan", "context-dependent"]
     cards: list[str] = Field(min_length=7, max_length=7)
-    explanation: str = Field(min_length=1, max_length=1200)
+    explanation: str = Field(min_length=1)
 
 
 class TutorOpeningHandOutput(BaseModel):
     """One model-produced hand before its required output field supplies the decision."""
 
     cards: list[str] = Field(min_length=7, max_length=7)
-    explanation: str = Field(min_length=1, max_length=1200)
+    explanation: str = Field(min_length=1)
 
 
 class TutorGuideStructuredOutput(BaseModel):
     """Model-only shape that requires every worked-hand decision exactly once."""
 
-    title: str = Field(min_length=1, max_length=200)
-    content: str = Field(min_length=1, max_length=MAX_TUTOR_GUIDE_CONTENT_CHARS)
+    title: str = Field(min_length=1)
+    content: str = Field(min_length=1)
     keep: TutorOpeningHandOutput
     mulligan: TutorOpeningHandOutput
     context_dependent: TutorOpeningHandOutput
@@ -126,10 +124,10 @@ class TutorGuideStructuredOutput(BaseModel):
 
 
 class TutorGuideDraft(BaseModel):
-    """The teacher's bounded, readable guide output."""
+    """The teacher's readable guide output."""
 
-    title: str = Field(min_length=1, max_length=200)
-    content: str = Field(min_length=1, max_length=MAX_TUTOR_GUIDE_CONTENT_CHARS)
+    title: str = Field(min_length=1)
+    content: str = Field(min_length=1)
     opening_hands: list[TutorOpeningHand] = Field(default_factory=list, max_length=3)
 
 

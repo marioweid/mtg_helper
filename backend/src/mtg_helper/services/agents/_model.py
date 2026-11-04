@@ -33,14 +33,16 @@ def make_openai_model(
 
 def openai_model_settings(
     *,
-    max_tokens: int,
+    max_tokens: int | None = None,
     reasoning: ReasoningLevel,
     verbosity: TextVerbosity = "low",
 ) -> OpenAIResponsesModelSettings:
-    """Build private, low-verbosity settings for one OpenAI Responses run."""
-    return OpenAIResponsesModelSettings(
-        max_tokens=max_tokens,
+    """Build private OpenAI Responses settings, omitting an unset provider output limit."""
+    model_settings = OpenAIResponsesModelSettings(
         openai_reasoning_effort=reasoning,
         openai_store=False,
         openai_text_verbosity=verbosity,
     )
+    if max_tokens is not None:
+        model_settings["max_tokens"] = max_tokens
+    return model_settings

@@ -141,8 +141,8 @@ export function TutorPanelView({ state, busy, error, onMode, onGenerate }: Tutor
             mode="cedh"
             label="cEDH"
             detail={
-              "Efficient lines, protection windows, and race-versus-grind decisions—not a strength " +
-              "certificate."
+              "Efficient lines, protection windows, and race-versus-grind decisions—not a " +
+              "strength certificate."
             }
             selected={state.mode === "cedh"}
             onSelect={onMode}

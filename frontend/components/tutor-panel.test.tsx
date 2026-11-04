@@ -122,7 +122,7 @@ describe("Tutor panel", () => {
   });
 
   it("wraps a detailed saved guide without truncating it", () => {
-    const content = "Useful guide detail. ".repeat(2_000);
+    const content = "Useful guide detail. ".repeat(4_000);
     const markup = renderToStaticMarkup(
       <TutorPanelView
         state={{

@@ -37,7 +37,7 @@ from mtg_helper.services import (
 from mtg_helper.services.admin_jobs import JobRegistry
 from mtg_helper.services.new_cards.repository import NewCardsError
 from mtg_helper.services.recommendations.repository import DiscoveryError
-from mtg_helper.services.tutor.repository import interrupt_running
+from mtg_helper.services.tutor.repository import TutorError, interrupt_running
 
 _log = logging.getLogger(__name__)
 
@@ -114,6 +114,15 @@ async def discovery_error_handler(_request: Request, exc: DiscoveryError) -> JSO
     return JSONResponse(
         status_code=exc.status,
         content={"error": {"code": "DISCOVERY_ERROR", "message": str(exc)}},
+    )
+
+
+@app.exception_handler(TutorError)
+async def tutor_error_handler(_request: Request, exc: TutorError) -> JSONResponse:
+    """Return owner-scoped Tutor failures in the standard error envelope."""
+    return JSONResponse(
+        status_code=exc.status,
+        content={"error": {"code": exc.code, "message": str(exc)}},
     )
 
 

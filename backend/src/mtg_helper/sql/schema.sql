@@ -588,10 +588,11 @@ CREATE TABLE IF NOT EXISTS tutor_runs (
     finished_at TIMESTAMPTZ,
     UNIQUE (account_id, request_key)
 );
--- The original per-owner guard allowed a transferred deck to execute twice.  Resolve a
--- pre-upgrade duplicate deterministically before replacing the index, so schema reapplication is safe.
+-- The original per-owner guard allowed a transferred deck to execute twice. Resolve a pre-upgrade
+-- duplicate deterministically before replacing the index, so schema reapplication is safe.
 WITH ranked_tutor_runs AS (
-    SELECT id, row_number() OVER (PARTITION BY deck_id ORDER BY created_at DESC, id DESC) AS position
+    SELECT id, row_number() OVER (PARTITION BY deck_id ORDER BY created_at DESC, id DESC)
+        AS position
     FROM tutor_runs
     WHERE status = 'running'
 )
@@ -606,7 +607,8 @@ CREATE UNIQUE INDEX tutor_one_active_run ON tutor_runs (deck_id) WHERE status = 
 CREATE INDEX IF NOT EXISTS idx_tutor_runs_deck ON tutor_runs (deck_id, account_id, created_at DESC);
 
 -- Experimental released-card discovery; additive and safe on existing databases.
-ALTER TABLE deck_card_plans ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE deck_card_plans
+    ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS new_card_catalog (
     oracle_id UUID PRIMARY KEY,

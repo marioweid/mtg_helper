@@ -91,6 +91,7 @@ def _valid_guide() -> object:
 def _tutor_responses_success(request: httpx.Request) -> httpx.Response:
     """Return one Responses API-shaped structured Tutor result without external model work."""
     body = json.loads(request.content)
+    assert "max_output_tokens" not in body
     output = {
         "title": "Transport baseline",
         "content": "Interpretation: a persisted guide survives a failed explicit update.",
@@ -151,6 +152,46 @@ async def test_setup_saves_mode_without_starting_a_guide(client: AsyncClient) ->
     assert loaded.status_code == 200
     assert loaded.json()["data"]["mode"] == "cedh"
     assert loaded.json()["data"]["latest_run"] is None
+
+
+@pytest.mark.asyncio
+async def test_tutor_errors_use_the_standard_error_envelope(
+    client: AsyncClient, db_pool: asyncpg.Pool
+) -> None:
+    """Tutor request failures retain their status and structured error details."""
+    from mtg_helper.auth import get_current_account
+    from mtg_helper.main import app
+    from mtg_helper.models.accounts import AccountResponse
+
+    deck_id = await _deck_id(client)
+    missing_mode = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert missing_mode.status_code == 409
+    assert missing_mode.json() == {
+        "error": {
+            "code": "TUTOR_REQUEST_INVALID",
+            "message": "Choose a Tutor mode before generating a guide",
+        }
+    }
+
+    account = await db_pool.fetchrow(
+        "SELECT * FROM accounts WHERE email = $1", "default@test.local"
+    )
+    assert account is not None
+    app.dependency_overrides[get_current_account] = lambda: AccountResponse(
+        id=account["id"],
+        display_name=account["display_name"],
+        created_at=account["created_at"],
+    )
+    try:
+        email_required = await client.get(f"/api/v1/decks/{deck_id}/tutor")
+    finally:
+        app.dependency_overrides.pop(get_current_account, None)
+    assert email_required.status_code == 403
+    assert email_required.json() == {
+        "error": {"code": "EMAIL_REQUIRED", "message": "Account has no email"}
+    }
 
 
 def test_tutor_fixture_commander_is_stable() -> None:
@@ -578,19 +619,32 @@ def test_teaching_structured_output_requires_each_opening_hand_decision() -> Non
         )
 
 
-def test_teaching_output_keeps_detailed_guides_bounded_without_discarding_them() -> None:
-    """The persisted contract accepts useful detailed prose but still rejects oversized output."""
-    from mtg_helper.models.tutor import MAX_TUTOR_GUIDE_CONTENT_CHARS, TutorGuideDraft
+def test_teaching_output_preserves_unbounded_guide_and_hand_prose() -> None:
+    """Generated and persisted guide prose retain useful provider-sized output intact."""
+    from mtg_helper.models.tutor import TutorGuideDraft, TutorGuideStructuredOutput
 
-    detailed = "Guide detail. " * 3_000
-    accepted = TutorGuideDraft(title="Detailed guide", content=detailed)
+    title = "Detailed guide title " * 20
+    content = "Guide detail. " * 5_000
+    explanation = "Explain the actual hand. " * 100
+    hand = {"cards": ["Forest"] * 7, "explanation": explanation}
+    generated = TutorGuideStructuredOutput(
+        title=title,
+        content=content,
+        keep=hand,
+        mulligan=hand,
+        context_dependent=hand,
+    )
+    persisted = TutorGuideDraft(
+        title=title,
+        content=content,
+        opening_hands=generated.to_draft().opening_hands,
+    )
 
-    assert len(accepted.content) == len(detailed)
-    with pytest.raises(ValidationError):
-        TutorGuideDraft(
-            title="Too long",
-            content="x" * (MAX_TUTOR_GUIDE_CONTENT_CHARS + 1),
-        )
+    assert len(content) > 64_000
+    assert len(explanation) > 1_200
+    assert persisted.title == title
+    assert persisted.content == content
+    assert [hand.explanation for hand in persisted.opening_hands] == [explanation] * 3
 
 
 @pytest.mark.asyncio

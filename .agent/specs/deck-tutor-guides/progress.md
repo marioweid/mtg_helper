@@ -232,3 +232,25 @@ Three rounds used; coordinator gate-3 PASS (45 backend / 127 frontend tests and 
   in 136.79s`; Ruff, format, and Ty clean. Frontend gate: 31 files / 131 tests passed, typecheck, zero-warning lint,
   format, and production build passed. No paid model or live-data call occurred; the pre-existing `GLOSSARY.md` edit
   remains unstaged.
+
+## Round 10 — standards and approved output-policy repair
+
+- Feedback scope: `review-standards.md` hard findings only, plus the user's explicit approved Tutor output policy.
+  The pre-existing user-owned `GLOSSARY.md` modification remains untouched and excluded from the commit.
+- User policy: generated/persisted Tutor guide title, content, and worked-hand explanation have no application character,
+  output-token, or cost caps. Provider-native limits apply. Input safety limits, exactly one request, no callable tools,
+  zero SDK/agent retries, owned-client close, exact three seven-card validation, and Tutor-only `gpt-6.1-sol` high
+  reasoning remain intact; Coach and Discover retain the Luna default.
+- Red-to-green evidence: the model/persistence boundary test initially failed against the 200/1,200/64,000 Pydantic
+  limits and the absent optional settings API. It now proves a guide above 64,000 characters and explanations above
+  1,200 characters are retained intact; existing malformed-output/durable-failure coverage remains green. The real SDK
+  transport fixture asserts outgoing Tutor requests omit `max_output_tokens`, while the request spy asserts no
+  Pydantic-AI output-token usage cap.
+- Tutor router failures now go through the application `TutorError` handler and its standard `error: {code, message}`
+  envelope, including the email-required status; owner/status semantics are unchanged. SQL and cEDH detail literals
+  now observe the 100-column standard without semantic changes.
+- Final Docker-only checks: affected SQL/HTTP/model suite `148 passed in 114.64s`; no-DB suite `569 passed, 667
+  deselected in 10.80s`; Ruff clean; `257 files already formatted`; Ty clean. Frontend gate: `31` files / `131` tests
+  passed, typecheck passed, lint `0 warnings and 0 errors`, format clean, production build compiled successfully.
+- No paid/model call, live-data operation, environment/volume change, acceptance edit, or unrelated full backend-suite
+  retry was made. Next action: commit this scoped round excluding `GLOSSARY.md`, then hand off for independent evaluation.

@@ -23,7 +23,6 @@ _MAX_CARD_FACTS = 200
 _MAX_RULE_FACTS = 64
 _MAX_COMBO_FACTS = 200
 _TUTOR_MODEL = "gpt-6.1-sol"
-_TUTOR_OUTPUT_TOKENS = 16_000
 
 
 @dataclass(frozen=True)
@@ -56,8 +55,8 @@ def _prompt(guide_input: TeachingInput, perspective: str, focus: str) -> str:
             "Cover commander role, packages, primary and backup lines with prerequisites or",
             "outlets/gaps, early/mid/late priorities, interaction, strengths, weaknesses, lessons,",
             "mistakes, terminology, and three actual-list seven-card worked examples.",
-            "Aim for 12,000 to 24,000 characters of focused prose. Be detailed but not exhaustive;",
-            "the saved guide content must stay below 64,000 characters.",
+            "Give the actual deck as much detailed, useful guidance as it needs; do not pad it to",
+            "a fixed length or write an exhaustive card-by-card essay.",
             "Return a structured object with required keep, mulligan, and "
             "context_dependent fields.",
             "Each field has cards and explanation and must copy one supplied candidate exactly.",
@@ -190,7 +189,6 @@ def _agent(focus: str) -> Agent[TeachingInput, TutorGuideStructuredOutput]:
         deps_type=TeachingInput,
         output_type=TutorGuideStructuredOutput,
         model_settings=openai_model_settings(
-            max_tokens=_TUTOR_OUTPUT_TOKENS,
             reasoning="high",
             verbosity="medium",
         ),
@@ -227,7 +225,6 @@ async def run_agent(guide_input: TeachingInput, perspective: str, focus: str) ->
             usage_limits=UsageLimits(
                 request_limit=1,
                 tool_calls_limit=0,
-                output_tokens_limit=_TUTOR_OUTPUT_TOKENS,
             ),
         )
     finally:

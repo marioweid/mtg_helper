@@ -15,9 +15,12 @@ from mtg_helper.services.tutor import evidence
 class TutorError(ValueError):
     """Expected owner-scoped Tutor request failure with an HTTP status."""
 
-    def __init__(self, message: str, status: int = 400) -> None:
+    def __init__(
+        self, message: str, status: int = 400, code: str = "TUTOR_REQUEST_INVALID"
+    ) -> None:
         super().__init__(message)
         self.status = status
+        self.code = code
 
 
 @dataclass(frozen=True)

@@ -192,3 +192,33 @@ No acceptance text, paid model call, live-data operation, environment/volume cha
 Coach/Discover default changed. The documented 64,000-character cap is deliberately finite and rejects 64,001+
 characters; existing frontend wrapping renders it without truncation. The prior unrelated complete-suite baseline was
 not rerun. The pre-existing `GLOSSARY.md` modification remains unstaged and untouched.
+
+## Round 10 — standards and approved output-policy repair
+
+- `backend/src/mtg_helper/main.py`: added the standard-envelope handler for expected Tutor failures.
+- `backend/src/mtg_helper/models/tutor.py`: removed generated/persisted title, content, and hand-explanation character caps.
+- `backend/src/mtg_helper/routers/tutor.py`: routes expected Tutor and email-required failures through the app handler.
+- `backend/src/mtg_helper/services/agents/_model.py`: allows callers to omit `max_tokens` without emitting that setting.
+- `backend/src/mtg_helper/services/tutor/repository.py`: carries an expected Tutor error code into the app error envelope.
+- `backend/src/mtg_helper/services/tutor/teaching.py`: removed Tutor output-token/character targeting while retaining input
+  safety and the one-request/no-tools/zero-retry contract.
+- `backend/src/mtg_helper/sql/schema.sql`: wrapped the reviewed Tutor-upgrade SQL lines at 100 columns.
+- `backend/tests/test_openai_model_config.py`: covers omitted model/usage output caps while preserving Tutor model/retry policy.
+- `backend/tests/test_tutor_guides.py`: covers standard Tutor errors, >64,000-character guide and >1,200-character hand
+  explanation retention, and outgoing request omission of `max_output_tokens`.
+- `frontend/components/tutor-panel.tsx`: wrapped the cEDH explanatory literal at 100 columns without changing output.
+- `frontend/components/tutor-panel.test.tsx`: renders an above-64,000-character guide through existing wrapping.
+- `.agent/specs/deck-tutor-guides/{progress,build-notes}.md`: records the approved user output policy and round evidence.
+
+Gate: explicit local Docker Compose only. Affected backend suite
+`tests/test_tutor_guides.py tests/test_deck_crud.py tests/test_deck_import.py tests/test_card_identity_service.py
+tests/test_snapshots.py tests/test_retrieval_source_tags.py tests/test_scryfall_label_schema.py
+tests/test_openai_model_config.py` -> `148 passed in 114.64s`; no-DB suite -> `569 passed, 667 deselected in 10.80s`;
+Ruff -> `All checks passed!`; format -> `257 files already formatted`; Ty -> `All checks passed!`. Frontend `pnpm test &&
+pnpm typecheck && pnpm lint && pnpm format:check && pnpm build` -> `31` files / `131` tests passed, typecheck passed, lint
+`0 warnings and 0 errors`, format passed, and production build compiled successfully.
+
+Approved deviation: none. The user explicitly removed application output length/cost constraints for Tutor guides; this
+round removes only those output constraints, retains input-safety bounds and provider-native limits, and does not change
+Coach/Discover. No paid call, live-data operation, acceptance edit, environment/volume change, or unrelated full backend
+suite retry occurred. The pre-existing user-owned `GLOSSARY.md` change remains uncommitted.
