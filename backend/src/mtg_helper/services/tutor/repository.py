@@ -3,11 +3,24 @@
 import json
 import re
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 import asyncpg
 
-from mtg_helper.models.tutor import TutorEvidence, TutorGuideDraft, TutorMode, TutorRunResponse
+from mtg_helper.models.tutor import (
+    TutorCardFact,
+    TutorEvidence,
+    TutorGuideDraft,
+    TutorMode,
+    TutorReference,
+    TutorReferenceDifferences,
+    TutorReferencePreviewResponse,
+    TutorReferenceRequest,
+    TutorRunResponse,
+)
+from mtg_helper.services import card_service, import_service
 from mtg_helper.services.recommendations.repository import Owner, owned_deck
 from mtg_helper.services.tutor import evidence
 
@@ -56,6 +69,77 @@ class TutorRepository:
                 owner.account_id,
                 mode,
             )
+
+    async def preview_reference(
+        self, owner: Owner, deck_id: UUID, request: TutorReferenceRequest
+    ) -> TutorReferencePreviewResponse:
+        """Capture a private candidate without changing the saved reference or deck."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            deck = await owned_deck(conn, owner, deck_id, lock=True)
+            _, actual_cards = await evidence.deck_facts(conn, deck)
+            candidate = await _reference_candidate(conn, self.pool, owner, deck, request)
+            preview_id = uuid4()
+            await conn.execute(
+                "DELETE FROM tutor_reference_previews WHERE deck_id=$1 AND account_id=$2",
+                deck_id,
+                owner.account_id,
+            )
+            await conn.execute(
+                "INSERT INTO tutor_reference_previews (id, deck_id, account_id, snapshot) "
+                "VALUES ($1,$2,$3,$4::jsonb)",
+                preview_id,
+                deck_id,
+                owner.account_id,
+                candidate.model_dump_json(),
+            )
+            return TutorReferencePreviewResponse(
+                preview_id=preview_id,
+                reference=candidate,
+                differences=evidence.reference_differences(candidate, actual_cards),
+            )
+
+    async def confirm_reference(self, owner: Owner, deck_id: UUID, preview_id: UUID) -> None:
+        """Atomically replace a reference with the exact preview and supersede active work."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            await owned_deck(conn, owner, deck_id, lock=True)
+            row = await conn.fetchrow(
+                "SELECT snapshot FROM tutor_reference_previews "
+                "WHERE id=$1 AND deck_id=$2 AND account_id=$3",
+                preview_id,
+                deck_id,
+                owner.account_id,
+            )
+            if row is None:
+                raise TutorError("Reference preview not found; preview the source again", 404)
+            candidate = TutorReference.model_validate(_value(row["snapshot"]))
+            await conn.execute(
+                "INSERT INTO tutor_references (deck_id, account_id, version, snapshot) "
+                "VALUES ($1,$2,$3,$4::jsonb) ON CONFLICT (deck_id) DO UPDATE SET "
+                "account_id=EXCLUDED.account_id, version=EXCLUDED.version, "
+                "snapshot=EXCLUDED.snapshot, created_at=now()",
+                deck_id,
+                owner.account_id,
+                candidate.version,
+                candidate.model_dump_json(),
+            )
+            await conn.execute(
+                "DELETE FROM tutor_reference_previews WHERE deck_id=$1 AND account_id=$2",
+                deck_id,
+                owner.account_id,
+            )
+            await _supersede_running(conn, deck_id)
+
+    async def remove_reference(self, owner: Owner, deck_id: UUID) -> None:
+        """Remove only the optional reference and make old in-flight advice unpublishable."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            await owned_deck(conn, owner, deck_id, lock=True)
+            await conn.execute("DELETE FROM tutor_references WHERE deck_id=$1", deck_id)
+            await conn.execute(
+                "DELETE FROM tutor_reference_previews WHERE deck_id=$1 AND account_id=$2",
+                deck_id,
+                owner.account_id,
+            )
+            await _supersede_running(conn, deck_id)
 
     async def create(self, owner: Owner, deck_id: UUID, request_key: UUID) -> TutorWork | None:
         """Persist one explicit intent and immutable capture, reusing an idempotent request key."""
@@ -211,7 +295,13 @@ class TutorRepository:
 
     async def state(
         self, owner: Owner, deck_id: UUID
-    ) -> tuple[TutorMode | None, TutorRunResponse | None, TutorRunResponse | None]:
+    ) -> tuple[
+        TutorMode | None,
+        TutorRunResponse | None,
+        TutorRunResponse | None,
+        TutorReference | None,
+        TutorReferenceDifferences | None,
+    ]:
         """Read setup and guide status without changing lifecycle state."""
         async with self.pool.acquire() as conn, conn.transaction():
             deck = await owned_deck(conn, owner, deck_id)
@@ -220,7 +310,7 @@ class TutorRepository:
                 deck_id,
                 owner.account_id,
             )
-            manifest, _ = await evidence.capture(
+            manifest, current_evidence = await evidence.capture(
                 conn, deck, self.pool, owner.email, include_sources=False
             )
             current_hashes = {
@@ -249,7 +339,13 @@ class TutorRepository:
                 if successful_row
                 else None
             )
-            return (setup["mode"] if setup else None, latest, successful)
+            return (
+                setup["mode"] if setup else None,
+                latest,
+                successful,
+                current_evidence.reference,
+                current_evidence.reference_differences,
+            )
 
     @staticmethod
     async def _pin_sources(
@@ -289,6 +385,96 @@ class TutorRepository:
             created_at=row["created_at"],
             finished_at=row["finished_at"],
         )
+
+
+async def _reference_candidate(
+    conn: asyncpg.Connection,
+    pool: asyncpg.Pool,
+    owner: Owner,
+    target: asyncpg.Record,
+    request: TutorReferenceRequest,
+) -> TutorReference:
+    """Resolve one source completely and enforce its exact commander configuration."""
+    target_commanders, _ = await evidence.deck_facts(conn, target)
+    source: Literal["current_deck", "owned_deck", "pasted_text"]
+    if request.source == "current":
+        source = "current_deck"
+    elif request.source == "owned":
+        source = "owned_deck"
+    else:
+        source = "pasted_text"
+    source_deck_id: UUID | None = None
+    source_name = "Pasted deck list"
+    if request.source in {"current", "owned"}:
+        if request.source == "owned":
+            if request.source_deck_id is None:
+                raise TutorError("Choose an owned deck to preview as a reference", 422)
+            source_deck_id = request.source_deck_id
+        else:
+            source_deck_id = target["id"]
+        source_deck = await owned_deck(conn, owner, source_deck_id, lock=True)
+        commanders, cards = await evidence.deck_facts(conn, source_deck)
+        source_name = source_deck["name"]
+    else:
+        commanders, cards = await _pasted_facts(conn, pool, request.text)
+    if _commander_keys(commanders) != _commander_keys(target_commanders):
+        raise TutorError(
+            "Reference commanders must exactly match the current deck's commander configuration",
+            422,
+        )
+    return TutorReference(
+        version=uuid4(),
+        source=source,
+        source_deck_id=source_deck_id,
+        source_name=source_name,
+        source_url=request.source_url,
+        captured_at=datetime.now(UTC),
+        commanders=commanders,
+        cards=cards,
+    )
+
+
+async def _pasted_facts(
+    conn: asyncpg.Connection, pool: asyncpg.Pool, text: str | None
+) -> tuple[list[TutorCardFact], list[TutorCardFact]]:
+    """Reuse import parsing/resolution without creating or modifying a physical deck."""
+    if not text or not text.strip():
+        raise TutorError("Paste a deck list with commanders marked *CMDR*", 422)
+    try:
+        entries = import_service.parse_deck_list(text)
+    except ValueError as exc:
+        raise TutorError(str(exc), 422) from exc
+    resolved: list[tuple[UUID, int, bool]] = []
+    unresolved: list[str] = []
+    for entry in entries:
+        card = await card_service.resolve_card_by_name(pool, entry.name)
+        if card is None:
+            unresolved.append(entry.name)
+        else:
+            resolved.append((card.scryfall_id, entry.quantity, entry.is_commander))
+    if unresolved:
+        names = ", ".join(dict.fromkeys(unresolved))
+        raise TutorError(f"Unresolved reference entries: {names}. Correct them and retry.", 422)
+    if not any(entry.is_commander for entry in entries):
+        raise TutorError("Mark every reference commander with *CMDR* and retry", 422)
+    commanders, cards = await evidence.resolved_facts(conn, resolved)
+    if any(commander.quantity != 1 for commander in commanders) or not commanders:
+        raise TutorError("A reference must contain each commander exactly once", 422)
+    return commanders, cards
+
+
+def _commander_keys(commanders: list[TutorCardFact]) -> set[str]:
+    return {str(card.oracle_id) if card.oracle_id else card.name.casefold() for card in commanders}
+
+
+async def _supersede_running(conn: asyncpg.Connection, deck_id: UUID) -> None:
+    """Make pre-reference-change work terminal without starting any replacement."""
+    await conn.execute(
+        "UPDATE tutor_runs SET status='superseded', finished_at=now(), "
+        "error='The reference changed during generation; update explicitly when ready.' "
+        "WHERE deck_id=$1 AND status='running'",
+        deck_id,
+    )
 
 
 def _value(raw: object) -> dict[str, object]:

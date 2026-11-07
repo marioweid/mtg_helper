@@ -241,6 +241,46 @@ export interface TutorCardFact {
   quantity: number;
   type_line: string | null;
   oracle_text: string | null;
+  mana_cost?: string | null;
+  cmc?: number | null;
+  color_identity?: string[];
+  legalities?: Record<string, string>;
+}
+
+export interface TutorReferenceDifference {
+  name: string;
+  oracle_id: string | null;
+  reference_quantity: number;
+  actual_quantity: number;
+}
+
+export interface TutorReferenceDifferences {
+  missing: TutorReferenceDifference[];
+  added: TutorReferenceDifference[];
+}
+
+export interface TutorReference {
+  version: string;
+  source: "current_deck" | "owned_deck" | "pasted_text";
+  source_deck_id: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  captured_at: string;
+  commanders: TutorCardFact[];
+  cards: TutorCardFact[];
+}
+
+export interface TutorReferenceRequest {
+  source: "current" | "owned" | "pasted";
+  source_deck_id?: string | null;
+  text?: string | null;
+  source_url?: string | null;
+}
+
+export interface TutorReferencePreviewResponse {
+  preview_id: string;
+  reference: TutorReference;
+  differences: TutorReferenceDifferences;
 }
 
 export interface TutorEvidence {
@@ -248,6 +288,9 @@ export interface TutorEvidence {
   cards: TutorCardFact[];
   warnings: string[];
   sources: Record<string, string | null>;
+  reference?: TutorReference | null;
+  reference_differences?: TutorReferenceDifferences | null;
+  optional_suggestions?: TutorCardFact[];
 }
 
 export interface TutorGuideDraft {
@@ -278,6 +321,8 @@ export interface TutorStateResponse {
   mode: TutorMode | null;
   latest_run: TutorRunResponse | null;
   last_successful_run: TutorRunResponse | null;
+  reference?: TutorReference | null;
+  reference_differences?: TutorReferenceDifferences | null;
 }
 
 // AI

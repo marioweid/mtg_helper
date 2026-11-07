@@ -73,6 +73,58 @@ class TutorLineRequirement(BaseModel):
     zone: Literal["command_zone", "mainboard"]
 
 
+class TutorReferenceDifference(BaseModel):
+    """One canonical card quantity in the frozen reference and current Lerndeck."""
+
+    name: str
+    oracle_id: UUID | None
+    reference_quantity: int = Field(ge=0)
+    actual_quantity: int = Field(ge=0)
+
+
+class TutorReferenceDifferences(BaseModel):
+    """Actual-list changes relative to a Referenzdeck, never proposed membership."""
+
+    missing: list[TutorReferenceDifference] = Field(default_factory=list)
+    added: list[TutorReferenceDifference] = Field(default_factory=list)
+
+
+class TutorReference(BaseModel):
+    """An immutable, self-contained Referenzdeck captured by its owner."""
+
+    version: UUID
+    source: Literal["current_deck", "owned_deck", "pasted_text"]
+    source_deck_id: UUID | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    captured_at: datetime
+    commanders: list[TutorCardFact]
+    cards: list[TutorCardFact]
+
+
+class TutorReferenceRequest(BaseModel):
+    """One source selection used only to prepare a reference preview."""
+
+    source: Literal["current", "owned", "pasted"]
+    source_deck_id: UUID | None = None
+    text: str | None = Field(default=None, max_length=65_536)
+    source_url: str | None = Field(default=None, max_length=2_048)
+
+
+class TutorReferenceConfirm(BaseModel):
+    """Confirm the exact server-captured preview, rather than client-supplied facts."""
+
+    preview_id: UUID
+
+
+class TutorReferencePreviewResponse(BaseModel):
+    """A private candidate awaiting explicit confirmation or cancellation."""
+
+    preview_id: UUID
+    reference: TutorReference
+    differences: TutorReferenceDifferences
+
+
 class TutorEvidence(BaseModel):
     """Frozen exact facts and explicit source gaps for one guide run."""
 
@@ -82,6 +134,9 @@ class TutorEvidence(BaseModel):
     combos: list[TutorComboFact] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     sources: dict[str, str | None] = Field(default_factory=dict)
+    reference: TutorReference | None = None
+    reference_differences: TutorReferenceDifferences | None = None
+    optional_suggestions: list[TutorCardFact] = Field(default_factory=list)
 
 
 class TutorOpeningHand(BaseModel):
@@ -151,3 +206,5 @@ class TutorStateResponse(BaseModel):
     mode: TutorMode | None = None
     latest_run: TutorRunResponse | None = None
     last_successful_run: TutorRunResponse | None = None
+    reference: TutorReference | None = None
+    reference_differences: TutorReferenceDifferences | None = None
