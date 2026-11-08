@@ -1,13 +1,11 @@
 """Commander-mode adapter for bounded Deck Tutor teaching."""
 
-from mtg_helper.models.tutor import TutorAnswerDraft, TutorGuideDraft, TutorHandoffDraft
+from mtg_helper.models.tutor import TutorAnswerDraft, TutorGuideDraft
 from mtg_helper.services.tutor.teaching import (
-    CompactionInput,
     ConversationInput,
     TeachingInput,
     run_agent,
     run_answer_agent,
-    run_compaction_agent,
 )
 
 
@@ -26,8 +24,3 @@ async def answer(question_input: ConversationInput) -> TutorAnswerDraft:
         question_input,
         "Teach multiplayer sequencing, board development, resilience, and the deck's own identity.",
     )
-
-
-async def compact(compaction_input: CompactionInput) -> TutorHandoffDraft:
-    """Summarize learning without turning history into current Commander facts."""
-    return await run_compaction_agent(compaction_input)

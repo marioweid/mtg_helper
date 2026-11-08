@@ -15,11 +15,17 @@ from mtg_helper.models.tutor import (
 )
 from mtg_helper.services.recommendations.repository import Owner
 from mtg_helper.services.tutor import cedh, commander
-from mtg_helper.services.tutor.repository import TutorQuestionWork, TutorRepository, TutorWork
+from mtg_helper.services.tutor.repository import (
+    TutorHandoffRetryWork,
+    TutorQuestionWork,
+    TutorRepository,
+    TutorWork,
+)
 from mtg_helper.services.tutor.teaching import (
     CompactionInput,
     ConversationInput,
     TeachingInput,
+    run_compaction_agent,
     validate_opening_hands,
 )
 
@@ -98,6 +104,15 @@ class TutorService:
         """Read the full owner-scoped conversation without starting work."""
         return await self.repository.conversation(owner, deck_id)
 
+    async def retry_handoff(
+        self, owner: Owner, deck_id: UUID, chapter_id: UUID, request_key: UUID
+    ) -> TutorConversationResponse:
+        """Start only an explicit, deduplicated retry for one failed Lernübergabe."""
+        work = await self.repository.create_handoff_retry(owner, deck_id, chapter_id, request_key)
+        if work is not None:
+            asyncio.create_task(self._retry_handoff(work))
+        return await self.repository.conversation(owner, deck_id)
+
     async def clear_conversation(self, owner: Owner, deck_id: UUID) -> TutorConversationResponse:
         """Clear only deck-local Tutor history and return its now-empty state."""
         await self.repository.clear_conversation(owner, deck_id)
@@ -132,27 +147,44 @@ class TutorService:
 
     async def _handoff(self, work: TutorWork | TutorQuestionWork) -> str | None:
         """Compact once when required; failure never blocks an answer from current facts."""
-        if not work.compaction_required:
-            return work.handoff
-        if not await self.repository.start_handoff(work):
+        handoff_work = work.handoff_work
+        if handoff_work is None:
+            return None
+        if not handoff_work.compaction_required:
+            return handoff_work.handoff
+        if not await self.repository.start_handoff(handoff_work):
             return None
         compaction_input = CompactionInput(
             mode=work.mode,
-            previous_handoff=work.previous_handoff,
-            turns=work.compaction_turns,
+            previous_handoff=handoff_work.previous_handoff,
+            turns=handoff_work.compaction_turns,
         )
         try:
-            summary = await (
-                commander.compact(compaction_input)
-                if work.mode == "commander"
-                else cedh.compact(compaction_input)
-            )
+            summary = await run_compaction_agent(compaction_input)
         except Exception:
             _log.exception("Tutor handoff failed")
-            await self.repository.fail_handoff(work)
+            await self.repository.fail_handoff(handoff_work)
             return None
-        await self.repository.complete_handoff(work, summary.content)
+        await self.repository.complete_handoff(handoff_work, summary.content)
         return summary.content
+
+    async def _retry_handoff(self, work: TutorHandoffRetryWork) -> None:
+        """Run one paid compaction only after its explicit user request."""
+        handoff = work.handoff_work
+        compaction_input = CompactionInput(
+            mode=work.mode,
+            previous_handoff=handoff.previous_handoff,
+            turns=handoff.compaction_turns,
+        )
+        try:
+            summary = await run_compaction_agent(compaction_input)
+            published = await self.repository.complete_handoff(handoff, summary.content)
+            error = None if published else "Lernübergabe retry was interrupted; retry explicitly."
+        except Exception:
+            _log.exception("Explicit Tutor handoff retry failed")
+            await self.repository.fail_handoff(handoff)
+            error = "Lernübergabe retry failed; retry explicitly."
+        await self.repository.finish_handoff_retry(work, error)
 
     async def _run(self, work: TutorWork) -> None:
         await self._handoff(work)

@@ -780,9 +780,11 @@ CREATE TABLE IF NOT EXISTS tutor_chapters (
     handoff_status TEXT NOT NULL DEFAULT 'none'
         CHECK (handoff_status IN ('none', 'pending', 'running', 'ready', 'failed')),
     handoff_error TEXT,
+    source_chapter_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (deck_id, epoch, sequence)
 );
+ALTER TABLE tutor_chapters ADD COLUMN IF NOT EXISTS source_chapter_id UUID;
 CREATE INDEX IF NOT EXISTS idx_tutor_chapters_owner
     ON tutor_chapters (deck_id, account_id, epoch, sequence);
 
@@ -806,6 +808,24 @@ CREATE TABLE IF NOT EXISTS tutor_turns (
     UNIQUE (account_id, request_key)
 );
 CREATE INDEX IF NOT EXISTS idx_tutor_turns_chapter ON tutor_turns (chapter_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS tutor_handoff_retries (
+    id UUID PRIMARY KEY,
+    chapter_id UUID NOT NULL REFERENCES tutor_chapters(id) ON DELETE CASCADE,
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    epoch BIGINT NOT NULL,
+    request_key UUID NOT NULL,
+    token UUID NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'succeeded', 'failed', 'interrupted', 'superseded')),
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    UNIQUE (account_id, request_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS tutor_one_active_handoff_retry
+    ON tutor_handoff_retries (chapter_id) WHERE status = 'running';
 
 CREATE TABLE IF NOT EXISTS tutor_chapter_sources (
     chapter_id UUID NOT NULL REFERENCES tutor_chapters(id) ON DELETE CASCADE,

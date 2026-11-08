@@ -16,6 +16,7 @@ from mtg_helper.models.common import DataResponse, ErrorDetail, ErrorResponse
 from mtg_helper.models.tutor import (
     TutorConversationResponse,
     TutorGenerateRequest,
+    TutorHandoffRetryRequest,
     TutorQuestionRequest,
     TutorReferenceConfirm,
     TutorReferencePreviewResponse,
@@ -167,6 +168,23 @@ async def clear_conversation(
 ) -> DataResponse[TutorConversationResponse]:
     """Delete all saved Tutor chapters and turns while preserving guides and references."""
     conversation = await _service(request).clear_conversation(_owner(account), deck_id)
+    return DataResponse(data=conversation)
+
+
+@router.post(
+    "/chapters/{chapter_id}/handoff", response_model=DataResponse[TutorConversationResponse]
+)
+async def retry_handoff(
+    deck_id: UUID,
+    chapter_id: UUID,
+    body: TutorHandoffRetryRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[TutorConversationResponse]:
+    """Retry one failed Lernübergabe only after an explicit owner request."""
+    conversation = await _service(request).retry_handoff(
+        _owner(account), deck_id, chapter_id, body.request_key
+    )
     return DataResponse(data=conversation)
 
 

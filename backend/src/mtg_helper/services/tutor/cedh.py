@@ -1,13 +1,11 @@
 """cEDH-mode adapter for bounded Deck Tutor teaching."""
 
-from mtg_helper.models.tutor import TutorAnswerDraft, TutorGuideDraft, TutorHandoffDraft
+from mtg_helper.models.tutor import TutorAnswerDraft, TutorGuideDraft
 from mtg_helper.services.tutor.teaching import (
-    CompactionInput,
     ConversationInput,
     TeachingInput,
     run_agent,
     run_answer_agent,
-    run_compaction_agent,
 )
 
 
@@ -28,8 +26,3 @@ async def answer(question_input: ConversationInput) -> TutorAnswerDraft:
         "Teach resource efficiency, tutor targets, protection windows, "
         "and race-versus-grind pivots.",
     )
-
-
-async def compact(compaction_input: CompactionInput) -> TutorHandoffDraft:
-    """Summarize learning without turning history into current cEDH facts."""
-    return await run_compaction_agent(compaction_input)

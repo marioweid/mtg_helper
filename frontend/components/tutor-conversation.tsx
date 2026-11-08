@@ -1,8 +1,8 @@
 "use client";
 
-import type { FormEvent, KeyboardEvent } from "react";
-
+import { TutorClearHistory } from "@/components/tutor-clear-history";
 import { TutorMarkdown } from "@/components/tutor-markdown";
+import { TutorQuestionForm } from "@/components/tutor-question-form";
 import type {
   TutorCardFact,
   TutorChapterResponse,
@@ -13,9 +13,6 @@ import type {
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 " +
   "focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950";
-const PRIMARY =
-  "min-h-11 touch-manipulation rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold " +
-  `text-white hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-50 ${FOCUS}`;
 const SECONDARY =
   "min-h-11 touch-manipulation rounded-lg border border-white/15 px-4 py-2 text-sm " +
   `font-semibold text-gray-100 hover:bg-white/5 disabled:opacity-50 ${FOCUS}`;
@@ -32,6 +29,7 @@ interface TutorConversationProps {
   onChapterChange?: (chapterId: string) => void;
   onAsk?: () => void;
   onClear?: () => void;
+  onRetryHandoff?: (chapterId: string) => void;
 }
 
 export function TutorConversation({
@@ -46,6 +44,7 @@ export function TutorConversation({
   onChapterChange = () => {},
   onAsk = () => {},
   onClear = () => {},
+  onRetryHandoff = () => {},
 }: TutorConversationProps) {
   const chapters = conversation?.chapters ?? [];
   const selected =
@@ -53,18 +52,6 @@ export function TutorConversation({
   const answering = chapters.some((chapter) =>
     chapter.turns.some((turn) => turn.status === "running"),
   );
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (question.trim() && !busy && !answering) onAsk();
-  }
-
-  function keyboardSend(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      event.currentTarget.form?.requestSubmit();
-    }
-  }
 
   return (
     <section
@@ -83,122 +70,83 @@ export function TutorConversation({
           Loading conversation…
         </p>
       ) : (
-        <>
-          {chapters.length > 0 && (
-            <label className="block text-sm font-medium text-gray-200">
-              Conversation chapter
-              <select
-                aria-label="Conversation chapter"
-                className={`mt-2 min-h-11 w-full rounded-lg border border-white/15 bg-gray-950 p-2 ${FOCUS}`}
-                value={selected?.id ?? ""}
-                onChange={(event) => onChapterChange(event.target.value)}
-              >
-                {[...chapters].reverse().map((chapter) => (
-                  <option key={chapter.id} value={chapter.id}>
-                    {chapter.current
-                      ? `Current deck chapter ${chapter.sequence}`
-                      : `Archived chapter ${chapter.sequence}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {selected ? (
-            <Chapter chapter={selected} />
-          ) : (
-            <p className="text-sm leading-6 text-gray-400">
-              No saved Tutor questions yet. Your first answer starts a current deck chapter.
-            </p>
-          )}
-        </>
+        <ConversationChapters
+          chapters={chapters}
+          selected={selected}
+          busy={busy}
+          onChapterChange={onChapterChange}
+          onRetryHandoff={onRetryHandoff}
+        />
       )}
-      <form className="min-w-0 space-y-3 border-t border-white/10 pt-4" onSubmit={submit}>
-        <h4 className="font-medium text-white">Ask about the current deck</h4>
-        <label className="block text-sm text-gray-200">
-          Card to explain (optional)
-          <select
-            aria-label="Card to explain"
-            className={`mt-2 min-h-11 w-full rounded-lg border border-white/15 bg-gray-950 p-2 ${FOCUS}`}
-            value={selectedCard}
-            disabled={busy || answering}
-            onChange={(event) => onCardChange(event.target.value)}
-          >
-            <option value="">Whole deck or follow-up</option>
-            {currentCards.map((card) => (
-              <option key={`${card.oracle_id ?? "unknown"}-${card.name}`} value={card.name}>
-                {card.quantity} × {card.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-sm text-gray-200">
-          Tutor question
-          <textarea
-            aria-label="Tutor question"
-            className={`mt-2 min-h-28 w-full resize-y rounded-lg border border-white/15 bg-gray-950 p-3 text-sm leading-6 ${FOCUS}`}
-            value={question}
-            maxLength={8000}
-            disabled={busy || answering}
-            placeholder="What should I prioritize before trying to win?"
-            onChange={(event) => onQuestionChange(event.target.value)}
-            onKeyDown={keyboardSend}
-          />
-        </label>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button
-            type="submit"
-            className={PRIMARY}
-            disabled={busy || answering || !question.trim()}
-          >
-            {answering ? "Answering…" : "Send question"}
-          </button>
-          <p className="text-xs leading-5 text-gray-400">
-            Enter to send; Shift+Enter for a new line. Failed answers leave your question here.
-          </p>
-        </div>
-        {answering && (
-          <p role="status" aria-live="polite" className="text-sm text-indigo-100">
-            The Tutor is answering with the current saved list.
-          </p>
-        )}
-      </form>
-      <details className="rounded-xl border border-red-300/20 p-4">
-        <summary className={`cursor-pointer text-sm font-medium text-red-100 ${FOCUS}`}>
-          Clear tutor history
-        </summary>
-        <div className="mt-3 space-y-3" aria-label="Clear tutor history confirmation">
-          <p className="text-sm leading-6 text-gray-300">
-            Delete every saved Tutor message, chapter, and Lernübergabe for this deck. Guides and
-            references remain. Existing operator tracing is not covered.
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              className={PRIMARY}
-              disabled={busy}
-              onClick={(event) => {
-                event.currentTarget.closest("details")?.removeAttribute("open");
-                onClear();
-              }}
-            >
-              Confirm clear tutor history
-            </button>
-            <button
-              type="button"
-              className={SECONDARY}
-              disabled={busy}
-              onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
-            >
-              Cancel clear tutor history
-            </button>
-          </div>
-        </div>
-      </details>
+      <TutorQuestionForm
+        currentCards={currentCards}
+        question={question}
+        selectedCard={selectedCard}
+        busy={busy}
+        answering={answering}
+        onQuestionChange={onQuestionChange}
+        onCardChange={onCardChange}
+        onAsk={onAsk}
+      />
+      <TutorClearHistory busy={busy} onClear={onClear} />
     </section>
   );
 }
 
-function Chapter({ chapter }: { chapter: TutorChapterResponse }) {
+function ConversationChapters({
+  chapters,
+  selected,
+  busy,
+  onChapterChange,
+  onRetryHandoff,
+}: {
+  chapters: TutorChapterResponse[];
+  selected: TutorChapterResponse | null;
+  busy: boolean;
+  onChapterChange: (chapterId: string) => void;
+  onRetryHandoff: (chapterId: string) => void;
+}) {
+  return (
+    <>
+      {chapters.length > 0 && (
+        <label className="block text-sm font-medium text-gray-200">
+          Conversation chapter
+          <select
+            aria-label="Conversation chapter"
+            className={`mt-2 min-h-11 w-full rounded-lg border border-white/15 bg-gray-950 p-2 ${FOCUS}`}
+            value={selected?.id ?? ""}
+            onChange={(event) => onChapterChange(event.target.value)}
+          >
+            {[...chapters].reverse().map((chapter) => (
+              <option key={chapter.id} value={chapter.id}>
+                {chapter.current
+                  ? `Current deck chapter ${chapter.sequence}`
+                  : `Archived chapter ${chapter.sequence}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {selected ? (
+        <Chapter chapter={selected} busy={busy} onRetryHandoff={onRetryHandoff} />
+      ) : (
+        <p className="text-sm leading-6 text-gray-400">
+          No saved Tutor questions yet. Your first answer starts a current deck chapter.
+        </p>
+      )}
+    </>
+  );
+}
+
+function Chapter({
+  chapter,
+  busy,
+  onRetryHandoff,
+}: {
+  chapter: TutorChapterResponse;
+  busy: boolean;
+  onRetryHandoff: (chapterId: string) => void;
+}) {
   return (
     <article
       aria-label={chapter.current ? "Current deck chapter" : `Archived chapter ${chapter.sequence}`}
@@ -227,10 +175,21 @@ function Chapter({ chapter }: { chapter: TutorChapterResponse }) {
         </p>
       )}
       {chapter.handoff_status === "failed" && (
-        <p role="alert" className="text-sm leading-6 text-amber-200">
-          {chapter.handoff_error ??
-            "Lernübergabe unavailable; current deck facts remain available."}
-        </p>
+        <div className="space-y-3">
+          <p role="alert" className="text-sm leading-6 text-amber-200">
+            {chapter.handoff_error ??
+              "Lernübergabe unavailable; current deck facts remain available."}
+          </p>
+          <button
+            type="button"
+            aria-label={`Retry Lernübergabe for chapter ${chapter.sequence}`}
+            className={SECONDARY}
+            disabled={busy}
+            onClick={() => onRetryHandoff(chapter.id)}
+          >
+            Retry Lernübergabe
+          </button>
+        </div>
       )}
       {chapter.turns.length === 0 ? (
         <p className="text-sm text-gray-400">No questions in this chapter yet.</p>

@@ -41,6 +41,29 @@ class TutorError(ValueError):
 
 
 @dataclass(frozen=True)
+class TutorChapterCapture:
+    """Exact current inputs used to reuse or append a Gesprächskapitel."""
+
+    owner: Owner
+    deck_id: UUID
+    mode: TutorMode
+    manifest: dict[str, object]
+    evidence: TutorEvidence
+
+
+@dataclass(frozen=True)
+class TutorHandoffWork:
+    """Shared bounded compaction intent for a guide, question, or explicit retry."""
+
+    chapter_id: UUID
+    handoff: str | None = None
+    compaction_required: bool = False
+    compaction_turns: list[TutorTurnContext] = field(default_factory=list)
+    previous_handoff: str | None = None
+    compaction_through: UUID | None = None
+
+
+@dataclass(frozen=True)
 class TutorWork:
     """One persisted generation intent safe to execute at most once."""
 
@@ -51,12 +74,7 @@ class TutorWork:
     mode: TutorMode
     manifest: dict[str, object]
     guide_evidence: TutorEvidence
-    chapter_id: UUID | None = None
-    handoff: str | None = None
-    compaction_required: bool = False
-    compaction_turns: list[TutorTurnContext] = field(default_factory=list)
-    previous_handoff: str | None = None
-    compaction_through: UUID | None = None
+    handoff_work: TutorHandoffWork | None = None
 
 
 @dataclass(frozen=True)
@@ -76,12 +94,21 @@ class TutorQuestionWork:
     card_name: str | None
     selected_card: TutorCardFact | None
     selected_card_present: bool
-    handoff: str | None
     recent_turns: list[TutorTurnContext]
-    compaction_required: bool
-    compaction_turns: list[TutorTurnContext]
-    previous_handoff: str | None
-    compaction_through: UUID | None
+    handoff_work: TutorHandoffWork
+
+
+@dataclass(frozen=True)
+class TutorHandoffRetryWork:
+    """Durable explicit retry intent scoped to one failed chapter and epoch."""
+
+    id: UUID
+    token: UUID
+    owner: Owner
+    deck_id: UUID
+    epoch: int
+    mode: TutorMode
+    handoff_work: TutorHandoffWork
 
 
 class TutorRepository:
@@ -217,17 +244,18 @@ class TutorRepository:
                 manifest=manifest,
                 guide_evidence=guide_evidence,
             )
-            chapter, compaction_turns, previous_handoff, through = await self._question_chapter(
-                conn, owner, deck_id, mode, manifest, guide_evidence
-            )
+            capture = TutorChapterCapture(owner, deck_id, mode, manifest, guide_evidence)
+            chapter, turns, previous, through = await self._question_chapter(conn, capture)
             work = replace(
                 work,
-                chapter_id=chapter["id"],
-                handoff=chapter["handoff"],
-                compaction_required=chapter["handoff_status"] == "pending",
-                compaction_turns=compaction_turns,
-                previous_handoff=previous_handoff,
-                compaction_through=through,
+                handoff_work=TutorHandoffWork(
+                    chapter_id=chapter["id"],
+                    handoff=chapter["handoff"],
+                    compaction_required=chapter["handoff_status"] == "pending",
+                    compaction_turns=turns,
+                    previous_handoff=previous,
+                    compaction_through=through,
+                ),
             )
             await conn.execute(
                 """
@@ -435,7 +463,7 @@ class TutorRepository:
                 previous_handoff,
                 compaction_through,
             ) = await self._question_chapter(
-                conn, owner, deck_id, mode, manifest, question_evidence
+                conn, TutorChapterCapture(owner, deck_id, mode, manifest, question_evidence)
             )
             turn_id = uuid4()
             work = TutorQuestionWork(
@@ -452,12 +480,15 @@ class TutorRepository:
                 card_name=card_name.strip() if card_name else None,
                 selected_card=_selected_card(question_evidence, card_name),
                 selected_card_present=_selected_card(question_evidence, card_name) is not None,
-                handoff=chapter["handoff"],
                 recent_turns=await self._recent_turns(conn, chapter["id"]),
-                compaction_required=chapter["handoff_status"] == "pending",
-                compaction_turns=compaction_turns,
-                previous_handoff=previous_handoff,
-                compaction_through=compaction_through,
+                handoff_work=TutorHandoffWork(
+                    chapter_id=chapter["id"],
+                    handoff=chapter["handoff"],
+                    compaction_required=chapter["handoff_status"] == "pending",
+                    compaction_turns=compaction_turns,
+                    previous_handoff=previous_handoff,
+                    compaction_through=compaction_through,
+                ),
             )
             await conn.execute(
                 "INSERT INTO tutor_turns (id, chapter_id, deck_id, account_id, epoch, "
@@ -477,15 +508,14 @@ class TutorRepository:
         return await self._capture_question_evidence(work)
 
     async def _question_chapter(
-        self,
-        conn: asyncpg.Connection,
-        owner: Owner,
-        deck_id: UUID,
-        mode: TutorMode,
-        manifest: dict[str, object],
-        question_evidence: TutorEvidence,
+        self, conn: asyncpg.Connection, capture: TutorChapterCapture
     ) -> tuple[asyncpg.Record, list[TutorTurnContext], str | None, UUID | None]:
         """Reuse only the latest matching chapter; returning to old facts starts fresh."""
+        owner = capture.owner
+        deck_id = capture.deck_id
+        mode = capture.mode
+        manifest = capture.manifest
+        question_evidence = capture.evidence
         await conn.execute(
             "INSERT INTO tutor_histories (deck_id) VALUES ($1) ON CONFLICT DO NOTHING", deck_id
         )
@@ -529,8 +559,8 @@ class TutorRepository:
         chapter_id = uuid4()
         await conn.execute(
             "INSERT INTO tutor_chapters (id, deck_id, account_id, epoch, sequence, mode, "
-            "composition_hash, teaching_hash, manifest, evidence, handoff_status, handoff_error) "
-            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12)",
+            "composition_hash, teaching_hash, manifest, evidence, handoff_status, handoff_error, "
+            "source_chapter_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13)",
             chapter_id,
             deck_id,
             owner.account_id,
@@ -543,6 +573,7 @@ class TutorRepository:
             question_evidence.model_dump_json(),
             handoff_status,
             handoff_error,
+            latest["id"] if latest else None,
         )
         await conn.execute(
             "UPDATE tutor_histories SET next_sequence=next_sequence+1 WHERE deck_id=$1", deck_id
@@ -552,13 +583,18 @@ class TutorRepository:
             raise TutorError("Tutor chapter could not be saved", 500)
         return chapter, previous_turns, latest["handoff"] if latest else None, None
 
-    @staticmethod
     async def _same_chapter_compaction(
-        conn: asyncpg.Connection, chapter: asyncpg.Record
+        self, conn: asyncpg.Connection, chapter: asyncpg.Record
     ) -> tuple[list[TutorTurnContext], UUID | None]:
         """Compact twelve new turns down to a handoff plus eight recent full turns."""
         if chapter["handoff_status"] not in {"none", "ready"}:
             return [], None
+        return await self._same_chapter_candidates(conn, chapter)
+
+    @staticmethod
+    async def _same_chapter_candidates(
+        conn: asyncpg.Connection, chapter: asyncpg.Record
+    ) -> tuple[list[TutorTurnContext], UUID | None]:
         rows = await conn.fetch(
             "SELECT id, question, answer, created_at FROM tutor_turns "
             "WHERE chapter_id=$1 AND status='succeeded' AND ($2::uuid IS NULL OR "
@@ -657,10 +693,8 @@ class TutorRepository:
             == evidence.teaching_hash(work.manifest, work.mode)
         )
 
-    async def start_handoff(self, work: TutorWork | TutorQuestionWork) -> bool:
+    async def start_handoff(self, work: TutorHandoffWork) -> bool:
         """Claim one lazy compaction; overlapping questions never duplicate that model call."""
-        if work.chapter_id is None:
-            return False
         result = await self.pool.execute(
             "UPDATE tutor_chapters SET handoff_status='running', handoff_error=NULL "
             "WHERE id=$1 AND handoff_status='pending'",
@@ -668,11 +702,9 @@ class TutorRepository:
         )
         return result == "UPDATE 1"
 
-    async def complete_handoff(self, work: TutorWork | TutorQuestionWork, handoff: str) -> None:
+    async def complete_handoff(self, work: TutorHandoffWork, handoff: str) -> bool:
         """Retain a bounded summary as untrusted learning context, not current evidence."""
-        if work.chapter_id is None:
-            return
-        await self.pool.execute(
+        result = await self.pool.execute(
             "UPDATE tutor_chapters SET handoff=$2, handoff_through=$3, "
             "handoff_status='ready', handoff_error=NULL "
             "WHERE id=$1 AND handoff_status='running'",
@@ -680,16 +712,117 @@ class TutorRepository:
             handoff,
             work.compaction_through,
         )
+        return result == "UPDATE 1"
 
-    async def fail_handoff(self, work: TutorWork | TutorQuestionWork) -> None:
+    async def fail_handoff(self, work: TutorHandoffWork) -> None:
         """Expose unavailable compaction while allowing current-fact chat to continue."""
-        if work.chapter_id is None:
-            return
         await self.pool.execute(
-            "UPDATE tutor_chapters SET handoff=NULL, handoff_status='failed', "
+            "UPDATE tutor_chapters SET handoff_status='failed', "
             "handoff_error='Lernübergabe failed; this answer uses current deck facts only.' "
             "WHERE id=$1 AND handoff_status='running'",
             work.chapter_id,
+        )
+
+    async def create_handoff_retry(
+        self, owner: Owner, deck_id: UUID, chapter_id: UUID, request_key: UUID
+    ) -> TutorHandoffRetryWork | None:
+        """Persist one explicit retry without allowing duplicates or hidden paid work."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            await owned_deck(conn, owner, deck_id, lock=True)
+            previous = await conn.fetchrow(
+                "SELECT deck_id, chapter_id FROM tutor_handoff_retries "
+                "WHERE account_id=$1 AND request_key=$2",
+                owner.account_id,
+                request_key,
+            )
+            if previous is not None:
+                if previous["deck_id"] != deck_id or previous["chapter_id"] != chapter_id:
+                    raise TutorError("Request key already belongs to another handoff", 409)
+                return None
+            epoch = await conn.fetchval(
+                "SELECT epoch FROM tutor_histories WHERE deck_id=$1", deck_id
+            )
+            chapter = await conn.fetchrow(
+                "SELECT * FROM tutor_chapters WHERE id=$1 AND deck_id=$2 AND account_id=$3 "
+                "AND epoch=$4",
+                chapter_id,
+                deck_id,
+                owner.account_id,
+                epoch,
+            )
+            if chapter is None:
+                raise TutorError("Tutor chapter not found", 404)
+            active = await conn.fetchval(
+                "SELECT id FROM tutor_handoff_retries WHERE chapter_id=$1 AND status='running'",
+                chapter_id,
+            )
+            if active is not None:
+                return None
+            if chapter["handoff_status"] != "failed":
+                raise TutorError("Only a failed Lernübergabe can be retried", 409)
+            handoff_work = await self._retry_handoff_work(conn, chapter)
+            work = TutorHandoffRetryWork(
+                id=uuid4(),
+                token=uuid4(),
+                owner=owner,
+                deck_id=deck_id,
+                epoch=epoch,
+                mode=chapter["mode"],
+                handoff_work=handoff_work,
+            )
+            await conn.execute(
+                "INSERT INTO tutor_handoff_retries (id, chapter_id, deck_id, account_id, epoch, "
+                "request_key, token) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+                work.id,
+                chapter_id,
+                deck_id,
+                owner.account_id,
+                epoch,
+                request_key,
+                work.token,
+            )
+            await conn.execute(
+                "UPDATE tutor_chapters SET handoff_status='running', handoff_error=NULL "
+                "WHERE id=$1 AND handoff_status='failed'",
+                chapter_id,
+            )
+            return work
+
+    async def _retry_handoff_work(
+        self, conn: asyncpg.Connection, chapter: asyncpg.Record
+    ) -> TutorHandoffWork:
+        source_id = chapter["source_chapter_id"]
+        if source_id is not None:
+            source = await conn.fetchrow("SELECT * FROM tutor_chapters WHERE id=$1", source_id)
+            if source is None:
+                raise TutorError("Archived handoff source is unavailable", 409)
+            turns = await self._compaction_turns(conn, source_id)
+            through = None
+            previous = source["handoff"]
+        else:
+            turns, through = await self._same_chapter_candidates(conn, chapter)
+            previous = chapter["handoff"]
+        if not turns:
+            raise TutorError("No archived turns are available for this Lernübergabe", 409)
+        return TutorHandoffWork(
+            chapter_id=chapter["id"],
+            handoff=chapter["handoff"],
+            compaction_required=True,
+            compaction_turns=turns,
+            previous_handoff=previous,
+            compaction_through=through,
+        )
+
+    async def finish_handoff_retry(self, work: TutorHandoffRetryWork, error: str | None) -> None:
+        """Finish only the original durable retry token after chapter publication/failure."""
+        status = "failed" if error else "succeeded"
+        await self.pool.execute(
+            "UPDATE tutor_handoff_retries SET status=$3, error=$4, finished_at=now() "
+            "WHERE id=$1 AND token=$2 AND status='running'",
+            work.id,
+            work.token,
+            status,
+            error,
         )
 
     async def publish_question(self, work: TutorQuestionWork, answer: str) -> None:
@@ -825,15 +958,11 @@ class TutorRepository:
     async def _pin_chapter_sources(
         conn: asyncpg.Connection, chapter_id: UUID, question_evidence: TutorEvidence
     ) -> None:
-        source_hashes = _source_hashes(question_evidence.sources)
-        present = await conn.fetch(
-            "SELECT sha256 FROM recommendation_sources WHERE sha256 = ANY($1::text[])",
-            source_hashes,
-        )
+        present = await _present_source_hashes(conn, question_evidence)
         await conn.executemany(
             "INSERT INTO tutor_chapter_sources (chapter_id, source_hash) VALUES ($1,$2) "
             "ON CONFLICT DO NOTHING",
-            [(chapter_id, row["sha256"]) for row in present],
+            [(chapter_id, source_hash) for source_hash in present],
         )
 
     @staticmethod
@@ -841,17 +970,11 @@ class TutorRepository:
         conn: asyncpg.Connection, run_id: UUID, guide_evidence: TutorEvidence
     ) -> None:
         """Retain source snapshots explicitly cited by a saved run."""
-        source_hashes = _source_hashes(guide_evidence.sources)
-        if not source_hashes:
-            return
-        present = await conn.fetch(
-            "SELECT sha256 FROM recommendation_sources WHERE sha256 = ANY($1::text[])",
-            source_hashes,
-        )
+        present = await _present_source_hashes(conn, guide_evidence)
         await conn.executemany(
             "INSERT INTO tutor_run_sources (run_id, source_hash) VALUES ($1, $2) "
             "ON CONFLICT DO NOTHING",
-            [(run_id, row["sha256"]) for row in present],
+            [(run_id, source_hash) for source_hash in present],
         )
 
     @staticmethod
@@ -1010,6 +1133,18 @@ def _source_hashes(sources: dict[str, str | None]) -> list[str]:
     ]
 
 
+async def _present_source_hashes(conn: asyncpg.Connection, captured: TutorEvidence) -> list[str]:
+    """Return only cited source snapshots that still exist for association pinning."""
+    source_hashes = _source_hashes(captured.sources)
+    if not source_hashes:
+        return []
+    rows = await conn.fetch(
+        "SELECT sha256 FROM recommendation_sources WHERE sha256 = ANY($1::text[])",
+        source_hashes,
+    )
+    return [row["sha256"] for row in rows]
+
+
 async def interrupt_running(pool: asyncpg.Pool) -> None:
     """Mark process-lost work interrupted at startup; recovery is always explicit."""
     async with pool.acquire() as conn, conn.transaction():
@@ -1022,7 +1157,12 @@ async def interrupt_running(pool: asyncpg.Pool) -> None:
             "error='Tutor answer was interrupted; retry explicitly.' WHERE status='running'"
         )
         await conn.execute(
-            "UPDATE tutor_chapters SET handoff_status='failed', handoff=NULL, "
+            "UPDATE tutor_chapters SET handoff_status='failed', "
             "handoff_error='Lernübergabe was interrupted; current-fact chat remains available.' "
             "WHERE handoff_status IN ('pending', 'running')"
+        )
+        await conn.execute(
+            "UPDATE tutor_handoff_retries SET status='interrupted', finished_at=now(), "
+            "error='Lernübergabe retry was interrupted; retry explicitly.' "
+            "WHERE status='running'"
         )

@@ -3,6 +3,29 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import UUID
+
+FOREST_SCRYFALL_ID = UUID("6d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
+
+
+def valid_guide() -> object:
+    """Return a deterministic guide with three legal seven-Forest worked hands."""
+    from mtg_helper.models.tutor import TutorGuideDraft
+
+    return TutorGuideDraft(
+        title="Hazel guide",
+        content="Interpretation: build a token engine.",
+        opening_hands=[
+            {"decision": "keep", "cards": ["Forest"] * 7, "explanation": "Keep mana."},
+            {"decision": "mulligan", "cards": ["Forest"] * 7, "explanation": "No spells."},
+            {
+                "decision": "context-dependent",
+                "cards": ["Forest"] * 7,
+                "explanation": "Depends on the table.",
+            },
+        ],
+    )
+
 
 # These are intentionally materialized rather than parsed from ignored specification files.
 # Flavor names are part of the supplied Blue Farm list and resolve to canonical identities.

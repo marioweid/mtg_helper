@@ -420,6 +420,8 @@ describe("Tutor panel", () => {
       chapters: [
         {
           ...conversation.chapters[0]!,
+          handoff_status: "failed",
+          handoff_error: "Lernübergabe failed; retry explicitly.",
           turns: [
             {
               ...conversation.chapters[0]!.turns[0]!,
@@ -441,6 +443,7 @@ describe("Tutor panel", () => {
         error={null}
         onMode={vi.fn()}
         onGenerate={vi.fn()}
+        onRetryHandoff={vi.fn()}
       />,
     );
 
@@ -448,6 +451,8 @@ describe("Tutor panel", () => {
     expect(markup).toContain("read-only");
     expect(markup).toContain("Original full question");
     expect(markup).toContain("Tutor answer failed; retry explicitly.");
+    expect(markup).toContain("Lernübergabe failed; retry explicitly.");
+    expect(markup).toContain('aria-label="Retry Lernübergabe for chapter 1"');
     expect(markup).toMatch(/<textarea[^>]*>Original full question<\/textarea>/);
     expect(markup).toContain("Cancel clear tutor history");
   });

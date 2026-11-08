@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 import { TutorConversation } from "@/components/tutor-conversation";
 import { TutorMarkdown } from "@/components/tutor-markdown";
+import { useTutorConversation } from "@/components/use-tutor-conversation";
 import { apiClient } from "@/lib/api";
 import type {
   DeckSummary,
@@ -49,22 +51,13 @@ interface TutorPanelViewProps {
   onChapterChange?: (chapterId: string) => void;
   onAsk?: () => void;
   onClearConversation?: () => void;
+  onRetryHandoff?: (chapterId: string) => void;
 }
 
 export function TutorPanel({ deckId }: TutorPanelProps) {
   const [state, setState] = useState<TutorStateResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [referencePreview, setReferencePreview] = useState<TutorReferencePreviewResponse | null>(
-    null,
-  );
-  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
-  const [ownedDecks, setOwnedDecks] = useState<DeckSummary[]>([]);
-  const [conversation, setConversation] = useState<TutorConversationResponse | null>(null);
-  const [question, setQuestion] = useState("");
-  const [selectedCard, setSelectedCard] = useState("");
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
-  const [pendingTurnId, setPendingTurnId] = useState<string | null>(null);
 
   const load = useCallback(async (): Promise<TutorStateResponse | null> => {
     try {
@@ -78,27 +71,13 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     }
   }, [deckId]);
 
-  const loadConversation = useCallback(async () => {
-    try {
-      const next = await apiClient.getTutorConversation(deckId);
-      setConversation(next);
-      setError(null);
-      return next;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Tutor conversation could not load");
-      return null;
-    }
-  }, [deckId]);
-
   useEffect(() => {
     void load();
   }, [load]);
-
   useEffect(() => {
     if (state?.latest_run?.status !== "running") return;
     let active = true;
     let timer = window.setTimeout(poll, 1500);
-
     async function poll() {
       const next = await load();
       if (active && next?.latest_run?.status === "running") timer = window.setTimeout(poll, 1500);
@@ -109,111 +88,82 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     };
   }, [load, state?.latest_run?.status]);
 
-  useEffect(() => {
-    void loadConversation();
-  }, [loadConversation]);
+  const references = useTutorReferences(deckId, setState, setBusy, setError);
+  const conversation = useTutorConversation(deckId, setError);
 
-  useEffect(() => {
-    if (!pendingTurnId || !conversation) return;
-    const turn = conversation.chapters
-      .flatMap((chapter) => chapter.turns)
-      .find((candidate) => candidate.id === pendingTurnId);
-    if (!turn || turn.status === "running") return;
-    if (turn.status === "succeeded") setQuestion("");
-    setPendingTurnId(null);
-  }, [conversation, pendingTurnId]);
+  async function perform(action: () => Promise<TutorStateResponse>, failure: string) {
+    setBusy(true);
+    try {
+      setState(await action());
+      await conversation.load();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : failure);
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  useEffect(() => {
-    const active = conversation?.chapters.some(
-      (chapter) =>
-        chapter.handoff_status === "pending" ||
-        chapter.handoff_status === "running" ||
-        chapter.turns.some((turn) => turn.status === "running"),
+  if (error && !state) return <TutorPanelFallback error={error} onRetry={load} />;
+  if (!state) return <TutorPanelFallback error={null} onRetry={load} />;
+  return (
+    <TutorPanelView
+      {...references}
+      {...conversation}
+      state={state}
+      busy={busy || conversation.conversationBusy}
+      error={error}
+      onMode={(mode) =>
+        perform(() => apiClient.saveTutorSetup(deckId, { mode }), "Tutor mode could not save")
+      }
+      onGenerate={() =>
+        perform(
+          () => apiClient.generateTutorGuide(deckId, { request_key: crypto.randomUUID() }),
+          "Guide generation could not start",
+        )
+      }
+    />
+  );
+}
+
+function TutorPanelFallback({
+  error,
+  onRetry,
+}: {
+  error: string | null;
+  onRetry: () => Promise<TutorStateResponse | null>;
+}) {
+  if (!error)
+    return (
+      <p role="status" className="text-sm text-gray-400">
+        Loading Tutor…
+      </p>
     );
-    if (!active) return;
-    let mounted = true;
-    let timer = window.setTimeout(poll, 1000);
-    async function poll() {
-      const next = await loadConversation();
-      const stillActive = next?.chapters.some(
-        (chapter) =>
-          chapter.handoff_status === "pending" ||
-          chapter.handoff_status === "running" ||
-          chapter.turns.some((turn) => turn.status === "running"),
-      );
-      if (mounted && stillActive) timer = window.setTimeout(poll, 1000);
-    }
-    return () => {
-      mounted = false;
-      window.clearTimeout(timer);
-    };
-  }, [conversation, loadConversation]);
+  return (
+    <section aria-label="Tutor" className="space-y-3">
+      <p role="alert" className="rounded-xl border border-red-400/20 p-4 text-sm text-red-200">
+        {error}
+      </p>
+      <button type="button" className={PRIMARY} onClick={() => void onRetry()}>
+        Retry Tutor
+      </button>
+    </section>
+  );
+}
 
-  async function saveMode(mode: TutorMode) {
-    setBusy(true);
-    try {
-      setState(await apiClient.saveTutorSetup(deckId, { mode }));
-      await loadConversation();
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Tutor mode could not save");
-    } finally {
-      setBusy(false);
-    }
-  }
+function useTutorReferences(
+  deckId: string,
+  setState: Dispatch<SetStateAction<TutorStateResponse | null>>,
+  setBusy: Dispatch<SetStateAction<boolean>>,
+  setError: Dispatch<SetStateAction<string | null>>,
+) {
+  const [referencePreview, setReferencePreview] = useState<TutorReferencePreviewResponse | null>(
+    null,
+  );
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+  const [ownedDecks, setOwnedDecks] = useState<DeckSummary[]>([]);
 
-  async function generate() {
-    setBusy(true);
-    try {
-      setState(await apiClient.generateTutorGuide(deckId, { request_key: crypto.randomUUID() }));
-      await loadConversation();
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Guide generation could not start");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function ask() {
-    const draft = question.trim();
-    if (!draft) return;
-    setBusy(true);
-    try {
-      const next = await apiClient.askTutorQuestion(deckId, {
-        request_key: crypto.randomUUID(),
-        question: draft,
-        ...(selectedCard ? { card_name: selectedCard } : {}),
-      });
-      setConversation(next);
-      const pending = next.chapters
-        .flatMap((chapter) => chapter.turns)
-        .filter((turn) => turn.status === "running")
-        .at(-1);
-      setPendingTurnId(pending?.id ?? null);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Tutor question could not be sent");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function clearConversation() {
-    setBusy(true);
-    try {
-      setConversation(await apiClient.clearTutorConversation(deckId));
-      setSelectedChapterId(null);
-      setPendingTurnId(null);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Tutor history could not be cleared");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function previewReference(request: TutorReferenceRequest) {
+  async function onReferencePreview(request: TutorReferenceRequest) {
     setBusy(true);
     try {
       setReferencePreview(await apiClient.previewTutorReference(deckId, request));
@@ -227,7 +177,7 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     }
   }
 
-  async function confirmReference() {
+  async function onReferenceConfirm() {
     if (!referencePreview) return;
     setBusy(true);
     try {
@@ -242,7 +192,7 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     }
   }
 
-  async function removeReference() {
+  async function onReferenceRemove() {
     setBusy(true);
     try {
       setState(await apiClient.removeTutorReference(deckId));
@@ -256,7 +206,7 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     }
   }
 
-  async function loadOwnedDecks() {
+  async function onOwnedDecksLoad() {
     try {
       setOwnedDecks(
         (await apiClient.listDecks({ limit: 100 })).filter((deck) => deck.id !== deckId),
@@ -266,54 +216,20 @@ export function TutorPanel({ deckId }: TutorPanelProps) {
     }
   }
 
-  if (error && !state)
-    return (
-      <section aria-label="Tutor" className="space-y-3">
-        <p role="alert" className="rounded-xl border border-red-400/20 p-4 text-sm text-red-200">
-          {error}
-        </p>
-        <button type="button" className={PRIMARY} onClick={() => void load()}>
-          Retry Tutor
-        </button>
-      </section>
-    );
-  if (!state)
-    return (
-      <p role="status" className="text-sm text-gray-400">
-        Loading Tutor…
-      </p>
-    );
-  return (
-    <TutorPanelView
-      state={state}
-      busy={busy}
-      error={error}
-      onMode={saveMode}
-      onGenerate={generate}
-      referencePreview={referencePreview}
-      referenceNotice={referenceNotice}
-      ownedDecks={ownedDecks}
-      onReferencePreview={previewReference}
-      onReferenceConfirm={confirmReference}
-      onReferenceCancel={() => {
-        setReferencePreview(null);
-        setReferenceNotice("Reference replacement cancelled; the saved reference is unchanged.");
-      }}
-      onReferenceRemove={removeReference}
-      onOwnedDecksLoad={loadOwnedDecks}
-      conversation={conversation}
-      question={question}
-      selectedCard={selectedCard}
-      selectedChapterId={selectedChapterId}
-      onQuestionChange={setQuestion}
-      onCardChange={setSelectedCard}
-      onChapterChange={setSelectedChapterId}
-      onAsk={ask}
-      onClearConversation={clearConversation}
-    />
-  );
+  return {
+    referencePreview,
+    referenceNotice,
+    ownedDecks,
+    onReferencePreview,
+    onReferenceConfirm,
+    onReferenceCancel: () => {
+      setReferencePreview(null);
+      setReferenceNotice("Reference replacement cancelled; the saved reference is unchanged.");
+    },
+    onReferenceRemove,
+    onOwnedDecksLoad,
+  };
 }
-
 export function TutorPanelView({
   state,
   busy,
@@ -337,13 +253,8 @@ export function TutorPanelView({
   onChapterChange = () => {},
   onAsk = () => {},
   onClearConversation = () => {},
+  onRetryHandoff = () => {},
 }: TutorPanelViewProps) {
-  const run = state.latest_run;
-  const displayedRun = run?.guide ? run : state.last_successful_run;
-  const guide = displayedRun?.guide;
-  const outdated = !!displayedRun && !displayedRun.current;
-  const generating = run?.status === "running";
-  const action = guide ? (outdated ? "Update Guide" : "Generate Guide") : "Generate Guide";
   return (
     <section aria-label="Tutor" className="min-w-0 space-y-5">
       <header className="space-y-1">
@@ -391,6 +302,44 @@ export function TutorPanelView({
           {error}
         </p>
       )}
+      <GuideWorkspace state={state} busy={busy} onGenerate={onGenerate} />
+      {state.mode && (
+        <TutorConversation
+          conversation={conversation}
+          currentCards={state.current_cards ?? []}
+          question={question}
+          selectedCard={selectedCard}
+          selectedChapterId={selectedChapterId}
+          busy={busy}
+          onQuestionChange={onQuestionChange}
+          onCardChange={onCardChange}
+          onChapterChange={onChapterChange}
+          onAsk={onAsk}
+          onClear={onClearConversation}
+          onRetryHandoff={onRetryHandoff}
+        />
+      )}
+    </section>
+  );
+}
+
+function GuideWorkspace({
+  state,
+  busy,
+  onGenerate,
+}: {
+  state: TutorStateResponse;
+  busy: boolean;
+  onGenerate: () => void;
+}) {
+  const run = state.latest_run;
+  const displayedRun = run?.guide ? run : state.last_successful_run;
+  const guide = displayedRun?.guide;
+  const outdated = !!displayedRun && !displayedRun.current;
+  const generating = run?.status === "running";
+  const action = guide && outdated ? "Update Guide" : "Generate Guide";
+  return (
+    <>
       {state.mode && (
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -427,22 +376,7 @@ export function TutorPanelView({
           warnings={displayedRun?.evidence?.warnings ?? []}
         />
       )}
-      {state.mode && (
-        <TutorConversation
-          conversation={conversation}
-          currentCards={state.current_cards ?? []}
-          question={question}
-          selectedCard={selectedCard}
-          selectedChapterId={selectedChapterId}
-          busy={busy}
-          onQuestionChange={onQuestionChange}
-          onCardChange={onCardChange}
-          onChapterChange={onChapterChange}
-          onAsk={onAsk}
-          onClear={onClearConversation}
-        />
-      )}
-    </section>
+    </>
   );
 }
 

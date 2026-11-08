@@ -13,8 +13,7 @@ from tests.conftest import (
     SCHEMA_PATH,
     create_test_account,
 )
-
-FOREST_SCRYFALL_ID = UUID("6d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
+from tests.tutor_fixtures import FOREST_SCRYFALL_ID, valid_guide
 
 
 async def _deck_id(client: AsyncClient) -> str:
@@ -50,19 +49,6 @@ async def _finished_conversation(client: AsyncClient, deck_id: str) -> dict[str,
             return state
         await asyncio.sleep(0)
     raise AssertionError("Tutor answer did not reach a terminal state")
-
-
-def _valid_guide() -> object:
-    from mtg_helper.models.tutor import TutorGuideDraft
-
-    return TutorGuideDraft(
-        title="Current guide",
-        content="Current-list guide",
-        opening_hands=[
-            {"decision": decision, "cards": ["Forest"] * 7, "explanation": decision}
-            for decision in ("keep", "mulligan", "context-dependent")
-        ],
-    )
 
 
 @pytest.mark.asyncio
@@ -118,7 +104,7 @@ async def test_handoff_archives_frozen_chapter_lazily_after_coalesced_edits(
 ) -> None:
     """Only the next question compacts prior learning into one new chronological chapter."""
     from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
-    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor import commander, service
 
     compactions = []
 
@@ -132,7 +118,7 @@ async def test_handoff_archives_frozen_chapter_lazily_after_coalesced_edits(
         )
 
     monkeypatch.setattr(commander, "answer", answer)
-    monkeypatch.setattr(commander, "compact", compact)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
     deck_id = await _deck_id(client)
     first = await client.post(
         f"/api/v1/decks/{deck_id}/tutor/questions",
@@ -174,7 +160,7 @@ async def test_handoff_bounds_same_chapter_growth_without_truncating_saved_turns
 ) -> None:
     """Older turns compact lazily while model context and handoff remain bounded."""
     from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
-    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor import commander, service
 
     compactions = []
     recent_sizes = []
@@ -188,7 +174,7 @@ async def test_handoff_bounds_same_chapter_growth_without_truncating_saved_turns
         return TutorHandoffDraft(content="Compacted learning goals")
 
     monkeypatch.setattr(commander, "answer", answer)
-    monkeypatch.setattr(commander, "compact", compact)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
     deck_id = await _deck_id(client)
     for index in range(13):
         await client.post(
@@ -219,7 +205,7 @@ async def test_handoff_also_runs_on_explicit_guide_action_without_adding_a_turn(
 ) -> None:
     """A manual guide action resumes learning history without fabricating a user message."""
     from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
-    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor import commander, service
 
     compactions = []
 
@@ -231,10 +217,10 @@ async def test_handoff_also_runs_on_explicit_guide_action_without_adding_a_turn(
         return TutorHandoffDraft(content="Learning carried into guide context")
 
     async def generate(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "answer", answer)
-    monkeypatch.setattr(commander, "compact", compact)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
     monkeypatch.setattr(commander, "generate", generate)
     deck_id = await _deck_id(client)
     await client.post(
@@ -310,7 +296,7 @@ async def test_concurrency_failed_handoff_is_visible_and_not_retried_implicitly(
 ) -> None:
     """A summarizer outage leaves archives intact and current-fact answers available."""
     from mtg_helper.models.tutor import TutorAnswerDraft
-    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor import commander, service
 
     compaction_calls = 0
     observed_handoffs = []
@@ -325,7 +311,7 @@ async def test_concurrency_failed_handoff_is_visible_and_not_retried_implicitly(
         raise ValueError("deterministic compaction outage")
 
     monkeypatch.setattr(commander, "answer", answer)
-    monkeypatch.setattr(commander, "compact", failed_compact)
+    monkeypatch.setattr(service, "run_compaction_agent", failed_compact)
     deck_id = await _deck_id(client)
     await client.post(
         f"/api/v1/decks/{deck_id}/tutor/questions",
@@ -355,17 +341,101 @@ async def test_concurrency_failed_handoff_is_visible_and_not_retried_implicitly(
 
 
 @pytest.mark.asyncio
+async def test_concurrency_failed_handoff_has_deduplicated_explicit_retry(
+    client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only a deliberate retry restarts compaction, including after another context transition."""
+    from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
+    from mtg_helper.services.tutor import commander, service
+
+    compaction_calls = 0
+    retry_entered = asyncio.Event()
+    retry_release = asyncio.Event()
+
+    async def answer(_input: object) -> TutorAnswerDraft:
+        return TutorAnswerDraft(content="Current-fact answer")
+
+    async def compact(_input: object) -> TutorHandoffDraft:
+        nonlocal compaction_calls
+        compaction_calls += 1
+        if compaction_calls == 1:
+            raise ValueError("deterministic first compaction outage")
+        retry_entered.set()
+        await retry_release.wait()
+        return TutorHandoffDraft(content="Explicitly recovered learning goals")
+
+    monkeypatch.setattr(commander, "answer", answer)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
+    deck_id = await _deck_id(client)
+    await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/questions",
+        json={"request_key": str(uuid4()), "question": "Original lesson"},
+    )
+    await _finished_conversation(client, deck_id)
+    for question in ("After first edit", "After second edit"):
+        await client.patch(
+            f"/api/v1/decks/{deck_id}", json={"description": f"Intent for {question}"}
+        )
+        await client.post(
+            f"/api/v1/decks/{deck_id}/tutor/questions",
+            json={"request_key": str(uuid4()), "question": question},
+        )
+        await _finished_conversation(client, deck_id)
+    failed = await _conversation(client, deck_id)
+    assert len(failed["chapters"]) == 3
+    assert failed["chapters"][-1]["handoff_status"] == "failed"
+    assert compaction_calls == 1
+    chapter_id = failed["chapters"][-1]["id"]
+
+    retry_url = f"/api/v1/decks/{deck_id}/tutor/chapters/{chapter_id}/handoff"
+    key = str(uuid4())
+    responses = await asyncio.gather(
+        *[
+            client.post(retry_url, json={"request_key": request_key})
+            for request_key in (key, key, str(uuid4()))
+        ]
+    )
+    assert [response.status_code for response in responses] == [200, 200, 200]
+    await retry_entered.wait()
+    assert compaction_calls == 2
+    assert (
+        await db_pool.fetchval(
+            "SELECT count(*) FROM tutor_handoff_retries WHERE chapter_id=$1", UUID(chapter_id)
+        )
+        == 1
+    )
+
+    continued = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/questions",
+        json={"request_key": str(uuid4()), "question": "Continue during retry"},
+    )
+    assert continued.status_code == 200
+    await _finished_conversation(client, deck_id)
+    retry_release.set()
+    for _ in range(30):
+        recovered = await _conversation(client, deck_id)
+        if recovered["chapters"][-1]["handoff_status"] == "ready":
+            break
+        await asyncio.sleep(0)
+    assert recovered["chapters"][-1]["handoff"] == "Explicitly recovered learning goals"
+    assert len(recovered["chapters"][-1]["turns"]) == 2
+    await client.post(retry_url, json={"request_key": key})
+    await asyncio.sleep(0)
+    assert compaction_calls == 2
+
+
+@pytest.mark.asyncio
 async def test_clear_deletes_chapters_turns_and_handoffs_across_an_epoch(
     client: AsyncClient, db_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Clear removes Tutor history only and a delayed completion cannot restore it."""
     from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
-    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor import commander, service
 
     async def compact(_input: object) -> TutorHandoffDraft:
         return TutorHandoffDraft(content="Previous learning goals")
 
-    monkeypatch.setattr(commander, "compact", compact)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
     entered = asyncio.Event()
     release = asyncio.Event()
     delayed = False
@@ -448,7 +518,7 @@ async def test_concurrency_resume_creates_one_chapter_and_one_handoff(
 ) -> None:
     """Two tabs resuming an edited deck share its new chapter and compaction."""
     from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
-    from mtg_helper.services.tutor import commander
+    from mtg_helper.services.tutor import commander, service
 
     compaction_calls = 0
 
@@ -462,7 +532,7 @@ async def test_concurrency_resume_creates_one_chapter_and_one_handoff(
         return TutorHandoffDraft(content="Shared handoff")
 
     monkeypatch.setattr(commander, "answer", answer)
-    monkeypatch.setattr(commander, "compact", compact)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
     deck_id = await _deck_id(client)
     await client.post(
         f"/api/v1/decks/{deck_id}/tutor/questions",
@@ -510,7 +580,8 @@ async def test_persistence_denies_other_owners_and_unauthenticated_history_acces
         f"/api/v1/decks/{deck_id}/tutor/questions",
         json={"request_key": str(uuid4()), "question": "Private question"},
     )
-    await _finished_conversation(client, deck_id)
+    saved = await _finished_conversation(client, deck_id)
+    chapter_id = saved["chapters"][0]["id"]
     await create_test_account(client, "Other Conversation Owner")
 
     for method, path, payload in (
@@ -519,6 +590,11 @@ async def test_persistence_denies_other_owners_and_unauthenticated_history_acces
             "post",
             f"/api/v1/decks/{deck_id}/tutor/questions",
             {"request_key": str(uuid4()), "question": "Steal history"},
+        ),
+        (
+            "post",
+            f"/api/v1/decks/{deck_id}/tutor/chapters/{chapter_id}/handoff",
+            {"request_key": str(uuid4())},
         ),
         ("delete", f"/api/v1/decks/{deck_id}/tutor/conversation", None),
     ):

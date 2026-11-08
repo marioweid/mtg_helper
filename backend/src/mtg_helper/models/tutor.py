@@ -24,6 +24,12 @@ class TutorGenerateRequest(BaseModel):
     request_key: UUID
 
 
+class TutorHandoffRetryRequest(BaseModel):
+    """One explicit, idempotent request to retry a failed Lernübergabe."""
+
+    request_key: UUID
+
+
 class TutorQuestionRequest(BaseModel):
     """One explicit question; the server alone supplies conversation history."""
 

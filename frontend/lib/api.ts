@@ -289,6 +289,12 @@ export const apiClient = {
       body: JSON.stringify(body),
     }),
 
+  retryTutorHandoff: (deckId: string, chapterId: string, body: { request_key: string }) =>
+    request<TutorConversationResponse>(`/decks/${deckId}/tutor/chapters/${chapterId}/handoff`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   clearTutorConversation: (deckId: string) =>
     request<TutorConversationResponse>(`/decks/${deckId}/tutor/conversation`, {
       method: "DELETE",

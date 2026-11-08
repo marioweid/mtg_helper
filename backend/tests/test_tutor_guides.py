@@ -17,6 +17,7 @@ from tests.tutor_fixtures import (
     BLUE_FARM_LINE_CARDS,
     BLUE_FARM_MAINBOARD,
     BLUE_FARM_PINNED_FACTS,
+    FOREST_SCRYFALL_ID,
     HOSTILE_SOURCE_TEXT,
     PINNED_FACE_SOURCE_FACTS,
     YUNA_MAINBOARD,
@@ -25,9 +26,8 @@ from tests.tutor_fixtures import (
     acceptance_fixtures,
     blue_farm_combo_payload,
     fixture_pinned_facts,
+    valid_guide,
 )
-
-FOREST_SCRYFALL_ID = UUID("6d7b8d2c-36f5-40e7-91de-9c8c1b44da67")
 
 
 async def _deck_id(client: AsyncClient) -> str:
@@ -67,25 +67,6 @@ async def _finished_tutor_state(client: AsyncClient, tutor_url: str) -> dict[str
             return state
         await asyncio.sleep(0)
     raise AssertionError("Tutor run did not reach a terminal state")
-
-
-def _valid_guide() -> object:
-    """Return a teacher result with three independently legal seven-card examples."""
-    from mtg_helper.models.tutor import TutorGuideDraft
-
-    return TutorGuideDraft(
-        title="Hazel guide",
-        content="Interpretation: build a token engine.",
-        opening_hands=[
-            {"decision": "keep", "cards": ["Forest"] * 7, "explanation": "Keep mana."},
-            {"decision": "mulligan", "cards": ["Forest"] * 7, "explanation": "No spells."},
-            {
-                "decision": "context-dependent",
-                "cards": ["Forest"] * 7,
-                "explanation": "Depends on the table.",
-            },
-        ],
-    )
 
 
 def _tutor_responses_success(request: httpx.Request) -> httpx.Response:
@@ -795,7 +776,7 @@ async def test_freshness_marks_saved_guide_historical_after_actual_card_change(
     from mtg_helper.services.tutor import commander
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "generate", fixed_teacher)
     deck_id = await _deck_id(client)
@@ -827,7 +808,7 @@ async def test_freshness_ignores_a_quantity_split_between_printings(
     from mtg_helper.services.tutor import commander
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "generate", fixed_teacher)
     deck_id = await _deck_id(client)
@@ -879,7 +860,7 @@ async def test_freshness_uses_saved_teaching_inputs_but_not_unrelated_metadata(
         return ComboListResponse(active=[], almost_there=[])
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -917,7 +898,7 @@ async def test_changed_mode_supersedes_a_blocked_generation(
     async def blocked_teacher(_input: object) -> object:
         started.set()
         await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "generate", blocked_teacher)
     deck_id = await _deck_id(client)
@@ -986,7 +967,7 @@ async def test_evidence_marks_malformed_combo_coverage_and_retains_exact_rules(
         return {"unexpected": "not a Commander Spellbook result"}
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", malformed_combos)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -1031,7 +1012,7 @@ async def test_evidence_classifies_malformed_http_combo_responses(
     from mtg_helper.services.tutor import commander
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     call_spellbook = combo_service._call_spellbook
 
@@ -1082,7 +1063,7 @@ async def test_evidence_rejects_malformed_nested_combo_entries(
         return payload
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "_call_spellbook", malformed_response)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -1114,7 +1095,7 @@ async def test_evidence_warns_when_pinned_rules_are_unavailable(
         raise OSError("rules resource unavailable")
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(source_repository, "rules_resource", missing_rules)
@@ -1149,7 +1130,7 @@ async def test_evidence_marks_corrupt_pinned_rules_as_malformed(
         return b"not a gzip stream", "a" * 64
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(source_repository, "rules_resource", corrupt_rules)
@@ -1171,7 +1152,7 @@ async def test_evidence_retains_exact_commander_faces(
     from mtg_helper.services.tutor import commander
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     scryfall_id = uuid4()
     oracle_id = uuid4()
@@ -1232,7 +1213,7 @@ async def test_evidence_distinguishes_combo_timeout_from_zero_coverage(
         return ComboListResponse(active=[], almost_there=[])
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", combo_source)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -1274,7 +1255,7 @@ async def test_teaching_treats_hostile_saved_and_source_text_as_data(
 
     async def fixed_teacher(guide_input: teaching.TeachingInput) -> object:
         captured.append(guide_input)
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "_call_spellbook", source_response)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -1308,7 +1289,7 @@ async def test_runs_rejects_an_oversized_hostile_description_before_model_work(
         nonlocal prompt_calls
         prompt_calls += 1
         teaching._prompt(guide_input, "Commander", "test")
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "generate", bounded_teacher)
     deck_id = await _deck_id(client)
@@ -1350,7 +1331,7 @@ async def test_evidence_tracks_blue_farm_line_membership_after_removals(
         return blue_farm_combo_payload()
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "_call_spellbook", source_response)
     monkeypatch.setattr(cedh, "generate", fixed_teacher)
@@ -1448,7 +1429,7 @@ async def test_persistence_removes_saved_tutor_evidence_with_its_deck(
     from mtg_helper.services.tutor import commander
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "generate", fixed_teacher)
     deck_id = await _deck_id(client)
@@ -1498,7 +1479,7 @@ async def test_runs_deduplicates_active_work_and_preserves_last_good_guide(
         calls += 1
         started.set()
         await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     async def failing_teacher(_input: object) -> object:
         raise ValueError("teacher failure")
@@ -1559,7 +1540,7 @@ async def test_runs_allow_only_one_active_teacher_after_a_deck_transfer(
         if calls == 1:
             entered.set()
             await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", teacher)
@@ -1776,7 +1757,7 @@ async def test_evidence_persists_intent_for_malformed_combo_payload_matrix(
         return payload
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "_call_spellbook", malformed_response)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -1815,7 +1796,7 @@ async def test_runs_publish_superseded_after_real_quantity_change(
     async def teacher(_input: object) -> object:
         entered.set()
         await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", teacher)
@@ -1859,7 +1840,7 @@ async def test_runs_get_is_read_only_for_an_expired_generation(
     async def teacher(_input: object) -> object:
         entered.set()
         await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", teacher)
@@ -1903,7 +1884,7 @@ async def test_runs_lifecycle_recovery_interrupts_without_a_hidden_retry(
         calls += 1
         entered.set()
         await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", teacher)
@@ -1935,7 +1916,7 @@ async def test_persistence_transferred_owner_can_save_a_tutor_mode(
         return ComboListResponse(active=[], almost_there=[])
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(cedh, "generate", fixed_teacher)
@@ -1978,7 +1959,7 @@ async def test_persistence_deletion_blocks_late_guide_publication(
     async def teacher(_input: object) -> object:
         entered.set()
         await release.wait()
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", teacher)
@@ -2011,7 +1992,7 @@ async def test_freshness_captures_known_banned_and_off_color_warnings(
         return ComboListResponse(active=[], almost_there=[])
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(combo_service, "fetch_combos", no_combos)
     monkeypatch.setattr(commander, "generate", fixed_teacher)
@@ -2049,7 +2030,7 @@ async def test_persistence_retains_pinned_source_until_deck_deletion(
     current_hash = "b" * 64
 
     async def fixed_teacher(_input: object) -> object:
-        return _valid_guide()
+        return valid_guide()
 
     monkeypatch.setattr(commander, "generate", fixed_teacher)
     async with db_pool.acquire() as conn:
