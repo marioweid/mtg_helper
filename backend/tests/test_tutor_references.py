@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -100,6 +101,17 @@ async def _seed_facts(pool: asyncpg.Pool, facts: dict[str, PinnedCardFact]) -> d
                     json.dumps({"commander": fact.commander_legality}),
                 )
                 for name, fact in facts.items()
+            ],
+        )
+        await conn.executemany(
+            "INSERT INTO new_card_catalog (oracle_id, facts, generation, source_facts) "
+            "VALUES ($1,'{}'::jsonb,gen_random_uuid(),$2::jsonb)",
+            [
+                (
+                    UUID(fact.oracle_id),
+                    json.dumps({"faces": list(fact.faces), "fixture_source": fact.source}),
+                )
+                for fact in facts.values()
             ],
         )
     return ids
@@ -346,6 +358,81 @@ async def test_context_reference_change_supersedes_delayed_run_without_automatic
     await asyncio.sleep(0)
     assert (await _state(client, deck_id))["latest_run"]["guide"] is None
     assert calls == 1
+
+
+@pytest.mark.no_db
+def test_teaching_full_reference_with_detailed_facts_stays_bounded_and_lossless() -> None:
+    """Detailed AC2-shaped evidence reaches the teacher without dropping reference facts."""
+    from mtg_helper.models.tutor import TutorCardFact, TutorEvidence, TutorReference
+    from mtg_helper.services.tutor import evidence as evidence_service
+    from mtg_helper.services.tutor.teaching import TeachingInput, _bounded_source_data
+
+    fixture = acceptance_fixtures()[1]
+    pinned = fixture_pinned_facts(fixture)
+
+    def card_fact(name: str, quantity: int = 1) -> TutorCardFact:
+        fact = pinned[name]
+        return TutorCardFact(
+            oracle_id=UUID(fact.oracle_id),
+            name=fact.canonical_name or name,
+            quantity=quantity,
+            type_line=fact.type_line,
+            oracle_text="\n".join([fact.oracle_text] * 3),
+            mana_cost=fact.mana_cost,
+            cmc=fact.cmc,
+            color_identity=list(fact.color_identity),
+            legalities={"commander": fact.commander_legality},
+            faces=list(fact.faces),
+        )
+
+    commanders = [card_fact(name) for name in fixture.commanders]
+    reference_cards = [card_fact(name, quantity) for quantity, name in fixture.mainboard]
+    removed = {"Thassa's Oracle", "Demonic Consultation"}
+    current_cards = [card for card in reference_cards if card.name not in removed]
+    reference = TutorReference(
+        version=uuid4(),
+        source="current_deck",
+        source_deck_id=uuid4(),
+        source_name=fixture.name,
+        captured_at=datetime.now(UTC),
+        commanders=commanders,
+        cards=reference_cards,
+    )
+    rules, rules_status = evidence_service._rules_evidence()
+    evidence = TutorEvidence(
+        commanders=commanders,
+        cards=current_cards,
+        rules=rules,
+        sources={"rules": rules_status},
+        reference=reference,
+        reference_differences=evidence_service.reference_differences(reference, current_cards),
+        optional_suggestions=[card for card in reference_cards if card.name in removed],
+    )
+
+    source = _bounded_source_data(TeachingInput("cedh", None, 4, evidence))
+    serialized = json.loads(source)["evidence"]
+    assert serialized["cards"] == [card.model_dump(mode="json") for card in current_cards]
+    actual = {
+        (zone, card["oracle_id"]): card
+        for zone in ("commanders", "cards")
+        for card in serialized[zone]
+    }
+    for zone in ("commanders", "cards"):
+        reconstructed = []
+        for card in serialized["reference"][zone]:
+            if "same_as_actual" not in card:
+                reconstructed.append(card)
+                continue
+            shared = actual[(card["same_as_actual"], card["oracle_id"])]
+            reconstructed.append(shared | {"quantity": card["quantity"]})
+        expected = getattr(reference, zone)
+        assert reconstructed == [card.model_dump(mode="json") for card in expected]
+    assert serialized["reference_differences"] == evidence.reference_differences.model_dump(
+        mode="json"
+    )
+    assert serialized["optional_suggestions"] == [
+        card.model_dump(mode="json") for card in evidence.optional_suggestions
+    ]
 
 
 @pytest.mark.asyncio

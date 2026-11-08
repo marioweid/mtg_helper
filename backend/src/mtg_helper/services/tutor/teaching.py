@@ -4,6 +4,7 @@ import json
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from openai import AsyncOpenAI
 from pydantic_ai import Agent, RunContext, UsageLimits
@@ -47,6 +48,10 @@ def _prompt(guide_input: TeachingInput, perspective: str, focus: str) -> str:
             "When a reference is present, evidence.cards and evidence.commanders are the only",
             "actual Lerndeck. Reference and reference_differences cards are reference-only, never",
             "current membership. Explain lost packages and intact current routes independently.",
+            "A reference entry with same_as_actual shares its exact facts with the entry of",
+            "the same Oracle identity in that actual-list zone; its reference quantity is kept.",
+            "These shared entries are complete evidence, not omissions or",
+            "current-membership claims.",
             "Do not demand a stock list or mandatory fixes. Restorations in optional_suggestions",
             "and any alternatives are optional ideas, not actual cards or automatic deck edits.",
             "Alternative cards without resolved captured facts are unverified; do not invent their",
@@ -92,6 +97,41 @@ def _prompt(guide_input: TeachingInput, perspective: str, focus: str) -> str:
     )
 
 
+def _teaching_evidence_data(evidence: TutorEvidence) -> dict[str, Any]:
+    """Share unchanged reference facts with actual entries without losing frozen quantities."""
+    data = evidence.model_dump(mode="json")
+    reference = evidence.reference
+    if reference is None:
+        return data
+
+    def identity(card: TutorCardFact) -> str:
+        return str(card.oracle_id) if card.oracle_id else card.name.casefold()
+
+    actual = {identity(card): ("commanders", card) for card in evidence.commanders}
+    actual.update({identity(card): ("cards", card) for card in evidence.cards})
+    for zone in ("commanders", "cards"):
+        data["reference"][zone] = [
+            _reference_card_data(card, actual) for card in getattr(reference, zone)
+        ]
+    return data
+
+
+def _reference_card_data(
+    card: TutorCardFact, actual: dict[str, tuple[str, TutorCardFact]]
+) -> dict[str, Any]:
+    """Point to an identical current fact, or retain a changed/missing reference fact fully."""
+    identity = str(card.oracle_id) if card.oracle_id else card.name.casefold()
+    match = actual.get(identity)
+    if match is None or match[1].model_copy(update={"quantity": card.quantity}) != card:
+        return card.model_dump(mode="json")
+    return {
+        "name": card.name,
+        "oracle_id": str(card.oracle_id) if card.oracle_id else None,
+        "quantity": card.quantity,
+        "same_as_actual": match[0],
+    }
+
+
 def _bounded_source_data(guide_input: TeachingInput) -> str:
     """Serialize complete captured facts only when they fit the deliberate model-input limit."""
     description = guide_input.description or ""
@@ -115,7 +155,7 @@ def _bounded_source_data(guide_input: TeachingInput) -> str:
                 "bracket": guide_input.bracket,
                 "mode": guide_input.mode,
             },
-            "evidence": guide_input.evidence.model_dump(mode="json"),
+            "evidence": _teaching_evidence_data(guide_input.evidence),
             "opening_hand_candidates": _opening_hand_candidates(guide_input.evidence),
         },
         ensure_ascii=False,
