@@ -606,6 +606,26 @@ DROP INDEX IF EXISTS tutor_one_active_run;
 CREATE UNIQUE INDEX tutor_one_active_run ON tutor_runs (deck_id) WHERE status = 'running';
 CREATE INDEX IF NOT EXISTS idx_tutor_runs_deck ON tutor_runs (deck_id, account_id, created_at DESC);
 
+-- Referenzdeck snapshots contain their own facts and deliberately have no source-deck FK.
+CREATE TABLE IF NOT EXISTS tutor_references (
+    deck_id UUID PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    version UUID NOT NULL UNIQUE,
+    snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Confirmation consumes the exact server-owned candidate shown by preview.
+CREATE TABLE IF NOT EXISTS tutor_reference_previews (
+    id UUID PRIMARY KEY,
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tutor_reference_previews_deck
+    ON tutor_reference_previews (deck_id, account_id, created_at DESC);
+
 -- Experimental released-card discovery; additive and safe on existing databases.
 ALTER TABLE deck_card_plans
     ADD COLUMN IF NOT EXISTS new_cards_origin BOOLEAN NOT NULL DEFAULT false;

@@ -69,6 +69,8 @@ import type {
   TopPicksResponse,
   TopPickSource,
   TutorMode,
+  TutorReferencePreviewResponse,
+  TutorReferenceRequest,
   TutorStateResponse,
 } from "@/lib/types";
 
@@ -258,6 +260,21 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  previewTutorReference: (deckId: string, body: TutorReferenceRequest) =>
+    request<TutorReferencePreviewResponse>(`/decks/${deckId}/tutor/reference/preview`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  confirmTutorReference: (deckId: string, previewId: string) =>
+    request<TutorStateResponse>(`/decks/${deckId}/tutor/reference`, {
+      method: "PUT",
+      body: JSON.stringify({ preview_id: previewId }),
+    }),
+
+  removeTutorReference: (deckId: string) =>
+    request<TutorStateResponse>(`/decks/${deckId}/tutor/reference`, { method: "DELETE" }),
 
   getTopPicks: (deckId: string, source: TopPickSource = "combined") =>
     request<TopPicksResponse>(`/decks/${deckId}/top-picks?source=${source}`),

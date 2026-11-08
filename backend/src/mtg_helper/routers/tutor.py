@@ -13,7 +13,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.common import DataResponse, ErrorDetail, ErrorResponse
-from mtg_helper.models.tutor import TutorGenerateRequest, TutorSetupUpdate, TutorStateResponse
+from mtg_helper.models.tutor import (
+    TutorGenerateRequest,
+    TutorReferenceConfirm,
+    TutorReferencePreviewResponse,
+    TutorReferenceRequest,
+    TutorSetupUpdate,
+    TutorStateResponse,
+)
 from mtg_helper.services.tutor.repository import TutorError
 from mtg_helper.services.tutor.service import TutorService, owner
 
@@ -107,6 +114,39 @@ async def save_tutor_setup(
 ) -> DataResponse[TutorStateResponse]:
     """Save mode selection without modifying the deck or initiating a guide."""
     state = await _service(request).save_mode(_owner(account), deck_id, body.mode)
+    return DataResponse(data=state)
+
+
+@router.post("/reference/preview", response_model=DataResponse[TutorReferencePreviewResponse])
+async def preview_reference(
+    deck_id: UUID,
+    body: TutorReferenceRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[TutorReferencePreviewResponse]:
+    """Resolve and freeze a candidate without replacing the saved reference."""
+    preview = await _service(request).preview_reference(_owner(account), deck_id, body)
+    return DataResponse(data=preview)
+
+
+@router.put("/reference", response_model=DataResponse[TutorStateResponse])
+async def confirm_reference(
+    deck_id: UUID,
+    body: TutorReferenceConfirm,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[TutorStateResponse]:
+    """Replace the optional reference only after explicit preview confirmation."""
+    state = await _service(request).confirm_reference(_owner(account), deck_id, body.preview_id)
+    return DataResponse(data=state)
+
+
+@router.delete("/reference", response_model=DataResponse[TutorStateResponse])
+async def remove_reference(
+    deck_id: UUID, request: Request, account: CurrentAccount
+) -> DataResponse[TutorStateResponse]:
+    """Remove the reference without altering the physical deck or generating advice."""
+    state = await _service(request).remove_reference(_owner(account), deck_id)
     return DataResponse(data=state)
 
 

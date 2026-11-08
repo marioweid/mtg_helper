@@ -76,7 +76,7 @@ describe("Tutor panel", () => {
     expect(markup).toContain("Update Guide");
     expect(markup).toContain("Keep interaction available");
     expect(markup).toContain("Rules snapshot unavailable");
-    expect(markup).not.toContain("Reference");
+    expect(markup).toContain("Reference deck");
     expect(markup).not.toContain("Mulligan Practice");
   });
 
@@ -199,6 +199,106 @@ describe("Tutor panel", () => {
     );
 
     expect(markup).toContain("Combo coverage is unavailable");
+  });
+
+  it("labels keyboard-operable reference sources without a premature confirmation", () => {
+    const markup = renderToStaticMarkup(
+      <TutorPanelView
+        state={{ mode: "commander", latest_run: null, last_successful_run: null }}
+        busy={false}
+        error={null}
+        onMode={vi.fn()}
+        onGenerate={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain("Use current deck as reference");
+    expect(markup).toContain("Choose another owned deck");
+    expect(markup).toContain("Paste an exported reference list");
+    expect(markup).toContain("Reference source URL (optional metadata; never fetched)");
+    expect(markup).toContain('aria-label="Reference deck controls"');
+    expect(markup).not.toContain("Confirm reference replacement");
+  });
+
+  it("renders frozen provenance, quantities, differences, and explicit replacement controls", () => {
+    const reference = {
+      version: "reference-version-1",
+      source: "current_deck" as const,
+      source_deck_id: "deck-1",
+      source_name: "Frozen learning list",
+      source_url: "https://example.invalid/metadata",
+      captured_at: "2026-11-02T03:04:05Z",
+      commanders: [
+        {
+          oracle_id: "commander-oracle",
+          name: "Hazel of the Rootbloom",
+          quantity: 1,
+          type_line: "Legendary Creature",
+          oracle_text: "Commander text",
+        },
+      ],
+      cards: [
+        {
+          oracle_id: "forest-oracle",
+          name: "Forest",
+          quantity: 7,
+          type_line: "Basic Land",
+          oracle_text: "{T}: Add {G}.",
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(
+      <TutorPanelView
+        state={{
+          ...saved,
+          reference,
+          reference_differences: {
+            missing: [
+              {
+                name: "Thassa's Oracle",
+                oracle_id: "oracle-card",
+                reference_quantity: 1,
+                actual_quantity: 0,
+              },
+            ],
+            added: [],
+          },
+        }}
+        referencePreview={{
+          preview_id: "preview-1",
+          reference,
+          differences: {
+            missing: [],
+            added: [
+              {
+                name: "Sol Ring",
+                oracle_id: "sol-ring",
+                reference_quantity: 0,
+                actual_quantity: 1,
+              },
+            ],
+          },
+        }}
+        busy={false}
+        error={null}
+        onMode={vi.fn()}
+        onGenerate={vi.fn()}
+        onReferencePreview={vi.fn()}
+        onReferenceConfirm={vi.fn()}
+        onReferenceCancel={vi.fn()}
+        onReferenceRemove={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain("Frozen learning list");
+    expect(markup).toContain('dateTime="2026-11-02T03:04:05Z"');
+    expect(markup).toContain("7 × Forest");
+    expect(markup).toContain("Thassa&#x27;s Oracle: reference 1, current 0");
+    expect(markup).toContain("Sol Ring: reference 0, current 1");
+    expect(markup).toContain("Confirm reference replacement");
+    expect(markup).toContain("Cancel reference replacement");
+    expect(markup).toContain("Remove reference");
+    expect(markup).not.toContain('href="https://example.invalid/metadata"');
   });
 
   it("wraps a detailed saved guide without truncating it", () => {
