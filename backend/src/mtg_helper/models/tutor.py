@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 TutorMode = Literal["commander", "cedh"]
 TutorRunStatus = Literal["running", "succeeded", "failed", "interrupted", "superseded"]
+TutorTurnStatus = Literal["running", "succeeded", "failed", "interrupted", "superseded"]
+TutorHandoffStatus = Literal["none", "pending", "running", "ready", "failed"]
 
 
 class TutorSetupUpdate(BaseModel):
@@ -20,6 +22,26 @@ class TutorGenerateRequest(BaseModel):
     """One explicit, idempotent request to generate a Deck-Lernleitfaden."""
 
     request_key: UUID
+
+
+class TutorQuestionRequest(BaseModel):
+    """One explicit question; the server alone supplies conversation history."""
+
+    request_key: UUID
+    question: str = Field(min_length=1, max_length=8_000)
+    card_name: str | None = Field(default=None, max_length=300)
+
+
+class TutorAnswerDraft(BaseModel):
+    """The specialized teacher's answer to one current-list question."""
+
+    content: str = Field(min_length=1)
+
+
+class TutorHandoffDraft(BaseModel):
+    """A bounded, untrusted Lernübergabe for a later teaching context."""
+
+    content: str = Field(min_length=1, max_length=6_000)
 
 
 class TutorCardFact(BaseModel):
@@ -208,3 +230,47 @@ class TutorStateResponse(BaseModel):
     last_successful_run: TutorRunResponse | None = None
     reference: TutorReference | None = None
     reference_differences: TutorReferenceDifferences | None = None
+    current_cards: list[TutorCardFact] = Field(default_factory=list)
+
+
+class TutorTurnContext(BaseModel):
+    """One successful saved turn admitted to bounded model context."""
+
+    question: str
+    answer: str
+
+
+class TutorTurnResponse(BaseModel):
+    """A full original user question and its durable answer status."""
+
+    id: UUID
+    question: str
+    answer: str | None = None
+    card_name: str | None = None
+    status: TutorTurnStatus
+    error: str | None = None
+    created_at: datetime
+    finished_at: datetime | None = None
+
+
+class TutorChapterResponse(BaseModel):
+    """One chronological Gesprächskapitel with its frozen teaching context."""
+
+    id: UUID
+    sequence: int
+    mode: TutorMode
+    teaching_hash: str
+    composition_hash: str
+    manifest: dict[str, object]
+    current: bool
+    handoff: str | None = None
+    handoff_status: TutorHandoffStatus
+    handoff_error: str | None = None
+    turns: list[TutorTurnResponse] = Field(default_factory=list)
+    created_at: datetime
+
+
+class TutorConversationResponse(BaseModel):
+    """The complete owner-scoped transcript, including read-only archives."""
+
+    chapters: list[TutorChapterResponse] = Field(default_factory=list)

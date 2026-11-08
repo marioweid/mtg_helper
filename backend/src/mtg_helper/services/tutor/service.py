@@ -7,6 +7,7 @@ from uuid import UUID
 import asyncpg
 
 from mtg_helper.models.tutor import (
+    TutorConversationResponse,
     TutorMode,
     TutorReferencePreviewResponse,
     TutorReferenceRequest,
@@ -14,8 +15,13 @@ from mtg_helper.models.tutor import (
 )
 from mtg_helper.services.recommendations.repository import Owner
 from mtg_helper.services.tutor import cedh, commander
-from mtg_helper.services.tutor.repository import TutorRepository, TutorWork
-from mtg_helper.services.tutor.teaching import TeachingInput, validate_opening_hands
+from mtg_helper.services.tutor.repository import TutorQuestionWork, TutorRepository, TutorWork
+from mtg_helper.services.tutor.teaching import (
+    CompactionInput,
+    ConversationInput,
+    TeachingInput,
+    validate_opening_hands,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -55,18 +61,101 @@ class TutorService:
         return await self.state(owner, deck_id)
 
     async def state(self, owner: Owner, deck_id: UUID) -> TutorStateResponse:
-        mode, latest, successful, reference, differences = await self.repository.state(
-            owner, deck_id
-        )
+        (
+            mode,
+            latest,
+            successful,
+            reference,
+            differences,
+            current_cards,
+        ) = await self.repository.state(owner, deck_id)
         return TutorStateResponse(
             mode=mode,
             latest_run=latest,
             last_successful_run=successful,
             reference=reference,
             reference_differences=differences,
+            current_cards=current_cards,
         )
 
+    async def ask(
+        self,
+        owner: Owner,
+        deck_id: UUID,
+        request_key: UUID,
+        question: str,
+        card_name: str | None,
+    ) -> TutorConversationResponse:
+        """Save and start one idempotent current-list answer request."""
+        work = await self.repository.create_question(
+            owner, deck_id, request_key, question, card_name
+        )
+        if work is not None:
+            asyncio.create_task(self._answer(work))
+        return await self.repository.conversation(owner, deck_id)
+
+    async def conversation(self, owner: Owner, deck_id: UUID) -> TutorConversationResponse:
+        """Read the full owner-scoped conversation without starting work."""
+        return await self.repository.conversation(owner, deck_id)
+
+    async def clear_conversation(self, owner: Owner, deck_id: UUID) -> TutorConversationResponse:
+        """Clear only deck-local Tutor history and return its now-empty state."""
+        await self.repository.clear_conversation(owner, deck_id)
+        return await self.repository.conversation(owner, deck_id)
+
+    async def _answer(self, work: TutorQuestionWork) -> None:
+        handoff = await self._handoff(work)
+        question_input = ConversationInput(
+            mode=work.mode,
+            description=work.manifest["description"]
+            if isinstance(work.manifest["description"], str)
+            else None,
+            bracket=work.manifest["bracket"] if isinstance(work.manifest["bracket"], int) else None,
+            evidence=work.question_evidence,
+            question=work.question,
+            selected_card_name=work.card_name,
+            selected_card=work.selected_card,
+            selected_card_present=work.selected_card_present,
+            handoff=handoff,
+            recent_turns=work.recent_turns,
+        )
+        try:
+            answer = await (
+                commander.answer(question_input)
+                if work.mode == "commander"
+                else cedh.answer(question_input)
+            )
+            await self.repository.publish_question(work, answer.content)
+        except Exception:
+            _log.exception("Tutor question failed")
+            await self.repository.fail_question(work)
+
+    async def _handoff(self, work: TutorWork | TutorQuestionWork) -> str | None:
+        """Compact once when required; failure never blocks an answer from current facts."""
+        if not work.compaction_required:
+            return work.handoff
+        if not await self.repository.start_handoff(work):
+            return None
+        compaction_input = CompactionInput(
+            mode=work.mode,
+            previous_handoff=work.previous_handoff,
+            turns=work.compaction_turns,
+        )
+        try:
+            summary = await (
+                commander.compact(compaction_input)
+                if work.mode == "commander"
+                else cedh.compact(compaction_input)
+            )
+        except Exception:
+            _log.exception("Tutor handoff failed")
+            await self.repository.fail_handoff(work)
+            return None
+        await self.repository.complete_handoff(work, summary.content)
+        return summary.content
+
     async def _run(self, work: TutorWork) -> None:
+        await self._handoff(work)
         teacher_input = TeachingInput(
             mode=work.mode,
             description=work.manifest["description"]

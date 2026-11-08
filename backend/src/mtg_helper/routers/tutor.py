@@ -14,7 +14,9 @@ from mtg_helper.auth import get_current_account
 from mtg_helper.models.accounts import AccountResponse
 from mtg_helper.models.common import DataResponse, ErrorDetail, ErrorResponse
 from mtg_helper.models.tutor import (
+    TutorConversationResponse,
     TutorGenerateRequest,
+    TutorQuestionRequest,
     TutorReferenceConfirm,
     TutorReferencePreviewResponse,
     TutorReferenceRequest,
@@ -148,6 +150,38 @@ async def remove_reference(
     """Remove the reference without altering the physical deck or generating advice."""
     state = await _service(request).remove_reference(_owner(account), deck_id)
     return DataResponse(data=state)
+
+
+@router.get("/conversation", response_model=DataResponse[TutorConversationResponse])
+async def get_conversation(
+    deck_id: UUID, request: Request, account: CurrentAccount
+) -> DataResponse[TutorConversationResponse]:
+    """Read all current and archived owner turns without triggering compaction."""
+    conversation = await _service(request).conversation(_owner(account), deck_id)
+    return DataResponse(data=conversation)
+
+
+@router.delete("/conversation", response_model=DataResponse[TutorConversationResponse])
+async def clear_conversation(
+    deck_id: UUID, request: Request, account: CurrentAccount
+) -> DataResponse[TutorConversationResponse]:
+    """Delete all saved Tutor chapters and turns while preserving guides and references."""
+    conversation = await _service(request).clear_conversation(_owner(account), deck_id)
+    return DataResponse(data=conversation)
+
+
+@router.post("/questions", response_model=DataResponse[TutorConversationResponse])
+async def ask_question(
+    deck_id: UUID,
+    body: TutorQuestionRequest,
+    request: Request,
+    account: CurrentAccount,
+) -> DataResponse[TutorConversationResponse]:
+    """Persist a question and start at most one answer for its request key."""
+    conversation = await _service(request).ask(
+        _owner(account), deck_id, body.request_key, body.question, body.card_name
+    )
+    return DataResponse(data=conversation)
 
 
 @router.post("/guides", response_model=DataResponse[TutorStateResponse])

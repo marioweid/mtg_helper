@@ -68,6 +68,7 @@ import type {
   SwapResponse,
   TopPicksResponse,
   TopPickSource,
+  TutorConversationResponse,
   TutorMode,
   TutorReferencePreviewResponse,
   TutorReferenceRequest,
@@ -275,6 +276,23 @@ export const apiClient = {
 
   removeTutorReference: (deckId: string) =>
     request<TutorStateResponse>(`/decks/${deckId}/tutor/reference`, { method: "DELETE" }),
+
+  getTutorConversation: (deckId: string) =>
+    request<TutorConversationResponse>(`/decks/${deckId}/tutor/conversation`),
+
+  askTutorQuestion: (
+    deckId: string,
+    body: { request_key: string; question: string; card_name?: string },
+  ) =>
+    request<TutorConversationResponse>(`/decks/${deckId}/tutor/questions`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  clearTutorConversation: (deckId: string) =>
+    request<TutorConversationResponse>(`/decks/${deckId}/tutor/conversation`, {
+      method: "DELETE",
+    }),
 
   getTopPicks: (deckId: string, source: TopPickSource = "combined") =>
     request<TopPicksResponse>(`/decks/${deckId}/top-picks?source=${source}`),

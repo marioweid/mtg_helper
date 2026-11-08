@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { TutorPanelView } from "@/components/tutor-panel";
-import type { TutorRunResponse, TutorStateResponse } from "@/lib/types";
+import type { TutorConversationResponse, TutorRunResponse, TutorStateResponse } from "@/lib/types";
 
 const saved: TutorStateResponse = {
   mode: "commander",
@@ -25,6 +25,60 @@ const saved: TutorStateResponse = {
   last_successful_run: null,
 };
 const savedRun = saved.latest_run as TutorRunResponse;
+const conversation: TutorConversationResponse = {
+  chapters: [
+    {
+      id: "chapter-old",
+      sequence: 1,
+      mode: "commander",
+      teaching_hash: "old-hash",
+      composition_hash: "old-composition",
+      manifest: { description: "Old counter plan", bracket: 3 },
+      current: false,
+      handoff: null,
+      handoff_status: "none",
+      handoff_error: null,
+      created_at: "2026-11-01T00:00:00Z",
+      turns: [
+        {
+          id: "turn-old",
+          question: "Original full question",
+          answer: "Original full answer",
+          card_name: "Forest",
+          status: "succeeded",
+          error: null,
+          created_at: "2026-11-01T00:00:00Z",
+          finished_at: "2026-11-01T00:01:00Z",
+        },
+      ],
+    },
+    {
+      id: "chapter-current",
+      sequence: 2,
+      mode: "commander",
+      teaching_hash: "current-hash",
+      composition_hash: "current-composition",
+      manifest: { description: "Current counter plan", bracket: 3 },
+      current: true,
+      handoff: "Recheck every old card claim.",
+      handoff_status: "ready",
+      handoff_error: null,
+      created_at: "2026-11-02T00:00:00Z",
+      turns: [
+        {
+          id: "turn-current",
+          question: "What should I prioritize?",
+          answer: "Develop the current engine first.",
+          card_name: null,
+          status: "succeeded",
+          error: null,
+          created_at: "2026-11-02T00:00:00Z",
+          finished_at: "2026-11-02T00:01:00Z",
+        },
+      ],
+    },
+  ],
+};
 
 describe("Tutor panel", () => {
   it("renders saved Markdown as headings, emphasis, lists, and tables", () => {
@@ -318,5 +372,83 @@ describe("Tutor panel", () => {
 
     expect(markup).toContain(content.trim());
     expect(markup).toContain("break-words");
+  });
+
+  it("renders current-list chat, actual card choices, handoff, and clear controls", () => {
+    const markup = renderToStaticMarkup(
+      <TutorPanelView
+        state={{
+          ...saved,
+          current_cards: [
+            {
+              oracle_id: "forest-oracle",
+              name: "Forest",
+              quantity: 7,
+              type_line: "Basic Land",
+              oracle_text: "{T}: Add {G}.",
+            },
+          ],
+        }}
+        conversation={conversation}
+        question="Explain its purpose and limitations"
+        selectedCard="Forest"
+        busy={false}
+        error={null}
+        onMode={vi.fn()}
+        onGenerate={vi.fn()}
+        onQuestionChange={vi.fn()}
+        onCardChange={vi.fn()}
+        onAsk={vi.fn()}
+        onClearConversation={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain("Ask about the current deck");
+    expect(markup).toContain('aria-label="Card to explain"');
+    expect(markup).toContain("7 × Forest");
+    expect(markup).toContain("What should I prioritize?");
+    expect(markup).toContain("Develop the current engine first.");
+    expect(markup).toContain("Recheck every old card claim.");
+    expect(markup).toContain("Current deck chapter");
+    expect(markup).toContain("Clear tutor history");
+    expect(markup).toContain("Enter to send");
+    expect(markup).not.toContain("Mulligan Practice");
+  });
+
+  it("shows a selected archive read-only and preserves failed answer text and retry status", () => {
+    const failed: TutorConversationResponse = {
+      chapters: [
+        {
+          ...conversation.chapters[0]!,
+          turns: [
+            {
+              ...conversation.chapters[0]!.turns[0]!,
+              answer: null,
+              status: "failed",
+              error: "Tutor answer failed; retry explicitly.",
+            },
+          ],
+        },
+      ],
+    };
+    const markup = renderToStaticMarkup(
+      <TutorPanelView
+        state={saved}
+        conversation={failed}
+        selectedChapterId="chapter-old"
+        question="Original full question"
+        busy={false}
+        error={null}
+        onMode={vi.fn()}
+        onGenerate={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain("Archived chapter 1");
+    expect(markup).toContain("read-only");
+    expect(markup).toContain("Original full question");
+    expect(markup).toContain("Tutor answer failed; retry explicitly.");
+    expect(markup).toMatch(/<textarea[^>]*>Original full question<\/textarea>/);
+    expect(markup).toContain("Cancel clear tutor history");
   });
 });

@@ -323,6 +323,40 @@ export interface TutorStateResponse {
   last_successful_run: TutorRunResponse | null;
   reference?: TutorReference | null;
   reference_differences?: TutorReferenceDifferences | null;
+  current_cards?: TutorCardFact[];
+}
+
+export type TutorTurnStatus = "running" | "succeeded" | "failed" | "interrupted" | "superseded";
+export type TutorHandoffStatus = "none" | "pending" | "running" | "ready" | "failed";
+
+export interface TutorTurnResponse {
+  id: string;
+  question: string;
+  answer: string | null;
+  card_name: string | null;
+  status: TutorTurnStatus;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface TutorChapterResponse {
+  id: string;
+  sequence: number;
+  mode: TutorMode;
+  teaching_hash: string;
+  composition_hash: string;
+  manifest: Record<string, unknown>;
+  current: boolean;
+  handoff: string | null;
+  handoff_status: TutorHandoffStatus;
+  handoff_error: string | null;
+  turns: TutorTurnResponse[];
+  created_at: string;
+}
+
+export interface TutorConversationResponse {
+  chapters: TutorChapterResponse[];
 }
 
 // AI

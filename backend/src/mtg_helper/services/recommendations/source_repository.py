@@ -125,6 +125,7 @@ async def prune(pool: asyncpg.Pool) -> int:
         "(SELECT source_sha256 FROM new_card_catalog_state), '') "
         "AND NOT EXISTS (SELECT 1 FROM recommendation_runs r "
         "WHERE r.source_hash = s.sha256 OR r.rules_hash = s.sha256) "
-        "AND NOT EXISTS (SELECT 1 FROM tutor_run_sources t WHERE t.source_hash = s.sha256)"
+        "AND NOT EXISTS (SELECT 1 FROM tutor_run_sources t WHERE t.source_hash = s.sha256) "
+        "AND NOT EXISTS (SELECT 1 FROM tutor_chapter_sources c WHERE c.source_hash = s.sha256)"
     )
     return int(result.split()[-1])

@@ -757,6 +757,62 @@ CREATE TABLE IF NOT EXISTS tutor_run_sources (
     PRIMARY KEY (run_id, source_hash)
 );
 
+-- Deck-local conversation epochs make clear/delete a barrier to delayed publication.
+CREATE TABLE IF NOT EXISTS tutor_histories (
+    deck_id UUID PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+    epoch BIGINT NOT NULL DEFAULT 1,
+    next_sequence INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS tutor_chapters (
+    id UUID PRIMARY KEY,
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    epoch BIGINT NOT NULL,
+    sequence INTEGER NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('commander', 'cedh')),
+    composition_hash TEXT NOT NULL,
+    teaching_hash TEXT NOT NULL,
+    manifest JSONB NOT NULL,
+    evidence JSONB NOT NULL,
+    handoff TEXT,
+    handoff_through UUID,
+    handoff_status TEXT NOT NULL DEFAULT 'none'
+        CHECK (handoff_status IN ('none', 'pending', 'running', 'ready', 'failed')),
+    handoff_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (deck_id, epoch, sequence)
+);
+CREATE INDEX IF NOT EXISTS idx_tutor_chapters_owner
+    ON tutor_chapters (deck_id, account_id, epoch, sequence);
+
+CREATE TABLE IF NOT EXISTS tutor_turns (
+    id UUID PRIMARY KEY,
+    chapter_id UUID NOT NULL REFERENCES tutor_chapters(id) ON DELETE CASCADE,
+    deck_id UUID NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    epoch BIGINT NOT NULL,
+    request_key UUID NOT NULL,
+    token UUID NOT NULL,
+    question TEXT NOT NULL CHECK (char_length(question) BETWEEN 1 AND 8000),
+    answer TEXT,
+    card_name TEXT,
+    teaching_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'succeeded', 'failed', 'interrupted', 'superseded')),
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    UNIQUE (account_id, request_key)
+);
+CREATE INDEX IF NOT EXISTS idx_tutor_turns_chapter ON tutor_turns (chapter_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS tutor_chapter_sources (
+    chapter_id UUID NOT NULL REFERENCES tutor_chapters(id) ON DELETE CASCADE,
+    source_hash TEXT NOT NULL REFERENCES recommendation_sources(sha256),
+    PRIMARY KEY (chapter_id, source_hash)
+);
+
 ALTER TABLE recommendation_sources DROP CONSTRAINT IF EXISTS recommendation_sources_kind_check;
 ALTER TABLE recommendation_sources ADD CONSTRAINT recommendation_sources_kind_check
     CHECK (kind IN ('cards', 'rules', 'oracle_tags'));
