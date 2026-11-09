@@ -51,6 +51,16 @@ async def _finished_conversation(client: AsyncClient, deck_id: str) -> dict[str,
     raise AssertionError("Tutor answer did not reach a terminal state")
 
 
+async def _finished_guide(client: AsyncClient, deck_id: str) -> dict[str, object]:
+    for _ in range(30):
+        response = await client.get(f"/api/v1/decks/{deck_id}/tutor")
+        guide = response.json()["data"]["latest_run"]
+        if guide["status"] != "running":
+            return guide
+        await asyncio.sleep(0)
+    raise AssertionError("Tutor guide did not reach a terminal state")
+
+
 @pytest.mark.asyncio
 async def test_persistence_saves_full_current_list_question_and_answer(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
@@ -349,14 +359,16 @@ async def test_concurrency_failed_handoff_has_deduplicated_explicit_retry(
     from mtg_helper.services.tutor import commander, service
 
     compaction_calls = 0
+    compaction_inputs = []
     retry_entered = asyncio.Event()
     retry_release = asyncio.Event()
 
     async def answer(_input: object) -> TutorAnswerDraft:
         return TutorAnswerDraft(content="Current-fact answer")
 
-    async def compact(_input: object) -> TutorHandoffDraft:
+    async def compact(compaction_input: object) -> TutorHandoffDraft:
         nonlocal compaction_calls
+        compaction_inputs.append(compaction_input)
         compaction_calls += 1
         if compaction_calls == 1:
             raise ValueError("deterministic first compaction outage")
@@ -419,9 +431,82 @@ async def test_concurrency_failed_handoff_has_deduplicated_explicit_retry(
         await asyncio.sleep(0)
     assert recovered["chapters"][-1]["handoff"] == "Explicitly recovered learning goals"
     assert len(recovered["chapters"][-1]["turns"]) == 2
+    assert compaction_inputs[1].previous_handoff is None
+    assert [turn.question for turn in compaction_inputs[1].turns] == [
+        "Original lesson",
+        "After first edit",
+    ]
     await client.post(retry_url, json={"request_key": key})
     await asyncio.sleep(0)
     assert compaction_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_concurrency_handoff_retry_recovers_turns_before_empty_immediate_source(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty failed source chapter does not hide older learning from explicit retry."""
+    from mtg_helper.models.tutor import TutorAnswerDraft, TutorHandoffDraft
+    from mtg_helper.services.tutor import commander, service
+
+    compaction_inputs = []
+
+    async def answer(_input: object) -> TutorAnswerDraft:
+        return TutorAnswerDraft(content="Current-fact answer")
+
+    async def compact(compaction_input: object) -> TutorHandoffDraft:
+        compaction_inputs.append(compaction_input)
+        if len(compaction_inputs) == 1:
+            raise ValueError("deterministic guide-chapter compaction outage")
+        return TutorHandoffDraft(content="Recovered the original lesson")
+
+    async def generate(_input: object) -> object:
+        return valid_guide()
+
+    monkeypatch.setattr(commander, "answer", answer)
+    monkeypatch.setattr(commander, "generate", generate)
+    monkeypatch.setattr(service, "run_compaction_agent", compact)
+    deck_id = await _deck_id(client)
+    await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/questions",
+        json={"request_key": str(uuid4()), "question": "Original lesson"},
+    )
+    await _finished_conversation(client, deck_id)
+    await client.patch(f"/api/v1/decks/{deck_id}", json={"description": "Guide chapter"})
+    started = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/guides", json={"request_key": str(uuid4())}
+    )
+    assert started.status_code == 200
+    guide = await _finished_guide(client, deck_id)
+    assert guide["status"] == "succeeded"
+
+    await client.patch(f"/api/v1/decks/{deck_id}", json={"description": "Question chapter"})
+    await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/questions",
+        json={"request_key": str(uuid4()), "question": "Continue after the empty chapter"},
+    )
+    failed = await _finished_conversation(client, deck_id)
+    assert [chapter["handoff_status"] for chapter in failed["chapters"]] == [
+        "none",
+        "failed",
+        "failed",
+    ]
+    assert failed["chapters"][1]["turns"] == []
+    assert len(compaction_inputs) == 1
+
+    chapter_id = failed["chapters"][-1]["id"]
+    retry = await client.post(
+        f"/api/v1/decks/{deck_id}/tutor/chapters/{chapter_id}/handoff",
+        json={"request_key": str(uuid4())},
+    )
+    assert retry.status_code == 200
+    for _ in range(30):
+        recovered = await _conversation(client, deck_id)
+        if recovered["chapters"][-1]["handoff_status"] == "ready":
+            break
+        await asyncio.sleep(0)
+    assert recovered["chapters"][-1]["handoff"] == "Recovered the original lesson"
+    assert [turn.question for turn in compaction_inputs[1].turns] == ["Original lesson"]
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,13 @@
 # Build notes — deck-tutor-conversations
 
+## Round-3 changes
+
+- `backend/src/mtg_helper/services/tutor/repository.py`: explicit retry now walks failed source chapters to recover older archived turns, including beyond an empty immediate source, while stopping at an existing Lernübergabe and capping retry input at 24 turns.
+- `backend/src/mtg_helper/services/tutor/service.py`: lazy and explicit retry paths now share compaction execution/publication and its outcome while retaining their distinct claim and retry-token lifecycles.
+- `backend/tests/test_tutor_conversations.py`: strengthened chained-recovery input assertions and added a real HTTP/SQL empty-immediate-source retry regression.
+- `.agent/specs/deck-tutor-conversations/progress.md`: recorded round-3 red/green evidence, final checks, and pending live-only acceptance.
+- `.agent/specs/deck-tutor-conversations/build-notes.md`: recorded the round-3 implementation and verification evidence.
+
 ## Round-2 changes
 
 - `backend/src/mtg_helper/models/tutor.py`: added the idempotent explicit Lernübergabe retry request contract.
@@ -25,7 +33,9 @@
 
 Explicit local Compose commands from `VERIFY.md`; no `Makefile` or `make gate` exists.
 
-- Backend conversations/guides/references/deck CRUD with disposable `mtg_helper_test`: **111 passed in 152.93s**.
+- Round-3 red: the two focused real HTTP/SQL regressions failed as reported; chained retry omitted `Original lesson`, and empty-immediate-source retry returned **409**.
+- Round-3 green: the same focused selection passed **2 tests** after source-chain recovery and again after shared compaction execution.
+- Backend conversations/guides/references/deck CRUD with disposable `mtg_helper_test`: **112 passed in 159.90s**.
 - Backend `ruff check .`: **all checks passed**.
 - Backend `ruff format --check .`: **259 files already formatted**.
 - Backend `ty check src/`: **all checks passed**.
@@ -34,11 +44,11 @@ Explicit local Compose commands from `VERIFY.md`; no `Makefile` or `make gate` e
 - Frontend `pnpm lint`: **0 warnings and 0 errors across 148 files**.
 - Frontend `pnpm format:check`: **all matched files correctly formatted**.
 - Frontend `pnpm build`: **compiled successfully; all 16 static pages generated**.
-- Docker AST function checks: **82 backend and 107 frontend functions checked; no line/parameter violations**.
+- Docker AST function checks: **109 backend functions** in the three round-3 changed backend/test files; no line/parameter violations. Ruff also enforced complexity limits.
 - `git diff --check`: **clean**.
 
 ## Deviations and remaining acceptance
 
 - No product-scope deviations: no automatic retry, new queue/agent infrastructure, practice controls, global-memory revival, or unrelated refactors.
 - Existing user-owned `GLOSSARY.md` edits are intentionally untouched and excluded from this change.
-- AC1/AC2 configured-live-model three-run semantic scenarios remain **UNVERIFIED**; no live/paid acceptance calls were authorized or made. Evaluator round-1 deterministic/browser AC3–AC7 results remain the browser evidence for this slice.
+- AC1/AC2 configured-live-model three-run semantic scenarios remain **UNVERIFIED**; no live/paid acceptance calls were authorized or made in rounds 2–3. Evaluator round-1 deterministic/browser AC3–AC7 results remain the browser evidence for this slice.

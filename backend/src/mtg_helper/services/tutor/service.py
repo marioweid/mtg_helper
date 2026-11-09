@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from uuid import UUID
 
 import asyncpg
@@ -17,6 +18,7 @@ from mtg_helper.services.recommendations.repository import Owner
 from mtg_helper.services.tutor import cedh, commander
 from mtg_helper.services.tutor.repository import (
     TutorHandoffRetryWork,
+    TutorHandoffWork,
     TutorQuestionWork,
     TutorRepository,
     TutorWork,
@@ -30,6 +32,12 @@ from mtg_helper.services.tutor.teaching import (
 )
 
 _log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _HandoffOutcome:
+    content: str | None = None
+    failed: bool = False
 
 
 class TutorService:
@@ -154,32 +162,38 @@ class TutorService:
             return handoff_work.handoff
         if not await self.repository.start_handoff(handoff_work):
             return None
-        compaction_input = CompactionInput(
-            mode=work.mode,
-            previous_handoff=handoff_work.previous_handoff,
-            turns=handoff_work.compaction_turns,
-        )
-        try:
-            summary = await run_compaction_agent(compaction_input)
-        except Exception:
-            _log.exception("Tutor handoff failed")
-            await self.repository.fail_handoff(handoff_work)
-            return None
-        await self.repository.complete_handoff(handoff_work, summary.content)
-        return summary.content
+        outcome = await self._execute_handoff(work.mode, handoff_work)
+        return outcome.content
 
-    async def _retry_handoff(self, work: TutorHandoffRetryWork) -> None:
-        """Run one paid compaction only after its explicit user request."""
-        handoff = work.handoff_work
+    async def _execute_handoff(self, mode: TutorMode, handoff: TutorHandoffWork) -> _HandoffOutcome:
+        """Execute and publish one claimed compaction without owning its caller's lifecycle."""
         compaction_input = CompactionInput(
-            mode=work.mode,
+            mode=mode,
             previous_handoff=handoff.previous_handoff,
             turns=handoff.compaction_turns,
         )
         try:
             summary = await run_compaction_agent(compaction_input)
-            published = await self.repository.complete_handoff(handoff, summary.content)
-            error = None if published else "Lernübergabe retry was interrupted; retry explicitly."
+        except Exception:
+            _log.exception("Tutor handoff failed")
+            await self.repository.fail_handoff(handoff)
+            return _HandoffOutcome(failed=True)
+        published = await self.repository.complete_handoff(handoff, summary.content)
+        return _HandoffOutcome(content=summary.content if published else None)
+
+    async def _retry_handoff(self, work: TutorHandoffRetryWork) -> None:
+        """Run one paid compaction only after its explicit user request."""
+        handoff = work.handoff_work
+        try:
+            outcome = await self._execute_handoff(work.mode, handoff)
+            if outcome.failed:
+                error = "Lernübergabe retry failed; retry explicitly."
+            else:
+                error = (
+                    None
+                    if outcome.content is not None
+                    else "Lernübergabe retry was interrupted; retry explicitly."
+                )
         except Exception:
             _log.exception("Explicit Tutor handoff retry failed")
             await self.repository.fail_handoff(handoff)

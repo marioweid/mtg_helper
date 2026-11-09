@@ -793,12 +793,8 @@ class TutorRepository:
     ) -> TutorHandoffWork:
         source_id = chapter["source_chapter_id"]
         if source_id is not None:
-            source = await conn.fetchrow("SELECT * FROM tutor_chapters WHERE id=$1", source_id)
-            if source is None:
-                raise TutorError("Archived handoff source is unavailable", 409)
-            turns = await self._compaction_turns(conn, source_id)
+            turns, previous = await self._archived_retry_context(conn, chapter)
             through = None
-            previous = source["handoff"]
         else:
             turns, through = await self._same_chapter_candidates(conn, chapter)
             previous = chapter["handoff"]
@@ -812,6 +808,32 @@ class TutorRepository:
             previous_handoff=previous,
             compaction_through=through,
         )
+
+    async def _archived_retry_context(
+        self, conn: asyncpg.Connection, chapter: asyncpg.Record
+    ) -> tuple[list[TutorTurnContext], str | None]:
+        """Recover through failed sources until a prior handoff already carries older learning."""
+        turns_by_chapter = []
+        previous = None
+        source_id = chapter["source_chapter_id"]
+        while source_id is not None:
+            source = await conn.fetchrow(
+                "SELECT * FROM tutor_chapters WHERE id=$1 AND deck_id=$2 AND account_id=$3 "
+                "AND epoch=$4",
+                source_id,
+                chapter["deck_id"],
+                chapter["account_id"],
+                chapter["epoch"],
+            )
+            if source is None:
+                raise TutorError("Archived handoff source is unavailable", 409)
+            turns_by_chapter.append(await self._compaction_turns(conn, source_id))
+            previous = source["handoff"]
+            if previous is not None:
+                break
+            source_id = source["source_chapter_id"]
+        turns = [turn for chapter_turns in reversed(turns_by_chapter) for turn in chapter_turns]
+        return turns[-24:], previous
 
     async def finish_handoff_retry(self, work: TutorHandoffRetryWork, error: str | None) -> None:
         """Finish only the original durable retry token after chapter publication/failure."""
