@@ -6,7 +6,8 @@
 - Prerequisite implementation present in start HEAD: saved guides and frozen references, including `a44b0784` and `2e248f8d`.
 - Round 1 product HEAD: `826e61e517ccdf151c4e15bf2ce413e5a3352df8` (`spec(deck-tutor-conversations): round 1`).
 - Round 2 product HEAD: `94ffc261` (`spec(deck-tutor-conversations): round 2`).
-- Current phase: round-3 final-review repairs and explicit local Docker verification complete; ready for the single round-3 local commit.
+- Round 3 product HEAD: `4a45d1546dcfb4aefb33701907f120c15a49eb66` (`spec(deck-tutor-conversations): round 3`).
+- Final phase: deterministic/browser evaluation, static reviews and all live semantic acceptance passed.
 - User-owned `GLOSSARY.md` modification remains untouched and excluded from staging.
 
 ## Delivered acceptance coverage
@@ -35,7 +36,15 @@
 - `git diff --check`: **clean**.
 - There is no repository `Makefile`/`make gate`; all verification used explicit local `docker-compose.yml`, with no host checks or live-data configuration.
 
-## Pending acceptance and next action
+## Final independent and live acceptance
 
-- Evaluator round 1 passed deterministic/browser AC3–AC7. AC1/AC2 remain **UNVERIFIED** solely for the required configured-live-model three-run semantic scenarios; those calls were not authorized or made in rounds 2–3.
-- Next action: create the local round-3 commit excluding `GLOSSARY.md`; do not push or deploy. Live semantic acceptance remains a separately authorized follow-up.
+- `eval-3.md`: deterministic/browser AC3–AC7 **PASS**, including chained/empty-source recovery, a separate 24-turn compaction-boundary probe, desktop/390px UI and the complete affected gate. Final Scope had no violations.
+- Final `review-standards.md`: no hard violations or judgement findings. Final `review-spec.md`: no findings or scope creep.
+- `eval-live-1.md`: AC1 and AC2 **PASS**. All required scenarios passed 3/3 using 21 explicit successful UI answer requests with `gpt-6.1-sol`; no hidden retries or new guide-generation calls.
+- The live evaluation verified full-message reloads and unchanged cards/guides/references. The three 98-card fixtures retained historical guides while current answers recognized both cuts and the intact Breach route.
+- All nine disposable live fixtures were deleted (204 then 404); browser and local project containers were closed/stopped. Volumes, environment files and preexisting data were preserved.
+
+## Completion
+
+- All seven acceptance criteria now **PASS**. No pending product, deterministic, browser, live semantic or review issue remains.
+- Final run report: `report.md`. Do not push or deploy without separate user direction.

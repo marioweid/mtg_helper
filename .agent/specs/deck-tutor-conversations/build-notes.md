@@ -47,8 +47,10 @@ Explicit local Compose commands from `VERIFY.md`; no `Makefile` or `make gate` e
 - Docker AST function checks: **109 backend functions** in the three round-3 changed backend/test files; no line/parameter violations. Ruff also enforced complexity limits.
 - `git diff --check`: **clean**.
 
-## Deviations and remaining acceptance
+## Final acceptance
 
 - No product-scope deviations: no automatic retry, new queue/agent infrastructure, practice controls, global-memory revival, or unrelated refactors.
 - Existing user-owned `GLOSSARY.md` edits are intentionally untouched and excluded from this change.
-- AC1/AC2 configured-live-model three-run semantic scenarios remain **UNVERIFIED**; no live/paid acceptance calls were authorized or made in rounds 2–3. Evaluator round-1 deterministic/browser AC3–AC7 results remain the browser evidence for this slice.
+- `eval-3.md` passed deterministic/browser AC3–AC7, including desktop/390px checks, chained recovery and the complete affected gate. Final static reviews reported no standards/spec findings.
+- `eval-live-1.md` passed AC1/AC2: every required live scenario passed 3/3 in 21 explicit successful UI answer requests. No guide regeneration or hidden retries occurred; reload/no-edit and historical-guide checks passed.
+- All nine disposable live fixtures and local browser/process state were cleaned up without deleting volumes or touching preexisting data.
